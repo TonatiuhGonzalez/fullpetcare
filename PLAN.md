@@ -126,7 +126,7 @@ Y los tres primeros tests, cada uno explicado:
 sucursal, y ves tu nombre y tu rol. Nada más. Pero cada pieza de infraestructura del
 proyecto ya está probada de punta a punta.
 
-*Por qué primero:* si Cloudflare, las variables de entorno o las migraciones en la nube
+_Por qué primero:_ si Cloudflare, las variables de entorno o las migraciones en la nube
 tienen un problema, se descubre ahora con 300 líneas de código, no en la fase 5 con
 6 000.
 
@@ -208,7 +208,7 @@ contiene campos fuera de la lista blanca.
 **Demostrable:** copiar el link, abrirlo en el celular, y ver la cartilla de vacunación
 de Canela con su foto. Es lo que va a vender el producto en las reuniones.
 
-*Por qué al final:* necesita que exista historial real que mostrar, y es la superficie
+_Por qué al final:_ necesita que exista historial real que mostrar, y es la superficie
 más delicada. Se construye cuando el flujo interno ya está firme.
 
 ### Después de v1 (no ahora)
@@ -238,7 +238,7 @@ en SQL.
 **Alternativa descartada:** `tenant_id` inyectado en el token de sesión.
 **Por qué:** con el claim, revocarle acceso a alguien no surte efecto hasta que caduca su
 token (~1 h). Eso es un hueco de seguridad real, no una molestia. Además el claim exige
-un *auth hook* que no se prueba bien en local, y complica al `owner` que ve varias
+un _auth hook_ que no se prueba bien en local, y complica al `owner` que ve varias
 sucursales.
 **Costo aceptado:** una consulta extra por query, mitigada con función `STABLE` e índice
 en `memberships(user_id, tenant_id)`.
@@ -340,14 +340,14 @@ unitarios y en los tests de RLS.
 
 ## Parte 4 — Riesgos conocidos
 
-| Riesgo | Cómo se atiende |
-|---|---|
-| RLS mal escrito = fuga entre tenants | Test de aislamiento por tabla, desde la fase 1. Ninguna tabla se da por hecha sin él |
+| Riesgo                                             | Cómo se atiende                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| RLS mal escrito = fuga entre tenants               | Test de aislamiento por tabla, desde la fase 1. Ninguna tabla se da por hecha sin él       |
 | Recursión infinita en la política de `memberships` | `app.is_member_of()` es `SECURITY DEFINER`, que salta RLS. Documentado en `CLAUDE.md` §7.2 |
-| Un `SECURITY DEFINER` sin revalidar membresía | Revisión obligatoria: toda función así valida en su primera línea |
-| El link público filtra de más | Lista blanca de campos en el DTO, tests que comparan la forma exacta de la respuesta |
-| Redondeo de centavos que no cuadra | IVA por partida, enteros siempre, tests de redondeo en `lib/money.ts` |
-| Hora equivocada por zona horaria | `timestamptz` en la base, zona IANA por sucursal, conversión solo al mostrar |
-| El CI pasa en Mac y falla en Linux | `.nvmrc` compartido, cuidado con mayúsculas en imports, scripts portables |
-| El demo se ensucia entre reuniones | `npm run demo:reset` antes de cada una |
-| Migración mala en producción | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main` |
+| Un `SECURITY DEFINER` sin revalidar membresía      | Revisión obligatoria: toda función así valida en su primera línea                          |
+| El link público filtra de más                      | Lista blanca de campos en el DTO, tests que comparan la forma exacta de la respuesta       |
+| Redondeo de centavos que no cuadra                 | IVA por partida, enteros siempre, tests de redondeo en `lib/money.ts`                      |
+| Hora equivocada por zona horaria                   | `timestamptz` en la base, zona IANA por sucursal, conversión solo al mostrar               |
+| El CI pasa en Mac y falla en Linux                 | `.nvmrc` compartido, cuidado con mayúsculas en imports, scripts portables                  |
+| El demo se ensucia entre reuniones                 | `npm run demo:reset` antes de cada una                                                     |
+| Migración mala en producción                       | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main`             |
