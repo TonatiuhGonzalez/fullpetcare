@@ -1,15 +1,65 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// El guard de sesión real (exigir login + tenant activo en /app/*) se agrega
-// en la tarea 1.31, cuando exista useSessionStore. Por ahora solo hay una
-// ruta de aterrizaje para confirmar que el router y Vuetify funcionan juntos.
+import { useSessionStore } from '@/stores/session'
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/', redirect: '/app/agenda' },
     {
-      path: '/',
-      name: 'home',
-      component: () => import('@/pages/HomePage.vue'),
+      path: '/login',
+      name: 'login',
+      component: () => import('@/pages/auth/LoginPage.vue'),
+    },
+    {
+      path: '/seleccionar-negocio',
+      name: 'select-business',
+      component: () => import('@/pages/auth/SelectBusinessPage.vue'),
+    },
+    {
+      path: '/app',
+      component: () => import('@/layouts/AppLayout.vue'),
+      children: [
+        {
+          path: 'agenda',
+          name: 'agenda',
+          component: () => import('@/pages/agenda/AgendaPage.vue'),
+        },
+      ],
     },
   ],
+})
+
+// Guard de sesión: corre ANTES de cada navegación, para las tres rutas
+// privadas (/app/*, /seleccionar-negocio) y para /login al revés (si ya
+// hay sesión, no tiene caso volver a mostrarlo).
+//
+// "beforeEach" puede ser async: Vue Router espera a que la promesa
+// resuelva antes de decidir si la navegación sigue, se cancela, o se
+// redirige — por eso se puede hacer "await ensureInitialized()" aquí
+// mismo, que es justo lo que hace falta al recargar la página (F5): sin
+// esto, una recarga en /app/agenda mandaría a /login por un instante
+// mientras supabase-js todavía está restaurando la sesión guardada.
+router.beforeEach(async (to) => {
+  const session = useSessionStore()
+  await session.ensureInitialized()
+
+  const isPrivateRoute = to.path.startsWith('/app')
+  const isSelectBusinessRoute = to.path === '/seleccionar-negocio'
+
+  if ((isPrivateRoute || isSelectBusinessRoute) && !session.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  if (isPrivateRoute && session.needsBusinessSelection) {
+    return { path: '/seleccionar-negocio' }
+  }
+
+  if (to.path === '/login' && session.isAuthenticated) {
+    return session.needsBusinessSelection
+      ? { path: '/seleccionar-negocio' }
+      : { path: '/app/agenda' }
+  }
+
+  return true
 })
