@@ -67,7 +67,7 @@ Consecuencias directas para cómo escribes:
    caso importa (qué se rompería en producción si no existiera).
 2. **Comenta el CI bloque por bloque.** No una línea al inicio: cada paso.
 3. **Explica antes de introducir un concepto nuevo** (mocks, fixtures, `SECURITY
-   DEFINER`, protección de rama, variables de entorno por ambiente).
+DEFINER`, protección de rama, variables de entorno por ambiente).
 4. En Vue/Vuetify/SASS puedes ir al grano, ahí no necesita andamiaje.
 5. Explica en español, con ejemplos concretos del propio proyecto, no genéricos.
 
@@ -77,24 +77,24 @@ Consecuencias directas para cómo escribes:
 
 Ya está decidido. **No lo cambies sin discutirlo primero.**
 
-| Capa | Elección | Por qué |
-|---|---|---|
-| UI | Vue 3 (Composition API, `<script setup>`) | Terreno del usuario |
-| Componentes | Vuetify 3 | Terreno del usuario; Material da un demo presentable sin diseñador |
-| Build | Vite | Estándar de Vue 3 |
-| Estado | Pinia | Estándar; los stores son unidad de prueba |
-| Rutas | Vue Router | Estándar |
-| Estilos | SASS | Terreno del usuario |
-| Backend/BD | Supabase (Postgres, Auth, Storage) | RLS en Postgres es el aislamiento multi-tenant real; evita escribir un backend |
-| Serverless | Supabase Edge Functions | **Solo** para la vista pública del cliente (§7.4) |
-| Hosting | Cloudflare Pages | Despliegue por git, previews por PR, gratis |
-| CI | GitHub Actions | Integrado a los PRs |
-| Tests unitarios | Vitest + Vue Test Utils | Vitest comparte config con Vite |
-| Tests de BD/RLS | Vitest + `pg` contra Supabase local | Un solo runner y un solo lenguaje que aprender |
-| E2E | Playwright | Un único test: agendar → atender → cobrar |
-| Lenguaje | TypeScript | Ver §5.1 |
-| Runtime | Node 22 LTS, fijado en `.nvmrc` | Mac y runner de Linux iguales |
-| Paquetes | npm | Ya instalado, cero setup extra |
+| Capa            | Elección                                  | Por qué                                                                        |
+| --------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| UI              | Vue 3 (Composition API, `<script setup>`) | Terreno del usuario                                                            |
+| Componentes     | Vuetify 3                                 | Terreno del usuario; Material da un demo presentable sin diseñador             |
+| Build           | Vite                                      | Estándar de Vue 3                                                              |
+| Estado          | Pinia                                     | Estándar; los stores son unidad de prueba                                      |
+| Rutas           | Vue Router                                | Estándar                                                                       |
+| Estilos         | SASS                                      | Terreno del usuario                                                            |
+| Backend/BD      | Supabase (Postgres, Auth, Storage)        | RLS en Postgres es el aislamiento multi-tenant real; evita escribir un backend |
+| Serverless      | Supabase Edge Functions                   | **Solo** para la vista pública del cliente (§7.4)                              |
+| Hosting         | Cloudflare Pages                          | Despliegue por git, previews por PR, gratis                                    |
+| CI              | GitHub Actions                            | Integrado a los PRs                                                            |
+| Tests unitarios | Vitest + Vue Test Utils                   | Vitest comparte config con Vite                                                |
+| Tests de BD/RLS | Vitest + `pg` contra Supabase local       | Un solo runner y un solo lenguaje que aprender                                 |
+| E2E             | Playwright                                | Un único test: agendar → atender → cobrar                                      |
+| Lenguaje        | TypeScript                                | Ver §5.1                                                                       |
+| Runtime         | Node 22 LTS, fijado en `.nvmrc`           | Mac y runner de Linux iguales                                                  |
+| Paquetes        | npm                                       | Ya instalado, cero setup extra                                                 |
 
 ### Dependencias permitidas y su justificación
 
@@ -198,18 +198,18 @@ con un `// TODO: tipar` es aceptable en un demo. No se optimiza el sistema de ti
 - **UI y datos de ejemplo: en español de México.** Todo lo que ve un usuario.
 - **Documentación (`CLAUDE.md`, `PLAN.md`, `TASKS.md`, `README.md`): en español.**
 
-| Cosa | Convención | Ejemplo |
-|---|---|---|
-| Tablas y columnas | `snake_case`, tabla en plural | `appointment_services.unit_price_cents` |
-| Componentes Vue | `PascalCase`, dos palabras mínimo | `PetTimeline.vue`, `AppointmentCard.vue` |
-| Pages | `PascalCase` terminado en `Page` | `AgendaPage.vue` |
-| Composables | `useAlgo` | `useBranchClock` |
-| Services | archivo en plural, funciones verbo primero | `appointments.ts` → `listByDay()` |
-| Stores | `useAlgoStore` | `useSessionStore` |
-| Enums de BD | tipo Postgres `enum`, valores en inglés | `appointment_status` |
-| Booleanos | `is_` / `has_` | `is_active`, `has_medical_alert` |
-| Dinero | siempre sufijo `_cents` | `total_cents` |
-| Migraciones | `AAAAMMDDHHMMSS_snake_case.sql` | `20260903120000_tenancy.sql` |
+| Cosa              | Convención                                 | Ejemplo                                  |
+| ----------------- | ------------------------------------------ | ---------------------------------------- |
+| Tablas y columnas | `snake_case`, tabla en plural              | `appointment_services.unit_price_cents`  |
+| Componentes Vue   | `PascalCase`, dos palabras mínimo          | `PetTimeline.vue`, `AppointmentCard.vue` |
+| Pages             | `PascalCase` terminado en `Page`           | `AgendaPage.vue`                         |
+| Composables       | `useAlgo`                                  | `useBranchClock`                         |
+| Services          | archivo en plural, funciones verbo primero | `appointments.ts` → `listByDay()`        |
+| Stores            | `useAlgoStore`                             | `useSessionStore`                        |
+| Enums de BD       | tipo Postgres `enum`, valores en inglés    | `appointment_status`                     |
+| Booleanos         | `is_` / `has_`                             | `is_active`, `has_medical_alert`         |
+| Dinero            | siempre sufijo `_cents`                    | `total_cents`                            |
+| Migraciones       | `AAAAMMDDHHMMSS_snake_case.sql`            | `20260903120000_tenancy.sql`             |
 
 ### 5.3 Vue
 
@@ -250,44 +250,44 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 
 ### 6.1 Tenencia e identidad
 
-| Tabla | Campos clave | Notas |
-|---|---|---|
-| `tenants` | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4) |
-| `branches` | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb` | Sucursal. **Su propia zona horaria** (§8.3) |
-| `profiles` | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path` | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios |
-| `memberships` | `tenant_id`, `user_id`, `role`, `is_active` | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7) |
-| `membership_branches` | `membership_id`, `branch_id` | A qué sucursales entra. El rol `owner` ve todas sin necesidad de filas aquí |
+| Tabla                 | Campos clave                                                                                  | Notas                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4)                                                  |
+| `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`     | Sucursal. **Su propia zona horaria** (§8.3)                                                      |
+| `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`                                   | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios |
+| `memberships`         | `tenant_id`, `user_id`, `role`, `is_active`                                                   | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7)                     |
+| `membership_branches` | `membership_id`, `branch_id`                                                                  | A qué sucursales entra. El rol `owner` ve todas sin necesidad de filas aquí                      |
 
 `role` es un enum: `owner` | `receptionist` | `groomer` | `vet`.
 
-| Rol | Ve | Puede |
-|---|---|---|
-| `owner` | Todas las sucursales del tenant | Todo |
-| `receptionist` | Sus sucursales | Clientes, mascotas, agenda, cobro. **No** escribe expediente clínico |
-| `groomer` | Sus sucursales | Su agenda, ficha de estética. **No lee expediente clínico** |
-| `vet` | Sus sucursales | Su agenda, expediente clínico, vacunas |
+| Rol            | Ve                              | Puede                                                                |
+| -------------- | ------------------------------- | -------------------------------------------------------------------- |
+| `owner`        | Todas las sucursales del tenant | Todo                                                                 |
+| `receptionist` | Sus sucursales                  | Clientes, mascotas, agenda, cobro. **No** escribe expediente clínico |
+| `groomer`      | Sus sucursales                  | Su agenda, ficha de estética. **No lee expediente clínico**          |
+| `vet`          | Sus sucursales                  | Su agenda, expediente clínico, vacunas                               |
 
 Que un `groomer` no pueda leer `medical_records` es una política RLS probada, no una
 condición en un `v-if`.
 
 ### 6.2 Clientes y mascotas
 
-| Tabla | Campos clave |
-|---|---|
-| `customers` | `tenant_id`, `first_name`, `last_name`, `phone`, `email`, `notes`, + CFDI: `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `requires_invoice` |
-| `pets` | `tenant_id`, `customer_id`, `name`, `species`, `breed`, `sex`, `birth_date`, `is_sterilized`, `photo_path`, `grooming_notes`, `medical_alerts` |
-| `pet_weights` | `tenant_id`, `pet_id`, `appointment_id`, `weight_grams int`, `measured_at` |
+| Tabla         | Campos clave                                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers`   | `tenant_id`, `first_name`, `last_name`, `phone`, `email`, `notes`, + CFDI: `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `requires_invoice` |
+| `pets`        | `tenant_id`, `customer_id`, `name`, `species`, `breed`, `sex`, `birth_date`, `is_sterilized`, `photo_path`, `grooming_notes`, `medical_alerts`                   |
+| `pet_weights` | `tenant_id`, `pet_id`, `appointment_id`, `weight_grams int`, `measured_at`                                                                                       |
 
 `weight_grams` es entero (12 400 = 12.4 kg). Misma razón que el dinero: nada de
 flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 ### 6.3 Catálogo y agenda
 
-| Tabla | Campos clave |
-|---|---|
-| `services` | `tenant_id`, `kind` (`grooming`\|`veterinary`), `name`, `duration_minutes`, `price_cents`, `tax_rate_bp`, `is_active` |
-| `appointments` | `tenant_id`, `branch_id`, `customer_id`, `pet_id`, `kind`, `employee_user_id`, `starts_at timestamptz`, `ends_at timestamptz`, `status`, `notes`, `created_by` |
-| `appointment_services` | `tenant_id`, `appointment_id`, `service_id`, `name_snapshot`, `unit_price_cents`, `quantity`, `duration_minutes_snapshot` |
+| Tabla                  | Campos clave                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services`             | `tenant_id`, `kind` (`grooming`\|`veterinary`), `name`, `duration_minutes`, `price_cents`, `tax_rate_bp`, `is_active`                                          |
+| `appointments`         | `tenant_id`, `branch_id`, `customer_id`, `pet_id`, `kind`, `employee_user_id`, `starts_at timestamptz`, `ends_at timestamptz`, `status`, `notes`, `created_by` |
+| `appointment_services` | `tenant_id`, `appointment_id`, `service_id`, `name_snapshot`, `unit_price_cents`, `quantity`, `duration_minutes_snapshot`                                      |
 
 - **Una cita es de un solo tipo** (`kind`). Si la mascota va a baño y a consulta, son dos
   citas del mismo cliente, que pueden cobrarse en un mismo ticket.
@@ -295,28 +295,28 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - `*_snapshot`: al agendar se **copia** nombre, precio y duración del servicio. Si mañana
   suben el precio del baño, las citas viejas conservan el suyo. Un ticket histórico
   nunca cambia de monto.
-- `tax_rate_bp` en *basis points*: 1600 = 16.00 %. Entero, otra vez.
+- `tax_rate_bp` en _basis points_: 1600 = 16.00 %. Entero, otra vez.
 
 ### 6.4 Atención
 
-| Tabla | Campos clave |
-|---|---|
-| `grooming_records` | `appointment_id` (único), `pet_id`, `cut_style`, `blade_used`, `shampoo_used`, `behavior_notes`, `groomer_notes`, `condition_observations` |
-| `medical_records` | `appointment_id` (único), `pet_id`, `reason`, `history`, `examination`, `diagnosis`, `treatment`, `indications`, `temperature_deci_c`, `next_visit_date` |
-| `vaccines` | `tenant_id`, `name`, `species`, `default_interval_days` (catálogo) |
-| `vaccinations` | `tenant_id`, `pet_id`, `vaccine_id`, `applied_at`, `batch_number`, `applied_by_user_id`, `next_due_date`, `appointment_id`, `notes` |
+| Tabla              | Campos clave                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `grooming_records` | `appointment_id` (único), `pet_id`, `cut_style`, `blade_used`, `shampoo_used`, `behavior_notes`, `groomer_notes`, `condition_observations`               |
+| `medical_records`  | `appointment_id` (único), `pet_id`, `reason`, `history`, `examination`, `diagnosis`, `treatment`, `indications`, `temperature_deci_c`, `next_visit_date` |
+| `vaccines`         | `tenant_id`, `name`, `species`, `default_interval_days` (catálogo)                                                                                       |
+| `vaccinations`     | `tenant_id`, `pet_id`, `vaccine_id`, `applied_at`, `batch_number`, `applied_by_user_id`, `next_due_date`, `appointment_id`, `notes`                      |
 
 `grooming_records` y `medical_records` son **expediente**: nunca se borran físicamente
 (§8.5) y todo cambio queda en la bitácora (§8.6).
 
 ### 6.5 Cobro
 
-| Tabla | Campos clave |
-|---|---|
-| `sales` | `tenant_id`, `branch_id`, `customer_id`, `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
-| `sale_items` | `tenant_id`, `sale_id`, `item_type` (`service`), `service_id`, `appointment_id`, `description`, `quantity`, `unit_price_cents`, `tax_rate_bp`, `tax_cents`, `line_total_cents` |
-| `payments` | `tenant_id`, `sale_id`, `method`, `amount_cents`, `reference`, `status`, `paid_at` |
-| `invoice_requests` | `tenant_id`, `sale_id`, `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `payment_form_code`, `payment_method_code`, `status`, `fiscal_uuid` |
+| Tabla              | Campos clave                                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sales`            | `tenant_id`, `branch_id`, `customer_id`, `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
+| `sale_items`       | `tenant_id`, `sale_id`, `item_type` (`service`), `service_id`, `appointment_id`, `description`, `quantity`, `unit_price_cents`, `tax_rate_bp`, `tax_cents`, `line_total_cents`   |
+| `payments`         | `tenant_id`, `sale_id`, `method`, `amount_cents`, `reference`, `status`, `paid_at`                                                                                               |
+| `invoice_requests` | `tenant_id`, `sale_id`, `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `payment_form_code`, `payment_method_code`, `status`, `fiscal_uuid`                   |
 
 - `item_type` es enum con un solo valor hoy (`service`). Cuando entren productos se
   agrega `product` y una columna `product_id` nullable: migración aditiva, sin tocar
@@ -329,10 +329,10 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 ### 6.6 Vista pública y bitácora
 
-| Tabla | Campos clave |
-|---|---|
+| Tabla         | Campos clave                                                                                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `share_links` | `tenant_id`, `scope` (`pet`\|`customer`), `pet_id`, `customer_id`, `token_hash`, `token_prefix`, `expires_at`, `revoked_at`, `created_by`, `access_count`, `last_accessed_at` |
-| `audit_log` | `tenant_id`, `table_name`, `record_id`, `action`, `actor_user_id`, `changed_at`, `old_data jsonb`, `new_data jsonb` |
+| `audit_log`   | `tenant_id`, `table_name`, `record_id`, `action`, `actor_user_id`, `changed_at`, `old_data jsonb`, `new_data jsonb`                                                           |
 
 `share_links` **nunca guarda el token en claro**, solo su SHA-256 (§7.4).
 
@@ -462,7 +462,7 @@ enteros ese problema no existe. Se convierte a pesos solo al **mostrar**, con
 `formatMXN()` de `lib/money.ts`.
 
 Mismo criterio para toda magnitud: pesos de mascota en gramos, temperatura en décimas de
-grado, tasas de impuesto en *basis points*.
+grado, tasas de impuesto en _basis points_.
 
 **IVA incluido en el precio.** `services.price_cents` es lo que paga el cliente, como en
 el mostrador mexicano. El ticket desglosa hacia atrás:
@@ -543,13 +543,13 @@ muchas veces y no debe presentar con basura de la sesión anterior.
 
 ### Qué se prueba
 
-| Sí | No |
-|---|---|
+| Sí                                                                    | No                                       |
+| --------------------------------------------------------------------- | ---------------------------------------- |
 | `lib/` — funciones puras (dinero, fechas, disponibilidad, validación) | Componentes Vuetify (salvo 1–2 críticos) |
-| `services/` — acceso a datos y reglas | Que un botón sea azul |
-| `stores/` — transiciones de estado de Pinia | Que Vuetify funcione |
-| Políticas RLS y RPCs, contra Postgres real | Configuración de librerías |
-| Un único E2E: agendar → atender → cobrar | Flujos secundarios en E2E |
+| `services/` — acceso a datos y reglas                                 | Que un botón sea azul                    |
+| `stores/` — transiciones de estado de Pinia                           | Que Vuetify funcione                     |
+| Políticas RLS y RPCs, contra Postgres real                            | Configuración de librerías               |
+| Un único E2E: agendar → atender → cobrar                              | Flujos secundarios en E2E                |
 
 Meta: **70–80 % de cobertura en `services/`, `stores/` y `lib/`**. Sin meta global.
 
@@ -582,11 +582,11 @@ Meta: **70–80 % de cobertura en `services/`, `stores/` y `lib/`**. Sin meta gl
 
 ### Los tres entornos
 
-| Entorno | Frontend | Supabase | Cuándo |
-|---|---|---|---|
-| **local** | `npm run dev` | Supabase CLI (Docker local) | Desarrollo diario |
-| **staging** | Preview de Cloudflare Pages (por PR) | Proyecto `fullpetcare-staging` | Revisar un PR antes de mergear |
-| **producción** | Cloudflare Pages, rama `main` | Proyecto `fullpetcare-prod` | **Es el demo que se enseña** |
+| Entorno        | Frontend                             | Supabase                       | Cuándo                         |
+| -------------- | ------------------------------------ | ------------------------------ | ------------------------------ |
+| **local**      | `npm run dev`                        | Supabase CLI (Docker local)    | Desarrollo diario              |
+| **staging**    | Preview de Cloudflare Pages (por PR) | Proyecto `fullpetcare-staging` | Revisar un PR antes de mergear |
+| **producción** | Cloudflare Pages, rama `main`        | Proyecto `fullpetcare-prod`    | **Es el demo que se enseña**   |
 
 Producción es el demo. Por eso `demo:reset` apunta ahí y es seguro: no hay datos reales.
 Cuando entre el primer cliente de verdad, esa suposición cambia y hay que revisarlo.

@@ -1,0 +1,9 @@
+// Punto de entrada de estilos globales. Vuetify ya trae su propio reset y
+// utilidades (v-app, spacing helpers como "pa-6"); este archivo es solo
+// para lo que el tema de Vuetify no cubre.
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}

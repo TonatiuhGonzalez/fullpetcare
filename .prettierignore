@@ -1,0 +1,7 @@
+dist/
+dist-ssr/
+coverage/
+node_modules/
+src/types/database.ts
+playwright-report/
+test-results/
