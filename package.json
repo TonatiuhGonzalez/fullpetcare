@@ -12,7 +12,13 @@
     "format": "prettier --write .",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:unit:coverage": "vitest run --coverage"
+    "test:unit:coverage": "vitest run --coverage",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "./scripts/gen-types.sh",
+    "db:diff": "supabase db diff -f"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
@@ -23,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/coverage-v8": "^5.0.0",
     "@vue/eslint-config-typescript": "^14.9.0",
@@ -33,6 +40,7 @@
     "eslint-plugin-vue": "^10.10.0",
     "globals": "^17.12.0",
     "jsdom": "^30.0.1",
+    "pg": "^8.23.0",
     "prettier": "^3.9.6",
     "sass-embedded": "^1.103.1",
     "typescript": "~6.0.2",
