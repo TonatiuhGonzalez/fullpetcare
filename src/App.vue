@@ -1,9 +1,12 @@
 <script setup lang="ts">
-// App.vue queda deliberadamente vacío de layout: cada rama de rutas (privada
-// bajo /app, pública en /c/:token) trae su propio layout (AppLayout,
-// PublicLayout). Aquí solo se monta lo que decida el router.
+// <v-app> va UNA sola vez en toda la aplicación, aquí — es el contenedor
+// raíz que Vuetify espera para su sistema de layout (v-main, overlays,
+// etc.). Cada página/layout de abajo (LoginPage, AppLayout...) renderiza
+// su propio <v-main> o <v-app-bar>, pero NUNCA otro <v-app>.
 </script>
 
 <template>
-  <router-view />
+  <v-app>
+    <router-view />
+  </v-app>
 </template>
