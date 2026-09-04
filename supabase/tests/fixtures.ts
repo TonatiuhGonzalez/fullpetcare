@@ -15,6 +15,31 @@ export const USER_RECEPCION = 'a0000000-0000-4000-8000-000000000002'
 export const USER_GROOMER = 'a0000000-0000-4000-8000-000000000003'
 export const USER_VET = 'a0000000-0000-4000-8000-000000000004'
 
+// Clientes (fase 2, tarea 2.6) — los 6 primeros son de Patitas Felices,
+// los últimos 2 de Huellitas Spa (para los tests de aislamiento).
+export const CUSTOMER_SOFIA = 'd0000000-0000-4000-8000-000000000001'
+export const CUSTOMER_DIEGO = 'd0000000-0000-4000-8000-000000000002'
+export const CUSTOMER_VALENTINA = 'd0000000-0000-4000-8000-000000000003'
+export const CUSTOMER_EMILIANO = 'd0000000-0000-4000-8000-000000000004'
+export const CUSTOMER_CAMILA = 'd0000000-0000-4000-8000-000000000005'
+export const CUSTOMER_SANTIAGO = 'd0000000-0000-4000-8000-000000000006' // el único que factura
+export const CUSTOMER_FERNANDA = 'd0000000-0000-4000-8000-000000000007' // Huellitas Spa
+export const CUSTOMER_RICARDO = 'd0000000-0000-4000-8000-000000000008' // Huellitas Spa
+
+// Mascotas (fase 2, tarea 2.6).
+export const PET_ROCKY = 'e0000000-0000-4000-8000-000000000001' // de Sofía, tiene pesos de ejemplo
+export const PET_MICHI = 'e0000000-0000-4000-8000-000000000002' // de Sofía
+export const PET_LUNA = 'e0000000-0000-4000-8000-000000000003' // de Diego
+export const PET_TOBY = 'e0000000-0000-4000-8000-000000000004' // de Valentina
+export const PET_NUBE = 'e0000000-0000-4000-8000-000000000005' // de Valentina
+export const PET_KIRA = 'e0000000-0000-4000-8000-000000000006' // de Emiliano
+export const PET_SIMON = 'e0000000-0000-4000-8000-000000000007' // de Camila
+export const PET_COCO = 'e0000000-0000-4000-8000-000000000008' // de Camila
+export const PET_MAX = 'e0000000-0000-4000-8000-000000000009' // de Santiago
+export const PET_BRUNO = 'e0000000-0000-4000-8000-000000000010' // de Fernanda, Huellitas Spa
+export const PET_PELUSA = 'e0000000-0000-4000-8000-000000000011' // de Fernanda, Huellitas Spa
+export const PET_DUNA = 'e0000000-0000-4000-8000-000000000012' // de Ricardo, Huellitas Spa
+
 // Un id con formato de UUID válido pero que NO existe en ninguna tabla.
 // Sirve para probar "¿qué pasa si busco algo que no existe?" sin
 // depender de que la semilla no haya cambiado.
