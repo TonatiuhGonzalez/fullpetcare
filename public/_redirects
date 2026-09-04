@@ -1,0 +1,15 @@
+# Cloudflare Pages sirve archivos estáticos: si alguien recarga (F5) en
+# /app/agenda, por defecto Cloudflare busca un archivo físico en esa ruta,
+# no lo encuentra, y regresa 404 — aunque la ruta sea válida para Vue
+# Router (que decide todo en el navegador, del lado del cliente).
+#
+# Esta regla le dice a Cloudflare: "para cualquier ruta (/*) que no
+# coincida con un archivo real (CSS, JS, imágenes), sirve index.html en su
+# lugar, con status 200 (no un redirect visible)". Así entra Vue Router,
+# lee la URL actual y renderiza la página correcta.
+#
+# Sin este archivo: login funciona (es la raíz), pero compartir o recargar
+# cualquier URL interna (/app/agenda, /c/:token) da 404 en el sitio
+# desplegado — aunque en `npm run dev` nunca se note, porque el servidor
+# de Vite ya hace este mismo truco automáticamente.
+/*  /index.html  200
