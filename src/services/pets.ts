@@ -82,15 +82,26 @@ export async function softDelete(id: string): Promise<void> {
  * se corrige agregando una medición nueva, no editando el historial —
  * `pet_weights` es un registro de hechos que ya pasaron (igual que
  * `audit_log`), no un valor que se sobrescribe.
+ *
+ * `appointmentId` es opcional: se manda cuando el peso se toma durante
+ * una cita (tarea 4.10/4.14, ficha de veterinaria) para que quede
+ * ligado a esa visita; una pesada suelta desde la ficha de la mascota
+ * no tiene cita que asociar.
  */
 export async function addWeight(
   tenantId: string,
   petId: string,
   weightGrams: number,
+  appointmentId?: string,
 ): Promise<PetWeight> {
   const { data, error } = await supabase
     .from('pet_weights')
-    .insert({ tenant_id: tenantId, pet_id: petId, weight_grams: weightGrams })
+    .insert({
+      tenant_id: tenantId,
+      pet_id: petId,
+      weight_grams: weightGrams,
+      appointment_id: appointmentId ?? null,
+    })
     .select()
     .single()
 
