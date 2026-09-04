@@ -12,14 +12,24 @@
 name: CI
 
 # Cuándo se dispara:
-# - "push" a CUALQUIER rama (incluida main): así cada commit, aunque no
-#   tenga PR todavía, se valida.
-# - "pull_request": además, cada vez que se abre o actualiza un PR. Esto es
-#   lo que le da a GitHub el check verde/rojo que se ve en la pantalla del
-#   PR, y lo que la tarea 1.40 exigirá como requisito para poder mergear.
+# - "push" solo a "main": ese push ocurre nada más al mergear un PR (main
+#   está protegida, nadie empuja ahí directo — tarea 1.3), así que valida
+#   el estado final después de cada merge.
+# - "pull_request": corre en cada commit de una rama MIENTRAS tiene un PR
+#   abierto. Es lo que da el check verde/rojo en la pantalla del PR, y lo
+#   que la tarea 1.40 exigirá como requisito para poder mergear.
+#
+# Si "push" no tuviera "branches: [main]", cada commit en una rama con PR
+# abierto dispararía el workflow DOS VECES para el mismo código: una por
+# "push" (a la rama) y otra por "pull_request" — el doble de minutos de CI
+# por nada, y el doble de probabilidad de toparse con algo como el rate
+# limit de la Action del CLI de Supabase (ver el paso 6 más abajo). Con
+# "branches: [main]", una rama de feature solo dispara por "pull_request"
+# mientras tiene PR, y "push" solo entra en juego para el commit de merge
+# en main.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 jobs:
@@ -72,10 +82,20 @@ jobs:
       # tienes en tu Mac vía Homebrew, aquí instalado por una Action
       # oficial de Supabase en vez de brew (Linux no tiene brew instalado
       # por defecto).
+      #
+      # "version" va FIJA (no "latest"): con "latest", la Action tiene que
+      # preguntarle a la API de GitHub cuál es el release más reciente del
+      # CLI, y esa consulta comparte límite de peticiones con TODOS los
+      # runners de GitHub Actions del mundo en ese momento — es fácil
+      # toparse con "rate limit exceeded" (nos pasó en la primera corrida
+      # de este mismo workflow). Fijar el número evita esa llamada de más
+      # y es más predecible: un runner nuevo no puede sorprendernos con
+      # una versión distinta a la de ayer. Se actualiza a mano cuando haga
+      # falta, igual que las versiones en package.json.
       - name: Instalar el CLI de Supabase
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
 
       # 7) Levanta el mismo Supabase local que usas con `npm run db:start`:
       # Postgres + Auth + Storage en contenedores Docker. GitHub Actions
