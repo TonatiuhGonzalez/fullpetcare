@@ -214,3 +214,21 @@ insert into pet_weights (tenant_id, pet_id, weight_grams, measured_at)
 values
   ('b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 28500, now() - interval '90 days'),
   ('b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 29200, now() - interval '30 days');
+
+-- ===========================================================================
+-- Catálogo de servicios (fase 3, tarea 3.3)
+-- ===========================================================================
+-- Precios en centavos, IVA incluido (CLAUDE.md §8.2 — el precio es lo
+-- que paga el cliente, el ticket desglosa el IVA hacia atrás). Duraciones
+-- realistas para una estética/veterinaria mexicana chica. Solo en
+-- Patitas Felices — Huellitas Spa sigue sin catálogo propio, a
+-- propósito (existe solo para aislamiento y zona horaria, ver el
+-- comentario de arriba).
+insert into services (id, tenant_id, kind, name, duration_minutes, price_cents, tax_rate_bp)
+values
+  ('f0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'grooming', 'Baño', 60, 25000, 1600),
+  ('f0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'grooming', 'Corte de raza', 90, 45000, 1600),
+  ('f0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'grooming', 'Deslanado', 75, 38000, 1600),
+  ('f0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Consulta general', 30, 35000, 1600),
+  ('f0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Vacunación', 20, 28000, 1600),
+  ('f0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Desparasitación', 15, 18000, 1600);
