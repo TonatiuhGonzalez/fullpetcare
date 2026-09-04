@@ -694,7 +694,73 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_appointment: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string
+          p_employee_user_id: string
+          p_ends_at: string
+          p_kind: Database["public"]["Enums"]["service_kind"]
+          p_notes: string
+          p_pet_id: string
+          p_services: Json
+          p_starts_at: string
+          p_tenant_id: string
+        }
+        Returns: {
+          branch_id: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          deleted_at: string | null
+          employee_user_id: string
+          ends_at: string
+          id: string
+          kind: Database["public"]["Enums"]["service_kind"]
+          notes: string | null
+          pet_id: string
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reschedule_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_ends_at: string
+          p_starts_at: string
+        }
+        Returns: {
+          branch_id: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          deleted_at: string | null
+          employee_user_id: string
+          ends_at: string
+          id: string
+          kind: Database["public"]["Enums"]["service_kind"]
+          notes: string | null
+          pet_id: string
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       appointment_status:
