@@ -40,6 +40,14 @@ export const PET_BRUNO = 'e0000000-0000-4000-8000-000000000010' // de Fernanda, 
 export const PET_PELUSA = 'e0000000-0000-4000-8000-000000000011' // de Fernanda, Huellitas Spa
 export const PET_DUNA = 'e0000000-0000-4000-8000-000000000012' // de Ricardo, Huellitas Spa
 
+// Catálogo de servicios (fase 3, tarea 3.3) — todos en Patitas Felices.
+export const SERVICE_BANO = 'f0000000-0000-4000-8000-000000000001'
+export const SERVICE_CORTE_RAZA = 'f0000000-0000-4000-8000-000000000002'
+export const SERVICE_DESLANADO = 'f0000000-0000-4000-8000-000000000003'
+export const SERVICE_CONSULTA_GENERAL = 'f0000000-0000-4000-8000-000000000004'
+export const SERVICE_VACUNACION = 'f0000000-0000-4000-8000-000000000005'
+export const SERVICE_DESPARASITACION = 'f0000000-0000-4000-8000-000000000006'
+
 // Un id con formato de UUID válido pero que NO existe en ninguna tabla.
 // Sirve para probar "¿qué pasa si busco algo que no existe?" sin
 // depender de que la semilla no haya cambiado.

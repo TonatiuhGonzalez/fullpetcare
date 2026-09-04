@@ -34,6 +34,153 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_services: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          deleted_at: string | null
+          duration_minutes_snapshot: number
+          id: string
+          name_snapshot: string
+          quantity: number
+          service_id: string
+          tenant_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          deleted_at?: string | null
+          duration_minutes_snapshot: number
+          id?: string
+          name_snapshot: string
+          quantity?: number
+          service_id: string
+          tenant_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          duration_minutes_snapshot?: number
+          id?: string
+          name_snapshot?: string
+          quantity?: number
+          service_id?: string
+          tenant_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_services_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_services_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointments: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          deleted_at: string | null
+          employee_user_id: string
+          ends_at: string
+          id: string
+          kind: Database["public"]["Enums"]["service_kind"]
+          notes: string | null
+          pet_id: string
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by: string
+          customer_id: string
+          deleted_at?: string | null
+          employee_user_id: string
+          ends_at: string
+          id?: string
+          kind: Database["public"]["Enums"]["service_kind"]
+          notes?: string | null
+          pet_id: string
+          starts_at: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string
+          customer_id?: string
+          deleted_at?: string | null
+          employee_user_id?: string
+          ends_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["service_kind"]
+          notes?: string | null
+          pet_id?: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: Database["public"]["Enums"]["audit_action"]
@@ -329,6 +476,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "pet_weights_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pet_weights_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
@@ -443,6 +597,56 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          duration_minutes: number
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["service_kind"]
+          name: string
+          price_cents: number
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          duration_minutes: number
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["service_kind"]
+          name: string
+          price_cents: number
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["service_kind"]
+          name?: string
+          price_cents?: number
+          tax_rate_bp?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -493,10 +697,17 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      appointment_status:
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+        | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
+      service_kind: "grooming" | "veterinary"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -627,10 +838,18 @@ export const Constants = {
   },
   public: {
     Enums: {
+      appointment_status: [
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show",
+      ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
       member_role: ["owner", "receptionist", "groomer", "vet"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
+      service_kind: ["grooming", "veterinary"],
     },
   },
 } as const
