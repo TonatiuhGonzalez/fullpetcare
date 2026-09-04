@@ -130,11 +130,11 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **3.13** 🧪 Tests RLS de `appointments` y `appointment_services` — 9 tests: aislamiento por tenant, alcance por SUCURSAL dentro del mismo tenant (con casos de control), que la política de INSERT sigue protegiendo aunque la app normal use la RPC, y que solo owner/receptionist o el empleado ASIGNADO puede actualizar una cita. Dos bugs de los propios tests (no del código) atrapados y corregidos: usé una sucursal a la que el rol de prueba no tenía acceso, lo que hacía que el rechazo pareciera correcto por la razón equivocada
 - [x] **3.14** `useAgendaStore`: día activo, sucursal, citas cargadas, filtro por empleado — la sucursal de la agenda es independiente de la sucursal activa de la sesión (arranca igual, pero se puede ver la agenda de otra sucursal del mismo tenant sin cambiar de contexto — CLAUDE.md §8.3). `memberships.ts` ganó `timezone` en `BranchSummary` (lo necesita `dayRangeUtc`)
 - [x] **3.15** 🧪 Tests de `useAgendaStore`: cambiar de día recarga; cambiar de sucursal limpia el filtro de empleado — 4 tests nuevos (44/44 unitarios en total), mismo patrón de mocks que session.spec.ts
-- [ ] **3.16** `CatalogPage.vue`: catálogo de servicios, separado en pestañas Estética / Veterinaria
-- [ ] **3.17** `AgendaPage.vue` real: agenda del día por empleado, con navegación de fechas
-- [ ] **3.18** `NewAppointmentPage.vue` paso a paso: cliente y mascota (con alta rápida) → tipo → servicios → empleado y horario (usando los huecos calculados)
-- [ ] **3.19** `AppointmentDetailPage.vue`: detalle, reagendar, cancelar
-- [ ] **3.20** 🧪 Test de componente (uno de los pocos): el selector de huecos no ofrece horarios ocupados
+- [x] **3.16** `CatalogPage.vue`: catálogo de servicios, separado en pestañas Estética / Veterinaria — solo owner ve alta/edición/desactivar; `lib/money.ts` ganó `pesosToCents` para capturar el precio
+- [x] **3.17** `AgendaPage.vue` real: agenda del día por empleado, con navegación de fechas — `services/appointments.ts#listByDay` ahora trae `customerName`/`petName` embebidos (evita una consulta por fila); `services/memberships.ts` ganó `listBranchEmployees`
+- [x] **3.18** `NewAppointmentPage.vue` paso a paso: cliente y mascota (con alta rápida) → tipo → servicios → empleado y horario (usando los huecos calculados) — nuevo `services/branches.ts` y `lib/availability.ts#hoursForDate` (lee `branches.opening_hours`, sembrado por primera vez con horarios reales lunes-sábado). Reutiliza `CustomerFormDialog`/`PetFormDialog` de fase 2 para el alta rápida
+- [x] **3.19** `AppointmentDetailPage.vue`: detalle, reagendar, cancelar — reagendar mantiene la duración original y deja que la RPC valide el traslape. Todo el flujo (catálogo, agenda, nueva cita, detalle) verificado en navegador por el usuario
+- [x] **3.20** 🧪 Test de componente (uno de los pocos): el selector de huecos no ofrece horarios ocupados — se extrajo `TimeSlotPicker.vue` de `NewAppointmentPage.vue` para poder montarlo aislado. Primer test de componente del proyecto: hizo falta `css: true`, inlinear `vuetify` en `server.deps` y un stub de `ResizeObserver` en `vitest.config.ts`/`src/test-setup.ts` (jsdom no lo implementa y algunos componentes de Vuetify lo necesitan para montarse)
 - [ ] **3.21** **Cierre de fase:** PR, CI verde, merge, agendar una cita en producción
 
 ---

@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAgendaStore } from './agenda'
 import { useSessionStore } from './session'
-import type { Appointment } from '@/services/appointments'
+import type { AppointmentWithNames } from '@/services/appointments'
 import type { MembershipSummary } from '@/services/memberships'
 
 vi.mock('@/services/appointments', () => ({
@@ -46,7 +46,7 @@ const MEMBERSHIP: MembershipSummary = {
   ],
 }
 
-function makeAppointment(overrides: Partial<Appointment>): Appointment {
+function makeAppointment(overrides: Partial<AppointmentWithNames>): AppointmentWithNames {
   return {
     id: 'apt-default',
     tenant_id: 'tenant-1',
@@ -63,6 +63,8 @@ function makeAppointment(overrides: Partial<Appointment>): Appointment {
     created_at: '2027-01-01T00:00:00Z',
     updated_at: '2027-01-01T00:00:00Z',
     deleted_at: null,
+    customerName: 'Sofía Ramírez',
+    petName: 'Rocky',
     ...overrides,
   }
 }

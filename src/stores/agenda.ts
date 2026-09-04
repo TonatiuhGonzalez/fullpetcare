@@ -9,14 +9,14 @@ import { defineStore } from 'pinia'
 import { format } from 'date-fns'
 
 import * as appointmentsService from '@/services/appointments'
-import type { Appointment } from '@/services/appointments'
+import type { AppointmentWithNames } from '@/services/appointments'
 import { toBranchTime } from '@/lib/datetime'
 import { useSessionStore } from './session'
 
 export const useAgendaStore = defineStore('agenda', () => {
   const activeDate = ref<string | null>(null) // 'YYYY-MM-DD'
   const activeBranchId = ref<string | null>(null)
-  const appointments = ref<Appointment[]>([])
+  const appointments = ref<AppointmentWithNames[]>([])
   const employeeFilter = ref<string | null>(null)
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const errorMessage = ref<string | null>(null)

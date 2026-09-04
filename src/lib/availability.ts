@@ -112,3 +112,33 @@ export function computeAvailableSlots({
 
   return slots
 }
+
+// Claves de branches.opening_hours (jsonb), una por día de la semana —
+// el mismo día que devuelve Date.getDay() en JS (0 = domingo). Cada
+// valor es un BranchHours o null (cerrado ese día).
+const WEEKDAY_KEYS = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+] as const
+
+/**
+ * El horario de una sucursal para una fecha calendario concreta —
+ * traduce el jsonb "una entrada por día de la semana" a lo que
+ * `computeAvailableSlots` necesita. `dateStr` es 'YYYY-MM-DD'; no hace
+ * falta convertir zonas horarias aquí porque ya representa el día
+ * calendario correcto en la sucursal (esa conversión ya pasó al elegir
+ * la fecha) — es aritmética de calendario pura, no de instantes.
+ */
+export function hoursForDate(
+  openingHours: Record<string, BranchHours | null | undefined>,
+  dateStr: string,
+): BranchHours | null {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const dayOfWeek = new Date(year, month - 1, day).getDay()
+  return openingHours[WEEKDAY_KEYS[dayOfWeek]] ?? null
+}

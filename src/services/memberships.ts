@@ -88,3 +88,48 @@ async function listAllBranches(tenantId: string): Promise<BranchSummary[]> {
   if (error) throw error
   return data ?? []
 }
+
+export interface EmployeeSummary {
+  userId: string
+  fullName: string
+  role: MemberRole
+}
+
+/**
+ * Quién puede atender citas en ESTA sucursal (fase 3: el filtro de
+ * empleado de la agenda, y el paso "empleado y horario" de agendar una
+ * cita nueva). "owner" ve todas las sucursales de su tenant sin fila en
+ * membership_branches (mismo criterio que listMyMemberships) — se pide
+ * todo el tenant y se filtra aquí en vez de hacerlo en dos consultas
+ * separadas, porque a esta escala (unas decenas de personas por
+ * negocio) es más simple que más rápido.
+ */
+export async function listBranchEmployees(
+  tenantId: string,
+  branchId: string,
+): Promise<EmployeeSummary[]> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(
+      `
+      user_id,
+      role,
+      profiles ( full_name ),
+      membership_branches ( branch_id )
+    `,
+    )
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+
+  if (error) throw error
+
+  return (data ?? [])
+    .filter(
+      (m) => m.role === 'owner' || m.membership_branches.some((mb) => mb.branch_id === branchId),
+    )
+    .map((m) => ({
+      userId: m.user_id,
+      fullName: m.profiles?.full_name ?? '(sin nombre)',
+      role: m.role,
+    }))
+}

@@ -17,6 +17,16 @@ export type AppointmentService = Database['public']['Tables']['appointment_servi
 export type AppointmentStatus = Database['public']['Enums']['appointment_status']
 export type ServiceKind = Database['public']['Enums']['service_kind']
 
+/**
+ * Una cita más el nombre del cliente y de la mascota — lo que necesita
+ * mostrarse en una lista (AgendaPage, tarea 3.17) sin obligar a quien la
+ * pinta a hacer una consulta aparte por cada fila.
+ */
+export interface AppointmentWithNames extends Appointment {
+  customerName: string
+  petName: string
+}
+
 export interface NewAppointmentService {
   serviceId: string
   quantity?: number
@@ -41,12 +51,12 @@ export async function listByDay(
   branchId: string,
   dateStr: string,
   branchTimezone: string,
-): Promise<Appointment[]> {
+): Promise<AppointmentWithNames[]> {
   const { startUtc, endUtc } = dayRangeUtc(dateStr, branchTimezone)
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('*')
+    .select('*, customers ( first_name, last_name ), pets ( name )')
     .eq('tenant_id', tenantId)
     .eq('branch_id', branchId)
     .is('deleted_at', null)
@@ -55,7 +65,12 @@ export async function listByDay(
     .order('starts_at')
 
   if (error) throw error
-  return data ?? []
+
+  return (data ?? []).map(({ customers, pets, ...appointment }) => ({
+    ...appointment,
+    customerName: customers ? `${customers.first_name} ${customers.last_name}` : '',
+    petName: pets?.name ?? '',
+  }))
 }
 
 export async function getById(tenantId: string, id: string): Promise<Appointment | null> {

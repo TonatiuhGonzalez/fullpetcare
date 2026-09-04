@@ -32,7 +32,8 @@ function handleBranchChange(branchId: unknown): void {
          (agenda y clientes). Un v-navigation-drawer completo se agrega
          cuando haya suficientes secciones para justificarlo. -->
     <v-btn to="/app/agenda" variant="text" class="mr-1">Agenda</v-btn>
-    <v-btn to="/app/clientes" variant="text" class="mr-4">Clientes</v-btn>
+    <v-btn to="/app/clientes" variant="text" class="mr-1">Clientes</v-btn>
+    <v-btn to="/app/catalogo" variant="text" class="mr-4">Catálogo</v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
          elegir — con una sola, se muestra su nombre como texto fijo. -->

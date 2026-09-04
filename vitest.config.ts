@@ -17,7 +17,26 @@ export default mergeConfig(
       // es más simple que configurarlo por archivo.
       environment: 'jsdom',
       globals: true, // permite usar describe/it/expect sin importarlos en cada archivo
-      css: false, // no hace falta procesar CSS real para que un test pase
+      setupFiles: ['./src/test-setup.ts'],
+      // "true" desde la fase 3 (TimeSlotPicker.spec.ts, tarea 3.20): los
+      // componentes de Vuetify importan su propio .css directo (p. ej.
+      // VChip.css) — con "false", Vitest intenta cargar ese archivo como
+      // si fuera un módulo de JS normal y truena con "Unknown file
+      // extension .css". La mayoría de los tests (lib/, services/,
+      // stores/) no montan ningún componente, así que nunca lo notaron;
+      // en cuanto el primer test monta uno de verdad, hace falta esto.
+      css: true,
+      server: {
+        deps: {
+          // Sin esto, Vitest trata "vuetify" como una dependencia
+          // externa y deja que Node la cargue directo con su propio
+          // resolutor de módulos — que no sabe qué hacer con un
+          // `import './VChip.css'` dentro del paquete. "inline" fuerza a
+          // que Vite (que sí sabe procesar CSS) sea quien la cargue,
+          // igual que ya hace para el código de la app en dev/build.
+          inline: ['vuetify'],
+        },
+      },
       // Solo corre lo unitario aquí. Los tests de BD (supabase/tests/) y
       // el E2E de Playwright tienen su propio runner — mezclarlos aquí
       // haría que "npm run test:unit" necesitara Docker corriendo.
