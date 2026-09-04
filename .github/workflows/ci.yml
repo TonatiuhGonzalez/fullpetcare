@@ -1,0 +1,125 @@
+# CI — se corre en cada push y en cada Pull Request.
+#
+# Qué es esto: un "workflow" de GitHub Actions es una receta que GitHub
+# ejecuta automáticamente en una máquina virtual limpia (aquí, Ubuntu) cada
+# vez que pasa algo (aquí: push o PR). No corre nada en tu Mac ni depende
+# de que tu Mac esté prendida — GitHub levanta la máquina, hace el trabajo,
+# y la apaga.
+#
+# Por qué importa que sea Linux y no Mac: ver CLAUDE.md §10 "Mac vs
+# Linux" — mayúsculas en imports, `sed`, banderas de comandos. Este archivo
+# es la red que atrapa esos problemas antes de que lleguen a producción.
+name: CI
+
+# Cuándo se dispara:
+# - "push" solo a "main": ese push ocurre nada más al mergear un PR (main
+#   está protegida, nadie empuja ahí directo — tarea 1.3), así que valida
+#   el estado final después de cada merge.
+# - "pull_request": corre en cada commit de una rama MIENTRAS tiene un PR
+#   abierto. Es lo que da el check verde/rojo en la pantalla del PR, y lo
+#   que la tarea 1.40 exigirá como requisito para poder mergear.
+#
+# Si "push" no tuviera "branches: [main]", cada commit en una rama con PR
+# abierto dispararía el workflow DOS VECES para el mismo código: una por
+# "push" (a la rama) y otra por "pull_request" — el doble de minutos de CI
+# por nada, y el doble de probabilidad de toparse con algo como el rate
+# limit de la Action del CLI de Supabase (ver el paso 6 más abajo). Con
+# "branches: [main]", una rama de feature solo dispara por "pull_request"
+# mientras tiene PR, y "push" solo entra en juego para el commit de merge
+# en main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Un "job" es un grupo de pasos que corre junto, en una sola máquina.
+  # Este proyecto tiene un solo job: si algún día el E2E de Playwright (fase
+  # 6) se vuelve lento, se puede separar en su propio job que corra en
+  # paralelo — por ahora, uno solo es más simple y más fácil de leer.
+  test:
+    name: Lint y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      # 1) Trae el código del commit/PR a la máquina virtual. Sin este
+      # paso no hay nada que probar — es literalmente un "git clone" del
+      # commit exacto que disparó el workflow.
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      # 2) Instala Node. "node-version-file: .nvmrc" lee el mismo archivo
+      # que usas en tu Mac con `nvm use` — así la versión de Node NUNCA se
+      # escribe dos veces en el repo, se escribe una vez en .nvmrc y ambos
+      # lados (tu Mac y GitHub) la leen de ahí (CLAUDE.md §10, punto 4).
+      # "cache: npm" guarda node_modules entre corridas para que "npm ci"
+      # no vuelva a descargar todo desde cero cada vez.
+      - name: Instalar Node (misma versión que .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      # 3) "npm ci" (Clean Install) es distinto de "npm install": instala
+      # EXACTAMENTE las versiones que están en package-lock.json y falla si
+      # el lock no coincide con package.json, en vez de "arreglarlo" solo.
+      # Es lo que se usa en CI porque queremos el mismo árbol de
+      # dependencias que ya se probó en local, sin sorpresas.
+      - name: Instalar dependencias
+        run: npm ci
+
+      # 4) Lint: ESLint (reglas de código) + Prettier (formato), la misma
+      # regla "0 warnings" que corre en tu Mac con `npm run lint`.
+      - name: Lint (ESLint + Prettier)
+        run: npm run lint
+
+      # 5) Pruebas unitarias: todo lo de lib/, services/ y stores/ que NO
+      # necesita una base de datos real (los mocks de session.spec.ts, los
+      # tests puros de money.spec.ts). Rápidas, corren en segundos.
+      - name: Pruebas unitarias
+        run: npm run test:unit
+
+      # 6) Instala el CLI de Supabase en la máquina virtual — el mismo que
+      # tienes en tu Mac vía Homebrew, aquí instalado por una Action
+      # oficial de Supabase en vez de brew (Linux no tiene brew instalado
+      # por defecto).
+      #
+      # "version" va FIJA (no "latest"): con "latest", la Action tiene que
+      # preguntarle a la API de GitHub cuál es el release más reciente del
+      # CLI, y esa consulta comparte límite de peticiones con TODOS los
+      # runners de GitHub Actions del mundo en ese momento — es fácil
+      # toparse con "rate limit exceeded" (nos pasó en la primera corrida
+      # de este mismo workflow). Fijar el número evita esa llamada de más
+      # y es más predecible: un runner nuevo no puede sorprendernos con
+      # una versión distinta a la de ayer. Se actualiza a mano cuando haga
+      # falta, igual que las versiones en package.json.
+      - name: Instalar el CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # 7) Levanta el mismo Supabase local que usas con `npm run db:start`:
+      # Postgres + Auth + Storage en contenedores Docker. GitHub Actions
+      # trae Docker preinstalado en sus runners de Ubuntu, así que no hay
+      # que instalarlo aparte. Al arrancar por primera vez, el CLI aplica
+      # TODAS las migraciones de supabase/migrations/ y corre seed.sql —
+      # exactamente el mismo proceso que un `supabase db reset` en tu Mac.
+      # Si una migración tiene un error de sintaxis, o el seed falla, este
+      # paso truena aquí — antes de que ese error llegue a un PR.
+      - name: Levantar Supabase local
+        run: supabase start
+
+      # 8) Pruebas de base de datos: supabase/tests/*.spec.ts, los que
+      # conectan por `pg` directo a Postgres y simulan distintos roles
+      # (dueño, groomer, anon...) para verificar que las políticas RLS
+      # bloquean lo que deben bloquear. Este es el paso que atrapa una
+      # fuga de datos entre tenants ANTES de que se mergee a main.
+      - name: Pruebas de base de datos (RLS y aislamiento)
+        run: npm run test:db
+
+      # 9) Apaga los contenedores. "if: always()" significa "corre este
+      # paso pase lo que pase en los pasos anteriores" — si test:db falla,
+      # igual queremos apagar Docker limpiamente y liberar la máquina
+      # virtual, en vez de dejarla a medias.
+      - name: Apagar Supabase local
+        if: always()
+        run: supabase stop
