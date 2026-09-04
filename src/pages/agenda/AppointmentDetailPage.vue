@@ -80,12 +80,16 @@ async function load(): Promise<void> {
 onMounted(load)
 
 async function handleCancel(): Promise<void> {
-  if (!appointment.value) return
+  if (!appointment.value || !session.activeTenantId) return
   try {
-    await appointmentsService.cancel(appointment.value.id)
+    await appointmentsService.cancel(session.activeTenantId, appointment.value.id)
     await load()
   } catch {
-    errorMessage.value = 'No se pudo cancelar la cita. Revisa tu conexión.'
+    // Cubre tanto un problema de red como una transición inválida (por
+    // ejemplo, cancelar una cita que ya se completó) — lib/appointmentStatus.ts
+    // decide qué transiciones existen, changeStatus() la valida antes del
+    // UPDATE (tarea 4.8-4.9).
+    errorMessage.value = 'No se pudo cancelar la cita.'
   }
 }
 
