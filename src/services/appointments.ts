@@ -10,6 +10,7 @@
 // algo que dos llamadas sueltas desde aquí no podrían garantizar.
 import { supabase } from './supabase'
 import { dayRangeUtc } from '@/lib/datetime'
+import { canTransition } from '@/lib/appointmentStatus'
 import type { Database } from '@/types/database'
 
 export type Appointment = Database['public']['Tables']['appointments']['Row']
@@ -131,17 +132,32 @@ export async function reschedule(id: string, startsAt: Date, endsAt: Date): Prom
   return data
 }
 
-export async function cancel(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('appointments')
-    .update({ status: 'cancelled' })
-    .eq('id', id)
+/**
+ * Cambia el estado de una cita, pero solo si la transición tiene sentido
+ * (tarea 4.8-4.9: `canTransition()` en lib/appointmentStatus.ts). Sin
+ * esto, nada impediría "completar" una cita ya cancelada o "reabrir" una
+ * ya cobrada — el enum de Postgres acepta cualquier valor, la máquina de
+ * estados vive aquí, no en la base.
+ */
+export async function changeStatus(
+  tenantId: string,
+  id: string,
+  status: AppointmentStatus,
+): Promise<void> {
+  const current = await getById(tenantId, id)
+  if (!current) throw new Error('La cita no existe.')
+
+  if (!canTransition(current.status, status)) {
+    throw new Error(
+      `No se puede cambiar la cita de "${current.status}" a "${status}".`,
+    )
+  }
+
+  const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
 
   if (error) throw error
 }
 
-export async function changeStatus(id: string, status: AppointmentStatus): Promise<void> {
-  const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
-
-  if (error) throw error
+export async function cancel(tenantId: string, id: string): Promise<void> {
+  await changeStatus(tenantId, id, 'cancelled')
 }

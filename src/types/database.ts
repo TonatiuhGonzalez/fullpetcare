@@ -829,6 +829,121 @@ export type Database = {
         }
         Relationships: []
       }
+      vaccinations: {
+        Row: {
+          applied_at: string
+          applied_by_user_id: string | null
+          appointment_id: string | null
+          batch_number: string | null
+          created_at: string
+          id: string
+          next_due_date: string | null
+          notes: string | null
+          pet_id: string
+          tenant_id: string
+          updated_at: string
+          vaccine_id: string
+        }
+        Insert: {
+          applied_at?: string
+          applied_by_user_id?: string | null
+          appointment_id?: string | null
+          batch_number?: string | null
+          created_at?: string
+          id?: string
+          next_due_date?: string | null
+          notes?: string | null
+          pet_id: string
+          tenant_id: string
+          updated_at?: string
+          vaccine_id: string
+        }
+        Update: {
+          applied_at?: string
+          applied_by_user_id?: string | null
+          appointment_id?: string | null
+          batch_number?: string | null
+          created_at?: string
+          id?: string
+          next_due_date?: string | null
+          notes?: string | null
+          pet_id?: string
+          tenant_id?: string
+          updated_at?: string
+          vaccine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vaccinations_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_vaccine_id_fkey"
+            columns: ["vaccine_id"]
+            isOneToOne: false
+            referencedRelation: "vaccines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vaccines: {
+        Row: {
+          created_at: string
+          default_interval_days: number | null
+          deleted_at: string | null
+          id: string
+          name: string
+          species: Database["public"]["Enums"]["pet_species"] | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_interval_days?: number | null
+          deleted_at?: string | null
+          id?: string
+          name: string
+          species?: Database["public"]["Enums"]["pet_species"] | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_interval_days?: number | null
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          species?: Database["public"]["Enums"]["pet_species"] | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vaccines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

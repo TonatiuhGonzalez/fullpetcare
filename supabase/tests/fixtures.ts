@@ -48,6 +48,12 @@ export const SERVICE_CONSULTA_GENERAL = 'f0000000-0000-4000-8000-000000000004'
 export const SERVICE_VACUNACION = 'f0000000-0000-4000-8000-000000000005'
 export const SERVICE_DESPARASITACION = 'f0000000-0000-4000-8000-000000000006'
 
+// Catálogo de vacunas (fase 4, tarea 4.5) — todas en Patitas Felices.
+export const VACCINE_RABIA = '10000000-0000-4000-8000-000000000001'
+export const VACCINE_TRIPLE_FELINA = '10000000-0000-4000-8000-000000000002'
+export const VACCINE_SEXTUPLE_CANINA = '10000000-0000-4000-8000-000000000003'
+export const VACCINE_BORDETELLA = '10000000-0000-4000-8000-000000000004'
+
 // Un id con formato de UUID válido pero que NO existe en ninguna tabla.
 // Sirve para probar "¿qué pasa si busco algo que no existe?" sin
 // depender de que la semilla no haya cambiado.
