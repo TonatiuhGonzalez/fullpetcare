@@ -128,8 +128,8 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **3.11** 🧪 Test clave: al crear la cita se copian nombre, precio y duración; si después cambia el precio del servicio, la cita conserva el original — verificado subiendo el precio real después de agendar y confirmando que el snapshot no cambió
 - [x] **3.12** 🧪 Test: no se puede crear una cita que se encime con otra del mismo empleado — más el caso de control (termina justo cuando otra empieza, sí cabe)
 - [x] **3.13** 🧪 Tests RLS de `appointments` y `appointment_services` — 9 tests: aislamiento por tenant, alcance por SUCURSAL dentro del mismo tenant (con casos de control), que la política de INSERT sigue protegiendo aunque la app normal use la RPC, y que solo owner/receptionist o el empleado ASIGNADO puede actualizar una cita. Dos bugs de los propios tests (no del código) atrapados y corregidos: usé una sucursal a la que el rol de prueba no tenía acceso, lo que hacía que el rechazo pareciera correcto por la razón equivocada
-- [ ] **3.14** `useAgendaStore`: día activo, sucursal, citas cargadas, filtro por empleado
-- [ ] **3.15** 🧪 Tests de `useAgendaStore`: cambiar de día recarga; cambiar de sucursal limpia el filtro de empleado
+- [x] **3.14** `useAgendaStore`: día activo, sucursal, citas cargadas, filtro por empleado — la sucursal de la agenda es independiente de la sucursal activa de la sesión (arranca igual, pero se puede ver la agenda de otra sucursal del mismo tenant sin cambiar de contexto — CLAUDE.md §8.3). `memberships.ts` ganó `timezone` en `BranchSummary` (lo necesita `dayRangeUtc`)
+- [x] **3.15** 🧪 Tests de `useAgendaStore`: cambiar de día recarga; cambiar de sucursal limpia el filtro de empleado — 4 tests nuevos (44/44 unitarios en total), mismo patrón de mocks que session.spec.ts
 - [ ] **3.16** `CatalogPage.vue`: catálogo de servicios, separado en pestañas Estética / Veterinaria
 - [ ] **3.17** `AgendaPage.vue` real: agenda del día por empleado, con navegación de fechas
 - [ ] **3.18** `NewAppointmentPage.vue` paso a paso: cliente y mascota (con alta rápida) → tipo → servicios → empleado y horario (usando los huecos calculados)

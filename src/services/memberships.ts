@@ -5,6 +5,8 @@ export type MemberRole = 'owner' | 'receptionist' | 'groomer' | 'vet'
 export interface BranchSummary {
   id: string
   name: string
+  /** Zona horaria IANA de la sucursal (CLAUDE.md §8.3) — la necesita useAgendaStore (fase 3). */
+  timezone: string
 }
 
 export interface MembershipSummary {
@@ -38,7 +40,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
       role,
       tenant_id,
       tenants ( name, timezone ),
-      membership_branches ( branches ( id, name ) )
+      membership_branches ( branches ( id, name, timezone ) )
     `,
     )
     .eq('user_id', userId)
@@ -78,7 +80,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
 async function listAllBranches(tenantId: string): Promise<BranchSummary[]> {
   const { data, error } = await supabase
     .from('branches')
-    .select('id, name')
+    .select('id, name, timezone')
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
     .order('name')
