@@ -101,6 +101,62 @@ npm run db:types           # regenera src/types/database.ts desde el esquema loc
 npm run db:stop            # apaga los contenedores de Supabase local
 ```
 
+## Despliegue
+
+Tres entornos (ver `CLAUDE.md` §10 para el detalle):
+
+| Entorno        | Frontend                             | Supabase             |
+| -------------- | ------------------------------------- | --------------------- |
+| **local**      | `npm run dev`                        | Docker (`db:start`)   |
+| **staging**    | Preview de Cloudflare Pages (por PR) | `fullpetcare-staging` |
+| **producción** | Cloudflare Pages, rama `main`        | `fullpetcare-prod`    |
+
+Producción **es** el demo que se enseña — no hay datos reales de clientes
+todavía, por eso es seguro resetearla o mergear ahí con frecuencia.
+
+### Qué pasa al abrir un PR
+
+1. GitHub Actions corre `.github/workflows/ci.yml`: lint, pruebas unitarias
+   y pruebas de RLS contra un Supabase temporal dentro del runner. Main
+   exige que este check pase para poder mergear (branch protection).
+2. Cloudflare Pages construye un **preview deployment** en una URL propia
+   del PR (`<hash>.fullpetcare.pages.dev`), usando las variables de
+   entorno de Preview — que apuntan a `fullpetcare-staging`, no a prod.
+
+### Qué pasa al mergear a `main`
+
+1. Cloudflare Pages construye la versión de **producción**
+   (`fullpetcare.pages.dev`), con las variables de entorno de Production
+   apuntando a `fullpetcare-prod`.
+2. Si el merge tocó `supabase/migrations/**`, `.github/workflows/deploy-migrations.yml`
+   corre `supabase db push` contra `fullpetcare-prod` automáticamente — no
+   hace falta correrlo a mano. Usa dos Secrets del repo:
+   - `SUPABASE_ACCESS_TOKEN`: token de acceso personal, con alcance de
+     organización (necesario para crear/administrar proyectos, no solo
+     leerlos).
+   - `SUPABASE_DB_PASSWORD`: la contraseña de Postgres de
+     `fullpetcare-prod` específicamente.
+
+   Ninguno de los dos es la `service_role` key — esa nunca vive en un
+   Secret de este repo porque no la necesita ningún workflow (ver
+   "Variables de entorno" arriba).
+
+### Crear o reconfigurar los proyectos de Supabase en la nube
+
+Es manual, se hace una vez (o cuando haga falta un proyecto nuevo), vía el
+CLI ya autenticado con `supabase login`:
+
+```bash
+supabase link --project-ref <ref>              # conecta el repo local a un proyecto
+supabase db push --linked                       # aplica las migraciones pendientes
+```
+
+`fullpetcare-staging` y `fullpetcare-prod` ya existen (fase 1). El repo
+local queda enlazado a **staging** por defecto — evita que un `db push`
+manual accidental afecte producción sin querer. Para tocar prod a mano
+(algo excepcional, ya que 1.41 lo automatiza) hay que `link` explícito a
+su `project-ref` primero.
+
 ## Estructura del repo
 
 Ver `CLAUDE.md` §4 para el árbol completo comentado y la "regla de capas"
