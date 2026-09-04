@@ -25,6 +25,23 @@ export const router = createRouter({
           name: 'agenda',
           component: () => import('@/pages/agenda/AgendaPage.vue'),
         },
+        {
+          path: 'clientes',
+          name: 'clientes',
+          component: () => import('@/pages/clientes/CustomersPage.vue'),
+        },
+        {
+          path: 'clientes/:id',
+          name: 'cliente-detalle',
+          component: () => import('@/pages/clientes/CustomerDetailPage.vue'),
+          props: true,
+        },
+        {
+          path: 'mascotas/:id',
+          name: 'mascota-detalle',
+          component: () => import('@/pages/clientes/PetDetailPage.vue'),
+          props: true,
+        },
       ],
     },
   ],

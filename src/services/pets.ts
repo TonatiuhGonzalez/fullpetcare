@@ -111,3 +111,45 @@ export async function listWeights(tenantId: string, petId: string): Promise<PetW
   if (error) throw error
   return data ?? []
 }
+
+/**
+ * Sube una foto al bucket privado `pet-photos` y devuelve la RUTA
+ * (no una URL) para guardar en `pets.photo_path`. La ruta empieza con
+ * `tenantId` a propósito: es lo que la política de Storage revisa para
+ * decidir quién puede leerla (ver la migración `pet_photos_bucket.sql`).
+ * `upsert: true` porque, si la mascota ya tenía foto, se sube al MISMO
+ * nombre de archivo fijo ("foto") para no acumular archivos huérfanos
+ * cada vez que alguien cambia la foto.
+ */
+export async function uploadPhoto(
+  tenantId: string,
+  petId: string,
+  file: File,
+): Promise<string> {
+  const extension = file.name.split('.').pop() ?? 'jpg'
+  const path = `${tenantId}/${petId}/foto.${extension}`
+
+  const { error } = await supabase.storage
+    .from('pet-photos')
+    .upload(path, file, { upsert: true })
+
+  if (error) throw error
+  return path
+}
+
+/**
+ * Como el bucket es privado (CLAUDE.md/migración: nunca público), no hay
+ * una URL fija que se pueda poner directo en un `<img src>` — hay que
+ * pedirle a Supabase una URL FIRMADA, válida solo un rato (60 segundos
+ * aquí, de sobra para que la página termine de cargar la imagen). Cada
+ * vez que se muestra la foto se pide una nueva; no se guarda la URL
+ * firmada en ningún lado porque caduca.
+ */
+export async function getPhotoUrl(photoPath: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from('pet-photos')
+    .createSignedUrl(photoPath, 60)
+
+  if (error) throw error
+  return data.signedUrl
+}
