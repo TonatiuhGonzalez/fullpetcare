@@ -72,7 +72,14 @@ import { es } from 'date-fns/locale'
  * strings SIN offset.
  */
 export function toBranchTime(utcInstant: Date | string, branchTimezone: string): TZDate {
-  return new TZDate(utcInstant, branchTimezone)
+  // El "if" (en vez de pasar utcInstant tal cual) no es cosmético: los
+  // tipos de TZDate tienen un overload distinto para string y para Date,
+  // y TypeScript no reparte un tipo unión (Date | string) entre varios
+  // overloads de un constructor — hay que "aterrizar" el tipo primero en
+  // uno concreto para que elija el overload correcto.
+  return typeof utcInstant === 'string'
+    ? new TZDate(utcInstant, branchTimezone)
+    : new TZDate(utcInstant, branchTimezone)
 }
 
 /**
