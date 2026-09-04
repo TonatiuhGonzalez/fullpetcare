@@ -143,9 +143,9 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 
 **Meta: atender una cita de estética y una de veterinaria, cada una con su ficha.**
 
-- [ ] **4.1** Migración `0011_grooming_records.sql`: tabla, RLS (lectura: owner, receptionist, groomer), auditoría, sin delete
-- [ ] **4.2** Migración `0012_medical_records.sql`: tabla con `temperature_deci_c`, RLS **restringida a owner y vet**, auditoría, sin delete
-- [ ] **4.3** 🧪 📚 **Test de RLS por rol**: un usuario `groomer` autenticado consulta `medical_records` y recibe cero filas. **Explicar por qué esto se prueba en la base y no confiando en un `v-if` de la UI**
+- [x] **4.1** Migración `0011_grooming_records.sql`: tabla, RLS (lectura: owner, receptionist, groomer), auditoría, sin delete — `20260904214054_grooming_records.sql`. Sin `deleted_at` (CLAUDE.md §8.5: expediente no se borra, ni suave ni duro), con `prevent_hard_delete()`. Escritura: owner o el groomer ASIGNADO a esa cita
+- [x] **4.2** Migración `0012_medical_records.sql`: tabla con `temperature_deci_c`, RLS **restringida a owner y vet**, auditoría, sin delete — `20260904214332_medical_records.sql`, mismo patrón que grooming_records con vet en vez de groomer
+- [x] **4.3** 🧪 📚 **Test de RLS por rol**: un usuario `groomer` autenticado consulta `medical_records` y recibe cero filas. **Explicar por qué esto se prueba en la base y no confiando en un `v-if` de la UI** — `medical-records-rls.spec.ts` y `grooming-records-rls.spec.ts` (13 tests de aislamiento por tenant, por rol, y de escritura). Un bug en mis propios tests (no en el código): usar `asUser()` dentro de una transacción con datos sin confirmar abre OTRA conexión que no ve nada — se corrigió usando `setRole()` sobre el mismo cliente
 - [ ] **4.4** Migración `0013_vaccines.sql`: catálogo `vaccines` y `vaccinations` (`applied_at`, `batch_number`, `next_due_date`), RLS, auditoría
 - [ ] **4.5** Semilla: vacunas comunes (rabia, triple felina, séxtuple canina, bordetella) con sus intervalos
 - [ ] **4.6** `lib/vaccination.ts`: `computeNextDueDate()` y `classifyVaccineStatus()` (vigente / por vencer / vencida)
