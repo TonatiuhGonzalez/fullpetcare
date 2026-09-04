@@ -1,0 +1,77 @@
+# Despliegue de migraciones a producción.
+#
+# Qué hace: cada vez que un PR se mergea a main (o alguien empuja directo,
+# aunque main está protegida y eso no debería pasar), este workflow aplica
+# las migraciones nuevas de supabase/migrations/ contra fullpetcare-prod
+# automáticamente. Es lo mismo que hicimos a mano con "supabase db push"
+# para la tarea 1.35, pero para que a partir de aquí no dependa de que
+# alguien se acuerde de correrlo — si una migración queda en el repo sin
+# aplicarse en prod, el esquema real se desincroniza silenciosamente de
+# las migraciones versionadas, que es justo lo que CLAUDE.md §8.1 quiere
+# evitar.
+#
+# Por qué un workflow aparte de ci.yml y no un paso más ahí: ci.yml corre
+# en cada PR, con datos de prueba en un Supabase temporal dentro del
+# runner — nunca debe tener credenciales de prod. Este workflow solo se
+# dispara en main, después de que el PR ya pasó CI y ya se mergeó, así que
+# aislar las credenciales de prod en su propio archivo (con su propio
+# trigger, y por lo tanto sus propios permisos y Secrets) reduce dónde
+# puede filtrarse una llave real por accidente.
+name: Desplegar migraciones a producción
+
+on:
+  push:
+    branches: [main]
+    # Solo dispara este workflow si el push tocó archivos de migraciones.
+    # Sin este filtro, CUALQUIER merge a main (un cambio de README, de
+    # estilos, lo que sea) intentaría un "db push" innecesario contra la
+    # base de datos real. Con el filtro, un PR que no toca
+    # supabase/migrations/ ni siquiera dispara este workflow.
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  deploy:
+    name: supabase db push a prod
+    runs-on: ubuntu-latest
+    steps:
+      # 1) Igual que en ci.yml: traer el código del commit que se mergeó.
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      # 2) Mismo CLI, misma versión fija que en ci.yml (ver ese archivo
+      # para la explicación completa de por qué no usamos "latest").
+      - name: Instalar el CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # 3) "supabase db push" necesita dos credenciales distintas, y es
+      # importante no confundirlas:
+      #
+      # - SUPABASE_ACCESS_TOKEN: el token de acceso personal (empieza con
+      #   "sbp_"). Autentica contra la Management API de Supabase — con
+      #   esto el CLI sabe QUÉ CUENTA/ORGANIZACIÓN está usando. El CLI lo
+      #   lee solo si existe como variable de entorno con ese nombre
+      #   exacto, por eso va en "env:" del paso, no como un flag.
+      #
+      # - SUPABASE_DB_PASSWORD (pasada como --password): la contraseña de
+      #   Postgres del proyecto fullpetcare-prod específico. Autentica la
+      #   CONEXIÓN A LA BASE DE DATOS en sí, es un secreto totalmente
+      #   distinto al access token.
+      #
+      # Ninguna de las dos es la "service_role key" — esa es para llamar a
+      # la API de datos (PostgREST/Auth), no para correr migraciones. Por
+      # eso este workflow no la necesita y nunca debe agregarse aquí.
+      #
+      # El project ref (boajojegcmpvzjsloosk) no es secreto — identifica
+      # el proyecto, no da acceso a nada por sí solo — así que va normal
+      # en el comando, no en Secrets.
+      - name: Aplicar migraciones nuevas a fullpetcare-prod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase db push \
+            --project-ref boajojegcmpvzjsloosk \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
+            --yes
