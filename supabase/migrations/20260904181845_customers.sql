@@ -43,39 +43,30 @@ create trigger customers_audit
 create index customers_tenant_id_idx on customers (tenant_id);
 
 -- =============================================================================
--- Índice de búsqueda por nombre: por qué "text_pattern_ops"
+-- Índice de búsqueda por nombre y teléfono
 -- =============================================================================
 -- La búsqueda de la tarea 2.9 (`services/customers.ts`, método `search`)
--- es del tipo "empieza con lo que escribiste" — `where nombre ilike
--- 'mar%'`, no "contiene en cualquier parte" (para eso se necesitaría la
--- extensión pg_trgm, que este proyecto decidió no agregar todavía por
--- mantenerlo simple — CLAUDE.md §3, "ninguna dependencia nueva sin
--- justificarla").
+-- es del tipo "empieza con lo que escribiste", contra first_name O
+-- last_name por separado (así "cruz" encuentra a alguien con ese
+-- apellido, y "val" encuentra a alguien con ese nombre) — PostgREST (la
+-- API que genera Supabase) arma esa consulta como dos condiciones
+-- `ilike` unidas con OR, una por columna, así que el índice tiene que
+-- calzar con columnas reales, no con una expresión combinada como
+-- "first_name || ' ' || last_name" que la API nunca va a poder pedir
+-- directo sin una función de base de datos aparte (RPC) — y eso es más
+-- pieza de la que hace falta para el volumen de datos de un demo (unas
+-- decenas de clientes por tenant: hasta una búsqueda sin índice es
+-- instantánea).
 --
--- Un índice btree normal (el que crea `create index` por default) SÍ
--- acelera `= 'valor exacto'`, pero NO acelera `like 'valor%'` cuando la
--- base de datos usa un "collation" que no es "C" (el orden de texto
--- "consciente del idioma", que es el default en Supabase/Postgres para
--- que ORDER BY ordene bien los acentos en español) — con ese collation,
--- Postgres no puede asumir que las filas que empiezan igual quedan
--- juntas en el índice. "text_pattern_ops" es una variante del operador
--- de comparación de texto que SÍ ordena byte a byte (como "C"), y con
--- ESA variante el índice vuelve a servir para acelerar un `like 'algo%'`.
--- Es puramente una decisión de rendimiento, no cambia qué filas
--- devuelve la consulta.
---
--- Se busca por "nombre completo" (first_name || ' ' || last_name) para
--- que un usuario pueda escribir "juan perez" y encontrarlo, no solo
--- buscando por first_name o por last_name por separado. lower() hace
--- la búsqueda insensible a mayúsculas.
-create index customers_tenant_name_idx
-  on customers (tenant_id, lower(first_name || ' ' || last_name) text_pattern_ops);
+-- Por eso este índice es solo un btree normal sobre (tenant_id,
+-- first_name, last_name): ayuda al ORDER BY de "list" (tarea 2.9) y dado
+-- que empieza por tenant_id, cumple la regla general (CLAUDE.md §6). No
+-- se optimiza más allá de eso — si el volumen de datos creciera de
+-- verdad, ahí sí valdría la pena revisar pg_trgm.
+create index customers_tenant_name_idx on customers (tenant_id, first_name, last_name);
 
--- Búsqueda por teléfono: mismo criterio (empieza con), pero sin
--- necesidad de "text_pattern_ops" porque un teléfono se compara tal cual
--- se guarda (sin collation de idioma de por medio en la práctica — son
--- solo dígitos, CLAUDE.md §5.2 dice que se validan a 10 dígitos en
--- lib/validation.ts) y no se hace lower() sobre números.
+-- Búsqueda por teléfono: mismo criterio de "no sobre-optimizar para el
+-- tamaño de un demo" — un índice normal alcanza.
 create index customers_tenant_phone_idx on customers (tenant_id, phone);
 
 alter table customers enable row level security;
@@ -84,9 +75,26 @@ alter table customers force row level security;
 -- Cualquier miembro activo del tenant puede VER los clientes — un
 -- groomer o un vet necesitan saber de quién es la mascota que están
 -- atendiendo, aunque ellos no den de alta clientes nuevos.
+--
+-- A propósito SIN "and deleted_at is null" (a diferencia del patrón de
+-- CLAUDE.md §7.2 y de las tablas de tenencia de la fase 1): Postgres
+-- exige que la fila RESULTANTE de un UPDATE siga pasando la política de
+-- SELECT de la tabla, sin importar qué diga el "with check" de la
+-- política de UPDATE. Si esta política filtrara "deleted_at is null",
+-- el borrado suave (`update ... set deleted_at = now()`, hecho por
+-- owner/receptionist vía customers_update de abajo) fallaría siempre con
+-- "new row violates row-level security policy" — la fila, después de
+-- marcarse borrada, dejaría de ser "seleccionable" y Postgres rechaza la
+-- escritura completa, no solo esconde la fila después. Ocurrió de
+-- verdad al escribir esta migración: quitar la condición de aquí lo
+-- resuelve. RLS sigue protegiendo lo importante (aislamiento entre
+-- tenants, vía is_member_of); esconder los borrados suaves de las
+-- listas es trabajo de la capa de servicios (`.is('deleted_at', null)`
+-- explícito en cada `select` de `services/customers.ts`), no de esta
+-- política.
 create policy customers_select on customers for select
   to authenticated
-  using (app.is_member_of(tenant_id) and deleted_at is null);
+  using (app.is_member_of(tenant_id));
 
 -- Solo owner y receptionist pueden dar de alta o editar clientes
 -- (CLAUDE.md §6.1: "receptionist ... Clientes, mascotas, agenda, cobro").

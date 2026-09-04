@@ -49,9 +49,15 @@ alter table pets force row level security;
 -- las mascotas (un groomer necesita ver la ficha de estética de
 -- cualquier mascota que le toque atender, no solo las que él mismo dio
 -- de alta); solo owner y receptionist dan de alta o editan.
+--
+-- Sin "and deleted_at is null" por la misma razón que customers_select
+-- (ver el comentario largo en customers.sql): con esa condición, el
+-- borrado suave de pets_update fallaría con "violates row-level security
+-- policy" porque Postgres exige que la fila resultante de un UPDATE siga
+-- siendo seleccionable. El filtro vive en services/pets.ts.
 create policy pets_select on pets for select
   to authenticated
-  using (app.is_member_of(tenant_id) and deleted_at is null);
+  using (app.is_member_of(tenant_id));
 
 create policy pets_insert on pets for insert
   to authenticated
@@ -110,9 +116,10 @@ create index pet_weights_tenant_pet_measured_idx
 alter table pet_weights enable row level security;
 alter table pet_weights force row level security;
 
+-- Sin "and deleted_at is null" — mismo motivo que pets_select arriba.
 create policy pet_weights_select on pet_weights for select
   to authenticated
-  using (app.is_member_of(tenant_id) and deleted_at is null);
+  using (app.is_member_of(tenant_id));
 
 -- A diferencia de pets/customers, CUALQUIER rol activo puede registrar un
 -- peso (no solo owner/receptionist): pesar a la mascota es parte de
