@@ -107,7 +107,7 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **2.18** `CustomerDetailPage.vue`: datos del cliente y sus mascotas
 - [x] **2.19** `PetFormDialog.vue`: alta y edición, con subida de foto y preferencias de corte — `services/pets.ts` ganó `uploadPhoto`/`getPhotoUrl` (URL firmada, el bucket es privado)
 - [x] **2.20** `PetDetailPage.vue` provisional: ficha con foto, datos y peso actual — verificado en navegador por el usuario: login → Clientes → alta de cliente (con y sin factura) → ficha → alta de mascota con foto → ficha de mascota, todo funcionando
-- [ ] **2.21** **Cierre de fase:** PR, CI verde, merge, verificar en producción
+- [x] **2.21** **Cierre de fase:** PR, CI verde, merge, verificar en producción — PR #14 mergeado con CI verde; usuario confirmó el flujo de clientes/mascotas funcionando en `fullpetcare.pages.dev`. **Fase 2 completa.**
 
 ---
 
