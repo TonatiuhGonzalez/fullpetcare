@@ -138,20 +138,28 @@ export async function addVaccination(input: NewVaccination): Promise<Vaccination
   return data
 }
 
+/** Una vacunación más el nombre de la vacuna — lo que necesita mostrarse en una lista. */
+export interface VaccinationWithName extends Vaccination {
+  vaccineName: string
+}
+
 /** Cartilla de vacunación de una mascota, de la más reciente a la más vieja. */
 export async function listVaccinationsByPet(
   tenantId: string,
   petId: string,
-): Promise<Vaccination[]> {
+): Promise<VaccinationWithName[]> {
   const { data, error } = await supabase
     .from('vaccinations')
-    .select('*')
+    .select('*, vaccines ( name )')
     .eq('tenant_id', tenantId)
     .eq('pet_id', petId)
     .order('applied_at', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map(({ vaccines, ...vaccination }) => ({
+    ...vaccination,
+    vaccineName: vaccines?.name ?? '',
+  }))
 }
 
 export async function getGroomingRecordByAppointment(

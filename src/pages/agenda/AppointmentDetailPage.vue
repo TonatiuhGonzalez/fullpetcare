@@ -168,7 +168,17 @@ async function handleReschedule(): Promise<void> {
         </v-list-item>
       </v-list>
 
-      <v-card-actions v-if="appointment.status !== 'cancelled'">
+      <v-card-actions
+        v-if="!['cancelled', 'completed', 'no_show'].includes(appointment.status)"
+      >
+        <v-btn
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-clipboard-text"
+          :to="`/app/citas/${appointment.id}/atender`"
+        >
+          Atender
+        </v-btn>
         <v-btn variant="text" prepend-icon="mdi-calendar-edit" @click="openReschedule">
           Reagendar
         </v-btn>
