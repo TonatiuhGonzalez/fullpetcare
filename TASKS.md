@@ -102,11 +102,11 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **2.13** 🧪 Tests de `services/pets.ts` y RLS de `pets` y `pet_weights` — `pets-service.spec.ts` (sesión real) y `pets-rls.spec.ts` (aislamiento + caso de control + confirma que cualquier rol activo puede registrar peso). 26/26 tests de BD en verde
 - [x] **2.14** 📚 Bucket de Storage `pet-photos` con política por tenant (la ruta del archivo empieza con el `tenant_id`). **Explicar cómo funcionan las políticas de Storage y por qué la ruta es parte de la seguridad** — `20260904190536_pet_photos_bucket.sql`. Bucket privado (`public: false`), 5 MB, solo JPEG/PNG/WebP. Políticas sobre `storage.objects` usando `storage.foldername(name)[1]` como tenant_id; sin UPDATE/DELETE (reemplazar foto = subir una nueva ruta)
 - [x] **2.15** 🧪 Test: un usuario del tenant A no puede leer un archivo bajo la carpeta del tenant B — `supabase/tests/storage-rls.spec.ts`, con sesión real y caso de control; prueba explícitamente que conocer la ruta exacta no alcanza
-- [ ] **2.16** `CustomersPage.vue`: lista con búsqueda y paginación simple
-- [ ] **2.17** `CustomerFormDialog.vue`: alta y edición, con sección fiscal colapsada (solo si "requiere factura")
-- [ ] **2.18** `CustomerDetailPage.vue`: datos del cliente y sus mascotas
-- [ ] **2.19** `PetFormDialog.vue`: alta y edición, con subida de foto y preferencias de corte
-- [ ] **2.20** `PetDetailPage.vue` provisional: ficha con foto, datos y peso actual
+- [x] **2.16** `CustomersPage.vue`: lista con búsqueda y paginación simple — paginación de `v-data-table` (del lado del cliente), búsqueda sin debounce (volumen de demo)
+- [x] **2.17** `CustomerFormDialog.vue`: alta y edición, con sección fiscal colapsada (solo si "requiere factura") — en `src/components/` (no termina en "Page")
+- [x] **2.18** `CustomerDetailPage.vue`: datos del cliente y sus mascotas
+- [x] **2.19** `PetFormDialog.vue`: alta y edición, con subida de foto y preferencias de corte — `services/pets.ts` ganó `uploadPhoto`/`getPhotoUrl` (URL firmada, el bucket es privado)
+- [x] **2.20** `PetDetailPage.vue` provisional: ficha con foto, datos y peso actual — verificado en navegador por el usuario: login → Clientes → alta de cliente (con y sin factura) → ficha → alta de mascota con foto → ficha de mascota, todo funcionando
 - [ ] **2.21** **Cierre de fase:** PR, CI verde, merge, verificar en producción
 
 ---
