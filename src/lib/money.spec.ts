@@ -23,7 +23,7 @@
 //   que veas la diferencia de inmediato.
 import { describe, expect, it } from 'vitest'
 
-import { formatMXN } from './money'
+import { formatMXN, pesosToCents } from './money'
 
 describe('formatMXN', () => {
   it('formatea centavos como pesos con dos decimales', () => {
@@ -45,5 +45,23 @@ describe('formatMXN', () => {
     // caso de borde real, no hipotético. Si formatMXN devolviera algo raro
     // con 0, el ticket se vería roto justo en ese renglón.
     expect(formatMXN(0)).toBe('$0.00')
+  })
+})
+
+describe('pesosToCents', () => {
+  it('convierte pesos con centavos exactos', () => {
+    expect(pesosToCents(250.5)).toBe(25050)
+  })
+
+  it('redondea en vez de truncar, para no perder un centavo por un float mal representado', () => {
+    // 3.1 * 100 en JS da 309.99999999999994, no 310 — truncar (Math.floor)
+    // devolvería 309 centavos, un peso completo menos de lo que alguien
+    // capturó. Es exactamente el tipo de bug de punto flotante que
+    // CLAUDE.md §8.2 dice evitar guardando siempre enteros.
+    expect(pesosToCents(3.1)).toBe(310)
+  })
+
+  it('pesos enteros no ganan centavos de la nada', () => {
+    expect(pesosToCents(500)).toBe(50000)
   })
 })

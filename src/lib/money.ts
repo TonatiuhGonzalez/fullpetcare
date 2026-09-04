@@ -3,10 +3,10 @@
 // una persona, y solo debe llamarse al MOSTRAR — nunca antes de guardar o
 // calcular.
 //
-// Este archivo hoy solo tiene el formateador. El resto de money.ts
-// (desglose de IVA, suma de partidas, descuentos) se agrega en la fase 5,
+// El desglose de IVA, suma de partidas y descuentos se agrega en la fase 5,
 // cuando existe el flujo de cobro; no tiene caso escribirlo antes de tener
-// un caso real que lo use.
+// un caso real que lo use. pesosToCents sí hace falta desde la fase 3
+// (ServiceFormDialog: alguien captura "$250.00" y hay que guardar 25000).
 
 /**
  * Convierte centavos (p. ej. 35000) a un texto de pesos mexicanos
@@ -19,4 +19,15 @@ export function formatMXN(cents: number): string {
     style: 'currency',
     currency: 'MXN',
   }).format(pesos)
+}
+
+/**
+ * Convierte pesos (lo que alguien captura en un formulario, p. ej. 250.5)
+ * a centavos enteros (25050) para guardar. `Math.round`, no truncar: los
+ * números de punto flotante de JS a veces representan "3.10" como
+ * 3.0999999999999996 por dentro — truncar eso daría 309 centavos en vez
+ * de 310.
+ */
+export function pesosToCents(pesos: number): number {
+  return Math.round(pesos * 100)
 }

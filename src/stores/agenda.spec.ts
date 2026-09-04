@@ -1,6 +1,14 @@
-// Tests de useAgendaStore (tarea 3.15). Mismo patrón de mocks que
-// session.spec.ts: se reemplaza services/appointments.ts por una
-// versión falsa, así el test no necesita Supabase ni Docker.
+// Tests de useAgendaStore (tarea 3.15). Se mockea services/appointments.ts
+// (lo que este store llama directo) y, aunque este archivo no prueba
+// login/membresías, TAMBIÉN se mockean auth/profiles/memberships — este
+// store importa useSessionStore, que a su vez los importa a ELLOS, que a
+// su vez importan services/supabase.ts. Ese archivo revienta al cargarse
+// si faltan VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY (services/supabase.ts,
+// tarea 1.25) — en la Mac del usuario no se nota porque sí existe un
+// .env.local con valores reales, pero en CI ese archivo no existe (está
+// en .gitignore) y el test truena al importar, no al correr. Mockear
+// auth/profiles/memberships corta la cadena de imports ANTES de llegar
+// a supabase.ts, igual que ya hace session.spec.ts.
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +19,17 @@ import type { MembershipSummary } from '@/services/memberships'
 
 vi.mock('@/services/appointments', () => ({
   listByDay: vi.fn(),
+}))
+vi.mock('@/services/auth', () => ({
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  getCurrentUser: vi.fn(),
+}))
+vi.mock('@/services/profiles', () => ({
+  getProfile: vi.fn(),
+}))
+vi.mock('@/services/memberships', () => ({
+  listMyMemberships: vi.fn(),
 }))
 
 import { listByDay } from '@/services/appointments'
