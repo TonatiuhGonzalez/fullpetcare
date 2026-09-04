@@ -166,3 +166,51 @@ begin
     (gen_random_uuid(), v_tenant_patitas, v_membership_groomer, v_branch_centro),
     (gen_random_uuid(), v_tenant_patitas, v_membership_vet, v_branch_delvalle);
 end $$;
+
+-- ===========================================================================
+-- Clientes y mascotas (fase 2, tarea 2.6)
+-- ===========================================================================
+-- 8 clientes y 12 mascotas ficticias, repartidas entre los dos tenants:
+-- 6 clientes / 9 mascotas en Patitas Felices (la que se usa en el
+-- recorrido de demo), 2 clientes / 3 mascotas en Huellitas Spa — igual
+-- que con las sucursales, lo mínimo necesario para que el aislamiento
+-- entre tenants sea verificable de verdad en los tests de RLS (tarea
+-- 2.11), no un tenant vacío que "por casualidad" no tiene nada que
+-- filtrar. Ids fijos con el mismo criterio que el resto de la semilla
+-- (ver supabase/tests/fixtures.ts).
+insert into customers (id, tenant_id, first_name, last_name, phone, email, requires_invoice, rfc, legal_name, tax_regime_code, cfdi_use, postal_code)
+values
+  ('d0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Sofía', 'Ramírez Castillo', '5512345601', 'sofia.ramirez@example.mx', false, null, null, null, null, null),
+  ('d0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Diego', 'Martínez Ortiz', '5512345602', 'diego.martinez@example.mx', false, null, null, null, null, null),
+  ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Valentina', 'Cruz Mendoza', '5512345603', null, false, null, null, null, null, null),
+  ('d0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'Emiliano', 'Flores Vargas', '5512345604', 'emiliano.flores@example.mx', false, null, null, null, null, null),
+  ('d0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'Camila', 'Herrera Soto', '5512345605', 'camila.herrera@example.mx', false, null, null, null, null, null),
+  -- Único cliente de la semilla que factura — da un caso real con el que
+  -- probar la sección fiscal de CustomerFormDialog (tarea 2.17) sin
+  -- inventar datos al vuelo. RFC y demás campos ficticios, por supuesto.
+  ('d0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'Santiago', 'Núñez Reyes', '5512345606', 'santiago.nunez@example.mx', true, 'NURS850312AB1', 'Santiago Núñez Reyes', '612', 'G03', '03100'),
+  ('d0000000-0000-4000-8000-000000000007', 'b0000000-0000-4000-8000-000000000002', 'Fernanda', 'López Aguilar', '6641234567', 'fernanda.lopez@example.mx', false, null, null, null, null, null),
+  ('d0000000-0000-4000-8000-000000000008', 'b0000000-0000-4000-8000-000000000002', 'Ricardo', 'Gómez Torres', '6641234568', null, false, null, null, null, null, null);
+
+insert into pets (id, tenant_id, customer_id, name, species, breed, sex, birth_date, is_sterilized, grooming_notes, medical_alerts)
+values
+  ('e0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001', 'Rocky', 'dog', 'Labrador', 'male', '2021-03-15', true, 'Le gusta el corte de verano, se asusta con la secadora', null),
+  ('e0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001', 'Michi', 'cat', 'Doméstico de pelo corto', 'female', '2022-07-01', true, null, null),
+  ('e0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000002', 'Luna', 'dog', 'Schnauzer', 'female', '2019-11-20', true, 'Corte estilo teddy bear', null),
+  ('e0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003', 'Toby', 'dog', 'Salchicha', 'male', '2020-05-10', false, null, 'Alergia a shampoo con avena'),
+  ('e0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003', 'Nube', 'cat', 'Persa', null, '2023-01-05', false, 'Pelo largo, requiere cepillado antes del baño', null),
+  ('e0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000004', 'Kira', 'dog', 'Border Collie', 'female', '2018-09-30', true, null, null),
+  ('e0000000-0000-4000-8000-000000000007', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005', 'Simón', 'cat', 'Siamés', 'male', '2021-12-25', true, null, null),
+  ('e0000000-0000-4000-8000-000000000008', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005', 'Coco', 'dog', 'Poodle', 'male', '2022-02-14', false, 'Corte estilo poodle clásico', null),
+  ('e0000000-0000-4000-8000-000000000009', 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000006', 'Max', 'dog', 'Bóxer', 'male', '2020-08-08', true, null, 'Cardiopatía leve, vigilar durante ejercicio'),
+  ('e0000000-0000-4000-8000-000000000010', 'b0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000007', 'Bruno', 'dog', 'Chihuahua', 'male', '2019-04-18', true, null, null),
+  ('e0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000007', 'Pelusa', 'cat', 'Angora', 'female', '2021-06-06', false, 'Pelo largo, se estresa fácil', null),
+  ('e0000000-0000-4000-8000-000000000012', 'b0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000008', 'Duna', 'dog', 'Golden Retriever', 'female', '2020-10-02', true, null, null);
+
+-- Un par de pesos de ejemplo para Rocky, para tener algo real que mostrar
+-- en la ficha de mascota (tarea 2.20) sin esperar a que exista el flujo
+-- completo de citas (fase 3) que normalmente los generaría.
+insert into pet_weights (tenant_id, pet_id, weight_grams, measured_at)
+values
+  ('b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 28500, now() - interval '90 days'),
+  ('b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 29200, now() - interval '30 days');

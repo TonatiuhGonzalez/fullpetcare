@@ -34,6 +34,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id: string | null
+          changed_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+          tenant_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          changed_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+          tenant_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          changed_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -77,6 +121,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "branches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          cfdi_use: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          legal_name: string | null
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          requires_invoice: boolean
+          rfc: string | null
+          tax_regime_code: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          cfdi_use?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          legal_name?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          requires_invoice?: boolean
+          rfc?: string | null
+          tax_regime_code?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          cfdi_use?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          legal_name?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          requires_invoice?: boolean
+          rfc?: string | null
+          tax_regime_code?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -184,6 +293,126 @@ export type Database = {
           },
         ]
       }
+      pet_weights: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          measured_at: string
+          pet_id: string
+          tenant_id: string
+          updated_at: string
+          weight_grams: number
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          measured_at?: string
+          pet_id: string
+          tenant_id: string
+          updated_at?: string
+          weight_grams: number
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          measured_at?: string
+          pet_id?: string
+          tenant_id?: string
+          updated_at?: string
+          weight_grams?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_weights_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_weights_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pets: {
+        Row: {
+          birth_date: string | null
+          breed: string | null
+          created_at: string
+          customer_id: string
+          deleted_at: string | null
+          grooming_notes: string | null
+          id: string
+          is_sterilized: boolean
+          medical_alerts: string | null
+          name: string
+          photo_path: string | null
+          sex: Database["public"]["Enums"]["pet_sex"] | null
+          species: Database["public"]["Enums"]["pet_species"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          breed?: string | null
+          created_at?: string
+          customer_id: string
+          deleted_at?: string | null
+          grooming_notes?: string | null
+          id?: string
+          is_sterilized?: boolean
+          medical_alerts?: string | null
+          name: string
+          photo_path?: string | null
+          sex?: Database["public"]["Enums"]["pet_sex"] | null
+          species: Database["public"]["Enums"]["pet_species"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          breed?: string | null
+          created_at?: string
+          customer_id?: string
+          deleted_at?: string | null
+          grooming_notes?: string | null
+          id?: string
+          is_sterilized?: boolean
+          medical_alerts?: string | null
+          name?: string
+          photo_path?: string | null
+          sex?: Database["public"]["Enums"]["pet_sex"] | null
+          species?: Database["public"]["Enums"]["pet_species"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -264,7 +493,10 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      audit_action: "INSERT" | "UPDATE" | "DELETE"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
+      pet_sex: "male" | "female"
+      pet_species: "dog" | "cat" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -395,7 +627,10 @@ export const Constants = {
   },
   public: {
     Enums: {
+      audit_action: ["INSERT", "UPDATE", "DELETE"],
       member_role: ["owner", "receptionist", "groomer", "vet"],
+      pet_sex: ["male", "female"],
+      pet_species: ["dog", "cat", "other"],
     },
   },
 } as const

@@ -393,6 +393,19 @@ create policy customers_insert on customers for insert
               and app.role_in(tenant_id) in ('owner','receptionist'));
 ```
 
+**Trampa conocida — `deleted_at is null` en SELECT + UPDATE de un rol autenticado no se
+llevan bien.** Postgres RLS exige que la fila RESULTANTE de un UPDATE siga pasando la
+política de SELECT de la tabla, sin importar qué diga el `with check` de la propia
+política de UPDATE. Si el SELECT de arriba filtra `deleted_at is null` y una política de
+UPDATE le permite a `owner`/`receptionist` poner `deleted_at`, el borrado suave
+(`update ... set deleted_at = now()`) falla siempre con "new row violates row-level
+security policy" — descubierto y verificado a mano al escribir `customers` (fase 2).
+**Si una tabla tiene UPDATE para un rol autenticado normal (no solo `service_role`), su
+política de SELECT no debe filtrar `deleted_at is null`** — ese filtro se hace en la capa
+de servicios (`.is('deleted_at', null)` explícito en cada consulta de lectura). Las
+tablas de tenencia (§6.1) no llevan el filtro por esta misma razón, aunque hoy no tengan
+UPDATE para authenticated todavía.
+
 Para el expediente clínico, la lectura además excluye al groomer:
 
 ```sql
