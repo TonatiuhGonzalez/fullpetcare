@@ -264,3 +264,17 @@ values
   ('f0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Consulta general', 30, 35000, 1600),
   ('f0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Vacunación', 20, 28000, 1600),
   ('f0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Desparasitación', 15, 18000, 1600);
+
+-- ===========================================================================
+-- Catálogo de vacunas (fase 4, tarea 4.5)
+-- ===========================================================================
+-- Rabia y bordetella sin especie (aplican a perro y gato por igual);
+-- triple felina y séxtuple canina restringidas a su especie. Intervalos
+-- realistas de refuerzo anual, salvo bordetella (semestral, criterio
+-- común cuando la mascota va seguido a estética o pensión).
+insert into vaccines (id, tenant_id, name, species, default_interval_days)
+values
+  ('g0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Rabia', null, 365),
+  ('g0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Triple felina', 'cat', 365),
+  ('g0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Séxtuple canina', 'dog', 365),
+  ('g0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'Bordetella', null, 180);
