@@ -26,6 +26,22 @@ export const router = createRouter({
           component: () => import('@/pages/agenda/AgendaPage.vue'),
         },
         {
+          path: 'catalogo',
+          name: 'catalogo',
+          component: () => import('@/pages/agenda/CatalogPage.vue'),
+        },
+        {
+          path: 'citas/nueva',
+          name: 'cita-nueva',
+          component: () => import('@/pages/agenda/NewAppointmentPage.vue'),
+        },
+        {
+          path: 'citas/:id',
+          name: 'cita-detalle',
+          component: () => import('@/pages/agenda/AppointmentDetailPage.vue'),
+          props: true,
+        },
+        {
           path: 'clientes',
           name: 'clientes',
           component: () => import('@/pages/clientes/CustomersPage.vue'),

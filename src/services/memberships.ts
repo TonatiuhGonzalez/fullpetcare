@@ -5,6 +5,8 @@ export type MemberRole = 'owner' | 'receptionist' | 'groomer' | 'vet'
 export interface BranchSummary {
   id: string
   name: string
+  /** Zona horaria IANA de la sucursal (CLAUDE.md §8.3) — la necesita useAgendaStore (fase 3). */
+  timezone: string
 }
 
 export interface MembershipSummary {
@@ -38,7 +40,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
       role,
       tenant_id,
       tenants ( name, timezone ),
-      membership_branches ( branches ( id, name ) )
+      membership_branches ( branches ( id, name, timezone ) )
     `,
     )
     .eq('user_id', userId)
@@ -78,11 +80,56 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
 async function listAllBranches(tenantId: string): Promise<BranchSummary[]> {
   const { data, error } = await supabase
     .from('branches')
-    .select('id, name')
+    .select('id, name, timezone')
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
     .order('name')
 
   if (error) throw error
   return data ?? []
+}
+
+export interface EmployeeSummary {
+  userId: string
+  fullName: string
+  role: MemberRole
+}
+
+/**
+ * Quién puede atender citas en ESTA sucursal (fase 3: el filtro de
+ * empleado de la agenda, y el paso "empleado y horario" de agendar una
+ * cita nueva). "owner" ve todas las sucursales de su tenant sin fila en
+ * membership_branches (mismo criterio que listMyMemberships) — se pide
+ * todo el tenant y se filtra aquí en vez de hacerlo en dos consultas
+ * separadas, porque a esta escala (unas decenas de personas por
+ * negocio) es más simple que más rápido.
+ */
+export async function listBranchEmployees(
+  tenantId: string,
+  branchId: string,
+): Promise<EmployeeSummary[]> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(
+      `
+      user_id,
+      role,
+      profiles ( full_name ),
+      membership_branches ( branch_id )
+    `,
+    )
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+
+  if (error) throw error
+
+  return (data ?? [])
+    .filter(
+      (m) => m.role === 'owner' || m.membership_branches.some((mb) => mb.branch_id === branchId),
+    )
+    .map((m) => ({
+      userId: m.user_id,
+      fullName: m.profiles?.full_name ?? '(sin nombre)',
+      role: m.role,
+    }))
 }

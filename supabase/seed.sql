@@ -56,29 +56,61 @@ begin
   -- ===========================================================================
   -- Branches
   -- ===========================================================================
-  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone)
+  -- opening_hours: una entrada por día de la semana ('sunday'..'saturday',
+  -- mismas claves que Date.getDay() en JS — ver lib/availability.ts
+  -- #hoursForDate, fase 3). null = cerrado ese día. Lunes a sábado
+  -- 09:00-18:00, domingo cerrado — horario típico de una estética/
+  -- veterinaria mexicana chica.
+  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone, opening_hours)
   values (
     v_branch_centro, v_tenant_patitas, 'Sucursal Centro',
     'Av. Insurgentes Sur 100, Col. Roma Norte, CDMX', '06700', '5555550101',
-    'America/Mexico_City'
+    'America/Mexico_City',
+    '{
+      "sunday": null,
+      "monday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "tuesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "wednesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "thursday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "friday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "saturday": {"opensAt": "09:00", "closesAt": "15:00"}
+    }'::jsonb
   );
 
-  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone)
+  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone, opening_hours)
   values (
     v_branch_delvalle, v_tenant_patitas, 'Sucursal Del Valle',
     'Av. Universidad 450, Col. Del Valle, CDMX', '03100', '5555550102',
-    'America/Mexico_City'
+    'America/Mexico_City',
+    '{
+      "sunday": null,
+      "monday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "tuesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "wednesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "thursday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "friday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "saturday": {"opensAt": "09:00", "closesAt": "15:00"}
+    }'::jsonb
   );
 
   -- Tijuana a propósito: es la excepción al "México ya no tiene horario de
   -- verano" (CLAUDE.md §8.3) — la franja fronteriza lo sigue aplicando
   -- para alinearse con EE. UU. Da un caso real con el que probar
   -- lib/datetime.ts en la fase 3.
-  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone)
+  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone, opening_hours)
   values (
     v_branch_tijuana, v_tenant_huellitas, 'Huellitas Spa Zona Río',
     'Blvd. Agua Caliente 4558, Tijuana, B.C.', '22420', '6646660303',
-    'America/Tijuana'
+    'America/Tijuana',
+    '{
+      "sunday": null,
+      "monday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "tuesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "wednesday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "thursday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "friday": {"opensAt": "09:00", "closesAt": "18:00"},
+      "saturday": {"opensAt": "09:00", "closesAt": "15:00"}
+    }'::jsonb
   );
 
   -- ===========================================================================

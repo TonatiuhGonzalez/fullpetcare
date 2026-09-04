@@ -60,8 +60,8 @@ const MEMBERSHIP_A: MembershipSummary = {
   tenantTimezone: 'America/Mexico_City',
   role: 'owner',
   branches: [
-    { id: 'branch-a1', name: 'Centro' },
-    { id: 'branch-a2', name: 'Del Valle' },
+    { id: 'branch-a1', name: 'Centro', timezone: 'America/Mexico_City' },
+    { id: 'branch-a2', name: 'Del Valle', timezone: 'America/Mexico_City' },
   ],
 }
 const MEMBERSHIP_B: MembershipSummary = {
@@ -70,7 +70,7 @@ const MEMBERSHIP_B: MembershipSummary = {
   tenantName: 'Huellitas Spa',
   tenantTimezone: 'America/Tijuana',
   role: 'vet',
-  branches: [{ id: 'branch-b1', name: 'Zona Río' }],
+  branches: [{ id: 'branch-b1', name: 'Zona Río', timezone: 'America/Tijuana' }],
 }
 
 beforeEach(() => {

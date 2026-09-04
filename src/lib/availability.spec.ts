@@ -5,7 +5,7 @@
 // Supabase, sin Docker, sin base de datos.
 import { describe, expect, it } from 'vitest'
 
-import { computeAvailableSlots, type ExistingAppointment } from './availability'
+import { computeAvailableSlots, hoursForDate, type ExistingAppointment } from './availability'
 
 const EMPLOYEE = 'empleado-1'
 const OTHER_EMPLOYEE = 'empleado-2'
@@ -152,5 +152,31 @@ describe('computeAvailableSlots', () => {
     })
 
     expect(slots).toEqual([])
+  })
+})
+
+describe('hoursForDate', () => {
+  const openingHours = {
+    monday: { opensAt: '09:00', closesAt: '18:00' },
+    tuesday: { opensAt: '09:00', closesAt: '18:00' },
+    sunday: null,
+  }
+
+  it('trae el horario del día de la semana correcto', () => {
+    // 2027-03-08 es lunes.
+    expect(hoursForDate(openingHours, '2027-03-08')).toEqual({
+      opensAt: '09:00',
+      closesAt: '18:00',
+    })
+  })
+
+  it('un día explícitamente null (cerrado) da null, no el horario de otro día', () => {
+    // 2027-03-07 es domingo.
+    expect(hoursForDate(openingHours, '2027-03-07')).toBeNull()
+  })
+
+  it('un día que ni siquiera está en el objeto (sin capturar) también da null', () => {
+    // 2027-03-10 es miércoles — no está en openingHours de este test.
+    expect(hoursForDate(openingHours, '2027-03-10')).toBeNull()
   })
 })
