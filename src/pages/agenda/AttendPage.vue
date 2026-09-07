@@ -126,7 +126,8 @@ async function handleVaccinationSaved(): Promise<void> {
     </v-alert>
 
     <v-alert v-if="justCompleted" type="success" density="compact" variant="tonal" class="mb-4">
-      Cita completada. El cobro estará disponible en la siguiente fase del proyecto.
+      Cita completada.
+      <router-link :to="`/app/citas/${props.id}/cobrar`">Ir a cobrar</router-link>
     </v-alert>
 
     <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
