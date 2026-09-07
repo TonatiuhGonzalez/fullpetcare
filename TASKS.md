@@ -191,8 +191,8 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 
 **Meta: la historia completa de una mascota, y un test que valida el demo antes de cada reunión.**
 
-- [ ] **6.1** `services/petHistory.ts`: `getTimeline(petId)` que mezcla citas de ambos tipos, fichas, vacunas y pesos en una sola lista ordenada por fecha
-- [ ] **6.2** 🧪 Tests de `getTimeline`: orden correcto mezclando tipos; dos eventos en el mismo instante; mascota sin historial; que no aparecen registros de otro tenant
+- [x] **6.1** `services/petHistory.ts`: `getTimeline(petId)` que mezcla citas de ambos tipos, fichas, vacunas y pesos en una sola lista ordenada por fecha — el ORDEN vive aparte, en `lib/timeline.ts#buildTimeline()` (función pura, mismo criterio que `lib/availability.ts`); `getTimeline()` solo trae los datos (citas completadas con su ficha embebida, vacunas, pesos) y llama a esa función
+- [x] **6.2** 🧪 Tests de `getTimeline`: orden correcto mezclando tipos; dos eventos en el mismo instante (sort estable, se prueba que conserva el orden de entrada); mascota sin historial; que no aparecen registros de otro tenant — divididos entre `lib/timeline.spec.ts` (4 tests, puros) y `supabase/tests/pet-history-service.spec.ts` (2 tests, sesión real: aislamiento y "sin historial" sí necesitan datos de verdad). 88/88 tests de BD, 105/105 unitarios
 - [ ] **6.3** `PetTimeline.vue`: línea de tiempo con ícono e insignia distinta por tipo de visita
 - [ ] **6.4** `VaccinationCard.vue`: cartilla con estado por vacuna (vigente / por vencer / vencida)
 - [ ] **6.5** `WeightChart.vue`: gráfica de peso en SVG simple, sin librería
