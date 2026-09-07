@@ -70,6 +70,16 @@ async function load(): Promise<void> {
     // si ya estaba en curso (se reabrió) o completada (se corrige algo),
     // no hay transición que hacer (canTransition la rechazaría de todos
     // modos, ver lib/appointmentStatus.ts).
+    //
+    // Esto corre AL FINAL de load(), después de que `appointment.value`
+    // ya se asignó arriba — a propósito el spinner de la plantilla usa
+    // `loading` (no `loading && !appointment`): si el formulario se
+    // mostrara en cuanto `appointment` tiene valor, alguien podría
+    // guardar la ficha ANTES de que esta transición termine, y
+    // handleSaved() intentaría "scheduled → completed" directo, que
+    // lib/appointmentStatus.ts rechaza (bug real encontrado probando el
+    // flujo de cobro en producción: la ficha se guarda pero la cita se
+    // queda sin poder cobrarse).
     if (found.status === 'scheduled') {
       await appointmentsService.changeStatus(tenantId, found.id, 'in_progress')
       appointment.value = { ...found, status: 'in_progress' }
@@ -130,7 +140,7 @@ async function handleVaccinationSaved(): Promise<void> {
       <router-link :to="`/app/citas/${props.id}/cobrar`">Ir a cobrar</router-link>
     </v-alert>
 
-    <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+    <v-progress-circular v-if="loading" indeterminate color="primary" />
 
     <v-card v-else-if="appointment && pet" class="pa-4">
       <h1 class="text-h5 mb-1">{{ pet.name }}</h1>
