@@ -18,6 +18,7 @@ import {
   TENANT_PATITAS,
   USER_DUENO,
   USER_GROOMER,
+  USER_VET,
 } from './fixtures'
 
 afterAll(closePool)
@@ -135,5 +136,77 @@ describe('El rol anon no lee ninguna tabla de tenencia', () => {
   it('anon no ve ningún profile', async () => {
     const { rows } = await asAnon((c) => c.query('select id from profiles'))
     expect(rows).toHaveLength(0)
+  })
+
+  it('anon no ve ninguna fila de membership_branches', async () => {
+    const { rows } = await asAnon((c) => c.query('select id from membership_branches'))
+    expect(rows).toHaveLength(0)
+  })
+})
+
+describe('Aislamiento entre tenants: membership_branches (revisión de seguridad, tarea 8.3)', () => {
+  // Esta tabla se quedó sin su propio test de aislamiento desde la fase 1
+  // (tarea 1.16: "se agregan con su propio test cuando exista esa
+  // pantalla") — nunca llegó a tener una pantalla propia, así que nunca
+  // se cerró el pendiente. Huellitas Spa no tiene personal sembrado
+  // (seed.sql), así que no hay ninguna fila real de otro tenant para
+  // probar contra ella — se arma una a mano, como service_role, dentro de
+  // la transacción de prueba.
+  it('un miembro de OTRO tenant no ve a qué sucursales entra un empleado ajeno', async () => {
+    await withTransaction(async (client) => {
+      await setRole(client, 'service_role')
+      const { rows: membershipRows } = await client.query(
+        'select id from memberships where user_id = $1',
+        [USER_VET],
+      )
+      const vetMembershipId = membershipRows[0].id
+
+      const { rows: inserted } = await client.query(
+        `insert into membership_branches (tenant_id, membership_id, branch_id)
+         values ($1, $2, $3)
+         returning id`,
+        [TENANT_PATITAS, vetMembershipId, BRANCH_CENTRO],
+      )
+      const newRowId = inserted[0].id
+
+      // Reasigna al GROOMER a Huellitas Spa — mismo truco que el resto
+      // del archivo, para tener un usuario real "de otro tenant" sin
+      // depender de que Huellitas tenga personal sembrado.
+      await client.query('update memberships set tenant_id = $1 where user_id = $2', [
+        TENANT_HUELLITAS,
+        USER_GROOMER,
+      ])
+
+      await setRole(client, 'authenticated', USER_GROOMER)
+      const { rows } = await client.query('select id from membership_branches where id = $1', [
+        newRowId,
+      ])
+      expect(rows).toHaveLength(0)
+    })
+  })
+
+  it('control: el dueño de Patitas Felices SÍ ve esa fila (mismo tenant)', async () => {
+    await withTransaction(async (client) => {
+      await setRole(client, 'service_role')
+      const { rows: membershipRows } = await client.query(
+        'select id from memberships where user_id = $1',
+        [USER_VET],
+      )
+      const vetMembershipId = membershipRows[0].id
+
+      const { rows: inserted } = await client.query(
+        `insert into membership_branches (tenant_id, membership_id, branch_id)
+         values ($1, $2, $3)
+         returning id`,
+        [TENANT_PATITAS, vetMembershipId, BRANCH_CENTRO],
+      )
+      const newRowId = inserted[0].id
+
+      await setRole(client, 'authenticated', USER_DUENO)
+      const { rows } = await client.query('select id from membership_branches where id = $1', [
+        newRowId,
+      ])
+      expect(rows).toHaveLength(1)
+    })
   })
 })

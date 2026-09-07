@@ -235,7 +235,7 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 
 - [ ] **8.1** Recorrer el flujo completo en producción con datos frescos, como si fuera la reunión
 - [ ] **8.2** Revisar la cobertura de `lib/`, `services/` y `stores/`; llegar a 70–80 % donde falte
-- [ ] **8.3** Revisión de seguridad: listar todas las tablas y confirmar que cada una tiene RLS activo y su test de aislamiento
-- [ ] **8.4** Confirmar que ningún secreto quedó en el repo (`git log -p` buscando llaves)
+- [x] **8.3** Revisión de seguridad: listar todas las tablas y confirmar que cada una tiene RLS activo y su test de aislamiento — 21 tablas de negocio en el esquema, las 21 con `enable` Y `force row level security` (ninguna se quedó solo con una de las dos). Se encontraron y cerraron DOS huecos reales: `membership_branches` nunca tuvo un test de aislamiento propio desde que se creó en la fase 1 (el pendiente que dejó la tarea 1.16 nunca se cerró porque nunca hubo una pantalla de administración que lo forzara) y `invoice_requests` (fase 5) nunca tuvo uno tampoco — se agregaron 3 tests a `tenancy-isolation.spec.ts` y un archivo nuevo `invoice-requests-rls.spec.ts` (4 tests). 133/133 tests de BD en verde
+- [x] **8.4** Confirmar que ningún secreto quedó en el repo (`git log -p` buscando llaves) — revisado todo el historial (`git log -p --all`) buscando `sb_secret_`/`sb_publishable_`/`sbp_`/JWTs/llaves privadas: cero coincidencias reales. Los dos JWT que sí aparecen son los del demo LOCAL fijo (anon/service_role, derivados del `JWT_SECRET` de ejemplo en `supabase/config.toml`, documentados en el README como no secretos e iguales en cualquier proyecto local). Ningún `.env*` real trackeado, solo `.env.example` con la llave vacía
 - [ ] **8.5** README con guion de demo: qué enseñar, en qué orden, y qué decir en cada pantalla
 - [ ] **8.6** Correr `demo:reset` y dejar el ambiente listo para la primera reunión
