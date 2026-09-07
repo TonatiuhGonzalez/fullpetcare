@@ -407,6 +407,75 @@ export type Database = {
           },
         ]
       }
+      invoice_requests: {
+        Row: {
+          cfdi_use: string
+          created_at: string
+          deleted_at: string | null
+          fiscal_uuid: string | null
+          id: string
+          legal_name: string
+          payment_form_code: string
+          payment_method_code: string
+          postal_code: string
+          rfc: string
+          sale_id: string
+          status: string
+          tax_regime_code: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          cfdi_use: string
+          created_at?: string
+          deleted_at?: string | null
+          fiscal_uuid?: string | null
+          id?: string
+          legal_name: string
+          payment_form_code: string
+          payment_method_code: string
+          postal_code: string
+          rfc: string
+          sale_id: string
+          status?: string
+          tax_regime_code: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          cfdi_use?: string
+          created_at?: string
+          deleted_at?: string | null
+          fiscal_uuid?: string | null
+          id?: string
+          legal_name?: string
+          payment_form_code?: string
+          payment_method_code?: string
+          postal_code?: string
+          rfc?: string
+          sale_id?: string
+          status?: string
+          tax_regime_code?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_requests_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medical_records: {
         Row: {
           appointment_id: string
@@ -580,6 +649,63 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          deleted_at: string | null
+          id: string
+          method: Database["public"]["Enums"]["payment_method"]
+          paid_at: string
+          reference: string | null
+          sale_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          method: Database["public"]["Enums"]["payment_method"]
+          paid_at?: string
+          reference?: string | null
+          sale_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          method?: Database["public"]["Enums"]["payment_method"]
+          paid_at?: string
+          reference?: string | null
+          sale_id?: string
+          status?: Database["public"]["Enums"]["payment_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_weights: {
         Row: {
           appointment_id: string | null
@@ -736,6 +862,165 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sale_items: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          deleted_at: string | null
+          description: string
+          id: string
+          item_type: Database["public"]["Enums"]["sale_item_type"]
+          line_total_cents: number
+          quantity: number
+          sale_id: string
+          service_id: string | null
+          tax_cents: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["sale_item_type"]
+          line_total_cents: number
+          quantity?: number
+          sale_id: string
+          service_id?: string | null
+          tax_cents: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["sale_item_type"]
+          line_total_cents?: number
+          quantity?: number
+          sale_id?: string
+          service_id?: string | null
+          tax_cents?: number
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          branch_id: string
+          closed_by: string | null
+          created_at: string
+          customer_id: string
+          deleted_at: string | null
+          discount_cents: number
+          folio: number
+          id: string
+          paid_at: string | null
+          status: Database["public"]["Enums"]["sale_status"]
+          subtotal_cents: number
+          tax_cents: number
+          tenant_id: string
+          total_cents: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          closed_by?: string | null
+          created_at?: string
+          customer_id: string
+          deleted_at?: string | null
+          discount_cents?: number
+          folio: number
+          id?: string
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["sale_status"]
+          subtotal_cents?: number
+          tax_cents?: number
+          tenant_id: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          closed_by?: string | null
+          created_at?: string
+          customer_id?: string
+          deleted_at?: string | null
+          discount_cents?: number
+          folio?: number
+          id?: string
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["sale_status"]
+          subtotal_cents?: number
+          tax_cents?: number
+          tenant_id?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
@@ -949,6 +1234,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      checkout_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_discount_cents?: number
+          p_payments: Json
+        }
+        Returns: string
+      }
       create_appointment: {
         Args: {
           p_branch_id: string
@@ -1026,8 +1319,12 @@ export type Database = {
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
+      payment_method: "cash" | "card" | "transfer_spei" | "openpay"
+      payment_status: "approved" | "simulated_approved"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
+      sale_item_type: "service"
+      sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
     }
     CompositeTypes: {
@@ -1168,8 +1465,12 @@ export const Constants = {
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
       member_role: ["owner", "receptionist", "groomer", "vet"],
+      payment_method: ["cash", "card", "transfer_spei", "openpay"],
+      payment_status: ["approved", "simulated_approved"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
+      sale_item_type: ["service"],
+      sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
     },
   },
