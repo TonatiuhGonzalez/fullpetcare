@@ -44,7 +44,12 @@ export default defineConfig({
   // vez); en la Mac, un reintento absorbe el parpadeo ocasional de un
   // `v-select` de Vuetify sin esconder un fallo real dos veces seguidas.
   retries: process.env.CI ? 0 : 1,
-  reporter: process.env.CI ? 'github' : 'list',
+  // En CI: "github" imprime los fallos como anotaciones en la pestaña del
+  // PR, y "html" además arma el reporte con capturas/traza que
+  // .github/workflows/ci.yml sube como artefacto si el test falla — sin
+  // "html" no habría ningún archivo que subir. En local, "list" alcanza
+  // (se ve la terminal directo, no hace falta abrir un reporte aparte).
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: 'http://localhost:5173',
     // Solo guarda la traza (screenshots + DOM paso a paso) si el test

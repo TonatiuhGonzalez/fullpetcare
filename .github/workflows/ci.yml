@@ -123,3 +123,75 @@ jobs:
       - name: Apagar Supabase local
         if: always()
         run: supabase stop
+
+  # Segundo job, SEPARADO del de arriba (tarea 6.10): el E2E de Playwright
+  # (fase 6) abre un navegador real y recorre agendar → atender → cobrar de
+  # punta a punta — es el más lento y el más caro de mantener de todos los
+  # tests del proyecto (CLAUDE.md §9, D12). Por eso va en su propio job con
+  # "needs: test": GitHub Actions no lo arranca hasta que el job "test"
+  # (lint + unitarios + RLS) termine en verde. Si algo básico ya está roto,
+  # no tiene caso gastar los ~30 segundos extra que tarda instalar un
+  # navegador de verdad y correrlo — el E2E solo corre cuando ya vale la
+  # pena confirmar que las piezas encajan juntas.
+  e2e:
+    name: E2E (Playwright)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node (misma versión que .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Un runner de Ubuntu nuevo no trae ni el navegador ni las librerías
+      # de sistema (fuentes, `libnss3`, etc.) que un Chromium real necesita
+      # para arrancar sin interfaz gráfica — a diferencia de una Mac, donde
+      # ya se probó el navegador a mano antes (tareas 6.8-6.9) y esas
+      # librerías ya existen. "--with-deps" instala ambas cosas de un
+      # jalón; sin eso, Playwright truena aquí con un error de librería
+      # faltante, no con un fallo del test en sí.
+      - name: Instalar Chromium (con dependencias del sistema)
+        run: npx playwright install --with-deps chromium
+
+      - name: Instalar el CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      - name: Levantar Supabase local
+        run: supabase start
+
+      # playwright.config.ts levanta `npm run dev` solo (bloque
+      # `webServer`) y espera a que responda antes de correr el test — no
+      # hace falta un paso aparte para arrancar el servidor. La variable
+      # de entorno CI (que GitHub Actions ya define sola en todo runner)
+      # es la que hace que ese mismo archivo de configuración NUNCA
+      # reutilice un servidor ajeno aquí, y que el reporter cambie a
+      # "github" (imprime los fallos como anotaciones directo en la
+      # pestaña del PR, en vez de una lista de texto plano).
+      - name: Test E2E (agendar → atender → cobrar)
+        run: npm run test:e2e
+
+      # Si el test falla, el reporte HTML de Playwright (capturas de
+      # pantalla y traza paso a paso del momento exacto del fallo) se sube
+      # como artefacto del workflow — se descarga desde la pestaña
+      # "Summary" de la corrida en GitHub, sin tener que reproducir el
+      # fallo a mano para verlo.
+      - name: Subir reporte de Playwright (solo si falló)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Apagar Supabase local
+        if: always()
+        run: supabase stop
