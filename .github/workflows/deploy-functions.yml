@@ -1,0 +1,53 @@
+# Despliegue de Edge Functions a producción.
+#
+# Qué hace: cada vez que un PR se mergea a main y toca algo dentro de
+# supabase/functions/, este workflow sube esa función a fullpetcare-prod
+# automáticamente — mismo patrón que deploy-migrations.yml (fase 1) para
+# las migraciones de la base, pero para el otro tipo de artefacto que
+# vive en supabase/ y que TAMBIÉN necesita llegar a producción por su
+# cuenta (una migración no se "despliega sola" junto con el código de una
+# función, son dos mecanismos de Supabase completamente distintos).
+#
+# Por qué un workflow aparte de deploy-migrations.yml: los "paths" de
+# GitHub Actions filtran por workflow completo, no por paso — si este
+# fuera un paso más dentro de deploy-migrations.yml, CUALQUIER push a
+# main que tocara una migración (sin tocar ninguna función) igual
+# intentaría desplegar funciones sin necesidad, y viceversa. Separarlos
+# significa que cada uno solo se dispara cuando de verdad hay algo suyo
+# que desplegar.
+name: Desplegar Edge Functions a producción
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    name: supabase functions deploy a prod
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar el CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # A diferencia de "supabase db push" (que se conecta directo a
+      # Postgres con una contraseña), desplegar una función sube su
+      # código a través de la Management API de Supabase — por eso aquí
+      # SOLO hace falta el access token, no SUPABASE_DB_PASSWORD.
+      #
+      # "--no-verify-jwt" no es necesario aquí: `verify_jwt = false` ya
+      # queda declarado en supabase/config.toml (sección
+      # `[functions.public-pet-view]`, tarea 7.4) y el CLI lo respeta al
+      # desplegar sin que haga falta repetirlo como flag.
+      - name: Desplegar public-pet-view a fullpetcare-prod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy public-pet-view \
+            --project-ref boajojegcmpvzjsloosk

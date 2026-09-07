@@ -1072,6 +1072,82 @@ export type Database = {
           },
         ]
       }
+      share_links: {
+        Row: {
+          access_count: number
+          created_at: string
+          created_by: string
+          customer_id: string | null
+          deleted_at: string | null
+          expires_at: string
+          id: string
+          last_accessed_at: string | null
+          pet_id: string | null
+          revoked_at: string | null
+          scope: Database["public"]["Enums"]["share_link_scope"]
+          tenant_id: string
+          token_hash: string
+          token_prefix: string
+          updated_at: string
+        }
+        Insert: {
+          access_count?: number
+          created_at?: string
+          created_by: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          expires_at: string
+          id?: string
+          last_accessed_at?: string | null
+          pet_id?: string | null
+          revoked_at?: string | null
+          scope: Database["public"]["Enums"]["share_link_scope"]
+          tenant_id: string
+          token_hash: string
+          token_prefix: string
+          updated_at?: string
+        }
+        Update: {
+          access_count?: number
+          created_at?: string
+          created_by?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          pet_id?: string | null
+          revoked_at?: string | null
+          scope?: Database["public"]["Enums"]["share_link_scope"]
+          tenant_id?: string
+          token_hash?: string
+          token_prefix?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -1326,6 +1402,7 @@ export type Database = {
       sale_item_type: "service"
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
+      share_link_scope: "pet" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1472,6 +1549,7 @@ export const Constants = {
       sale_item_type: ["service"],
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
+      share_link_scope: ["pet", "customer"],
     },
   },
 } as const
