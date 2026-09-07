@@ -55,7 +55,21 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 export default {
-  fetch: withSupabase({ auth: "publishable" }, async (req, ctx) => {
+  // `auth: "none"`, a propósito: `@supabase/server` en modo "publishable"
+  // exige el formato NUEVO de llave (`sb_publishable_...`), pero
+  // `supabase-js` en el navegador (y el resto de este proyecto — ver
+  // .env.example) usa la `anon key` clásica (un JWT) — son formatos
+  // incompatibles entre sí, no una sola llave con dos nombres. Cambiar
+  // TODO el proyecto al formato nuevo solo para esta función sería un
+  // cambio de alcance mayor sin discutirlo antes (CLAUDE.md §11). No hace
+  // falta: la seguridad real de este endpoint NUNCA dependió de qué
+  // apikey traiga la petición — depende por completo de que el TOKEN de
+  // `share_links` sea válido (ver el comentario de arriba). Exigir una
+  // apikey aquí sería una gate de plataforma redundante, no una capa de
+  // seguridad de verdad — igual que la anon key en el resto del proyecto
+  // (CLAUDE.md §7: "lo que de verdad decide qué es visible es RLS", no la
+  // llave).
+  fetch: withSupabase({ auth: "none" }, async (req, ctx) => {
     if (req.method !== "POST") {
       return Response.json(INVALID_TOKEN_RESPONSE, { status: 404 });
     }
@@ -117,7 +131,7 @@ export default {
 
     const { data: tenant } = await ctx.supabaseAdmin
       .from("tenants")
-      .select("name")
+      .select("name, timezone")
       .eq("id", tenantId)
       .maybeSingle();
 
@@ -182,6 +196,11 @@ export default {
     // montos, ni ids de otras filas.
     return Response.json({
       businessName: tenant?.name ?? "",
+      // Las vacunaciones no llevan sucursal (CLAUDE.md §6.4, no tienen
+      // branch_id) — se muestran en la zona del NEGOCIO, no la de una
+      // visita en particular (que sí trae la suya propia, `branchTimezone`
+      // en cada entrada de `visits`/`upcomingAppointments`).
+      businessTimezone: tenant?.timezone ?? "America/Mexico_City",
       pet: {
         name: pet.name,
         species: pet.species,

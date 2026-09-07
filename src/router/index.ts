@@ -72,6 +72,21 @@ export const router = createRouter({
         },
       ],
     },
+    // Vista pública (tarea 7.12): NO va dentro de /app — no exige sesión
+    // y usa su propio layout, sin nada de la navegación interna (el
+    // guard de abajo solo revisa rutas que empiecen con "/app").
+    {
+      path: '/c/:token',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'mascota-publica',
+          component: () => import('@/pages/publico/PublicPetPage.vue'),
+          props: true,
+        },
+      ],
+    },
   ],
 })
 

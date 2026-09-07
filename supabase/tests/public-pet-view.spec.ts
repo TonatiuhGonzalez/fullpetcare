@@ -255,7 +255,14 @@ describe('public-pet-view: forma exacta de la respuesta (tarea 7.8)', () => {
       const { body } = await callPublicPetView({ token })
 
       expect(Object.keys(body).sort()).toEqual(
-        ['businessName', 'pet', 'upcomingAppointments', 'vaccinations', 'visits'].sort(),
+        [
+          'businessName',
+          'businessTimezone',
+          'pet',
+          'upcomingAppointments',
+          'vaccinations',
+          'visits',
+        ].sort(),
       )
       expect(Object.keys(body.pet as Record<string, unknown>).sort()).toEqual(
         ['birthDate', 'breed', 'name', 'photoUrl', 'sex', 'species'].sort(),
