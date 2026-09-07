@@ -193,10 +193,10 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 
 - [x] **6.1** `services/petHistory.ts`: `getTimeline(petId)` que mezcla citas de ambos tipos, fichas, vacunas y pesos en una sola lista ordenada por fecha — el ORDEN vive aparte, en `lib/timeline.ts#buildTimeline()` (función pura, mismo criterio que `lib/availability.ts`); `getTimeline()` solo trae los datos (citas completadas con su ficha embebida, vacunas, pesos) y llama a esa función
 - [x] **6.2** 🧪 Tests de `getTimeline`: orden correcto mezclando tipos; dos eventos en el mismo instante (sort estable, se prueba que conserva el orden de entrada); mascota sin historial; que no aparecen registros de otro tenant — divididos entre `lib/timeline.spec.ts` (4 tests, puros) y `supabase/tests/pet-history-service.spec.ts` (2 tests, sesión real: aislamiento y "sin historial" sí necesitan datos de verdad). 88/88 tests de BD, 105/105 unitarios
-- [ ] **6.3** `PetTimeline.vue`: línea de tiempo con ícono e insignia distinta por tipo de visita
-- [ ] **6.4** `VaccinationCard.vue`: cartilla con estado por vacuna (vigente / por vencer / vencida)
-- [ ] **6.5** `WeightChart.vue`: gráfica de peso en SVG simple, sin librería
-- [ ] **6.6** `PetDetailPage.vue` final: foto, datos, alertas médicas, cartilla, peso, timeline, próximas citas
+- [x] **6.3** `PetTimeline.vue`: línea de tiempo con ícono e insignia distinta por tipo de visita — `v-timeline` de Vuetify; verificado en navegador que un groomer ve la visita veterinaria en la línea de tiempo pero SIN el diagnóstico (RLS lo oculta solo, sin ningún `v-if` de rol — CLAUDE.md §6.1)
+- [x] **6.4** `VaccinationCard.vue`: cartilla con estado por vacuna (vigente / por vencer / vencida) — una fila por vacuna (la aplicación más reciente), usando `lib/vaccination.ts#classifyVaccineStatus` (fase 4, primer uso real en la UI)
+- [x] **6.5** `WeightChart.vue`: gráfica de peso en SVG simple, sin librería — `<svg>` con `viewBox` fijo y `currentColor` (toma el color de texto de Vuetify)
+- [x] **6.6** `PetDetailPage.vue` final: foto, datos, alertas médicas, cartilla, peso, timeline, próximas citas — reemplaza la versión provisional de la tarea 2.20; `services/appointments.ts` ganó `listUpcomingByPet`. Verificado en navegador de punta a punta con historial real (vacuna, visita de estética, visita de veterinaria, dos pesadas, una cita futura)
 - [ ] **6.7** Sección "Próximas vacunas" en el dashboard, ordenada por urgencia
 - [ ] **6.8** 📚 Instalar y configurar Playwright; `playwright.config.ts` apuntando a Supabase local. **Explicar qué es un test end-to-end, en qué se diferencia de un unitario y por qué solo va a haber uno**
 - [ ] **6.9** 🧪 📚 **El test E2E**: login → agendar cita de estética → atender con notas → cobrar en efectivo → verificar el total en el ticket → verificar que aparece en el historial de la mascota. **Explicar cada paso y qué protege**
