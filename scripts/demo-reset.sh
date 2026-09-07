@@ -31,6 +31,23 @@ if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
 fi
 
 echo "Restaurando datos de demo en fullpetcare-prod..."
-supabase db query --project-ref "$PROD_PROJECT_REF" --file supabase/seed/demo_reset.sql
+
+# "supabase db query --project-ref X" por sí solo NO alcanza (el CLI lo
+# rechaza: "--project-ref only applies when targeting the linked
+# project") — hay que enlazar el repo a X primero y usar "--linked". Como
+# el repo queda enlazado a STAGING por defecto (tarea 1.35, a propósito,
+# para que un comando accidental no le pegue a prod), este script guarda
+# ese enlace antes de cambiarlo y lo REGRESA al terminar — para que correr
+# "npm run demo:reset" nunca deje el repo apuntando a prod por accidente
+# para el siguiente comando que alguien corra sin pensarlo.
+PREVIOUS_PROJECT_REF=$(supabase status -o env 2>/dev/null | grep '^LINKED_PROJECT_REF=' | cut -d'"' -f2 || true)
+
+supabase link --project-ref "$PROD_PROJECT_REF"
+supabase db query --linked --file supabase/seed/demo_reset.sql
+
+if [[ -n "$PREVIOUS_PROJECT_REF" && "$PREVIOUS_PROJECT_REF" != "$PROD_PROJECT_REF" ]]; then
+  echo "Regresando el enlace del repo a $PREVIOUS_PROJECT_REF..."
+  supabase link --project-ref "$PREVIOUS_PROJECT_REF"
+fi
 
 echo "Listo. El demo quedó restaurado."
