@@ -23,6 +23,7 @@ import PetFormDialog from '@/components/PetFormDialog.vue'
 import VaccinationCard from '@/components/VaccinationCard.vue'
 import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
+import ShareLinkManager from '@/components/ShareLinkManager.vue'
 
 const props = defineProps<{ id: string }>()
 
@@ -187,6 +188,13 @@ function handleSaved(): void {
         <p class="text-subtitle-1 mb-2">Historial</p>
         <PetTimeline :entries="timeline" :branch-timezone="displayTimezone" />
       </v-card>
+
+      <ShareLinkManager
+        v-if="session.activeTenantId"
+        class="mt-4"
+        :tenant-id="session.activeTenantId"
+        :pet-id="pet.id"
+      />
     </template>
 
     <PetFormDialog
