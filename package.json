@@ -19,7 +19,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:types": "./scripts/gen-types.sh",
-    "db:diff": "supabase db diff -f"
+    "db:diff": "supabase db diff -f",
+    "demo:reset": "./scripts/demo-reset.sh"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
