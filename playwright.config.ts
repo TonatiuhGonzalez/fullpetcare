@@ -51,22 +51,29 @@ export default defineConfig({
   // (se ve la terminal directo, no hace falta abrir un reporte aparte).
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:4173',
     // Solo guarda la traza (screenshots + DOM paso a paso) si el test
     // falla — no vale la pena el espacio en disco cuando pasa.
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  // Levanta el servidor de Vite automáticamente antes de correr el test
-  // (y lo apaga al terminar) — así `npm run test:e2e` funciona con un solo
-  // comando, sin tener que acordarse de dejar `npm run dev` corriendo
-  // aparte. En local, si YA hay un `npm run dev` corriendo en el puerto
-  // 5173 (dev normal del día a día), lo reutiliza en vez de fallar por
-  // puerto ocupado; en CI nunca reutiliza nada ajeno.
+  // "npm run build && npm run preview", NO "npm run dev" — a propósito
+  // (encontrado corriendo este mismo test en GitHub Actions, no en la
+  // Mac): el servidor de DESARROLLO de Vite compila cada módulo la
+  // primera vez que alguien lo pide, y justo al arrancar en frío puede
+  // responder "504 Outdated Optimize Dep" a un import dinámico (las
+  // rutas de `router/index.ts` son todas `() => import(...)`) — eso
+  // aborta la navegación a media prueba, sin ningún error en el código de
+  // la app. `vite preview` sirve el mismo `dist/` que se despliega a
+  // producción (CLAUDE.md §10): archivos ya compilados de antemano, nada
+  // que compilar sobre la marcha, cero margen para esa carrera. De paso,
+  // el E2E termina probando lo más parecido a lo que un cliente real ve.
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
+    command: 'npm run build && npm run preview -- --port 4173',
+    url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // El build (vue-tsc + vite build) tarda más que solo arrancar un
+    // servidor — 30s le quedaba corto en un runner de GitHub Actions.
+    timeout: 90_000,
   },
 })
