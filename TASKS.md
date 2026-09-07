@@ -159,7 +159,7 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **4.14** `MedicalRecordForm.vue`: motivo, exploración, diagnóstico, tratamiento, indicaciones, peso, temperatura, próxima visita — el peso se guarda como una fila nueva de `pet_weights` (nunca se edita una anterior), ligada a la cita
 - [x] **4.15** `VaccinationDialog.vue`: aplicar vacuna con lote y cálculo automático de próxima dosis, usando `lib/vaccination.ts` (tarea 4.6)
 - [x] **4.16** Al guardar la ficha, la cita pasa a `completed`; el "ofrece ir a cobrar" se resolvió con un mensaje de que el cobro llega en la Fase 5 (esa página no existe todavía, no se construyó antes de tiempo)
-- [ ] **4.17** **Cierre de fase:** PR, CI verde, merge (hecho, PRs #22-#24). Catálogo de vacunas sincronizado a mano en `fullpetcare-prod` (2026-09-04, mismo criterio que clientes/mascotas/servicios en Fases 2-3: las migraciones se despliegan solas, los datos de `seed.sql` no). Falta el último paso: atender una cita de estética y una de veterinaria **en producción** para cerrar del todo
+- [x] **4.17** **Cierre de fase:** PR, CI verde, merge (PRs #22-#25). Catálogo de vacunas sincronizado a mano en `fullpetcare-prod` (2026-09-04, mismo criterio que clientes/mascotas/servicios en Fases 2-3: las migraciones se despliegan solas, los datos de `seed.sql` no). Verificado en producción: atender una cita de estética y una de veterinaria de punta a punta — **Fase 4 completa**
 
 ---
 
