@@ -48,6 +48,12 @@ export const router = createRouter({
           props: true,
         },
         {
+          path: 'citas/:id/cobrar',
+          name: 'cita-cobrar',
+          component: () => import('@/pages/agenda/CheckoutPage.vue'),
+          props: true,
+        },
+        {
           path: 'clientes',
           name: 'clientes',
           component: () => import('@/pages/clientes/CustomersPage.vue'),

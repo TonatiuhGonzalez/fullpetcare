@@ -187,6 +187,16 @@ async function handleReschedule(): Promise<void> {
           Cancelar cita
         </v-btn>
       </v-card-actions>
+
+      <v-card-actions v-else-if="appointment.status === 'completed'">
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-cash-register"
+          :to="`/app/citas/${appointment.id}/cobrar`"
+        >
+          Cobrar
+        </v-btn>
+      </v-card-actions>
     </v-card>
 
     <v-dialog v-model="showReschedule" max-width="420">
