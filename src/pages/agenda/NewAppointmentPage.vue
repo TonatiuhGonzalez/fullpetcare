@@ -19,6 +19,7 @@ import type { EmployeeSummary } from '@/services/memberships'
 import { formatMXN } from '@/lib/money'
 import { formatTime, fromBranchTime } from '@/lib/datetime'
 import { computeAvailableSlots, hoursForDate, type AvailableSlot } from '@/lib/availability'
+import { canAttendKind } from '@/lib/roles'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
@@ -32,6 +33,12 @@ const router = useRouter()
 const step = ref(1)
 const errorMessage = ref<string | null>(null)
 const saving = ref(false)
+
+// Sucursal de LA CITA (UAT: antes no había forma de elegirla — se usaba
+// siempre la de la agenda sin decírselo a quien agenda). Arranca en la
+// misma sucursal que se estaba viendo en la agenda, pero es su propio
+// estado: cambiarla aquí no toca stores/agenda.ts ni la sesión.
+const selectedBranchId = ref<string | null>(agenda.activeBranchId)
 
 // --- Paso 1: cliente y mascota -------------------------------------------
 const customerSearchTerm = ref('')
@@ -97,9 +104,18 @@ const availableSlots = ref<AvailableSlot[]>([])
 const selectedSlot = ref<AvailableSlot | null>(null)
 const loadingSlots = ref(false)
 
+// Solo quien de verdad puede ATENDER este tipo de cita aparece como
+// opción — mismo criterio que valida create_appointment() en la base
+// (role_permission_hardening.sql): el rol específico del tipo, u owner.
+// Sin esto, se podía elegir a un groomer para una cita de veterinaria (o
+// a recepción para cualquiera) y enterarse del rechazo hasta agendar.
+const employeesForKind = computed(() =>
+  employees.value.filter((e) => canAttendKind(e.role, kind.value)),
+)
+
 async function loadEmployees(): Promise<void> {
-  if (!session.activeTenantId || !agenda.activeBranchId) return
-  employees.value = await listBranchEmployees(session.activeTenantId, agenda.activeBranchId)
+  if (!session.activeTenantId || !selectedBranchId.value) return
+  employees.value = await listBranchEmployees(session.activeTenantId, selectedBranchId.value)
 }
 
 async function loadAvailableSlots(): Promise<void> {
@@ -107,7 +123,7 @@ async function loadAvailableSlots(): Promise<void> {
   availableSlots.value = []
   if (
     !session.activeTenantId ||
-    !agenda.activeBranchId ||
+    !selectedBranchId.value ||
     !selectedEmployeeId.value ||
     totalDurationMinutes.value === 0
   ) {
@@ -116,12 +132,12 @@ async function loadAvailableSlots(): Promise<void> {
 
   loadingSlots.value = true
   try {
-    const branch = await branchesService.getById(agenda.activeBranchId)
+    const branch = await branchesService.getById(selectedBranchId.value)
     if (!branch) return
 
     const dayAppointments = await appointmentsService.listByDay(
       session.activeTenantId,
-      agenda.activeBranchId,
+      selectedBranchId.value,
       selectedDate.value,
       branch.timezone,
     )
@@ -138,7 +154,9 @@ async function loadAvailableSlots(): Promise<void> {
       existingAppointments,
       employeeId: selectedEmployeeId.value,
       durationMinutes: totalDurationMinutes.value,
-      stepMinutes: 15,
+      // Pedido en el UAT: horarios cada 30 minutos, no 15 — coincide con
+      // la duración mínima real de un servicio del catálogo.
+      stepMinutes: 30,
     })
   } finally {
     loadingSlots.value = false
@@ -146,8 +164,17 @@ async function loadAvailableSlots(): Promise<void> {
 }
 watch([selectedEmployeeId, selectedDate, totalDurationMinutes], loadAvailableSlots)
 
+// Cambiar de sucursal invalida al empleado y horario ya elegidos —
+// probablemente ni siquiera trabajan ahí (mismo criterio que
+// stores/agenda.ts#setBranch con su filtro de empleado).
+watch(selectedBranchId, () => {
+  selectedEmployeeId.value = null
+  loadEmployees()
+})
+
 onMounted(() => {
   if (!agenda.activeBranchId) agenda.initFromSession()
+  if (!selectedBranchId.value) selectedBranchId.value = agenda.activeBranchId
   loadEmployees()
 })
 
@@ -161,7 +188,7 @@ const canSubmit = computed(
 async function handleSubmit(): Promise<void> {
   if (
     !session.activeTenantId ||
-    !agenda.activeBranchId ||
+    !selectedBranchId.value ||
     !selectedCustomer.value ||
     !selectedPet.value ||
     !selectedEmployeeId.value ||
@@ -173,7 +200,7 @@ async function handleSubmit(): Promise<void> {
   saving.value = true
   errorMessage.value = null
   try {
-    const branch = await branchesService.getById(agenda.activeBranchId)
+    const branch = await branchesService.getById(selectedBranchId.value)
     if (!branch) throw new Error('sucursal no encontrada')
 
     const startsAt = fromBranchTime(selectedDate.value, selectedSlot.value.startsAt, branch.timezone)
@@ -181,7 +208,7 @@ async function handleSubmit(): Promise<void> {
 
     const appointment = await appointmentsService.create({
       tenantId: session.activeTenantId,
-      branchId: agenda.activeBranchId,
+      branchId: selectedBranchId.value,
       customerId: selectedCustomer.value.id,
       petId: selectedPet.value.id,
       kind: kind.value,
@@ -203,7 +230,24 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <v-container class="py-6" style="max-width: 640px">
-    <h1 class="text-h5 mb-4">Nueva cita</h1>
+    <h1 class="text-h5 mb-2">Nueva cita</h1>
+
+    <!-- Sucursal DE LA CITA (UAT: antes no se podía elegir, se usaba
+         siempre la de la agenda sin decirlo). Con una sola sucursal no
+         hay nada que elegir — mismo criterio que el resto de los
+         selectores de sucursal de la app. -->
+    <v-select
+      v-if="session.activeBranches.length > 1"
+      v-model="selectedBranchId"
+      :items="session.activeBranches"
+      item-title="name"
+      item-value="id"
+      label="Sucursal de la cita"
+      density="compact"
+      variant="outlined"
+      class="mb-2"
+      style="max-width: 280px"
+    />
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ errorMessage }}
@@ -311,15 +355,22 @@ async function handleSubmit(): Promise<void> {
     <v-card v-if="step === 4" class="pa-4 mb-4">
       <h2 class="text-subtitle-1 mb-2">4. Empleado y horario</h2>
 
+      <!-- Solo empleados que pueden ATENDER este tipo de cita
+           (employeesForKind: su rol, u owner) — el backend igual lo
+           revalida (create_appointment()), esto solo evita ofrecer una
+           opción que se va a rechazar. -->
       <v-select
         v-model="selectedEmployeeId"
-        :items="employees"
+        :items="employeesForKind"
         item-title="fullName"
         item-value="userId"
         label="Empleado"
         density="compact"
         variant="outlined"
       />
+      <p v-if="employeesForKind.length === 0" class="text-medium-emphasis text-body-2 mb-2">
+        No hay nadie que pueda atender este tipo de cita en esta sucursal.
+      </p>
       <v-text-field v-model="selectedDate" type="date" label="Fecha" density="compact" variant="outlined" />
 
       <v-progress-circular v-if="loadingSlots" indeterminate color="primary" />

@@ -18,6 +18,7 @@ import * as petHistoryService from '@/services/petHistory'
 import type { TimelineEntry } from '@/lib/timeline'
 import { formatDate, formatTime } from '@/lib/datetime'
 import { sexLabel, speciesLabel } from '@/lib/petLabels'
+import { isFrontDesk, visibleTimelineTypes } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import VaccinationCard from '@/components/VaccinationCard.vue'
@@ -53,6 +54,15 @@ const currentWeightKg = computed(() => {
 // sucursal de este evento en particular" para vacunas y pesos —que no
 // llevan sucursal—, se usa la de la sesión).
 const displayTimezone = computed(() => session.activeBranch?.timezone ?? 'America/Mexico_City')
+
+// groomer/vet: historial limitado a lo que les toca (UAT) —
+// visibleTimelineTypes() ya explica el porqué de cada caso.
+// medical_records ya viene filtrado por RLS para groomer (fase 4); esto
+// es lo mismo pero para lo que RLS SÍ deja leer (vaccination/weight) y
+// que ahora también hay que ocultar en su vista.
+const visibleTimeline = computed(() =>
+  timeline.value.filter((entry) => visibleTimelineTypes(session.role).includes(entry.type)),
+)
 
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
@@ -91,14 +101,27 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6" style="max-width: 720px">
+    <!-- groomer/vet no tienen acceso al listado/ficha de clientes (UAT,
+         router/index.ts) — para ellos este botón regresa a la agenda, de
+         donde llegaron (vía la cita que están atendiendo), en vez de a
+         una página a la que no pueden entrar. -->
     <v-btn
-      v-if="pet"
+      v-if="pet && isFrontDesk(session.role)"
       variant="text"
       prepend-icon="mdi-arrow-left"
       class="mb-2"
       :to="`/app/clientes/${pet.customer_id}`"
     >
       Volver al cliente
+    </v-btn>
+    <v-btn
+      v-else-if="pet"
+      variant="text"
+      prepend-icon="mdi-arrow-left"
+      class="mb-2"
+      to="/app/agenda"
+    >
+      Volver a la agenda
     </v-btn>
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
@@ -119,7 +142,15 @@ function handleSaved(): void {
             <div class="d-flex align-center">
               <h1 class="text-h5">{{ pet.name }}</h1>
               <v-spacer />
-              <v-btn variant="text" prepend-icon="mdi-pencil" @click="showEditPet = true">
+              <!-- Puede VER la ficha (RLS ya lo permite), pero editarla es
+                   tarea de recepción (CLAUDE.md §6.1) — el backend ya lo
+                   rechaza (pets_update), esto solo evita el botón. -->
+              <v-btn
+                v-if="isFrontDesk(session.role)"
+                variant="text"
+                prepend-icon="mdi-pencil"
+                @click="showEditPet = true"
+              >
                 Editar
               </v-btn>
             </div>
@@ -175,22 +206,34 @@ function handleSaved(): void {
         </v-list>
       </v-card>
 
+      <!-- Cartilla: RLS ya limita a groomer a solo la vacuna VIGENTE de
+           cada tipo (role_permission_hardening.sql) — VaccinationCard
+           igual se queda con "una fila por vacuna, la más reciente" (tarea
+           6.4), así que no necesita cambio para mostrarse bien con esos
+           datos ya recortados.
+
+           Peso: a groomer, RLS igual solo le llega LA pesada más
+           reciente — una gráfica con un solo punto no dice nada útil, así
+           que directamente se oculta para él (el "Peso actual" de la
+           tarjeta de arriba ya cubre lo que sí puede ver). -->
       <v-row>
         <v-col cols="12" md="6">
           <VaccinationCard :vaccinations="vaccinations" :branch-timezone="displayTimezone" />
         </v-col>
-        <v-col cols="12" md="6">
+        <v-col v-if="session.role !== 'groomer'" cols="12" md="6">
           <WeightChart :weights="weights" />
         </v-col>
       </v-row>
 
       <v-card class="pa-4 mt-4">
         <p class="text-subtitle-1 mb-2">Historial</p>
-        <PetTimeline :entries="timeline" :branch-timezone="displayTimezone" />
+        <PetTimeline :entries="visibleTimeline" :branch-timezone="displayTimezone" />
       </v-card>
 
+      <!-- Generar/revocar el link público es tarea de recepción (UAT,
+           share_links_insert/update en role_permission_hardening.sql). -->
       <ShareLinkManager
-        v-if="session.activeTenantId"
+        v-if="session.activeTenantId && isFrontDesk(session.role)"
         class="mt-4"
         :tenant-id="session.activeTenantId"
         :pet-id="pet.id"

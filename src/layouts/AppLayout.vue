@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { roleLabel } from '@/lib/roles'
+import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
@@ -30,9 +30,16 @@ function handleBranchChange(branchId: unknown): void {
 
     <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
          (agenda y clientes). Un v-navigation-drawer completo se agrega
-         cuando haya suficientes secciones para justificarlo. -->
+         cuando haya suficientes secciones para justificarlo.
+
+         "Clientes" solo para owner/receptionist (isFrontDesk) — groomer/
+         vet no tienen el listado completo (router/index.ts ya redirige
+         si llegan por URL directa; esto es solo para no mostrar un link
+         a algo a lo que de todos modos no pueden entrar). -->
     <v-btn to="/app/agenda" variant="text" class="mr-1">Agenda</v-btn>
-    <v-btn to="/app/clientes" variant="text" class="mr-1">Clientes</v-btn>
+    <v-btn v-if="isFrontDesk(session.role)" to="/app/clientes" variant="text" class="mr-1">
+      Clientes
+    </v-btn>
     <v-btn to="/app/catalogo" variant="text" class="mr-4">Catálogo</v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que

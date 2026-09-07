@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 
 import { formatTime } from '@/lib/datetime'
+import { isFrontDesk } from '@/lib/roles'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { listUpcomingVaccines } from '@/services/records'
@@ -54,6 +55,22 @@ async function loadEmployees(): Promise<void> {
 }
 
 watch(() => agenda.activeBranchId, loadEmployees)
+
+// Bug reportado en el UAT: cambiar de sucursal en el selector de la
+// barra superior (AppLayout.vue, que solo toca useSessionStore) no movía
+// nada aquí — la agenda tiene su PROPIA sucursal activa a propósito
+// (stores/agenda.ts: un dueño puede "asomarse" a otra sucursal sin
+// cambiar su sesión completa), pero eso significa que nada la mantenía
+// sincronizada con la de arriba tampoco. Este watcher hace que, si la
+// sucursal de la SESIÓN cambia mientras la agenda está abierta, la
+// agenda la siga — sin quitarle al selector propio de esta página la
+// posibilidad de ver otra sucursal sin tocar la sesión.
+watch(
+  () => session.activeBranchId,
+  (branchId) => {
+    if (branchId && branchId !== agenda.activeBranchId) agenda.setBranch(branchId)
+  },
+)
 
 async function loadUpcomingVaccines(): Promise<void> {
   if (!session.activeTenantId) return
@@ -132,7 +149,12 @@ function goToDetail(appointmentId: string): void {
         @update:model-value="handleBranchChange"
       />
 
+      <!-- groomer/vet: su agenda ya son solo SUS citas (RLS,
+           role_permission_hardening.sql) — no tiene caso ofrecerles un
+           filtro para ver las de otros empleados, que de todos modos el
+           backend no les va a devolver. -->
       <v-select
+        v-if="isFrontDesk(session.role)"
         :model-value="agenda.employeeFilter"
         :items="[{ userId: null, fullName: 'Todos los empleados' }, ...employees]"
         item-title="fullName"
@@ -146,7 +168,15 @@ function goToDetail(appointmentId: string): void {
       />
 
       <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="goToNewAppointment">
+      <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
+           lo rechaza para groomer/vet (create_appointment()), esto solo
+           evita mostrar un botón que termina en un error. -->
+      <v-btn
+        v-if="isFrontDesk(session.role)"
+        color="primary"
+        prepend-icon="mdi-plus"
+        @click="goToNewAppointment"
+      >
         Nueva cita
       </v-btn>
     </div>

@@ -1,6 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { isFrontDesk } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
+
+// Vue Router deja "meta" tipado vacío por defecto — esto le agrega la
+// propiedad que usan las rutas de abajo (clientes, citas/nueva), para
+// que el guard al final del archivo tenga tipos reales.
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** true si la ruta es tarea de recepción (owner/receptionist) — groomer/vet se redirigen a la agenda. */
+    requiresFrontDesk?: boolean
+  }
+}
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -34,6 +45,11 @@ export const router = createRouter({
           path: 'citas/nueva',
           name: 'cita-nueva',
           component: () => import('@/pages/agenda/NewAppointmentPage.vue'),
+          // Solo owner/receptionist agendan (CLAUDE.md §6.1) — el backend
+          // ya lo rechaza (create_appointment()), pero sin este guard un
+          // groomer/vet podría llegar al formulario completo y solo
+          // enterarse del rechazo hasta darle "Agendar".
+          meta: { requiresFrontDesk: true },
         },
         {
           path: 'citas/:id',
@@ -57,6 +73,11 @@ export const router = createRouter({
           path: 'clientes',
           name: 'clientes',
           component: () => import('@/pages/clientes/CustomersPage.vue'),
+          // El listado completo de clientes es tarea de recepción
+          // (CLAUDE.md §6.1) — groomer/vet ven al cliente dueño de la
+          // mascota que atienden (customers sigue siendo legible para
+          // ellos vía RLS), pero no un directorio del negocio completo.
+          meta: { requiresFrontDesk: true },
         },
         {
           path: 'clientes/:id',
@@ -119,6 +140,14 @@ router.beforeEach(async (to) => {
     return session.needsBusinessSelection
       ? { path: '/seleccionar-negocio' }
       : { path: '/app/agenda' }
+  }
+
+  // Rutas marcadas "requiresFrontDesk" (arriba: clientes, citas/nueva) —
+  // groomer/vet no las necesitan y el backend ya las rechaza; se manda a
+  // la agenda en vez de dejar ver un formulario/listado que de todos
+  // modos no va a poder usar.
+  if (to.meta.requiresFrontDesk && !isFrontDesk(session.role)) {
+    return { path: '/app/agenda' }
   }
 
   return true
