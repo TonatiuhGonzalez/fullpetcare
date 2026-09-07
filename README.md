@@ -162,3 +162,84 @@ su `project-ref` primero.
 Ver `CLAUDE.md` §4 para el árbol completo comentado y la "regla de capas"
 (`pages/components → stores → services → supabase`, con `lib/` como
 funciones puras sin dependencias del proyecto).
+
+## Guion de demo
+
+Para enseñar el producto en una reunión (`fullpetcare.pages.dev`, con los
+usuarios de demo del panel de arriba). El orden importa: cada pantalla se
+apoya en la anterior, y el historial rico de Rocky/Max (sembrado por
+`npm run demo:reset`, ver abajo) evita tener que construir meses de
+visitas en vivo frente al cliente.
+
+### 0. Antes de entrar a la sala
+
+```bash
+npm run demo:reset
+```
+
+Deja producción con las citas/ventas sueltas de la última demo ocultas, y
+revive el historial curado de Rocky y Max con fechas relativas a HOY (ver
+`supabase/seed/demo_reset.sql`). Sin esto, una demo anterior puede dejar
+el catálogo de citas del día con basura de otra sesión.
+
+### 1. Login y selector de negocio/sucursal
+
+Entra con `dueno@patitasfelices.mx`. **Qué decir:** "Un mismo negocio
+puede tener varias sucursales — Patitas Felices tiene Centro y Del Valle
+— y cada empleado solo ve las suyas. El dueño ve todas." Elige "Sucursal
+Centro".
+
+### 2. Agenda del día
+
+**Qué decir:** "Esta es la pantalla que un recepcionista tiene abierta
+todo el día." Señala la sección "Próximas vacunas" abajo — son Rocky y
+Max, con su chip de "por vencer": "el sistema avisa solo, sin que nadie
+tenga que llevar un Excel aparte".
+
+### 3. Agendar una cita nueva
+
+Botón "Nueva cita" → cliente existente (busca "Sofía") → su mascota
+(Rocky) → tipo Estética → servicio (Baño) → empleado y el primer horario
+libre. **Qué decir:** "El sistema ya sabe qué horarios están libres para
+Lupita ese día — no hay que revisar la agenda a mano para no encimar dos
+citas."
+
+### 4. Atender la cita
+
+Desde el detalle de la cita, botón "Atender". Llena una nota rápida de
+groomer y guarda. **Qué decir:** "Aquí la ficha cambia según el tipo de
+cita — una de estética pide estilo de corte y notas de comportamiento;
+una de veterinaria pide diagnóstico, peso y vacunas. Es la misma cita,
+pero cada quien ve solo lo que le toca."
+
+### 5. Cobrar
+
+Desde el mensaje de "cita completada", "Ir a cobrar". Marca efectivo,
+llena el monto completo, cobra. **Qué decir:** "El precio ya incluye IVA
+— como en el mostrador real — y el ticket lo desglosa. Ahí está el
+folio, van a coincidir siempre el subtotal más el IVA con el total, al
+centavo."
+
+### 6. Historial completo de una mascota
+
+Ve a Clientes → Sofía → Rocky (o entra directo por "Buscar cliente"
+desde otra pantalla). **Qué decir:** "Esto mezcla TODAS las visitas de
+Rocky — estética y veterinaria, vacunas, peso — en una sola línea de
+tiempo. La cita que se acaba de cobrar ya aparece aquí arriba." Señala la
+gráfica de peso y la cartilla de vacunación con su chip de estado.
+
+### 7. Vista pública para el dueño de la mascota
+
+Desde la ficha de Rocky, botón "Generar link" al final de la página.
+Cópialo y ábrelo en el celular (o en una pestaña de incógnito).
+**Qué decir:** "Esto es lo que le llega al dueño de la mascota por
+WhatsApp — sin necesidad de una cuenta ni una contraseña. Ve la cartilla
+de su mascota, su historial, y nada más: ni un teléfono de otro cliente,
+ni un peso, ni una nota interna del personal." Termina revocando el link
+en la ficha para mostrar que deja de funcionar al instante.
+
+### Si preguntan qué falta
+
+Ventas de producto/inventario, factura fiscal real (CFDI), pasarela de
+pago real, notificaciones automáticas por WhatsApp — todo está en
+`CLAUDE.md` §1 como decisiones YA tomadas para v1, no como olvidos.
