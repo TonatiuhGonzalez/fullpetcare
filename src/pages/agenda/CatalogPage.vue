@@ -6,12 +6,17 @@ import { onMounted, ref, watch } from 'vue'
 import * as servicesService from '@/services/services'
 import type { Service, ServiceKind } from '@/services/services'
 import { formatMXN } from '@/lib/money'
+import { visibleServiceKinds } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
 
 const session = useSessionStore()
 
-const activeKind = ref<ServiceKind>('grooming')
+// groomer solo ve Estética, vet solo Veterinaria (UAT: no necesitan
+// precios de servicios que nunca dan) — owner/receptionist ven las dos,
+// como antes.
+const visibleKinds = visibleServiceKinds(session.role)
+const activeKind = ref<ServiceKind>(visibleKinds[0])
 const services = ref<Service[]>([])
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -20,6 +25,7 @@ const showFormDialog = ref(false)
 const editingService = ref<Service | null>(null)
 
 const isOwner = () => session.role === 'owner'
+const kindLabels: Record<ServiceKind, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
@@ -71,9 +77,13 @@ function handleSaved(): void {
       </v-btn>
     </div>
 
+    <!-- Solo las pestañas visibles para el rol (arriba: visibleServiceKinds) —
+         con una sola, v-tabs igual funciona bien, solo no deja nada que
+         cambiar. -->
     <v-tabs v-model="activeKind" class="mb-4">
-      <v-tab value="grooming">Estética</v-tab>
-      <v-tab value="veterinary">Veterinaria</v-tab>
+      <v-tab v-for="kind in visibleKinds" :key="kind" :value="kind">
+        {{ kindLabels[kind] }}
+      </v-tab>
     </v-tabs>
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
