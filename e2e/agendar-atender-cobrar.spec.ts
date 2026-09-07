@@ -44,13 +44,17 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await page.locator('button', { hasText: /iniciar sesión|entrar/i }).click()
   await page.waitForURL(/\/(app|seleccionar-negocio)/)
 
-  // El dueño de la demo tiene dos sucursales — si pide elegir, cualquiera sirve.
+  // El dueño de la demo pertenece a un solo negocio (Patitas Felices) con
+  // DOS sucursales — SelectBusinessPage.vue salta el paso "elige tu
+  // negocio" solo (hay una única membresía) y muestra directo "Elige la
+  // sucursal". Se espera ESE título específico, no cualquier
+  // v-list-item: mientras useSessionStore todavía está cargando las
+  // membresías, la página puede pintar brevemente el paso de "negocio"
+  // primero — hacerle clic a lo que sea ahí es la carrera que tumbaba
+  // este test en CI (Ubuntu es más lento que la Mac para esto).
   if (page.url().includes('seleccionar-negocio')) {
-    await page
-      .locator('.v-list-item, button')
-      .filter({ hasText: /centro|patitas/i })
-      .first()
-      .click()
+    await page.getByText('Elige la sucursal').waitFor()
+    await page.locator('.v-list-item').first().click()
     await page.waitForURL(/\/app\//)
   }
 
