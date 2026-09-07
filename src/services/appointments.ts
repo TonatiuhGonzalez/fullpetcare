@@ -74,6 +74,39 @@ export async function listByDay(
   }))
 }
 
+export interface UpcomingAppointment extends Appointment {
+  branchName: string
+  branchTimezone: string
+}
+
+/**
+ * Las citas todavía por venir de una mascota (tarea 6.6, sección
+ * "Próximas citas" de la ficha) — solo `scheduled`: una cita `in_progress`
+ * ya está pasando ahora mismo, no es "próxima".
+ */
+export async function listUpcomingByPet(
+  tenantId: string,
+  petId: string,
+): Promise<UpcomingAppointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*, branches ( name, timezone )')
+    .eq('tenant_id', tenantId)
+    .eq('pet_id', petId)
+    .eq('status', 'scheduled')
+    .is('deleted_at', null)
+    .gte('starts_at', new Date().toISOString())
+    .order('starts_at')
+
+  if (error) throw error
+
+  return (data ?? []).map(({ branches, ...appointment }) => ({
+    ...appointment,
+    branchName: branches?.name ?? '',
+    branchTimezone: branches?.timezone ?? 'America/Mexico_City',
+  }))
+}
+
 export async function getById(tenantId: string, id: string): Promise<Appointment | null> {
   const { data, error } = await supabase
     .from('appointments')

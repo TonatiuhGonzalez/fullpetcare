@@ -7,6 +7,8 @@ import { format } from 'date-fns'
 import { formatTime } from '@/lib/datetime'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
+import { listUpcomingVaccines } from '@/services/records'
+import type { UpcomingVaccine } from '@/services/records'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 
@@ -15,6 +17,19 @@ const agenda = useAgendaStore()
 const router = useRouter()
 
 const employees = ref<EmployeeSummary[]>([])
+// Vacunas por reforzar, del negocio COMPLETO — no llevan sucursal (una
+// vacunación no tiene branch_id, CLAUDE.md §6.4), así que esta lista es
+// independiente de qué sucursal esté viendo la agenda ahora mismo.
+const upcomingVaccines = ref<UpcomingVaccine[]>([])
+
+const vaccineStatusLabels: Record<UpcomingVaccine['status'], string> = {
+  due_soon: 'Por vencer',
+  overdue: 'Vencida',
+}
+const vaccineStatusColors: Record<UpcomingVaccine['status'], string> = {
+  due_soon: 'warning',
+  overdue: 'error',
+}
 
 const branchTimezone = computed(
   () => session.activeBranches.find((b) => b.id === agenda.activeBranchId)?.timezone ?? 'UTC',
@@ -40,9 +55,16 @@ async function loadEmployees(): Promise<void> {
 
 watch(() => agenda.activeBranchId, loadEmployees)
 
+async function loadUpcomingVaccines(): Promise<void> {
+  if (!session.activeTenantId) return
+  const today = format(new Date(), 'yyyy-MM-dd')
+  upcomingVaccines.value = await listUpcomingVaccines(session.activeTenantId, today)
+}
+
 onMounted(() => {
   agenda.initFromSession()
   loadEmployees()
+  loadUpcomingVaccines()
 })
 
 function goToday(): void {
@@ -160,5 +182,24 @@ function goToDetail(appointmentId: string): void {
         <template #title>No hay citas agendadas para este día.</template>
       </v-list-item>
     </v-list>
+
+    <v-card v-if="upcomingVaccines.length > 0" class="pa-4 mt-6">
+      <p class="text-subtitle-1 mb-2">Próximas vacunas</p>
+      <v-list density="compact">
+        <v-list-item
+          v-for="vaccine in upcomingVaccines"
+          :key="vaccine.vaccinationId"
+          :to="`/app/mascotas/${vaccine.petId}`"
+        >
+          <template #title>{{ vaccine.petName }} · {{ vaccine.vaccineName }}</template>
+          <template #subtitle>Próxima dosis: {{ vaccine.nextDueDate }}</template>
+          <template #append>
+            <v-chip size="small" :color="vaccineStatusColors[vaccine.status]" variant="tonal">
+              {{ vaccineStatusLabels[vaccine.status] }}
+            </v-chip>
+          </template>
+        </v-list-item>
+      </v-list>
+    </v-card>
   </v-container>
 </template>
