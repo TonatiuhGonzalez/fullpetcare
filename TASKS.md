@@ -212,7 +212,7 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 
 **Meta: abrir el link en el celular y ver la cartilla de la mascota.**
 
-- [ ] **7.1** Migración `0018_share_links.sql`: `share_links` con `token_hash` (nunca el token), `token_prefix`, `expires_at`, `revoked_at`, `access_count`; RLS que solo deja al personal del tenant gestionarlos; auditoría
+- [x] **7.1** Migración `0018_share_links.sql`: `share_links` con `token_hash` (nunca el token), `token_prefix`, `expires_at`, `revoked_at`, `access_count`; RLS que solo deja al personal del tenant gestionarlos; auditoría — `20260907183312_share_links.sql`. `scope` acepta `pet`/`customer` (CLAUDE.md §6.6) pero v1 solo genera links de mascota (check constraint ya cierra la puerta a una fila inconsistente); cualquier rol activo administra los links de su tenant, sin restricción por rol (a diferencia del catálogo o el expediente). 6 tests nuevos de RLS (aislamiento entre tenants + `anon` sin ningún acceso), 94/94 tests de BD en verde
 - [ ] **7.2** 📚 `services/shareLinks.ts`: genera 32 bytes con `crypto.getRandomValues`, guarda solo el SHA-256, devuelve el token en claro **una sola vez**. **Explicar por qué se guarda hasheado, por qué 32 bytes son inadivinables y por qué un UUID de mascota no sirve como link**
 - [ ] **7.3** 🧪 Tests de `shareLinks.ts`: dos tokens nunca se repiten; en la base no queda el token en claro; revocar lo invalida
 - [ ] **7.4** 📚 Edge Function `public-pet-view`: recibe token, hashea, busca link vigente, consulta con service role filtrando **siempre** por `tenant_id` y `pet_id` del link, devuelve un DTO de lista blanca. **Explicar qué es una Edge Function, por qué corre con service role y por qué eso es seguro solo si valida antes**
