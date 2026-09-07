@@ -5,6 +5,7 @@
 // re-exporta para que AttendPage.vue no tenga que importar de dos
 // servicios distintos al guardar la ficha de veterinaria.
 import { supabase } from './supabase'
+import { classifyVaccineStatus, type VaccineStatus } from '@/lib/vaccination'
 import type { Database } from '@/types/database'
 
 export { addWeight } from './pets'
@@ -186,4 +187,64 @@ export async function getMedicalRecordByAppointment(
 
   if (error) throw error
   return data
+}
+
+export interface UpcomingVaccine {
+  vaccinationId: string
+  petId: string
+  petName: string
+  vaccineName: string
+  nextDueDate: string
+  status: Extract<VaccineStatus, 'due_soon' | 'overdue'>
+}
+
+/**
+ * Las vacunas que hay que reforzar pronto en todo el negocio (tarea 6.7,
+ * sección "Próximas vacunas" del dashboard) — ordenadas por urgencia: las
+ * más vencidas primero, después las que están por vencer más cerca. Es
+ * exactamente el orden que da `next_due_date` ascendente (una fecha
+ * vencida siempre es "menor" que una fecha futura), así que no hace falta
+ * un segundo criterio de orden aparte del de fecha.
+ */
+export async function listUpcomingVaccines(
+  tenantId: string,
+  today: string,
+): Promise<UpcomingVaccine[]> {
+  const { data, error } = await supabase
+    .from('vaccinations')
+    .select('id, pet_id, vaccine_id, next_due_date, vaccines ( name ), pets ( name )')
+    .eq('tenant_id', tenantId)
+    .not('next_due_date', 'is', null)
+    .order('applied_at', { ascending: false })
+
+  if (error) throw error
+
+  // Una mascota puede tener varias aplicaciones de la MISMA vacuna a lo
+  // largo de su vida (CLAUDE.md: cada dosis es un hecho propio) — solo
+  // importa la más reciente por (mascota, vacuna) para decidir si toca
+  // reforzar. Como la consulta ya viene ordenada de la más reciente a la
+  // más vieja, la primera vez que se ve cada combinación es la vigente.
+  const seenPetVaccine = new Set<string>()
+  const upcoming: UpcomingVaccine[] = []
+  for (const row of data ?? []) {
+    const key = `${row.pet_id}-${row.vaccine_id}`
+    if (seenPetVaccine.has(key)) continue
+    seenPetVaccine.add(key)
+
+    const status = classifyVaccineStatus(row.next_due_date, today)
+    if (status !== 'due_soon' && status !== 'overdue') continue
+
+    upcoming.push({
+      vaccinationId: row.id,
+      petId: row.pet_id,
+      petName: row.pets?.name ?? '',
+      vaccineName: row.vaccines?.name ?? '',
+      nextDueDate: row.next_due_date!,
+      status,
+    })
+  }
+
+  return upcoming.sort(
+    (a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime(),
+  )
 }
