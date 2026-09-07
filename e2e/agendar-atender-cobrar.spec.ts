@@ -1,0 +1,115 @@
+// El único test E2E del proyecto (tarea 6.9, CLAUDE.md D12): recorre el
+// flujo completo que promete el producto — agendar, atender, cobrar — y de
+// paso confirma que la venta queda en el historial de la mascota (fase 6).
+// Corre contra Supabase LOCAL real (Docker, no una base de mentira):
+// valida que TODAS las piezas encajan juntas (router, stores, RLS, la
+// función checkout_appointment()...), algo que ningún test unitario por sí
+// solo puede confirmar.
+//
+// Qué protege cada paso, en caso de que falle:
+//
+// 1. Login — si esto falla, nada de lo demás importa: es la puerta de
+//    entrada a toda la app.
+// 2. Agendar una cita de estética — prueba el wizard completo de
+//    NewAppointmentPage.vue (fase 3) y la función create_appointment().
+// 3. Atender con notas — prueba que la transición
+//    scheduled → in_progress → completed funciona de punta a punta
+//    (fase 4), incluido el arreglo de la carrera de estado del PR #28: si
+//    ese bug volviera, este test lo atraparía otra vez.
+// 4. Cobrar en efectivo — prueba checkout_appointment() de punta a punta
+//    (fase 5): folio, desglose de IVA, ticket.
+// 5. Verificar el total en el ticket — confirma que lib/money.ts y el RPC
+//    de la base siguen de acuerdo en el mismo número.
+// 6. Verificar que aparece en el historial de la mascota — confirma que
+//    services/petHistory.ts (fase 6) ve la cita recién cobrada, con las
+//    notas que se acaban de escribir (no una entrada vieja parecida).
+import { test, expect } from '@playwright/test'
+
+const DUENO_EMAIL = 'dueno@patitasfelices.mx'
+const DUENO_PASSWORD = 'Demo1234!'
+
+// Ids fijos de la semilla de demo (supabase/tests/fixtures.ts): Sofía
+// Ramírez Castillo, su perro Rocky, y el servicio "Baño".
+const PET_ROCKY_ID = 'e0000000-0000-4000-8000-000000000001'
+
+test('agendar → atender → cobrar, y que la visita quede en el historial de la mascota', async ({
+  page,
+}) => {
+  const groomerNotes = `Se portó tranquilo — corrida de prueba ${Date.now()}`
+
+  // 1. Login
+  await page.goto('/login')
+  await page.locator('input[type="email"]').fill(DUENO_EMAIL)
+  await page.locator('input[type="password"]').fill(DUENO_PASSWORD)
+  await page.locator('button', { hasText: /iniciar sesión|entrar/i }).click()
+  await page.waitForURL(/\/(app|seleccionar-negocio)/)
+
+  // El dueño de la demo tiene dos sucursales — si pide elegir, cualquiera sirve.
+  if (page.url().includes('seleccionar-negocio')) {
+    await page
+      .locator('.v-list-item, button')
+      .filter({ hasText: /centro|patitas/i })
+      .first()
+      .click()
+    await page.waitForURL(/\/app\//)
+  }
+
+  // 2. Agendar una cita de estética para Rocky
+  await page.goto('/app/citas/nueva')
+  await page.getByLabel(/Buscar cliente/i).fill('Sofía')
+  await page.locator('.v-list-item', { hasText: 'Sofía' }).first().click()
+  await page.locator('.v-chip', { hasText: 'Rocky' }).first().click()
+  await page.locator('button', { hasText: 'Siguiente' }).first().click()
+
+  await page.locator('button', { hasText: 'Estética' }).click()
+  await page.locator('button', { hasText: 'Siguiente' }).first().click()
+
+  // Vuetify: un click en el contenedor del checkbox no siempre marca el
+  // input — hay que apuntarle directo al <input type="checkbox">.
+  await page
+    .locator('.v-checkbox', { hasText: 'Baño' })
+    .locator('input[type="checkbox"]')
+    .click({ force: true })
+  await page.locator('button', { hasText: 'Siguiente' }).first().click()
+
+  await page.locator('.v-select', { hasText: 'Empleado' }).click()
+  await page.locator('.v-list-item').first().click()
+
+  // El PRIMER hueco disponible, sea cual sea — no un horario fijo. Así el
+  // test no choca si se corre más de una vez sin reiniciar la base (el
+  // hueco que usó la corrida anterior ya no aparecería disponible).
+  const slot = page.locator('.v-chip', { hasText: /^\d{2}:\d{2}$/ }).first()
+  await slot.waitFor({ state: 'visible' })
+  await slot.click()
+
+  await page.locator('button', { hasText: 'Agendar' }).click()
+  await page.waitForURL(/\/app\/citas\/[0-9a-f-]+$/)
+
+  // 3. Atender, con una nota de groomer que sirve de "huella" única para
+  // el paso 6 (así el assert final no puede confundirse con una visita
+  // vieja de otra corrida o de otro test).
+  await page.locator('a, button', { hasText: 'Atender' }).first().click()
+  await page.waitForURL(/\/atender$/)
+  await page.getByLabel('Notas del groomer').fill(groomerNotes)
+  await page.locator('button', { hasText: /Guardar|Registrar/i }).first().click()
+  await expect(page.getByText(/Cita completada/i)).toBeVisible()
+
+  // 4. Cobrar en efectivo
+  await page.locator('a', { hasText: 'Ir a cobrar' }).click()
+  await page.waitForURL(/\/cobrar$/)
+  await expect(page.getByText('Subtotal')).toBeVisible()
+  await page.locator('button', { hasText: 'Todo' }).first().click()
+  await page.locator('button:has(.mdi-plus)').first().click()
+  await page.locator('button', { hasText: /Cobrar \$/ }).click()
+  await expect(page.getByText(/Cobro registrado/i)).toBeVisible()
+
+  // 5. El ticket muestra el total de Baño ($250.00, IVA incluido — seed.sql).
+  const ticket = page.locator('.ticket-print')
+  await expect(ticket).toContainText('$250.00')
+
+  // 6. El historial de Rocky ve esta visita, con la nota que se acaba de
+  // escribir — prueba que services/petHistory.ts (fase 6) refleja la cita
+  // recién cobrada, no solo que "algo" se guardó.
+  await page.goto(`/app/mascotas/${PET_ROCKY_ID}`)
+  await expect(page.getByText(groomerNotes)).toBeVisible()
+})
