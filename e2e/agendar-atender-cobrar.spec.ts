@@ -72,18 +72,24 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   const dialog = page.getByRole('dialog')
   await dialog.waitFor()
 
+  // El buscador de cliente es un v-autocomplete (rediseño de UX): su menú
+  // también se pinta en un overlay fuera del dialog — mismo caso que el
+  // v-select de Empleado, un poco más abajo.
   await dialog.getByLabel(/Buscar cliente/i).fill('Sofía')
-  await dialog.locator('.v-list-item', { hasText: 'Sofía' }).first().click()
+  await page.locator('.v-list-item', { hasText: 'Sofía' }).first().click()
   await dialog.locator('.v-chip', { hasText: 'Rocky' }).first().click()
 
   await dialog.locator('button', { hasText: 'Estética' }).click()
 
-  // Vuetify: un click en el contenedor del checkbox no siempre marca el
-  // input — hay que apuntarle directo al <input type="checkbox">.
-  await dialog
-    .locator('.v-checkbox', { hasText: 'Baño' })
-    .locator('input[type="checkbox"]')
-    .click({ force: true })
+  // Servicios es un v-select de selección múltiple con chips (rediseño de
+  // UX, ya no checkboxes): se abre el menú — el listado con nombre,
+  // duración y precio se pinta en un overlay fuera del dialog — se elige
+  // "Baño" y se cierra con Escape (si no, el menú se queda abierto y
+  // estorba el siguiente click, porque un v-select "multiple" no se
+  // cierra solo al elegir una opción).
+  await dialog.locator('.v-select', { hasText: 'Servicios' }).click()
+  await page.locator('.v-list-item', { hasText: 'Baño' }).first().click()
+  await page.keyboard.press('Escape')
 
   // El menú del v-select se pinta en un overlay fuera del propio dialog
   // (por eso la opción se busca en "page", no en "dialog"), pero el
