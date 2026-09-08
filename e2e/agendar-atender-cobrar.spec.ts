@@ -10,8 +10,9 @@
 //
 // 1. Login — si esto falla, nada de lo demás importa: es la puerta de
 //    entrada a toda la app.
-// 2. Agendar una cita de estética — prueba el wizard completo de
-//    NewAppointmentPage.vue (fase 3) y la función create_appointment().
+// 2. Agendar una cita de estética — prueba el formulario completo de
+//    NewAppointmentDialog.vue (fase 3, rediseñado a un solo dialog) y la
+//    función create_appointment().
 // 3. Atender con notas — prueba que la transición
 //    scheduled → in_progress → completed funciona de punta a punta
 //    (fase 4), incluido el arreglo de la carrera de estado del PR #28: si
@@ -58,35 +59,46 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
     await page.waitForURL(/\/app\//)
   }
 
-  // 2. Agendar una cita de estética para Rocky
-  await page.goto('/app/citas/nueva')
-  await page.getByLabel(/Buscar cliente/i).fill('Sofía')
-  await page.locator('.v-list-item', { hasText: 'Sofía' }).first().click()
-  await page.locator('.v-chip', { hasText: 'Rocky' }).first().click()
-  await page.locator('button', { hasText: 'Siguiente' }).first().click()
+  // 2. Agendar una cita de estética para Rocky — todo en un solo dialog,
+  // sin pasos intermedios (NewAppointmentDialog.vue).
+  //
+  // Todo lo que se llena queda DENTRO del dialog (locator "dialog" a
+  // continuación): AgendaPage.vue, detrás del dialog, tiene su propio
+  // v-select "Empleado" (el filtro de la agenda) y su propia lista de
+  // citas del día — sin acotar los selectores a un lado u otro, Playwright
+  // encuentra dos elementos que hacen match y falla en modo estricto.
+  await page.goto('/app/agenda')
+  await page.locator('button', { hasText: 'Nueva cita' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.waitFor()
 
-  await page.locator('button', { hasText: 'Estética' }).click()
-  await page.locator('button', { hasText: 'Siguiente' }).first().click()
+  await dialog.getByLabel(/Buscar cliente/i).fill('Sofía')
+  await dialog.locator('.v-list-item', { hasText: 'Sofía' }).first().click()
+  await dialog.locator('.v-chip', { hasText: 'Rocky' }).first().click()
+
+  await dialog.locator('button', { hasText: 'Estética' }).click()
 
   // Vuetify: un click en el contenedor del checkbox no siempre marca el
   // input — hay que apuntarle directo al <input type="checkbox">.
-  await page
+  await dialog
     .locator('.v-checkbox', { hasText: 'Baño' })
     .locator('input[type="checkbox"]')
     .click({ force: true })
-  await page.locator('button', { hasText: 'Siguiente' }).first().click()
 
-  await page.locator('.v-select', { hasText: 'Empleado' }).click()
-  await page.locator('.v-list-item').first().click()
+  // El menú del v-select se pinta en un overlay fuera del propio dialog
+  // (por eso la opción se busca en "page", no en "dialog"), pero el
+  // v-select que lo abre sí es el de adentro.
+  await dialog.locator('.v-select', { hasText: 'Empleado' }).click()
+  await page.getByRole('option').first().click()
 
   // El PRIMER hueco disponible, sea cual sea — no un horario fijo. Así el
   // test no choca si se corre más de una vez sin reiniciar la base (el
   // hueco que usó la corrida anterior ya no aparecería disponible).
-  const slot = page.locator('.v-chip', { hasText: /^\d{2}:\d{2}$/ }).first()
+  const slot = dialog.locator('.v-chip', { hasText: /^\d{2}:\d{2}$/ }).first()
   await slot.waitFor({ state: 'visible' })
   await slot.click()
 
-  await page.locator('button', { hasText: 'Agendar' }).click()
+  await dialog.locator('button', { hasText: 'Agendar' }).click()
   await page.waitForURL(/\/app\/citas\/[0-9a-f-]+$/)
 
   // 3. Atender, con una nota de groomer que sirve de "huella" única para

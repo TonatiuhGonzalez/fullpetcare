@@ -62,9 +62,10 @@ describe('canAttendKind', () => {
   })
 
   it('un groomer NO puede atender una cita de veterinaria, ni un vet una de estética', () => {
-    // El caso que reportó el UAT: sin este chequeo, NewAppointmentPage.vue
-    // dejaba elegir a cualquier empleado de la sucursal sin importar el
-    // tipo de cita — el mismo bug que se corrigió en create_appointment().
+    // El caso que reportó el UAT: sin este chequeo, el formulario de
+    // agendar (hoy NewAppointmentDialog.vue) dejaba elegir a cualquier
+    // empleado de la sucursal sin importar el tipo de cita — el mismo bug
+    // que se corrigió en create_appointment().
     expect(canAttendKind('groomer', 'veterinary')).toBe(false)
     expect(canAttendKind('vet', 'grooming')).toBe(false)
   })
