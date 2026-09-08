@@ -27,8 +27,6 @@ import { computeAvailableSlots, hoursForDate, type AvailableSlot } from '@/lib/a
 import { canAttendKind } from '@/lib/roles'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
-import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
-import PetFormDialog from '@/components/PetFormDialog.vue'
 import TimeSlotPicker from '@/components/TimeSlotPicker.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
@@ -56,27 +54,50 @@ const customerResults = ref<Customer[]>([])
 const selectedCustomer = ref<Customer | null>(null)
 const customerPets = ref<Pet[]>([])
 const selectedPet = ref<Pet | null>(null)
-const showNewCustomerDialog = ref(false)
-const showNewPetDialog = ref(false)
 
+function customerLabel(customer: Customer): string {
+  return `${customer.first_name} ${customer.last_name}`
+}
+
+// Con término vacío, customersService.search() regresa la lista completa
+// del tenant (ver services/customers.ts) — así el autocomplete arranca
+// con opciones para elegir en vez de aparecer vacío hasta que se escribe.
 async function searchCustomers(): Promise<void> {
   if (!session.activeTenantId) return
   customerResults.value = await customersService.search(session.activeTenantId, customerSearchTerm.value)
 }
-watch(customerSearchTerm, searchCustomers)
 
-async function selectCustomer(customer: Customer): Promise<void> {
+// Al elegir una opción del autocomplete (sin borrar antes, ahora que el
+// campo se queda montado siempre — pedido explícito del usuario), Vuetify
+// deja el texto de búsqueda como el nombre completo del cliente elegido y
+// dispara @update:search con eso. Si eso disparara una búsqueda real, el
+// término (nombre + apellido juntos) no hace match ni por nombre ni por
+// apellido por separado (customers.search busca "empieza con" en un solo
+// campo), y customerResults quedaba vacío al reabrir el menú. El watcher
+// corre en el siguiente "tick" reactivo de Vue (después de que termine el
+// código síncrono que disparó el cambio), así que para cuando se evalúa
+// esta condición, selectCustomer ya alcanzó a actualizar selectedCustomer
+// — sin importar si Vuetify emitió el evento de búsqueda antes o después
+// del de selección.
+watch(customerSearchTerm, (term) => {
+  if (selectedCustomer.value && customerLabel(selectedCustomer.value) === term) return
+  searchCustomers()
+})
+
+async function selectCustomer(customer: Customer | null): Promise<void> {
   selectedCustomer.value = customer
   selectedPet.value = null
-  customerPets.value = await petsService.listByCustomer(session.activeTenantId ?? '', customer.id)
-}
+  customerPets.value = customer
+    ? await petsService.listByCustomer(session.activeTenantId ?? '', customer.id)
+    : []
 
-function handleNewCustomerSaved(customer: Customer): void {
-  selectCustomer(customer)
-}
-function handleNewPetSaved(pet: Pet): void {
-  selectedPet.value = pet
-  customerPets.value.push(pet)
+  // Al limpiar la selección, se regresa el buscador a su estado inicial:
+  // término vacío y la lista completa del tenant, en vez de dejar lo que
+  // haya quedado de la búsqueda anterior.
+  if (!customer) {
+    customerSearchTerm.value = ''
+    await searchCustomers()
+  }
 }
 
 // --- Tipo --------------------------------------------------------------
@@ -211,6 +232,7 @@ watch(
 
     loadEmployees()
     loadServices()
+    searchCustomers()
   },
 )
 
@@ -304,70 +326,105 @@ async function handleSubmit(): Promise<void> {
             <!-- Cliente y mascota -->
             <p class="text-overline text-medium-emphasis">Cliente y mascota</p>
 
-            <div v-if="!selectedCustomer">
-              <v-text-field
-                v-model="customerSearchTerm"
-                label="Buscar cliente por nombre o apellido"
-                prepend-inner-icon="mdi-magnify"
-                density="compact"
-                variant="outlined"
-              />
-              <v-list>
-                <v-list-item
-                  v-for="customer in customerResults"
-                  :key="customer.id"
-                  :title="`${customer.first_name} ${customer.last_name}`"
-                  @click="selectCustomer(customer)"
-                />
-              </v-list>
-              <v-btn variant="text" prepend-icon="mdi-plus" @click="showNewCustomerDialog = true">
-                Cliente nuevo
-              </v-btn>
-            </div>
+            <!-- El autocomplete se queda montado siempre, seleccionado o
+                 no (pedido explícito del usuario: nada de cambiar a un
+                 texto + botón "Cambiar"). Con no-filter, Vuetify no
+                 filtra del lado del cliente, así que aunque el cuadro
+                 muestre el nombre ya elegido, el menú sigue ofreciendo
+                 toda customerResults — elegir otro cliente es un solo
+                 clic, directo. -->
+            <v-autocomplete
+              :model-value="selectedCustomer"
+              :items="customerResults"
+              :item-title="customerLabel"
+              no-filter
+              return-object
+              label="Buscar cliente por nombre o apellido"
+              prepend-inner-icon="mdi-magnify"
+              density="compact"
+              variant="outlined"
+              @update:model-value="selectCustomer"
+              @update:search="customerSearchTerm = $event"
+            />
 
-            <div v-else>
-              <p class="mb-2">
-                <strong>Cliente:</strong> {{ selectedCustomer.first_name }} {{ selectedCustomer.last_name }}
-                <v-btn variant="text" size="small" @click="selectedCustomer = null">Cambiar</v-btn>
-              </p>
-
-              <p class="mb-1"><strong>Mascota:</strong></p>
-              <v-chip-group v-model="selectedPet" mandatory column>
-                <v-chip v-for="pet in customerPets" :key="pet.id" :value="pet" filter>
+            <!-- Solo se elige entre las mascotas ya registradas del
+                 cliente: dar de alta una mascota nueva desde este
+                 dialog quedó fuera de alcance (pedido explícito del
+                 usuario) — si no existe, se registra primero desde
+                 la ficha del cliente. -->
+            <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mt-2">
+              <span class="font-weight-bold">Mascota:</span>
+              <v-chip-group v-model="selectedPet" mandatory>
+                <v-chip
+                  v-for="pet in customerPets"
+                  :key="pet.id"
+                  :value="pet"
+                  :prepend-icon="pet.species === 'cat' ? 'mdi-cat' : 'mdi-dog'"
+                  filter
+                >
                   {{ pet.name }}
                 </v-chip>
               </v-chip-group>
-              <v-btn variant="text" prepend-icon="mdi-plus" @click="showNewPetDialog = true">
-                Mascota nueva
-              </v-btn>
             </div>
 
             <v-divider class="my-4" />
 
-            <!-- Tipo -->
+            <!-- Tipo: dos botones independientes, no v-btn-toggle (pedido
+                 explícito del usuario). El resaltado del elegido se hace
+                 a mano con :color/:variant, pero el comportamiento sigue
+                 siendo "uno u otro": kind siempre tiene un valor, y
+                 hacer clic en un botón solo lo reemplaza por el otro. -->
             <p class="text-overline text-medium-emphasis">Tipo de cita</p>
-            <v-btn-toggle v-model="kind" mandatory color="primary" class="mb-2">
-              <v-btn value="grooming">Estética</v-btn>
-              <v-btn value="veterinary">Veterinaria</v-btn>
-            </v-btn-toggle>
+            <div class="d-flex ga-2 mb-2">
+              <v-btn
+                :color="kind === 'grooming' ? 'primary' : undefined"
+                :variant="kind === 'grooming' ? 'flat' : 'outlined'"
+                @click="kind = 'grooming'"
+              >
+                Estética
+              </v-btn>
+              <v-btn
+                :color="kind === 'veterinary' ? 'primary' : undefined"
+                :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
+                @click="kind = 'veterinary'"
+              >
+                Veterinaria
+              </v-btn>
+            </div>
 
             <v-divider class="my-4" />
 
             <!-- Servicios -->
             <p class="text-overline text-medium-emphasis">Servicios</p>
-            <v-checkbox
-              v-for="service in availableServices"
-              :key="service.id"
+            <v-select
               v-model="selectedServiceIds"
-              :value="service.id"
-              :label="`${service.name} — ${service.duration_minutes} min — ${formatMXN(service.price_cents)}`"
+              :items="availableServices"
+              item-title="name"
+              item-value="id"
+              multiple
+              chips
+              label="Servicios"
               density="compact"
-              hide-details
-            />
+              variant="outlined"
+            >
+              <!-- En la lista desplegada, la info completa (nombre,
+                   duración, precio) — pedido explícito del usuario. -->
+              <template #item="{ item, props: itemProps }">
+                <v-list-item
+                  v-bind="itemProps"
+                  :title="item.raw.name"
+                  :subtitle="`${item.raw.duration_minutes} min — ${formatMXN(item.raw.price_cents)}`"
+                />
+              </template>
+              <!-- En el chip ya elegido, solo el nombre. -->
+              <template #chip="{ item, props: chipProps }">
+                <v-chip v-bind="chipProps" :text="item.raw.name" />
+              </template>
+            </v-select>
             <p v-if="availableServices.length === 0" class="text-medium-emphasis">
               No hay servicios activos en esta categoría.
             </p>
-            <p v-if="selectedServices.length > 0" class="mt-2 text-body-2">
+            <p class="mt-2 text-body-2">
               Total: {{ totalDurationMinutes }} min · {{ formatMXN(totalPriceCents) }}
             </p>
           </v-col>
@@ -400,8 +457,19 @@ async function handleSubmit(): Promise<void> {
               variant="outlined"
             />
 
+            <!-- El picker solo se pinta una vez que ya hay con qué buscar
+                 huecos (empleado + al menos un servicio). Antes de eso
+                 no hay una búsqueda real que haya fallado, así que no
+                 corresponde mostrar "no hay huecos disponibles". -->
             <v-progress-circular v-if="loadingSlots" indeterminate color="primary" />
-            <TimeSlotPicker v-else v-model="selectedSlot" :slots="availableSlots" />
+            <TimeSlotPicker
+              v-else-if="selectedEmployeeId && totalDurationMinutes > 0"
+              v-model="selectedSlot"
+              :slots="availableSlots"
+            />
+            <p v-else class="text-medium-emphasis text-body-2">
+              Elige empleado y al menos un servicio para ver los horarios disponibles.
+            </p>
           </v-col>
         </v-row>
 
@@ -418,18 +486,5 @@ async function handleSubmit(): Promise<void> {
         </v-btn>
       </v-card-actions>
     </v-card>
-
-    <CustomerFormDialog
-      v-model="showNewCustomerDialog"
-      :tenant-id="session.activeTenantId ?? ''"
-      @saved="handleNewCustomerSaved"
-    />
-    <PetFormDialog
-      v-if="selectedCustomer"
-      v-model="showNewPetDialog"
-      :tenant-id="session.activeTenantId ?? ''"
-      :customer-id="selectedCustomer.id"
-      @saved="handleNewPetSaved"
-    />
   </v-dialog>
 </template>
