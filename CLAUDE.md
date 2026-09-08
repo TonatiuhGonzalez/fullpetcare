@@ -606,16 +606,30 @@ Cuando entre el primer cliente de verdad, esa suposición cambia y hay que revis
 
 ### Git
 
-- **Cero commits directos a `main`.** Rama + PR siempre, con protección de rama activada.
-- Ramas: `feat/…`, `fix/…`, `chore/…`, `docs/…`.
+- **`develop` es la rama de integración.** Es la rama por defecto del repositorio en
+  GitHub. Toda rama nueva sale de `develop`, y todo PR se abre hacia `develop`.
+- **`main` es la rama de producción.** Solo recibe código por PR manual desde `develop`,
+  cuando se decide hacer una demo/release — no en cada merge de feature. Nadie mergea
+  una rama de feature directo a `main`.
+- **Cero commits directos ni a `develop` ni a `main`.** Rama + PR siempre; ambas tienen
+  protección de rama activada (PR obligatorio + CI en verde antes de mergear).
+- Ramas: `feat/…`, `fix/…`, `chore/…`, `docs/…`, siempre creadas a partir de `develop`.
 - Commits en inglés, imperativo: `add appointment availability calculator`.
 - El PR no se mergea si el CI falla.
 
+Por qué este cambio (2026-09-07): antes toda rama salía de `main` y mergeaba a `main`,
+y como Cloudflare Pages despliega producción en cada push a `main`, cada merge de
+feature disparaba un despliegue real. Con `develop` como integración, los merges del
+día a día no tocan producción; `main` solo avanza cuando se decide explícitamente
+promover, vía PR manual `develop` → `main`.
+
 ### CI (GitHub Actions)
 
-En cada push: instalar dependencias, `lint`, `test:unit`, levantar Supabase local y
-correr `test:db`. En `main`, además, aplicar migraciones a producción. El archivo va
-**comentado bloque por bloque**.
+En cada push a `main` o a `develop`, y en cada Pull Request: instalar dependencias,
+`lint`, `test:unit`, levantar Supabase local y correr `test:db`. Solo en `main`, además,
+aplicar migraciones y Edge Functions a producción — eso no cambia: producción sigue
+siendo `main` (§10, "Los tres entornos"), lo que cambia es qué tan seguido llega código
+ahí. El archivo va **comentado bloque por bloque**.
 
 ### Secretos
 
