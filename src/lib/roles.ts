@@ -45,7 +45,7 @@ export function roleForServiceKind(kind: ServiceKind): MemberRole {
  * el rol específico del tipo. receptionist queda fuera a propósito: agenda
  * citas, no las atiende (mismo criterio que create_appointment() en la
  * base, que rechaza asignarle una cita a recepción). Se usa para filtrar
- * a quién se le puede asignar una cita al agendar (NewAppointmentPage.vue).
+ * a quién se le puede asignar una cita al agendar (NewAppointmentDialog.vue).
  */
 export function canAttendKind(role: MemberRole | null, kind: ServiceKind): boolean {
   return role === 'owner' || role === roleForServiceKind(kind)

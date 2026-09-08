@@ -10,8 +10,10 @@ import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { listUpcomingVaccines } from '@/services/records'
 import type { UpcomingVaccine } from '@/services/records'
+import type { Appointment } from '@/services/appointments'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
+import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
@@ -108,8 +110,14 @@ function handleEmployeeFilterChange(userId: unknown): void {
   agenda.setEmployeeFilter(typeof userId === 'string' ? userId : null)
 }
 
+const showNewAppointmentDialog = ref(false)
+
 function goToNewAppointment(): void {
-  router.push('/app/citas/nueva')
+  showNewAppointmentDialog.value = true
+}
+
+function handleAppointmentCreated(appointment: Appointment): void {
+  router.push(`/app/citas/${appointment.id}`)
 }
 
 function goToDetail(appointmentId: string): void {
@@ -231,5 +239,7 @@ function goToDetail(appointmentId: string): void {
         </v-list-item>
       </v-list>
     </v-card>
+
+    <NewAppointmentDialog v-model="showNewAppointmentDialog" @created="handleAppointmentCreated" />
   </v-container>
 </template>
