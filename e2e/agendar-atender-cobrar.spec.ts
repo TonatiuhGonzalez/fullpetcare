@@ -24,6 +24,13 @@
 // 6. Verificar que aparece en el historial de la mascota — confirma que
 //    services/petHistory.ts (fase 6) ve la cita recién cobrada, con las
 //    notas que se acaban de escribir (no una entrada vieja parecida).
+//
+// Desde AppointmentDialog.vue (2026-09-10) los pasos 2-4 ya NO navegan a
+// /app/citas/:id, /atender ni /cobrar — todo pasa dentro de un solo
+// diálogo sobre /app/agenda, así que este test ya no espera esas URLs:
+// espera los textos/botones de cada etapa del diálogo, y vuelve a hacer
+// clic sobre el bloque de la cita en la agenda cada vez que una acción
+// (Atender/Terminar) lo cierra.
 import { test, expect } from '@playwright/test'
 
 const DUENO_EMAIL = 'dueno@patitasfelices.mx'
@@ -105,28 +112,50 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await slot.click()
 
   await dialog.locator('button', { hasText: 'Agendar' }).click()
-  await page.waitForURL(/\/app\/citas\/[0-9a-f-]+$/)
 
-  // 3. Atender, con una nota de groomer que sirve de "huella" única para
-  // el paso 6 (así el assert final no puede confundirse con una visita
-  // vieja de otra corrida o de otro test).
-  await page.locator('a, button', { hasText: 'Atender' }).first().click()
-  await page.waitForURL(/\/atender$/)
+  // NewAppointmentDialog se cierra y AppointmentDialog.vue se abre solo,
+  // ya para la cita recién creada (etapa 'info': "Detalle de la cita").
+  await expect(page.getByText('Detalle de la cita')).toBeVisible()
+
+  // 3. Atender: solo cambia el estado (scheduled → in_progress) y CIERRA
+  // el diálogo — pedido explícito del usuario (2026-09-10). Para llenar
+  // la ficha hay que volver a hacer clic sobre el bloque de la cita en
+  // la agenda, ya en su nuevo color ("En curso").
+  await page.locator('button', { hasText: 'Atender' }).click()
+  await expect(page.getByText('Detalle de la cita')).toBeHidden()
+
+  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  await expect(page.getByText('Atender cita')).toBeVisible()
+
+  // Nota de groomer que sirve de "huella" única para el paso 6 (así el
+  // assert final no puede confundirse con una visita vieja de otra
+  // corrida o de otro test). "Terminar" dispara el guardado de la ficha
+  // (GroomingRecordForm) y, si se guarda bien, cierra el diálogo.
   await page.getByLabel('Notas del groomer').fill(groomerNotes)
-  await page.locator('button', { hasText: /Guardar|Registrar/i }).first().click()
-  await expect(page.getByText(/Cita completada/i)).toBeVisible()
+  await page.locator('button', { hasText: 'Terminar' }).click()
+  await expect(page.getByText('Atender cita')).toBeHidden()
 
-  // 4. Cobrar en efectivo
-  await page.locator('a', { hasText: 'Ir a cobrar' }).click()
-  await page.waitForURL(/\/cobrar$/)
+  // 4. Cobrar en efectivo — "Cobrar" desliza al mismo formulario que antes
+  // vivía en /cobrar, DENTRO del diálogo (pedido explícito del usuario).
+  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  await page.getByRole('button', { name: 'Cobrar', exact: true }).click()
   await expect(page.getByText('Subtotal')).toBeVisible()
-  await page.locator('button', { hasText: 'Todo' }).first().click()
-  await page.locator('button:has(.mdi-plus)').first().click()
-  await page.locator('button', { hasText: /Cobrar \$/ }).click()
-  await expect(page.getByText(/Cobro registrado/i)).toBeVisible()
 
-  // 5. El ticket muestra el total de Baño ($250.00, IVA incluido — seed.sql).
+  // Acotado al diálogo (page.getByRole('dialog')): tanto "Nueva cita" del
+  // encabezado de AgendaPage.vue como el botón de "+" para agregar un
+  // pago usan el mismo ícono mdi-plus — sin acotar, Playwright puede
+  // resolver "button:has(.mdi-plus)" al del encabezado, que además queda
+  // bloqueado por el scrim del diálogo.
+  const checkoutDialog = page.getByRole('dialog')
+  await checkoutDialog.locator('button', { hasText: 'Todo' }).first().click()
+  await checkoutDialog.locator('button:has(.mdi-plus)').click()
+  await checkoutDialog.locator('button', { hasText: /Cobrar \$/ }).click()
+
+  // 5. El ticket queda mostrándose en el mismo diálogo (con su botón
+  // "Imprimir", TicketView) con el total de Baño ($250.00, IVA incluido
+  // — seed.sql).
   const ticket = page.locator('.ticket-print')
+  await expect(ticket).toBeVisible()
   await expect(ticket).toContainText('$250.00')
 
   // 6. El historial de Rocky ve esta visita, con la nota que se acaba de
