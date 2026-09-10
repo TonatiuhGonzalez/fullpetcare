@@ -263,7 +263,21 @@ function goToDetail(appointmentId: string): void {
       color="primary"
     />
 
-    <template v-else-if="agenda.status === 'ready'">
+    <!-- El "&& agenda.visibleDates.length > 0" de aquí abajo es la misma
+         protección que agenda.status === 'idle' de arriba, para OTRO
+         momento en el que pasa lo mismo: al cerrar sesión (AppLayout.vue
+         handleLogout), session.logout() limpia session.role y
+         session.activeBranches ANTES de que el router termine de
+         desmontar esta página. Con la sesión ya vacía, isFrontDeskView
+         cambia y Vue monta EmployeeWeekCalendar en vez de
+         EmployeeDayScheduler con agenda.visibleDates ya en [] (depende
+         de session.activeBranches, stores/agenda.ts) — start-date llega
+         vacío y DayPilot truena igual que antes. agenda.status se queda
+         en 'ready' en ese instante (el store de agenda no se resetea al
+         cerrar sesión), así que sin este segundo chequeo el de arriba no
+         lo detecta. Verificado a mano: sin esto, el logout deja la URL en
+         /login pero la pantalla congelada hasta hacer F5. -->
+    <template v-else-if="agenda.status === 'ready' && agenda.visibleDates.length > 0">
       <div class="d-flex flex-wrap ga-3 mb-2">
         <span
           v-for="item in statusLegend"
