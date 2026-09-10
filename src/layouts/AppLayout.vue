@@ -9,6 +9,14 @@ const session = useSessionStore()
 const router = useRouter()
 
 const businessName = computed(() => session.activeMembership?.tenantName ?? '')
+// "Patitas Felices - Sucursal Centro" — la sucursal activa va pegada al
+// nombre del negocio en el título (pedido explícito, antes solo se veía
+// más a la derecha de la barra, lejos del nombre). Mientras no haya
+// sucursal elegida (p. ej. el instante entre login y que
+// resolveActiveBranch() corra) se muestra solo el nombre del negocio.
+const titleLabel = computed(() =>
+  session.activeBranch ? `${businessName.value} - ${session.activeBranch.name}` : businessName.value,
+)
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
 async function handleLogout(): Promise<void> {
@@ -25,7 +33,7 @@ function handleBranchChange(branchId: unknown): void {
   <v-app-bar color="primary" density="comfortable">
     <v-app-bar-title>
       <v-icon icon="mdi-paw" class="mr-2" />
-      {{ businessName }}
+      {{ titleLabel }}
     </v-app-bar-title>
 
     <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
@@ -43,7 +51,9 @@ function handleBranchChange(branchId: unknown): void {
     <v-btn to="/app/catalogo" variant="text" class="mr-4">Catálogo</v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
-         elegir — con una sola, se muestra su nombre como texto fijo. -->
+         elegir — con una sola, el título de arriba ya la muestra
+         ("Patitas Felices - Sucursal Centro"), así que no hace falta
+         repetirla aquí. -->
     <v-select
       v-if="session.activeBranches.length > 1"
       :model-value="session.activeBranchId"
@@ -57,7 +67,6 @@ function handleBranchChange(branchId: unknown): void {
       class="mr-4"
       @update:model-value="handleBranchChange"
     />
-    <span v-else class="text-body-2 mr-4">{{ session.activeBranch?.name }}</span>
 
     <v-chip class="mr-4" size="small" variant="tonal">{{
       roleLabel(session.role)

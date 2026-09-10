@@ -1,9 +1,14 @@
 // Estado de la agenda: qué sucursal se está viendo y qué citas hay en el
-// rango de fechas visible. Separado de useSessionStore a propósito: la
-// sucursal de la AGENDA puede ser distinta de la sucursal "activa" de la
-// sesión — CLAUDE.md §8.3 pone el ejemplo de un dueño en CDMX revisando
-// la agenda de la sucursal de Tijuana sin cambiar su sesión completa a
-// ese negocio/sucursal.
+// rango de fechas visible. Tiene su PROPIO activeBranchId, separado del
+// de useSessionStore, aunque hoy (2026-09-10) siempre valen lo mismo: no
+// hay ningún control en la UI que los desincronice — AgendaPage.vue solo
+// los mantiene alineados con un watcher (ver ese archivo). Se dejan
+// separados porque la idea original era dejar a un dueño "asomarse" a la
+// agenda de otra sucursal sin cambiar la sucursal de toda su sesión; ese
+// selector se quitó de AgendaPage.vue (ahora solo existe el de
+// AppLayout.vue, que sí toca la sesión), pero el store no se colapsó en
+// uno solo por si esa función vuelve — si termina sin usarse, es candidato
+// a simplificarse a futuro.
 //
 // Rediseño 2026-09-08 (pedido explícito del usuario): el RANGO de fechas
 // visible ahora depende del ROL, no solo de un día elegido a mano —

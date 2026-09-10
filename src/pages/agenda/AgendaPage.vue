@@ -118,15 +118,12 @@ async function loadEmployees(): Promise<void> {
 
 watch(() => agenda.activeBranchId, loadEmployees)
 
-// Bug reportado en el UAT: cambiar de sucursal en el selector de la
-// barra superior (AppLayout.vue, que solo toca useSessionStore) no movía
-// nada aquí — la agenda tiene su PROPIA sucursal activa a propósito
-// (stores/agenda.ts: un dueño puede "asomarse" a otra sucursal sin
-// cambiar su sesión completa), pero eso significa que nada la mantenía
-// sincronizada con la de arriba tampoco. Este watcher hace que, si la
-// sucursal de la SESIÓN cambia mientras la agenda está abierta, la
-// agenda la siga — sin quitarle al selector propio de esta página la
-// posibilidad de ver otra sucursal sin tocar la sesión.
+// La agenda tiene su PROPIA sucursal activa en stores/agenda.ts, separada
+// de la de la sesión (ver el comentario al inicio de ese archivo) — pero
+// el único selector de sucursal que existe ahora es el de AppLayout.vue,
+// que solo toca useSessionStore. Sin este watcher, cambiar de sucursal
+// ahí arriba no movería nada aquí: este efecto hace que la agenda SIGA
+// a la sucursal de la sesión en cuanto cambia.
 watch(
   () => session.activeBranchId,
   (branchId) => {
@@ -163,10 +160,6 @@ function shiftDay(deltaDays: number): void {
 
 function handleDateInput(value: unknown): void {
   if (typeof value === 'string' && value) agenda.setDate(value)
-}
-
-function handleBranchChange(branchId: unknown): void {
-  if (typeof branchId === 'string') agenda.setBranch(branchId)
 }
 
 // Etiqueta informativa para groomer/vet ("8 sep – 14 sep 2026") — no hay
@@ -218,20 +211,6 @@ function goToDetail(appointmentId: string): void {
       <span v-else class="text-body-2 text-medium-emphasis text-capitalize">
         {{ visibleRangeLabel }}
       </span>
-
-      <v-select
-        v-if="session.activeBranches.length > 1"
-        :model-value="agenda.activeBranchId"
-        :items="session.activeBranches"
-        item-title="name"
-        item-value="id"
-        label="Sucursal"
-        density="compact"
-        variant="outlined"
-        hide-details
-        style="max-width: 200px"
-        @update:model-value="handleBranchChange"
-      />
 
       <v-spacer />
       <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
