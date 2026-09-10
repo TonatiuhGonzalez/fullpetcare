@@ -107,6 +107,23 @@ Las aprobadas hasta ahora:
   dependencia de fechas.
 - `pg` (dev) — cliente Postgres para los tests de RLS, que necesitan conectarse como
   roles distintos.
+- `@daypilot/daypilot-lite-vue` — componente real de calendario/scheduler para la
+  agenda (2026-09-08, pedido explícitamente por el usuario tras rechazar la primera
+  versión hecha a mano con Vuetify/CSS). Apache-2.0, gratuita ("Lite"), sin marca de
+  agua ni límite de uso. Incluye `DayPilotCalendar` (semana, horas verticales — vista
+  de groomer/vet) y `DayPilotScheduler` (filas de recursos, horas horizontales — vista
+  de dueño/recepción). El paquete no publica su `.d.ts` en `types`/`typings` de
+  `package.json`, pero TypeScript lo encuentra solo (mismo nombre de archivo que
+  `main`) gracias a `skipLibCheck: true` ya heredado de `@vue/tsconfig`.
+  Nota (mismo día): se probó cambiar a `@schedule-x/calendar` porque el Scheduler de
+  DayPilot Lite no puede OCULTAR las horas fuera del horario de la sucursal (solo
+  atenuarlas — esa función es de DayPilot Pro). Schedule-X sí recorta de verdad las
+  horas (`dayBoundaries`, gratis), pero al usuario no le gustó el resultado visual —
+  se regresó a DayPilot el mismo día. Si se retoma Schedule-X en el futuro: su
+  "resource view" (filas de empleados) **también** es de paga (confirmado en su repo,
+  la carpeta de vistas de código abierto no trae ninguna vista de recursos), y hay que
+  fijar `timezone` explícito en `createCalendar()` o muestra las citas en la zona del
+  navegador en vez de la de la sucursal.
 - `eslint`, `prettier`, `eslint-plugin-vue`, `vitest`, `@vue/test-utils`,
   `@playwright/test`, `vite-plugin-vuetify` — herramientas.
 
