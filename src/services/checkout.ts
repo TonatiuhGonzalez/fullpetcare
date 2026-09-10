@@ -108,6 +108,50 @@ export async function charge(args: ChargeArgs): Promise<Ticket> {
   return getTicket(saleId)
 }
 
+/**
+ * El id de la venta que ya cubre esta cita, o null si todavía no se cobra
+ * — misma condición que valida checkout_appointment() en la base ("ya fue
+ * cobrada", checkout_rpc.sql): una partida de sale_items ligada a la cita,
+ * en una venta que no esté cancelada. Se resuelve en el cliente (en vez de
+ * agregar una columna a appointments) porque la cita NUNCA deja de estar
+ * 'completed' — el hecho de "ya se cobró" vive en sales, no en el estado
+ * de la cita (CLAUDE.md §6.3/§8.5: completed es un estado terminal).
+ */
+export async function findSaleIdForAppointment(appointmentId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('sale_items')
+    .select('sale_id, sales ( status )')
+    .eq('appointment_id', appointmentId)
+    .is('deleted_at', null)
+
+  if (error) throw error
+  const active = (data ?? []).find((row) => row.sales?.status !== 'cancelled')
+  return active?.sale_id ?? null
+}
+
+/**
+ * De una lista de citas (p. ej. las de la agenda visible), cuáles ya
+ * tienen una venta que las cubre — para pintar el estado "Cobrada" en
+ * AgendaPage.vue sin una consulta por cita.
+ */
+export async function listPaidAppointmentIds(appointmentIds: string[]): Promise<Set<string>> {
+  if (appointmentIds.length === 0) return new Set()
+
+  const { data, error } = await supabase
+    .from('sale_items')
+    .select('appointment_id, sales ( status )')
+    .in('appointment_id', appointmentIds)
+    .is('deleted_at', null)
+
+  if (error) throw error
+
+  const paid = new Set<string>()
+  for (const row of data ?? []) {
+    if (row.appointment_id && row.sales?.status !== 'cancelled') paid.add(row.appointment_id)
+  }
+  return paid
+}
+
 /** Recupera un ticket ya cobrado (p. ej. al volver a una venta desde el historial). */
 export async function getTicket(saleId: string): Promise<Ticket> {
   const [saleResult, itemsResult, paymentsResult] = await Promise.all([

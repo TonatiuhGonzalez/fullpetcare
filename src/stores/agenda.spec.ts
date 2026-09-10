@@ -25,6 +25,13 @@ vi.mock('@/services/appointments', () => ({
 vi.mock('@/services/branches', () => ({
   getById: vi.fn(),
 }))
+// load() ahora también pregunta cuáles de esas citas ya se cobraron
+// (paidAppointmentIds, para pintar "Cobrada" en AgendaPage.vue) — sin
+// este mock, listPaidAppointmentIds() intentaría hablar con Supabase de
+// verdad y el test truena (test:unit es sin red, CLAUDE.md §9).
+vi.mock('@/services/checkout', () => ({
+  listPaidAppointmentIds: vi.fn(),
+}))
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -39,6 +46,7 @@ vi.mock('@/services/memberships', () => ({
 
 import { listByDateRange } from '@/services/appointments'
 import { getById as getBranchById } from '@/services/branches'
+import { listPaidAppointmentIds } from '@/services/checkout'
 
 const OWNER_MEMBERSHIP: MembershipSummary = {
   membershipId: 'm-1',
@@ -93,10 +101,12 @@ beforeEach(() => {
   setActivePinia(createPinia())
   vi.mocked(listByDateRange).mockReset()
   vi.mocked(getBranchById).mockReset()
+  vi.mocked(listPaidAppointmentIds).mockReset()
   // Default razonable: sin sucursal (o sin horario configurado), la
   // grilla cae en el rango por default de lib/calendarGrid.ts — cada
   // test que sí necesite un horario real lo sobreescribe.
   vi.mocked(getBranchById).mockResolvedValue(null)
+  vi.mocked(listPaidAppointmentIds).mockResolvedValue(new Set())
 })
 
 afterEach(() => {

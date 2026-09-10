@@ -25,6 +25,7 @@ import { format } from 'date-fns'
 
 import * as appointmentsService from '@/services/appointments'
 import type { AppointmentWithNames } from '@/services/appointments'
+import * as checkoutService from '@/services/checkout'
 import * as branchesService from '@/services/branches'
 import { toBranchTime } from '@/lib/datetime'
 import { hoursForDate, type BranchHours } from '@/lib/availability'
@@ -44,6 +45,12 @@ export const useAgendaStore = defineStore('agenda', () => {
   // — tanto el Scheduler de un día como el Calendar de 7 días las
   // necesitan todas a la vez.
   const appointments = ref<AppointmentWithNames[]>([])
+  // IDs de las citas de `appointments` que ya tienen una venta que las
+  // cubre — pinta el estado "Cobrada" en AgendaPage.vue. No es parte del
+  // estado real de la cita (appointments.status nunca deja 'completed',
+  // ver services/checkout.ts#findSaleIdForAppointment), así que se calcula
+  // aparte en vez de venir embebido en AppointmentWithNames.
+  const paidAppointmentIds = ref<Set<string>>(new Set())
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const errorMessage = ref<string | null>(null)
   // opening_hours (jsonb) de la sucursal activa — hace falta para saber
@@ -96,6 +103,9 @@ export const useAgendaStore = defineStore('agenda', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- opening_hours es un jsonb genérico (Json) en los tipos generados; misma nota que NewAppointmentDialog.vue.
       branchOpeningHours.value = (branch?.opening_hours as any) ?? {}
       appointments.value = rangeAppointments
+      paidAppointmentIds.value = await checkoutService.listPaidAppointmentIds(
+        rangeAppointments.map((a) => a.id),
+      )
       status.value = 'ready'
     } catch {
       status.value = 'error'
@@ -134,6 +144,7 @@ export const useAgendaStore = defineStore('agenda', () => {
     activeDate,
     activeBranchId,
     appointments,
+    paidAppointmentIds,
     visibleDates,
     hourRange,
     status,
