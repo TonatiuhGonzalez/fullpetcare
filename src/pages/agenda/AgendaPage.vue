@@ -12,7 +12,6 @@
 // (visibleDates) — esta página solo arma los bloques a pintar y elige
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -27,12 +26,12 @@ import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
+import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
-const router = useRouter()
 
 const isFrontDeskView = computed(() => isFrontDesk(session.role))
 
@@ -55,10 +54,19 @@ const branchTimezone = computed(
   () => session.activeBranches.find((b) => b.id === agenda.activeBranchId)?.timezone ?? 'UTC',
 )
 
-const statusLabels: Record<AppointmentStatus, string> = {
+// 'paid' no es un valor de appointments.status (ese enum nunca deja
+// 'completed' — CLAUDE.md §6.3/§8.5) — es un estado SOLO VISUAL para esta
+// página: "completada y además ya tiene una venta que la cubre"
+// (stores/agenda.ts#paidAppointmentIds, calculado aparte con
+// services/checkout.ts#listPaidAppointmentIds). displayStatus() de abajo
+// es la única función que combina ambas cosas.
+type DisplayStatus = AppointmentStatus | 'paid'
+
+const statusLabels: Record<DisplayStatus, string> = {
   scheduled: 'Agendada',
   in_progress: 'En curso',
   completed: 'Completada',
+  paid: 'Cobrada',
   cancelled: 'Cancelada',
   no_show: 'No se presentó',
 }
@@ -67,18 +75,27 @@ const statusLabels: Record<AppointmentStatus, string> = {
 // si es estética o veterinaria (eso ya va en el texto del bloque).
 // rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts en
 // vez de repetir colores a mano.
-const statusColors: Record<AppointmentStatus, string> = {
+const statusColors: Record<DisplayStatus, string> = {
   scheduled: 'rgb(var(--v-theme-info))',
   in_progress: 'rgb(var(--v-theme-warning))',
   completed: 'rgb(var(--v-theme-success))',
+  paid: 'rgb(var(--v-theme-primary))',
   cancelled: 'rgb(var(--v-theme-error))',
   no_show: 'rgb(var(--v-theme-error))',
 }
 const kindLabels: Record<string, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 
+/** El estado a MOSTRAR de una cita — como appointment.status, salvo que ya se cobró. */
+function displayStatus(appointment: Appointment): DisplayStatus {
+  if (appointment.status === 'completed' && agenda.paidAppointmentIds.has(appointment.id)) {
+    return 'paid'
+  }
+  return appointment.status
+}
+
 // Para la leyenda de colores del template.
 const statusLegend = computed(() =>
-  (Object.keys(statusLabels) as AppointmentStatus[]).map((key) => ({
+  (Object.keys(statusLabels) as DisplayStatus[]).map((key) => ({
     key,
     label: statusLabels[key],
     color: statusColors[key],
@@ -106,7 +123,7 @@ const calendarBlocks = computed<CalendarBlock[]>(() =>
     start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
     end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
     text: `${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
-    color: statusColors[appointment.status],
+    color: statusColors[displayStatus(appointment)],
     resource: appointment.employee_user_id,
   })),
 )
@@ -180,12 +197,22 @@ function goToNewAppointment(): void {
   showNewAppointmentDialog.value = true
 }
 
-function handleAppointmentCreated(appointment: Appointment): void {
-  router.push(`/app/citas/${appointment.id}`)
+// AppointmentDialog.vue reemplaza la navegación a /app/citas/:id al hacer
+// clic en un bloque de la agenda (pedido explícito del usuario,
+// 2026-09-10): antes esto navegaba a AppointmentDetailPage.vue, una
+// página aparte. Se reutiliza también justo después de agendar una cita
+// nueva, para no mezclar "crear" (diálogo) con "ver detalle" (antes
+// página, ahora también diálogo).
+const showAppointmentDialog = ref(false)
+const selectedAppointmentId = ref<string | null>(null)
+
+function openAppointmentDialog(appointmentId: string): void {
+  selectedAppointmentId.value = appointmentId
+  showAppointmentDialog.value = true
 }
 
-function goToDetail(appointmentId: string): void {
-  router.push(`/app/citas/${appointmentId}`)
+function handleAppointmentCreated(appointment: Appointment): void {
+  openAppointmentDialog(appointment.id)
 }
 </script>
 
@@ -274,7 +301,7 @@ function goToDetail(appointmentId: string): void {
         :hour-range="agenda.hourRange"
         :rows="schedulerRows"
         :blocks="calendarBlocks"
-        @select="goToDetail"
+        @select="openAppointmentDialog"
       />
       <EmployeeWeekCalendar
         v-else
@@ -282,7 +309,7 @@ function goToDetail(appointmentId: string): void {
         :days="agenda.visibleDates.length"
         :hour-range="agenda.hourRange"
         :blocks="calendarBlocks"
-        @select="goToDetail"
+        @select="openAppointmentDialog"
       />
     </template>
 
@@ -306,6 +333,11 @@ function goToDetail(appointmentId: string): void {
     </v-card>
 
     <NewAppointmentDialog v-model="showNewAppointmentDialog" @created="handleAppointmentCreated" />
+    <AppointmentDialog
+      v-model="showAppointmentDialog"
+      :appointment-id="selectedAppointmentId"
+      @changed="agenda.load()"
+    />
   </v-container>
 </template>
 

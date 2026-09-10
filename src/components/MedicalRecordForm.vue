@@ -20,8 +20,12 @@ const props = withDefaults(
     petId: string
     initialRecord?: MedicalRecord | null
     submitLabel?: string
+    // Ver el mismo comentario en GroomingRecordForm.vue: lo usa
+    // AppointmentDialog.vue para disparar el guardado desde su propio
+    // botón "Terminar", vía el ref expuesto abajo.
+    hideSubmitButton?: boolean
   }>(),
-  { submitLabel: 'Guardar y completar cita' },
+  { submitLabel: 'Guardar y completar cita', hideSubmitButton: false },
 )
 
 const emit = defineEmits<{ saved: [record: MedicalRecord] }>()
@@ -95,6 +99,8 @@ async function handleSubmit(): Promise<void> {
     saving.value = false
   }
 }
+
+defineExpose({ submit: handleSubmit })
 </script>
 
 <template>
@@ -137,6 +143,6 @@ async function handleSubmit(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-btn color="primary" type="submit" :loading="saving">{{ submitLabel }}</v-btn>
+    <v-btn v-if="!hideSubmitButton" color="primary" type="submit" :loading="saving">{{ submitLabel }}</v-btn>
   </v-form>
 </template>

@@ -14,6 +14,7 @@ import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { formatDate, formatTime, fromBranchTime } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
+import { isFrontDesk } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 const props = defineProps<{ id: string }>()
@@ -179,13 +180,21 @@ async function handleReschedule(): Promise<void> {
         >
           Atender
         </v-btn>
-        <v-btn variant="text" prepend-icon="mdi-calendar-edit" @click="openReschedule">
-          Reagendar
-        </v-btn>
-        <v-spacer />
-        <v-btn variant="text" color="error" prepend-icon="mdi-close" @click="handleCancel">
-          Cancelar cita
-        </v-btn>
+        <!-- Reagendar/cancelar es tarea de recepción (CLAUDE.md §6.1) —
+             groomer/vet solo atienden lo que recepción ya agendó (pedido
+             explícito del usuario, 2026-09-10). Esta página ya casi no se
+             usa desde la agenda (eso ahora abre AppointmentDialog.vue),
+             pero sigue siendo el destino real de "Próximas citas" en la
+             ficha de una mascota, a la que groomer/vet sí tienen acceso. -->
+        <template v-if="isFrontDesk(session.role)">
+          <v-btn variant="text" prepend-icon="mdi-calendar-edit" @click="openReschedule">
+            Reagendar
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" color="error" prepend-icon="mdi-close" @click="handleCancel">
+            Cancelar cita
+          </v-btn>
+        </template>
       </v-card-actions>
 
       <v-card-actions v-else-if="appointment.status === 'completed'">
