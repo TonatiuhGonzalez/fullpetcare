@@ -2,9 +2,9 @@
 // Componente tonto (CLAUDE.md §4): recibe la lista de huecos YA
 // calculada (lib/availability.ts#computeAvailableSlots, fuera de este
 // componente) y solo la pinta — no sabe nada de citas, empleados, ni
-// Supabase. Extraído de NewAppointmentPage.vue (tarea 3.18) para poder
-// probarlo aislado (tarea 3.20, uno de los pocos tests de componente del
-// proyecto — CLAUDE.md §9).
+// Supabase. Extraído del formulario de agendar (tarea 3.18, hoy
+// NewAppointmentDialog.vue) para poder probarlo aislado (tarea 3.20, uno
+// de los pocos tests de componente del proyecto — CLAUDE.md §9).
 import type { AvailableSlot } from '@/lib/availability'
 
 defineProps<{

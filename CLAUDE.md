@@ -107,6 +107,23 @@ Las aprobadas hasta ahora:
   dependencia de fechas.
 - `pg` (dev) — cliente Postgres para los tests de RLS, que necesitan conectarse como
   roles distintos.
+- `@daypilot/daypilot-lite-vue` — componente real de calendario/scheduler para la
+  agenda (2026-09-08, pedido explícitamente por el usuario tras rechazar la primera
+  versión hecha a mano con Vuetify/CSS). Apache-2.0, gratuita ("Lite"), sin marca de
+  agua ni límite de uso. Incluye `DayPilotCalendar` (semana, horas verticales — vista
+  de groomer/vet) y `DayPilotScheduler` (filas de recursos, horas horizontales — vista
+  de dueño/recepción). El paquete no publica su `.d.ts` en `types`/`typings` de
+  `package.json`, pero TypeScript lo encuentra solo (mismo nombre de archivo que
+  `main`) gracias a `skipLibCheck: true` ya heredado de `@vue/tsconfig`.
+  Nota (mismo día): se probó cambiar a `@schedule-x/calendar` porque el Scheduler de
+  DayPilot Lite no puede OCULTAR las horas fuera del horario de la sucursal (solo
+  atenuarlas — esa función es de DayPilot Pro). Schedule-X sí recorta de verdad las
+  horas (`dayBoundaries`, gratis), pero al usuario no le gustó el resultado visual —
+  se regresó a DayPilot el mismo día. Si se retoma Schedule-X en el futuro: su
+  "resource view" (filas de empleados) **también** es de paga (confirmado en su repo,
+  la carpeta de vistas de código abierto no trae ninguna vista de recursos), y hay que
+  fijar `timezone` explícito en `createCalendar()` o muestra las citas en la zona del
+  navegador en vez de la de la sucursal.
 - `eslint`, `prettier`, `eslint-plugin-vue`, `vitest`, `@vue/test-utils`,
   `@playwright/test`, `vite-plugin-vuetify` — herramientas.
 
@@ -606,16 +623,30 @@ Cuando entre el primer cliente de verdad, esa suposición cambia y hay que revis
 
 ### Git
 
-- **Cero commits directos a `main`.** Rama + PR siempre, con protección de rama activada.
-- Ramas: `feat/…`, `fix/…`, `chore/…`, `docs/…`.
+- **`develop` es la rama de integración.** Es la rama por defecto del repositorio en
+  GitHub. Toda rama nueva sale de `develop`, y todo PR se abre hacia `develop`.
+- **`main` es la rama de producción.** Solo recibe código por PR manual desde `develop`,
+  cuando se decide hacer una demo/release — no en cada merge de feature. Nadie mergea
+  una rama de feature directo a `main`.
+- **Cero commits directos ni a `develop` ni a `main`.** Rama + PR siempre; ambas tienen
+  protección de rama activada (PR obligatorio + CI en verde antes de mergear).
+- Ramas: `feat/…`, `fix/…`, `chore/…`, `docs/…`, siempre creadas a partir de `develop`.
 - Commits en inglés, imperativo: `add appointment availability calculator`.
 - El PR no se mergea si el CI falla.
 
+Por qué este cambio (2026-09-07): antes toda rama salía de `main` y mergeaba a `main`,
+y como Cloudflare Pages despliega producción en cada push a `main`, cada merge de
+feature disparaba un despliegue real. Con `develop` como integración, los merges del
+día a día no tocan producción; `main` solo avanza cuando se decide explícitamente
+promover, vía PR manual `develop` → `main`.
+
 ### CI (GitHub Actions)
 
-En cada push: instalar dependencias, `lint`, `test:unit`, levantar Supabase local y
-correr `test:db`. En `main`, además, aplicar migraciones a producción. El archivo va
-**comentado bloque por bloque**.
+En cada push a `main` o a `develop`, y en cada Pull Request: instalar dependencias,
+`lint`, `test:unit`, levantar Supabase local y correr `test:db`. Solo en `main`, además,
+aplicar migraciones y Edge Functions a producción — eso no cambia: producción sigue
+siendo `main` (§10, "Los tres entornos"), lo que cambia es qué tan seguido llega código
+ahí. El archivo va **comentado bloque por bloque**.
 
 ### Secretos
 

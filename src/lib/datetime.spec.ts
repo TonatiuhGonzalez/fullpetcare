@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayRangeUtc, formatDate, formatTime, fromBranchTime, toBranchTime } from './datetime'
+import {
+  dayRangeUtc,
+  formatDate,
+  formatTime,
+  fromBranchTime,
+  toBranchTime,
+  toNaiveLocalIso,
+} from './datetime'
 
 describe('formatTime', () => {
   it('el mismo instante UTC muestra horas distintas en CDMX, Tijuana y Cancún', () => {
@@ -90,5 +97,38 @@ describe('toBranchTime', () => {
     const asDate = toBranchTime(new Date('2026-07-15T20:30:00Z'), 'America/Mexico_City')
     const asString = toBranchTime('2026-07-15T20:30:00Z', 'America/Mexico_City')
     expect(asDate.getTime()).toBe(asString.getTime())
+  })
+})
+
+describe('toNaiveLocalIso', () => {
+  it('da la hora local de la sucursal como texto SIN zona, para dársela a DayPilot', () => {
+    // DayPilot (components/EmployeeDayScheduler.vue,
+    // EmployeeWeekCalendar.vue) no sabe nada de zonas horarias: pinta
+    // cualquier string que reciba tal cual, como hora "de pared". Si
+    // esto le pasara el string UTC original en vez de resolver primero
+    // la hora de LA SUCURSAL, la cita se dibujaría en la fila/columna
+    // equivocada para cualquier sucursal que no esté en UTC-0.
+    expect(toNaiveLocalIso('2026-07-15T20:30:00Z', 'America/Mexico_City')).toBe(
+      '2026-07-15T14:30:00',
+    )
+  })
+
+  it('el mismo instante da un texto distinto en sucursales de zonas distintas', () => {
+    // Mismo caso que formatTime, pero para el string que consume
+    // DayPilot: es la garantía de que dos sucursales no acaban
+    // compartiendo casilla en la grilla por error.
+    const instant = '2026-07-15T20:30:00Z'
+    expect(toNaiveLocalIso(instant, 'America/Mexico_City')).toBe('2026-07-15T14:30:00')
+    expect(toNaiveLocalIso(instant, 'America/Tijuana')).toBe('2026-07-15T13:30:00')
+  })
+
+  it('un instante cerca de medianoche cae en el día calendario correcto de la sucursal', () => {
+    // Mismo caso límite que formatDate: 01:00 UTC del 16 de julio son
+    // las 19:00 del 15 en CDMX. La vista de groomer/vet (columnas = 7
+    // días) usa esto para decidir en qué COLUMNA va una cita — si se
+    // equivocara, la cita aparecería en el día siguiente.
+    expect(toNaiveLocalIso('2026-07-16T01:00:00Z', 'America/Mexico_City')).toBe(
+      '2026-07-15T19:00:00',
+    )
   })
 })

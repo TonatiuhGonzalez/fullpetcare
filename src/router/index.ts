@@ -4,8 +4,8 @@ import { isFrontDesk } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 // Vue Router deja "meta" tipado vacío por defecto — esto le agrega la
-// propiedad que usan las rutas de abajo (clientes, citas/nueva), para
-// que el guard al final del archivo tenga tipos reales.
+// propiedad que usa la ruta de abajo (clientes), para que el guard al
+// final del archivo tenga tipos reales.
 declare module 'vue-router' {
   interface RouteMeta {
     /** true si la ruta es tarea de recepción (owner/receptionist) — groomer/vet se redirigen a la agenda. */
@@ -40,16 +40,6 @@ export const router = createRouter({
           path: 'catalogo',
           name: 'catalogo',
           component: () => import('@/pages/agenda/CatalogPage.vue'),
-        },
-        {
-          path: 'citas/nueva',
-          name: 'cita-nueva',
-          component: () => import('@/pages/agenda/NewAppointmentPage.vue'),
-          // Solo owner/receptionist agendan (CLAUDE.md §6.1) — el backend
-          // ya lo rechaza (create_appointment()), pero sin este guard un
-          // groomer/vet podría llegar al formulario completo y solo
-          // enterarse del rechazo hasta darle "Agendar".
-          meta: { requiresFrontDesk: true },
         },
         {
           path: 'citas/:id',
@@ -142,10 +132,12 @@ router.beforeEach(async (to) => {
       : { path: '/app/agenda' }
   }
 
-  // Rutas marcadas "requiresFrontDesk" (arriba: clientes, citas/nueva) —
-  // groomer/vet no las necesitan y el backend ya las rechaza; se manda a
-  // la agenda en vez de dejar ver un formulario/listado que de todos
-  // modos no va a poder usar.
+  // Rutas marcadas "requiresFrontDesk" (arriba: clientes) — groomer/vet
+  // no las necesitan y el backend ya las rechaza; se manda a la agenda en
+  // vez de dejar ver un listado que de todos modos no va a poder usar.
+  // (Agendar una cita ya no es una ruta aparte — es el dialog
+  // NewAppointmentDialog.vue, cuyo botón de apertura en AgendaPage.vue ya
+  // trae su propio "v-if=isFrontDesk(...)".)
   if (to.meta.requiresFrontDesk && !isFrontDesk(session.role)) {
     return { path: '/app/agenda' }
   }

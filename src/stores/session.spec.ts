@@ -210,6 +210,55 @@ describe('loadMemberships — selección activa', () => {
     expect(store.needsBusinessSelection).toBe(false)
   })
 
+  it('si el dueño tiene varias sucursales, elige la primera en vez de preguntar', async () => {
+    // Antes de este cambio, un "owner" con más de una sucursal se
+    // quedaba con activeBranchId en null y el guard del router lo
+    // mandaba a /seleccionar-negocio en CADA login — justo el flujo que
+    // se pidió quitar (el dueño siempre ve TODAS las sucursales de su
+    // tenant, así que "varias" es el caso normal, no la excepción). Si
+    // este caso se rompe, /seleccionar-negocio vuelve a aparecer para
+    // cualquier dueño con más de una sucursal.
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    store.user = { id: 'user-1', email: 'x@y.mx' }
+
+    await store.loadMemberships()
+
+    expect(store.role).toBe('owner')
+    // MEMBERSHIP_A trae "Centro" antes que "Del Valle" — mismo orden
+    // alfabético que listAllBranches() en services/memberships.ts.
+    expect(store.activeBranchId).toBe('branch-a1')
+    expect(store.needsBusinessSelection).toBe(false)
+  })
+
+  it('si un rol distinto de "owner" tiene varias sucursales, se sigue preguntando', async () => {
+    // El otro lado de la regla de arriba: para receptionist/groomer/vet
+    // las sucursales las asigna un admin a mano — si alguna vez tienen
+    // más de una, NO se debe adivinar cuál usar (a diferencia del
+    // dueño, aquí no hay garantía de que la primera en la lista sea la
+    // correcta). Se arma una membresía de "vet" con dos sucursales para
+    // este caso puntual, sin tocar MEMBERSHIP_B (que a propósito solo
+    // tiene una).
+    const vetConDosSucursales: MembershipSummary = {
+      ...MEMBERSHIP_B,
+      branches: [
+        { id: 'branch-b1', name: 'Zona Río', timezone: 'America/Tijuana' },
+        { id: 'branch-b2', name: 'Otay', timezone: 'America/Tijuana' },
+      ],
+    }
+    vi.mocked(listMyMemberships).mockResolvedValue([vetConDosSucursales])
+
+    const store = useSessionStore()
+    store.user = { id: 'user-1', email: 'x@y.mx' }
+
+    await store.loadMemberships()
+
+    expect(store.role).toBe('vet')
+    expect(store.activeBranchId).toBeNull()
+    expect(store.needsBusinessSelection).toBe(true)
+  })
+
   it('la membresía guardada SÍ se conserva si sigue siendo válida', async () => {
     localStorage.setItem('fpc.activeTenantId', 'tenant-a')
     localStorage.setItem('fpc.activeBranchId', 'branch-a2')

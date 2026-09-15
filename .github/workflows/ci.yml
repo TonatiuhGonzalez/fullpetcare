@@ -12,24 +12,26 @@
 name: CI
 
 # Cuándo se dispara:
-# - "push" solo a "main": ese push ocurre nada más al mergear un PR (main
-#   está protegida, nadie empuja ahí directo — tarea 1.3), así que valida
-#   el estado final después de cada merge.
+# - "push" solo a "main" y "develop": ese push ocurre nada más al mergear un
+#   PR (ambas ramas están protegidas, nadie empuja ahí directo — tarea 1.3),
+#   así que valida el estado final después de cada merge. `develop` es la
+#   rama de integración (todas las ramas de feature mergean ahí); `main` es
+#   producción y solo avanza por PR manual `develop` → `main` (CLAUDE.md §10).
 # - "pull_request": corre en cada commit de una rama MIENTRAS tiene un PR
 #   abierto. Es lo que da el check verde/rojo en la pantalla del PR, y lo
 #   que la tarea 1.40 exigirá como requisito para poder mergear.
 #
-# Si "push" no tuviera "branches: [main]", cada commit en una rama con PR
+# Si "push" no tuviera "branches: [...]", cada commit en una rama con PR
 # abierto dispararía el workflow DOS VECES para el mismo código: una por
 # "push" (a la rama) y otra por "pull_request" — el doble de minutos de CI
 # por nada, y el doble de probabilidad de toparse con algo como el rate
 # limit de la Action del CLI de Supabase (ver el paso 6 más abajo). Con
-# "branches: [main]", una rama de feature solo dispara por "pull_request"
-# mientras tiene PR, y "push" solo entra en juego para el commit de merge
-# en main.
+# "branches: [main, develop]", una rama de feature solo dispara por
+# "pull_request" mientras tiene PR, y "push" solo entra en juego para el
+# commit de merge en "develop" o en "main".
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 jobs:

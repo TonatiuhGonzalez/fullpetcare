@@ -46,14 +46,21 @@ export interface NewAppointmentArgs {
   services: NewAppointmentService[]
 }
 
-/** Las citas de una sucursal en un día calendario (hora local de esa sucursal). */
-export async function listByDay(
+/**
+ * Las citas de una sucursal entre dos días calendario, AMBOS incluidos
+ * (hora local de esa sucursal) — lo que necesita la vista semanal de la
+ * agenda (tarea de rediseño de AgendaPage): una sola consulta para los 7
+ * días de la semana, en vez de una por día.
+ */
+export async function listByDateRange(
   tenantId: string,
   branchId: string,
-  dateStr: string,
+  startDateStr: string,
+  endDateStrInclusive: string,
   branchTimezone: string,
 ): Promise<AppointmentWithNames[]> {
-  const { startUtc, endUtc } = dayRangeUtc(dateStr, branchTimezone)
+  const { startUtc } = dayRangeUtc(startDateStr, branchTimezone)
+  const { endUtc } = dayRangeUtc(endDateStrInclusive, branchTimezone)
 
   const { data, error } = await supabase
     .from('appointments')
@@ -72,6 +79,16 @@ export async function listByDay(
     customerName: customers ? `${customers.first_name} ${customers.last_name}` : '',
     petName: pets?.name ?? '',
   }))
+}
+
+/** Las citas de una sucursal en un día calendario (hora local de esa sucursal). */
+export async function listByDay(
+  tenantId: string,
+  branchId: string,
+  dateStr: string,
+  branchTimezone: string,
+): Promise<AppointmentWithNames[]> {
+  return listByDateRange(tenantId, branchId, dateStr, dateStr, branchTimezone)
 }
 
 export interface UpcomingAppointment extends Appointment {

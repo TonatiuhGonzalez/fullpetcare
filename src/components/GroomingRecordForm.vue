@@ -17,8 +17,14 @@ const props = withDefaults(
     petId: string
     initialRecord?: GroomingRecord | null
     submitLabel?: string
+    // AppointmentDialog.vue (botón "Terminar" del diálogo de atender) usa
+    // este formulario sin su propio botón: dispara el guardado llamando a
+    // submit() por el ref expuesto abajo, en vez de que el usuario le dé
+    // clic al botón interno. AttendPage.vue lo sigue usando sin esta prop
+    // (comportamiento sin cambios: botón interno visible).
+    hideSubmitButton?: boolean
   }>(),
-  { submitLabel: 'Guardar y completar cita' },
+  { submitLabel: 'Guardar y completar cita', hideSubmitButton: false },
 )
 
 const emit = defineEmits<{ saved: [record: GroomingRecord] }>()
@@ -71,6 +77,7 @@ async function handleSubmit(): Promise<void> {
   }
 }
 
+defineExpose({ submit: handleSubmit })
 </script>
 
 <template>
@@ -95,6 +102,6 @@ async function handleSubmit(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-btn color="primary" type="submit" :loading="saving">{{ submitLabel }}</v-btn>
+    <v-btn v-if="!hideSubmitButton" color="primary" type="submit" :loading="saving">{{ submitLabel }}</v-btn>
   </v-form>
 </template>

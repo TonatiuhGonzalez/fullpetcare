@@ -72,8 +72,7 @@ cero filas. Ese test existe desde la fase 1, antes de que haya casi nada que pro
 ```
 /login
 /seleccionar-negocio          elegir tenant y sucursal (si hay más de uno)
-/app/agenda                   dashboard: agenda del día
-/app/agenda/nueva             crear cita
+/app/agenda                   dashboard: agenda del día (crear cita: dialog, no ruta aparte)
 /app/citas/:id                detalle
 /app/citas/:id/atender        ficha según kind (estética o veterinaria)
 /app/citas/:id/cobrar         resumen, pago simulado, ticket

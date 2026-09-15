@@ -74,12 +74,23 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   /**
-   * Recalcula qué sucursal queda activa, con el mismo criterio en los tres
-   * casos donde hace falta (cargar membresías, elegir tenant, logout no
-   * llega aquí porque usa reset()): si lo guardado en localStorage sigue
-   * siendo una sucursal válida de la membresía activa, se conserva; si no,
-   * y hay una sola opción posible, se elige sola; si hay varias y ninguna
-   * coincide con lo guardado, se deja sin elegir.
+   * Recalcula qué sucursal queda activa: si lo guardado en localStorage
+   * sigue siendo una sucursal válida de la membresía activa, se conserva;
+   * si no, y hay una sola opción posible, se elige sola; si hay varias:
+   *
+   * - El dueño (`owner`) SIEMPRE ve todas las sucursales del tenant
+   *   (CLAUDE.md §6.1), así que para él "varias sucursales" es el caso
+   *   normal, no una excepción — obligarlo a elegir una en
+   *   SelectBusinessPage en cada login era el problema que se pidió
+   *   quitar. Mientras no exista una pantalla de administración donde
+   *   marcar una sucursal como "principal", se usa la primera en orden
+   *   alfabético (mismo orden que `listAllBranches` en
+   *   services/memberships.ts) como default. El dueño puede cambiarla
+   *   después con el select de AppLayout.vue.
+   * - Para receptionist/groomer/vet, la lista de sucursales la arma un
+   *   admin a mano (membership_branches) — si alguna vez tienen más de
+   *   una, sigue sin "adivinarse": se deja sin elegir y se pregunta en
+   *   SelectBusinessPage, como antes.
    */
   function resolveActiveBranch(): void {
     const branches = activeMembership.value?.branches ?? []
@@ -89,6 +100,8 @@ export const useSessionStore = defineStore('session', () => {
     if (validStoredBranch) {
       activeBranchId.value = validStoredBranch.id
     } else if (branches.length === 1) {
+      activeBranchId.value = branches[0].id
+    } else if (activeMembership.value?.role === 'owner' && branches.length > 1) {
       activeBranchId.value = branches[0].id
     } else {
       activeBranchId.value = null
