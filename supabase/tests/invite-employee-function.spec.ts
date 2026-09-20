@@ -56,14 +56,20 @@ async function callInviteEmployee(
 }
 
 describe('invite-employee: sin sesión válida', () => {
-  it('sin Authorization header, responde 403 genérico', async () => {
-    const { status, body } = await callInviteEmployee({
+  it('sin Authorization header, se rechaza (401 de la plataforma o 403 de la función)', async () => {
+    // Hay DOS capas y cuál responde depende de cómo se sirva la función:
+    // con verify_jwt = true (config.toml; es lo que corre en CI y en la
+    // nube) la plataforma rechaza con 401 antes de ejecutar nuestro código;
+    // con `supabase functions serve --no-verify-jwt` (atajo local) llega a
+    // la función, que revisa el header ella misma y responde 403. Lo que
+    // importa —y lo que este test protege— es que sin sesión NUNCA se
+    // invita a nadie, sin atar el test a una sola capa.
+    const { status } = await callInviteEmployee({
       tenantId: TENANT_PATITAS,
       email: 'quien-sea@patitasfelices.mx',
       fullName: 'Quien Sea',
     })
-    expect(status).toBe(403)
-    expect(body.message).toMatch(/no tienes permiso/i)
+    expect([401, 403]).toContain(status)
   })
 })
 
