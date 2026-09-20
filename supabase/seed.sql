@@ -197,6 +197,26 @@ begin
     (gen_random_uuid(), v_tenant_patitas, v_membership_recepcion, v_branch_centro),
     (gen_random_uuid(), v_tenant_patitas, v_membership_groomer, v_branch_centro),
     (gen_random_uuid(), v_tenant_patitas, v_membership_vet, v_branch_delvalle);
+
+  -- ===========================================================================
+  -- Permisos por rol (fase 9): módulo "employees" — hoy SOLO el dueño ve y
+  -- edita la pantalla de empleados. Las filas de 'owner' son documentales
+  -- (app.has_permission() ya regresa true para 'owner' sin mirar esta
+  -- tabla, CLAUDE.md §6.7); se siembran de todos modos para que quien abra
+  -- Studio vea el cuadro completo, no una tabla a medias. Se siembran los
+  -- dos tenants (incluido Huellitas Spa, aunque no tenga personal propio)
+  -- para que el test de aislamiento de role_permissions tenga algo real
+  -- que confirmar que NO se ve desde el otro tenant.
+  insert into role_permissions (tenant_id, role, module, can_view, can_edit)
+  values
+    (v_tenant_patitas, 'owner', 'employees', true, true),
+    (v_tenant_patitas, 'receptionist', 'employees', false, false),
+    (v_tenant_patitas, 'groomer', 'employees', false, false),
+    (v_tenant_patitas, 'vet', 'employees', false, false),
+    (v_tenant_huellitas, 'owner', 'employees', true, true),
+    (v_tenant_huellitas, 'receptionist', 'employees', false, false),
+    (v_tenant_huellitas, 'groomer', 'employees', false, false),
+    (v_tenant_huellitas, 'vet', 'employees', false, false);
 end $$;
 
 -- ===========================================================================
