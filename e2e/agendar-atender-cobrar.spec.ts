@@ -149,7 +149,17 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // esa fecha para que el bloque de la cita sea visible y clicable.
   await page.locator('input[type="date"]').fill(appointmentDate)
 
-  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  // La cita se ubica por su ESTADO, no por su posición: si el test ya corrió
+  // antes ese mismo día, la agenda trae citas viejas de Sofía (ya cobradas)
+  // y ni el orden del DOM ni "la primera" sirven para distinguir la nueva.
+  // AgendaPage.vue pinta cada bloque con el color de su estado
+  // (rgb(var(--v-theme-warning)) = "En curso"), y ese valor queda en su
+  // estilo en línea. Recién atendida, solo la nuestra está "En curso".
+  await page
+    .locator('[style*="--v-theme-warning"]')
+    .filter({ hasText: 'Sofía Ramírez' })
+    .first()
+    .click()
   await expect(page.getByText('Atender cita')).toBeVisible()
 
   // Nota de groomer que sirve de "huella" única para el paso 6 (así el
@@ -162,7 +172,13 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
 
   // 4. Cobrar en efectivo — "Cobrar" desliza al mismo formulario que antes
   // vivía en /cobrar, DENTRO del diálogo (pedido explícito del usuario).
-  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  // Recién terminada la ficha, la nuestra es la única "Completada" sin
+  // cobrar (success); las viejas ya están "Cobradas" (primary).
+  await page
+    .locator('[style*="--v-theme-success"]')
+    .filter({ hasText: 'Sofía Ramírez' })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Cobrar', exact: true }).click()
   await expect(page.getByText('Subtotal')).toBeVisible()
 
