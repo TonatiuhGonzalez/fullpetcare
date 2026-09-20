@@ -210,6 +210,27 @@ de Canela con su foto. Es lo que va a vender el producto en las reuniones.
 _Por qué al final:_ necesita que exista historial real que mostrar, y es la superficie
 más delicada. Se construye cuando el flujo interno ya está firme.
 
+### Fase 9 — Gestión de empleados y permisos por rol
+
+Pedida por el usuario después de v1. Migraciones de `role_permissions`
+(`app.has_permission()`, permisos por negocio en vez de un rol hardcodeado — D13),
+`employee_details` y `employee_documents` (+ bucket de Storage). Cierra el pendiente
+que `memberships`/`membership_branches`/`profiles` dejaron abierto desde la fase 1:
+esas tres tablas ganan aquí sus primeras políticas de INSERT/UPDATE. RPC
+`create_employee_membership()` (membership + sucursales + ficha, todo o nada, mismo
+criterio que `checkout_appointment`). Segunda Edge Function del proyecto,
+`invite-employee` — la única pieza que usa `service_role` desde una acción del
+frontend, porque `auth.admin.inviteUserByEmail` no tiene otra forma de llamarse.
+
+`EmployeesPage.vue` + `EmployeeFormDialog.vue` (un diálogo con pestañas, no pasos).
+"Empleados" en `AppLayout.vue` y la ruta `/app/empleados` se gatean con
+`session.canView('employees')` — un permiso de datos, no un `v-if="role === 'owner'"`.
+
+**Demostrable:** el dueño da de alta un empleado nuevo (correo de invitación real),
+le asigna rol y sucursales, sube su credencial de elector, y lo edita después.
+Cualquier otro rol ni ve la pestaña ni puede entrar por URL directa — y cambiar eso
+mañana es una fila en `role_permissions`, no una migración.
+
 ### Después de v1 (no ahora)
 
 Productos e inventario, CFDI real con un PAC, OpenPay real, WhatsApp Business API,
@@ -335,6 +356,29 @@ formularios de Vuetify alcanza. La única gráfica (peso de la mascota) se dibuj
 seguridad antes de una demo que como red de cobertura. La cobertura real vive en los
 unitarios y en los tests de RLS.
 
+### D13 — Permisos en una tabla (`role_permissions`), no un rol hardcodeado en código
+
+**Alternativa descartada:** un solo punto de chequeo aislado en código (una función SQL
++ un composable de frontend, ambos comparando `role_in(tenant_id) = 'owner'`), sin
+tabla nueva — la recomendación inicial para la fase 9, antes de discutirlo con el
+usuario.
+**Por qué se descartó esa alternativa:** da casi el mismo beneficio de "un solo lugar
+que cambiar" con mucho menos riesgo, pero el usuario prefirió la tabla — quería que
+"a futuro se puedan modificar los permisos de cada rol" fuera literal desde el día uno,
+no una promesa de que sería fácil migrar después.
+**Por qué la tabla, con `tenant_id` incluido (no global):** cada negocio en esta
+plataforma es independiente (CLAUDE.md §7) — una regla de permisos igual para todos
+los tenants habría sido la primera excepción a eso. `app.has_permission(tenant_id,
+module, action)` reutiliza el mismo `role_in()` que ya usa toda política del proyecto.
+**Costo aceptado:** una tabla más, sin pantalla de administración en esta fase (se
+siembra a mano, mismo criterio que las tablas de tenencia de la fase 1) — y el riesgo
+real de una tabla de permisos: una fila faltante o mal sembrada deja a un rol sin
+acceso a algo que debería tener. Mitigado en parte porque `owner` nunca depende de la
+tabla (bypass explícito en `app.has_permission()`).
+**Si algún día hace falta una pantalla para editarla:** la tabla y la función ya están
+listas; falta solo la política de INSERT/UPDATE y su UI — mismo patrón que esta misma
+fase le acaba de aplicar a `memberships`/`membership_branches`.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
@@ -350,3 +394,5 @@ unitarios y en los tests de RLS.
 | El CI pasa en Mac y falla en Linux                 | `.nvmrc` compartido, cuidado con mayúsculas en imports, scripts portables                  |
 | El demo se ensucia entre reuniones                 | `npm run demo:reset` antes de cada una                                                     |
 | Migración mala en producción                       | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main`             |
+| Fila faltante/mal sembrada en `role_permissions`   | `owner` nunca depende de la tabla (bypass en `app.has_permission()`); test que confirma que cambiar una fila cambia el resultado sin tocar código |
+| `invite-employee` mal validada = invitación indebida | Revalida permiso con el JWT de quien llama ANTES de tocar `service_role`; el RPC vuelve a revalidar aunque la Edge Function fallara |

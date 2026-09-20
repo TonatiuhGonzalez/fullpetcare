@@ -86,7 +86,7 @@ Ya está decidido. **No lo cambies sin discutirlo primero.**
 | Rutas           | Vue Router                                | Estándar                                                                       |
 | Estilos         | SASS                                      | Terreno del usuario                                                            |
 | Backend/BD      | Supabase (Postgres, Auth, Storage)        | RLS en Postgres es el aislamiento multi-tenant real; evita escribir un backend |
-| Serverless      | Supabase Edge Functions                   | **Solo** para la vista pública del cliente (§7.4)                              |
+| Serverless      | Supabase Edge Functions                   | Vista pública del cliente (§7.4) y alta de acceso de empleados (§10, la `service_role` key nunca toca el frontend) |
 | Hosting         | Cloudflare Pages                          | Despliegue por git, previews por PR, gratis                                    |
 | CI              | GitHub Actions                            | Integrado a los PRs                                                            |
 | Tests unitarios | Vitest + Vue Test Utils                   | Vitest comparte config con Vite                                                |
@@ -353,6 +353,33 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 `share_links` **nunca guarda el token en claro**, solo su SHA-256 (§7.4).
 
+### 6.7 Empleados y permisos
+
+| Tabla               | Campos clave                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy solo `'employees'`), `can_view`, `can_edit`               |
+| `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`                            |
+| `employee_documents`| `tenant_id`, `membership_id`, `document_type` (enum: `voter_id`\|`address_proof`\|`employment_contract`), `storage_path`, `uploaded_by`, `uploaded_at` |
+
+Un "empleado" en la pantalla de gestión **es** la persona que ya tiene `membership` en
+el tenant — no un registro de RH aparte. `employee_details` solo extiende esa fila con
+los datos personales que no viven en `profiles` (identidad global, sin `tenant_id`,
+§6.1) ni en `memberships` (rol y acceso). Los documentos escaneados (credencial de
+elector, comprobante de domicilio, contrato firmado) son archivos en el bucket privado
+`employee-documents`, con la misma convención de ruta que `pet-photos`
+(`{tenant_id}/{membership_id}/{tipo}.{ext}`) y un solo archivo vigente por tipo
+(`unique(membership_id, document_type)`, reemplazo por `upsert`, sin acumular
+huérfanos).
+
+`role_permissions` es la primera tabla de este proyecto donde un permiso vive en datos
+en vez de en código: hasta ahora, "quién puede hacer qué" era siempre un rol
+hardcodeado comparado en una política RLS o en `lib/roles.ts`. Dar de alta un
+empleado con acceso completo (invitar su correo, crear su `membership`) es la única
+operación de este proyecto que necesita la llave `service_role` desde el frontend —
+por eso pasa por una segunda Edge Function (`invite-employee`, §10), nunca por
+PostgREST directo. Ver §7.2 para `app.has_permission()`, la función que decide todo
+esto en la base.
+
 ---
 
 ## 7. Aislamiento multi-tenant
@@ -397,7 +424,21 @@ create function app.is_member_of(p_tenant_id uuid) returns boolean
 
 create function app.role_in(p_tenant_id uuid) returns text ...
 create function app.can_access_branch(p_branch_id uuid) returns boolean ...
+create function app.has_permission(p_tenant_id uuid, p_module permission_module, p_action text) returns boolean ...
 ```
+
+`app.has_permission()` (§6.7) es la más reciente: decide si el rol del usuario puede
+`'view'`/`'edit'` un módulo, mirando la tabla `role_permissions` — salvo `owner`, que
+siempre regresa `true` sin mirar nada (§6.1, "Puede: Todo"). Es el único punto de este
+proyecto donde un permiso vive en una fila de datos en vez de en una comparación de
+rol fija; toda política o RPC que la usa queda lista para que, a futuro, cambiar quién
+puede hacer algo sea una fila distinta, no una migración.
+
+`memberships`, `membership_branches` y `profiles` nacieron en la fase 1 con **solo**
+política de SELECT (sin pantalla de administración todavía que las escribiera). La
+gestión de empleados (fase 9) fue la primera pantalla que necesitó escribirlas, así
+que ya tienen sus políticas de INSERT/UPDATE — gateadas por `app.has_permission(...,
+'employees', 'edit')`, nunca por `'owner'` a secas.
 
 Patrón de política:
 

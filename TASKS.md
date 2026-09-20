@@ -239,3 +239,119 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **8.4** Confirmar que ningún secreto quedó en el repo (`git log -p` buscando llaves) — revisado todo el historial (`git log -p --all`) buscando `sb_secret_`/`sb_publishable_`/`sbp_`/JWTs/llaves privadas: cero coincidencias reales. Los dos JWT que sí aparecen son los del demo LOCAL fijo (anon/service_role, derivados del `JWT_SECRET` de ejemplo en `supabase/config.toml`, documentados en el README como no secretos e iguales en cualquier proyecto local). Ningún `.env*` real trackeado, solo `.env.example` con la llave vacía
 - [x] **8.5** README con guion de demo: qué enseñar, en qué orden, y qué decir en cada pantalla — 7 pasos (login → agenda → agendar → atender → cobrar → historial → vista pública), apoyándose en el historial curado de Rocky/Max de `demo_reset.sql` para no construir meses de visitas en vivo
 - [x] **8.6** Correr `demo:reset` y dejar el ambiente listo para la primera reunión — corrido contra `fullpetcare-prod` después del recorrido de la tarea 8.1 (que dejó una cita y una venta reales de prueba); verificado por API que solo quedan las 5 citas del guion fijo de Rocky (4 completadas + 1 agendada) y 0 ventas activas en Sucursal Centro. **v1 completo.**
+
+---
+
+## Fase 9 — Gestión de empleados y permisos por rol
+
+**Meta: un CRUD de empleados (datos personales, acceso, documentos) visible solo para
+el dueño hoy, pero construido para que a futuro se puedan modificar los permisos de
+cada rol sin tocar código.** Pedida por el usuario después de v1; decisiones de diseño
+resueltas con él antes de construir (un "empleado" es la persona que ya tiene
+`membership`/`profile`, no un registro de RH aparte; dar de alta crea el acceso
+completo — invita por correo; documentos como texto + archivo; permisos en una tabla
+por negocio, no hardcodeados; se aprobó una segunda Edge Function).
+
+- [x] **9.1** 📚 Migración `role_permissions.sql`: enum `permission_module` (hoy solo
+  `'employees'`, mismo patrón aditivo que `sale_items.item_type`), tabla
+  `role_permissions` (`tenant_id`, `role`, `module`, `can_view`, `can_edit`), RLS
+  **solo SELECT** (mismo precedente que las tablas de tenencia de la fase 1: sin
+  pantalla de administración todavía, se siembra a mano), y `app.has_permission()`
+  — `stable security definer`, mismo molde que `app.is_member_of()`/`app.role_in()`.
+  **Explicar por qué `owner` siempre regresa `true` sin mirar la tabla, y por qué eso
+  es justo el mismo bypass que ya usa CLAUDE.md §6.1 en todos lados** —
+  `20260910120000_role_permissions.sql`. Semilla en `seed.sql`: los dos tenants demo,
+  módulo `employees`, solo `owner` en `true/true`
+- [x] **9.2** Migración `employee_details.sql`: tabla 1 a 1 con `membership_id`
+  (`birth_date`, `curp`, `rfc`, `voter_id_number`, sin `check` de formato — la
+  validación de forma vive en `lib/validation.ts`, igual que `customers.rfc`), RLS
+  vía `app.has_permission(tenant_id, 'employees', 'view'|'edit')`. Misma trampa de
+  siempre (CLAUDE.md §7.2): sin `and deleted_at is null` en el SELECT, porque esta
+  tabla nace con UPDATE para authenticated — `20260910120200_employee_details.sql`
+- [x] **9.3** 📚 Migración `employee_access_rls.sql`: cierra el pendiente que
+  `rls_tenancy.sql` dejó anotado en la fase 1 (tarea 1.16) — INSERT/UPDATE en
+  `memberships` y `membership_branches`, gateados por `app.has_permission(...,
+  'employees', 'edit')` (no un rol fijo: cambiar quién administra empleados es una
+  fila de datos, no una migración), trigger `memberships_audit` que faltaba, y una
+  política de UPDATE nueva en `profiles` (propio perfil, o quien tenga
+  `employees:edit` sobre un tenant donde esa persona tiene membership activa).
+  **Explicar por qué el permiso de esta migración se pregunta a una tabla en vez de
+  compararse contra `'owner'` directo** — `20260910120400_employee_access_rls.sql`
+- [x] **9.4** Migración `employee_documents.sql`: enum `employee_document_type`
+  (`voter_id`, `address_proof`, `employment_contract`), tabla con
+  `unique(membership_id, document_type)` — un solo archivo vigente por tipo, mismo
+  criterio que `pets.photo_path` (ruta fija + `upsert`, sin huérfanos) — y bucket
+  Storage `employee-documents` (`public: false`, imagen + PDF, 10 MB), con políticas
+  idénticas en forma a `pet_photos_bucket.sql` pero llamando `app.has_permission()`
+  en vez de comparar rol. `uploaded_by` con `default auth.uid()` —
+  `20260910120600_employee_documents.sql`
+- [x] **9.5** Migración `fix_membership_branches_select_for_soft_delete.sql`: al
+  agregarle UPDATE a `membership_branches` (tarea 9.3), su política de SELECT
+  original (fase 1) seguía filtrando `deleted_at is null` — la MISMA trampa de
+  CLAUDE.md §7.2 que ya se había corregido una vez para `customers`/`pets` en la fase
+  2, ahora tocaba pagarla aquí. El filtro se movió a
+  `services/memberships.ts`/`services/employees.ts` (`.is('membership_branches.deleted_at',
+  null)` explícito sobre el recurso embebido) — `20260910121000_...sql`
+- [x] **9.6** 📚 RPC `create_employee_membership()`: crea `membership` +
+  `membership_branches` + `employee_details` en una sola transacción — mismo motivo
+  que `checkout_appointment`/`create_appointment` (PLAN.md §1.2): si la segunda
+  escritura fallara, quedaría un empleado a medias. Revalida
+  `app.has_permission(..., 'employees', 'edit')` adentro (CLAUDE.md §7.3.4, salta
+  RLS), valida que las sucursales pedidas sean del mismo tenant, y da un mensaje
+  claro si la persona ya tenía acceso a este negocio. **Explicar por qué esto NO
+  puede vivir en la Edge Function** — `20260910120800_create_employee_membership_rpc.sql`
+- [x] **9.7** 📚 Edge Function `invite-employee`: el único paso que exige
+  `service_role` (`auth.admin.inviteUserByEmail`) — CLAUDE.md §10, esa llave nunca
+  toca el frontend. A diferencia de `public-pet-view`, aquí SÍ hay sesión: se
+  revalida el permiso con un cliente scoped al JWT de quien llama (RLS normal, NO
+  `@supabase/server` en modo `"user"` — esa librería exige JWKS y este proyecto
+  todavía firma con el secreto clásico, mismo motivo que ya documentaba
+  `public-pet-view` para la anon key). Reutiliza el `userId` si el correo ya estaba
+  registrado (persona que ya trabaja en otro negocio del sistema, CLAUDE.md §6.1).
+  **Explicar la diferencia de auth entre esta función y `public-pet-view`, y qué
+  significa `verify_jwt = true` en `config.toml` aquí** —
+  `supabase/functions/invite-employee/`. Verificado a mano contra Supabase local:
+  alta exitosa, rechazo a quien no tiene permiso, aislamiento entre tenants, y
+  correo repetido reutilizando el id
+- [x] **9.8** 🧪 Tests de RLS/RPC/Edge Function — 38 tests nuevos, 196/196 de BD en
+  verde: `role-permissions-rls.spec.ts` (aislamiento + sin política de escritura),
+  `employee-details-rls.spec.ts` (view/edit por `app.has_permission`, con un caso que
+  prueba que cambiar SOLO una fila de `role_permissions` cambia el resultado sin
+  tocar código), `employee-documents-rls.spec.ts` (tabla + Storage),
+  `memberships-write-rls.spec.ts` (INSERT/UPDATE nuevos + que desactivar corta acceso
+  al instante), `create-employee-membership-rpc.spec.ts` (todo o nada, revalidación
+  de permiso aunque la RPC salte RLS), `invite-employee-function.spec.ts` (HTTP real,
+  mismo patrón que `public-pet-view.spec.ts`)
+- [x] **9.9** `lib/validation.ts#isValidCURP` + `lib/permissions.ts#hasPermission`
+  (la versión "para no mostrar un botón que el backend igual va a rechazar" —
+  CLAUDE.md §6.1 — mismo espíritu que `lib/roles.ts`). 12 tests nuevos, 151/151
+  unitarios en verde
+- [x] **9.10** `useSessionStore` gana `permissions` (cargadas junto al tenant activo)
+  y `canView()`/`canEdit()`; `selectTenant()` pasa a `async` para poder recargarlas al
+  cambiar de negocio sin cerrar sesión. `services/permissions.ts#listForTenant()`
+  nuevo. 3 tests nuevos en `session.spec.ts` (incluido el caso de "mismo rol,
+  resultado distinto" al cambiar de tenant)
+- [x] **9.11** `services/employees.ts` (`list`, `inviteAndCreate`, `update`) y
+  `services/employeeDocuments.ts` (`upload`, `listByMembership`, `getSignedUrl`) —
+  `services/branches.ts` ganó `listByTenant()`. `update()` calcula la diferencia real
+  de sucursales asignadas en vez de "borrar todo e insertar de nuevo" (el
+  `unique(membership_id, branch_id)` no excluye filas borradas suavemente, así que
+  soft-borrar y reinsertar la MISMA sucursal en una sola edición violaría esa
+  restricción)
+- [x] **9.12** `EmployeesPage.vue` (`/app/empleados`) y `EmployeeFormDialog.vue` — un
+  solo diálogo con pestañas (Datos personales / Acceso / Documentos), no pasos,
+  mismo criterio que ya se pidió para agendar una cita (commits #37/#38/#41). Botón
+  "Empleados" en `AppLayout.vue` y guard nuevo en `router/index.ts`
+  (`requiresPermission`), ambos gateados por `session.canView('employees')` — no por
+  un rol fijo
+- [x] **9.13** Verificación de punta a punta en navegador real (Playwright dirigido a
+  mano, sin agregarlo al único E2E de CLAUDE.md §9 — esto es un flujo secundario):
+  login como dueño → aparece "Empleados" → alta de un empleado nuevo (correo real
+  capturado en Mailpit local, `:54324`) → aparece en la lista con su rol → editar un
+  empleado sembrado, subir su credencial de elector, reabrir y confirmar "Ver
+  documento actual" → login como groomer → NO aparece "Empleados" → `/app/empleados`
+  por URL directa redirige a la agenda. Cero errores de consola en todo el recorrido
+- [x] **9.14** Documentación: `CLAUDE.md` §3 (dos Edge Functions, ya no "solo la vista
+  pública"), nueva §6.7 (las tres tablas de esta fase), §7.2 (`app.has_permission()`
+  junto a las demás funciones `app.*`, y el pendiente de 1.16 ya cerrado); `PLAN.md`
+  con la Fase 9 y la decisión `D13`. **Fase 9 completa.**
