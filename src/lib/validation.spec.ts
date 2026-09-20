@@ -1,6 +1,35 @@
 import { describe, expect, it } from 'vitest'
 
-import { isValidPhone, isValidPostalCode, isValidRFC } from './validation'
+import {
+  isValidCURP,
+  isValidEmail,
+  isValidPhone,
+  isValidPostalCode,
+  isValidRFC,
+} from './validation'
+
+describe('isValidEmail', () => {
+  it('acepta un correo normal', () => {
+    expect(isValidEmail('maria@patitasfelices.mx')).toBe(true)
+  })
+
+  it('rechaza un correo sin arroba ni dominio', () => {
+    // El error de captura más común: olvidar el "@" o el ".mx". Sin
+    // esta validación, la invitación se manda a un correo imposible y el
+    // empleado nunca recibe nada, sin que quien lo dio de alta se entere.
+    expect(isValidEmail('maria')).toBe(false)
+    expect(isValidEmail('maria@patitas')).toBe(false)
+  })
+
+  it('rechaza espacios adentro del correo y cadena vacía', () => {
+    expect(isValidEmail('maria @patitas.mx')).toBe(false)
+    expect(isValidEmail('')).toBe(false)
+  })
+
+  it('ignora espacios al inicio o al final', () => {
+    expect(isValidEmail('  maria@patitasfelices.mx  ')).toBe(true)
+  })
+})
 
 describe('isValidRFC', () => {
   it('acepta un RFC de persona física bien formado', () => {
@@ -78,6 +107,43 @@ describe('isValidPhone', () => {
 
   it('rechaza texto que no son dígitos', () => {
     expect(isValidPhone('llamar-por-favor')).toBe(false)
+  })
+})
+
+describe('isValidCURP', () => {
+  it('acepta una CURP bien formada', () => {
+    // 4 letras + 6 dígitos de fecha + sexo + 2 letras de entidad + 3
+    // consonantes + diferenciador + verificador = 18 caracteres. Si esto
+    // falla, nadie puede guardar la CURP de un empleado (fase 9).
+    expect(isValidCURP('GOMJ850312HDFRRL09')).toBe(true)
+  })
+
+  it('rechaza un mes de nacimiento que no existe', () => {
+    // "13" como mes es justo el tipo de error de captura (transponer
+    // día/mes) que esta validación existe para atrapar.
+    expect(isValidCURP('GOMJ851312HDFRRL09')).toBe(false)
+  })
+
+  it('rechaza una letra de sexo distinta de H/M', () => {
+    expect(isValidCURP('GOMJ850312XDFRRL09')).toBe(false)
+  })
+
+  it('rechaza longitud incorrecta', () => {
+    // Un carácter de menos (la CURP se pegó recortada) es el error real
+    // más común al capturar este dato a mano.
+    expect(isValidCURP('GOMJ850312HDFRRL9')).toBe(false)
+  })
+
+  it('rechaza cadena vacía', () => {
+    expect(isValidCURP('')).toBe(false)
+  })
+
+  it('acepta en minúsculas (se normaliza antes de validar)', () => {
+    expect(isValidCURP('gomj850312hdfrrl09')).toBe(true)
+  })
+
+  it('ignora espacios al inicio o al final', () => {
+    expect(isValidCURP('  GOMJ850312HDFRRL09  ')).toBe(true)
   })
 })
 

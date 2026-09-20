@@ -48,7 +48,14 @@ function handleBranchChange(branchId: unknown): void {
     <v-btn v-if="isFrontDesk(session.role)" to="/app/clientes" variant="text" class="mr-1">
       Clientes
     </v-btn>
-    <v-btn to="/app/catalogo" variant="text" class="mr-4">Catálogo</v-btn>
+    <v-btn to="/app/catalogo" variant="text" class="mr-1">Catálogo</v-btn>
+    <!-- "Empleados" (fase 9): gateado por PERMISO, no por rol fijo — hoy
+         solo el dueño tiene "employees:view" (role_permissions,
+         sembrado en seed.sql), pero a futuro un negocio podría dárselo a
+         otro rol sin tocar este archivo (CLAUDE.md §6.7). -->
+    <v-btn v-if="session.canView('employees')" to="/app/empleados" variant="text" class="mr-4">
+      Empleados
+    </v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
          elegir — con una sola, el título de arriba ya la muestra

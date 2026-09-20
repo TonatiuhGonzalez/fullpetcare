@@ -24,8 +24,8 @@ const step = computed<'tenant' | 'branch'>(() =>
   session.activeTenantId ? 'branch' : 'tenant',
 )
 
-function chooseTenant(tenantId: string): void {
-  session.selectTenant(tenantId)
+async function chooseTenant(tenantId: string): Promise<void> {
+  await session.selectTenant(tenantId)
   // selectTenant() ya intenta autoseleccionar la sucursal si solo hay una
   // — si lo logró, no hace falta preguntar y se avanza directo.
   if (session.activeBranchId) {
