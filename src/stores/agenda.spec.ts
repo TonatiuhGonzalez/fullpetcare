@@ -43,6 +43,12 @@ vi.mock('@/services/profiles', () => ({
 vi.mock('@/services/memberships', () => ({
   listMyMemberships: vi.fn(),
 }))
+// El store de sesión importa services/permissions.ts, que llega hasta
+// supabase.ts — y ese lanza error si faltan las variables VITE_* (en CI no
+// hay .env.local, en tu Mac sí, por eso solo tronaba en el runner).
+vi.mock('@/services/permissions', () => ({
+  listForTenant: vi.fn(),
+}))
 
 import { listByDateRange } from '@/services/appointments'
 import { getById as getBranchById } from '@/services/branches'
