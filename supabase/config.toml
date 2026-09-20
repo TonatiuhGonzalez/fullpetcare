@@ -422,3 +422,14 @@ entrypoint = "./functions/public-pet-view/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/public-pet-view/*.html" ]
+
+[functions.invite-employee]
+enabled = true
+# A diferencia de public-pet-view: aquí SÍ hay sesión (quien invita ya
+# inició sesión como dueño o con permiso de "employees:edit"), así que se
+# deja la verificación de JWT de la plataforma prendida (el valor por
+# default) — un request sin un JWT de sesión válido ni siquiera llega a
+# ejecutar el código de la función.
+verify_jwt = true
+import_map = "./functions/invite-employee/deno.json"
+entrypoint = "./functions/invite-employee/index.ts"

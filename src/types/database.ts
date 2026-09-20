@@ -340,6 +340,114 @@ export type Database = {
           },
         ]
       }
+      employee_details: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          curp: string | null
+          deleted_at: string | null
+          id: string
+          membership_id: string
+          rfc: string | null
+          tenant_id: string
+          updated_at: string
+          voter_id_number: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          curp?: string | null
+          deleted_at?: string | null
+          id?: string
+          membership_id: string
+          rfc?: string | null
+          tenant_id: string
+          updated_at?: string
+          voter_id_number?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          curp?: string | null
+          deleted_at?: string | null
+          id?: string
+          membership_id?: string
+          rfc?: string | null
+          tenant_id?: string
+          updated_at?: string
+          voter_id_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_details_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: true
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_details_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_documents: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_type: Database["public"]["Enums"]["employee_document_type"]
+          id: string
+          membership_id: string
+          storage_path: string
+          tenant_id: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type: Database["public"]["Enums"]["employee_document_type"]
+          id?: string
+          membership_id: string
+          storage_path: string
+          tenant_id: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type?: Database["public"]["Enums"]["employee_document_type"]
+          id?: string
+          membership_id?: string
+          storage_path?: string
+          tenant_id?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grooming_records: {
         Row: {
           appointment_id: string
@@ -863,6 +971,47 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: Database["public"]["Enums"]["permission_module"]
+          role?: Database["public"]["Enums"]["member_role"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_items: {
         Row: {
           appointment_id: string | null
@@ -1355,6 +1504,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_employee_membership: {
+        Args: {
+          p_birth_date: string
+          p_branch_ids: string[]
+          p_curp: string
+          p_rfc: string
+          p_role: Database["public"]["Enums"]["member_role"]
+          p_tenant_id: string
+          p_user_id: string
+          p_voter_id_number: string
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "memberships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reschedule_appointment: {
         Args: {
           p_appointment_id: string
@@ -1394,9 +1571,14 @@ export type Database = {
         | "cancelled"
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
+      employee_document_type:
+        | "voter_id"
+        | "address_proof"
+        | "employment_contract"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
+      permission_module: "employees"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       sale_item_type: "service"
@@ -1541,9 +1723,15 @@ export const Constants = {
         "no_show",
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
+      employee_document_type: [
+        "voter_id",
+        "address_proof",
+        "employment_contract",
+      ],
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
+      permission_module: ["employees"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       sale_item_type: ["service"],

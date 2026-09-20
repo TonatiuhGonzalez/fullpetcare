@@ -41,6 +41,9 @@ vi.mock('@/services/profiles', () => ({
 vi.mock('@/services/memberships', () => ({
   listMyMemberships: vi.fn(),
 }))
+vi.mock('@/services/permissions', () => ({
+  listForTenant: vi.fn(),
+}))
 
 // Se importan DESPUÉS de los vi.mock() de arriba — en este punto ya no
 // son las funciones reales, son las versiones falsas (vi.fn()) que se
@@ -48,6 +51,8 @@ vi.mock('@/services/memberships', () => ({
 import { signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
+import { listForTenant } from '@/services/permissions'
+import type { RolePermissionRow } from '@/lib/permissions'
 
 // Dos membresías de prueba, en tenants distintos — a propósito más de
 // una, para que "si solo hay una opción se elige sola" nunca se cuele
@@ -81,6 +86,9 @@ beforeEach(() => {
   // archivo si no se limpia a mano.
   localStorage.clear()
   vi.clearAllMocks()
+  // Default: sin reglas de permisos configuradas — los tests que no les
+  // interesa este tema no tienen que preocuparse por mockearlo aparte.
+  vi.mocked(listForTenant).mockResolvedValue([])
 })
 
 describe('login', () => {
@@ -271,5 +279,61 @@ describe('loadMemberships — selección activa', () => {
 
     expect(store.activeTenantId).toBe('tenant-a')
     expect(store.activeBranchId).toBe('branch-a2')
+  })
+})
+
+describe('permisos por módulo (fase 9)', () => {
+  it('owner puede ver y editar cualquier módulo, sin necesidad de reglas sembradas', async () => {
+    // Mismo bypass que app.has_permission() en Postgres: el dueño nunca
+    // depende de que exista una fila en role_permissions.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.canView('employees')).toBe(true)
+    expect(store.canEdit('employees')).toBe(true)
+  })
+
+  it('un rol sin ninguna regla para ese módulo no lo ve (default: no)', async () => {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'vet@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Dr. Vet', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_B])
+
+    const store = useSessionStore()
+    await store.login('vet@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.canView('employees')).toBe(false)
+  })
+
+  it('cambiar de tenant recarga las reglas del negocio nuevo — mismo rol, resultado distinto', async () => {
+    // Esta es la prueba de que el store no "recuerda" el permiso del
+    // tenant anterior: si role_permissions de tenant-b le da
+    // "employees:view" a vet pero tenant-a nunca lo configuró, cambiar
+    // de negocio SIN cerrar sesión debe reflejar la regla del NUEVO
+    // tenant activo, no arrastrar la de antes.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
+
+    const rowsForTenantB: RolePermissionRow[] = [
+      { role: 'vet', module: 'employees', canView: true, canEdit: false },
+    ]
+    vi.mocked(listForTenant).mockImplementation(async (tenantId: string) =>
+      tenantId === 'tenant-b' ? rowsForTenantB : [],
+    )
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    await store.selectTenant('tenant-a')
+    expect(store.canView('employees')).toBe(true) // owner: siempre true
+
+    await store.selectTenant('tenant-b')
+    expect(store.role).toBe('vet')
+    expect(store.canView('employees')).toBe(true) // fila explícita, sembrada para tenant-b
+    expect(store.canEdit('employees')).toBe(false)
   })
 })

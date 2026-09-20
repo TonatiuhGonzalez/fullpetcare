@@ -40,9 +40,28 @@ const DUENO_PASSWORD = 'Demo1234!'
 // Ramírez Castillo, su perro Rocky, y el servicio "Baño".
 const PET_ROCKY_ID = 'e0000000-0000-4000-8000-000000000001'
 
+/**
+ * El siguiente día HÁBIL (mañana, saltando domingo) como "aaaa-mm-dd".
+ *
+ * Por qué no "hoy": la sucursal cierra los domingos y a las 18:00 (seed.sql,
+ * `opening_hours`), así que agendar "hoy" solo funciona en horario de
+ * oficina de lunes a sábado — un push en domingo o de noche dejaba el
+ * diálogo sin ningún horario que elegir y tumbaba el test sin que nada
+ * estuviera roto. Agendar mañana (o el lunes) siempre tiene huecos.
+ */
+function nextBusinessDay(): string {
+  const date = new Date()
+  do {
+    date.setDate(date.getDate() + 1)
+  } while (date.getDay() === 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 test('agendar → atender → cobrar, y que la visita quede en el historial de la mascota', async ({
   page,
 }) => {
+  const appointmentDate = nextBusinessDay()
   const groomerNotes = `Se portó tranquilo — corrida de prueba ${Date.now()}`
 
   // 1. Login
@@ -104,6 +123,8 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await dialog.locator('.v-select', { hasText: 'Empleado' }).click()
   await page.getByRole('option').first().click()
 
+  await dialog.getByLabel('Fecha').fill(appointmentDate)
+
   // El PRIMER hueco disponible, sea cual sea — no un horario fijo. Así el
   // test no choca si se corre más de una vez sin reiniciar la base (el
   // hueco que usó la corrida anterior ya no aparecería disponible).
@@ -124,7 +145,21 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await page.locator('button', { hasText: 'Atender' }).click()
   await expect(page.getByText('Detalle de la cita')).toBeHidden()
 
-  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  // La cita quedó en OTRO día (ver nextBusinessDay): se lleva la agenda a
+  // esa fecha para que el bloque de la cita sea visible y clicable.
+  await page.locator('input[type="date"]').fill(appointmentDate)
+
+  // La cita se ubica por su ESTADO, no por su posición: si el test ya corrió
+  // antes ese mismo día, la agenda trae citas viejas de Sofía (ya cobradas)
+  // y ni el orden del DOM ni "la primera" sirven para distinguir la nueva.
+  // AgendaPage.vue pinta cada bloque con el color de su estado
+  // (rgb(var(--v-theme-warning)) = "En curso"), y ese valor queda en su
+  // estilo en línea. Recién atendida, solo la nuestra está "En curso".
+  await page
+    .locator('[style*="--v-theme-warning"]')
+    .filter({ hasText: 'Sofía Ramírez' })
+    .first()
+    .click()
   await expect(page.getByText('Atender cita')).toBeVisible()
 
   // Nota de groomer que sirve de "huella" única para el paso 6 (así el
@@ -137,7 +172,13 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
 
   // 4. Cobrar en efectivo — "Cobrar" desliza al mismo formulario que antes
   // vivía en /cobrar, DENTRO del diálogo (pedido explícito del usuario).
-  await page.getByText('Sofía Ramírez', { exact: false }).first().click()
+  // Recién terminada la ficha, la nuestra es la única "Completada" sin
+  // cobrar (success); las viejas ya están "Cobradas" (primary).
+  await page
+    .locator('[style*="--v-theme-success"]')
+    .filter({ hasText: 'Sofía Ramírez' })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Cobrar', exact: true }).click()
   await expect(page.getByText('Subtotal')).toBeVisible()
 

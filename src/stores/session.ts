@@ -12,6 +12,8 @@ import {
 } from '@/services/auth'
 import { getProfile, type MyProfile } from '@/services/profiles'
 import { listMyMemberships, type MembershipSummary } from '@/services/memberships'
+import { listForTenant } from '@/services/permissions'
+import { hasPermission, type PermissionModule, type RolePermissionRow } from '@/lib/permissions'
 
 const ACTIVE_TENANT_KEY = 'fpc.activeTenantId'
 const ACTIVE_BRANCH_KEY = 'fpc.activeBranchId'
@@ -41,6 +43,12 @@ export const useSessionStore = defineStore('session', () => {
   const user = ref<AuthUser | null>(null)
   const profile = ref<MyProfile | null>(null)
   const memberships = ref<MembershipSummary[]>([])
+  // Reglas de permisos del tenant ACTIVO únicamente (fase 9) — se
+  // recarga cada vez que cambia activeTenantId (loadMemberships,
+  // selectTenant). No vive dentro de MembershipSummary porque no es
+  // información de "mi membresía": son las mismas filas para cualquier
+  // colega con el mismo rol en ese negocio.
+  const permissions = ref<RolePermissionRow[]>([])
   const activeTenantId = ref<string | null>(null)
   const activeBranchId = ref<string | null>(null)
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -62,10 +70,31 @@ export const useSessionStore = defineStore('session', () => {
     () => isAuthenticated.value && (!activeTenantId.value || !activeBranchId.value),
   )
 
+  /**
+   * true si el rol activo puede VER un módulo (p. ej. "employees", la
+   * pestaña de empleados de la fase 9). Solo gatea la INTERFAZ — la
+   * autoridad real es la política RLS + app.has_permission() en
+   * Postgres; si esto y el backend algún día no coincidieran, el peor
+   * caso es un botón visible que el backend rechaza, nunca lo contrario.
+   */
+  function canView(module: PermissionModule): boolean {
+    return hasPermission(role.value, permissions.value, module, 'view')
+  }
+
+  /** Mismo criterio que canView(), para la acción de EDITAR. */
+  function canEdit(module: PermissionModule): boolean {
+    return hasPermission(role.value, permissions.value, module, 'edit')
+  }
+
+  async function loadPermissionsForActiveTenant(): Promise<void> {
+    permissions.value = activeTenantId.value ? await listForTenant(activeTenantId.value) : []
+  }
+
   function reset(): void {
     user.value = null
     profile.value = null
     memberships.value = []
+    permissions.value = []
     activeTenantId.value = null
     activeBranchId.value = null
     errorMessage.value = null
@@ -135,9 +164,10 @@ export const useSessionStore = defineStore('session', () => {
     writeStorage(ACTIVE_TENANT_KEY, activeTenantId.value)
 
     resolveActiveBranch()
+    await loadPermissionsForActiveTenant()
   }
 
-  function selectTenant(tenantId: string): void {
+  async function selectTenant(tenantId: string): Promise<void> {
     activeTenantId.value = tenantId
     writeStorage(ACTIVE_TENANT_KEY, tenantId)
     // Cambiar de negocio invalida la sucursal elegida anteriormente —
@@ -145,6 +175,7 @@ export const useSessionStore = defineStore('session', () => {
     activeBranchId.value = null
     writeStorage(ACTIVE_BRANCH_KEY, null)
     resolveActiveBranch()
+    await loadPermissionsForActiveTenant()
   }
 
   function selectBranch(branchId: string): void {
@@ -200,6 +231,7 @@ export const useSessionStore = defineStore('session', () => {
     user,
     profile,
     memberships,
+    permissions,
     activeTenantId,
     activeBranchId,
     status,
@@ -210,6 +242,8 @@ export const useSessionStore = defineStore('session', () => {
     activeBranches,
     activeBranch,
     needsBusinessSelection,
+    canView,
+    canEdit,
     login,
     logout,
     loadMemberships,
