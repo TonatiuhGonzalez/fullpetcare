@@ -40,9 +40,28 @@ const DUENO_PASSWORD = 'Demo1234!'
 // Ramírez Castillo, su perro Rocky, y el servicio "Baño".
 const PET_ROCKY_ID = 'e0000000-0000-4000-8000-000000000001'
 
+/**
+ * El siguiente día HÁBIL (mañana, saltando domingo) como "aaaa-mm-dd".
+ *
+ * Por qué no "hoy": la sucursal cierra los domingos y a las 18:00 (seed.sql,
+ * `opening_hours`), así que agendar "hoy" solo funciona en horario de
+ * oficina de lunes a sábado — un push en domingo o de noche dejaba el
+ * diálogo sin ningún horario que elegir y tumbaba el test sin que nada
+ * estuviera roto. Agendar mañana (o el lunes) siempre tiene huecos.
+ */
+function nextBusinessDay(): string {
+  const date = new Date()
+  do {
+    date.setDate(date.getDate() + 1)
+  } while (date.getDay() === 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 test('agendar → atender → cobrar, y que la visita quede en el historial de la mascota', async ({
   page,
 }) => {
+  const appointmentDate = nextBusinessDay()
   const groomerNotes = `Se portó tranquilo — corrida de prueba ${Date.now()}`
 
   // 1. Login
@@ -104,6 +123,8 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await dialog.locator('.v-select', { hasText: 'Empleado' }).click()
   await page.getByRole('option').first().click()
 
+  await dialog.getByLabel('Fecha').fill(appointmentDate)
+
   // El PRIMER hueco disponible, sea cual sea — no un horario fijo. Así el
   // test no choca si se corre más de una vez sin reiniciar la base (el
   // hueco que usó la corrida anterior ya no aparecería disponible).
@@ -123,6 +144,10 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // la agenda, ya en su nuevo color ("En curso").
   await page.locator('button', { hasText: 'Atender' }).click()
   await expect(page.getByText('Detalle de la cita')).toBeHidden()
+
+  // La cita quedó en OTRO día (ver nextBusinessDay): se lleva la agenda a
+  // esa fecha para que el bloque de la cita sea visible y clicable.
+  await page.locator('input[type="date"]').fill(appointmentDate)
 
   await page.getByText('Sofía Ramírez', { exact: false }).first().click()
   await expect(page.getByText('Atender cita')).toBeVisible()
