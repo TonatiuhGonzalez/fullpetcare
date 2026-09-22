@@ -212,6 +212,16 @@ function openAppointmentDialog(appointmentId: string): void {
 }
 
 function handleAppointmentCreated(appointment: Appointment): void {
+  // NewAppointmentDialog emite la cita "cruda" (Appointment), sin
+  // customerName/petName — calendarBlocks necesita un AppointmentWithNames
+  // (services/appointments.ts). Recargar el rango es el mismo patrón que ya
+  // usa AppointmentDialog (@changed="agenda.load()" más abajo): vuelve a
+  // pedir el rango completo al servidor en vez de armar el bloque a mano
+  // aquí, así el nombre del cliente/mascota y el "Cobrada" del bloque nuevo
+  // salen siempre correctos. No se espera a que termine (no es un await):
+  // la cita recién creada se ve en cuanto agenda.load() resuelve, mientras
+  // tanto ya se abrió su detalle.
+  agenda.load()
   openAppointmentDialog(appointment.id)
 }
 </script>
