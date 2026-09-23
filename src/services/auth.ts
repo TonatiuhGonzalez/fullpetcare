@@ -32,3 +32,18 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (error || !data.user?.email) return null
   return { id: data.user.id, email: data.user.email }
 }
+
+/**
+ * Avisa cuando supabase-js pierde la sesión por su cuenta: el refresh
+ * token expiró o fue revocado, se cumplió el timebox/inactividad del
+ * servidor (supabase/config.toml, [auth.sessions]), o se cerró sesión en
+ * OTRA pestaña (supabase-js lo propaga por el evento "storage"). En todos
+ * esos casos emite SIGNED_OUT. Devuelve la función para cancelar la
+ * suscripción.
+ */
+export function onSessionLost(callback: () => void): () => void {
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') callback()
+  })
+  return () => data.subscription.unsubscribe()
+}

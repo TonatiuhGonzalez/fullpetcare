@@ -20,8 +20,13 @@ const titleLabel = computed(() =>
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
 async function handleLogout(): Promise<void> {
-  await session.logout()
-  router.push('/login')
+  // "finally": aunque el servidor no responda, la sesión local ya se
+  // limpió en session.logout() — hay que salir de la pantalla igual.
+  try {
+    await session.logout()
+  } finally {
+    router.push('/login')
+  }
 }
 
 function handleBranchChange(branchId: unknown): void {

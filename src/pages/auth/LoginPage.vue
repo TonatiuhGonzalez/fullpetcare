@@ -59,6 +59,16 @@ async function handleSubmit(): Promise<void> {
         />
 
         <v-alert
+          v-if="route.query.reason === 'expired' && !session.errorMessage"
+          type="info"
+          density="compact"
+          variant="tonal"
+          class="mb-4"
+        >
+          Tu sesión terminó por seguridad. Vuelve a iniciar sesión.
+        </v-alert>
+
+        <v-alert
           v-if="session.errorMessage"
           type="error"
           density="compact"
