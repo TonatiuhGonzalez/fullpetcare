@@ -34,6 +34,7 @@ vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),
   getCurrentUser: vi.fn(),
+  onSessionLost: vi.fn(),
 }))
 vi.mock('@/services/profiles', () => ({
   getProfile: vi.fn(),
@@ -48,7 +49,7 @@ vi.mock('@/services/permissions', () => ({
 // Se importan DESPUÉS de los vi.mock() de arriba — en este punto ya no
 // son las funciones reales, son las versiones falsas (vi.fn()) que se
 // configuran abajo con mockResolvedValue().
-import { signIn, signOut } from '@/services/auth'
+import { onSessionLost, signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
 import { listForTenant } from '@/services/permissions'
@@ -171,6 +172,94 @@ describe('logout', () => {
     // el mismo navegador) heredaría esa selección sin querer.
     expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
     expect(localStorage.getItem('fpc.activeBranchId')).toBeNull()
+  })
+
+  it('limpia la sesión local aunque el servidor falle al cerrar sesión', async () => {
+    // Caso: el usuario pulsa "Salir" sin red y signOut() lanza. Antes, reset()
+    // no corría y la persona seguía "dentro" en una recepción compartida.
+    // Ahora la sesión local se limpia siempre y el error se sigue propagando.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+    vi.mocked(signOut).mockRejectedValue(new Error('Failed to fetch'))
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    await expect(store.logout()).rejects.toThrow('Failed to fetch')
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
+  })
+})
+
+describe('pérdida de sesión inesperada', () => {
+  // Captura el callback que el store registra con onSessionLost(), para
+  // poder "disparar" desde el test el evento SIGNED_OUT de supabase-js.
+  function captureSessionLostCallback(): () => void {
+    let callback: () => void = () => {}
+    vi.mocked(onSessionLost).mockImplementation((cb) => {
+      callback = cb
+      return () => {}
+    })
+    return () => callback()
+  }
+
+  async function loginAsOwner(store: ReturnType<typeof useSessionStore>): Promise<void> {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+  }
+
+  it('si supabase-js pierde la sesión, limpia el estado y marca sessionExpired', async () => {
+    // Caso: el servidor cerró la sesión (timebox de 12 h, inactividad de 1 h,
+    // token revocado, o logout en otra pestaña). Sin esto la pantalla seguía
+    // mostrando datos de alguien que ya no tiene acceso, hasta la siguiente
+    // consulta rechazada por RLS.
+    const fireSessionLost = captureSessionLostCallback()
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+    expect(store.isAuthenticated).toBe(true)
+
+    fireSessionLost()
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.memberships).toEqual([])
+    expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
+    expect(store.sessionExpired).toBe(true)
+  })
+
+  it('un "Salir" normal NO se confunde con una sesión vencida', async () => {
+    // signOut() de supabase-js emite SIGNED_OUT antes de que el store limpie
+    // su estado. Si no se distinguiera, cada logout mostraría al siguiente
+    // login el aviso falso "tu sesión terminó por seguridad".
+    const fireSessionLost = captureSessionLostCallback()
+    vi.mocked(signOut).mockImplementation(async () => fireSessionLost())
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+
+    await store.logout()
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.sessionExpired).toBe(false)
+  })
+
+  it('un nuevo login borra el aviso de sesión vencida', async () => {
+    // Si el aviso se quedara encendido, seguiría apareciendo después de
+    // volver a entrar correctamente.
+    const fireSessionLost = captureSessionLostCallback()
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+    fireSessionLost()
+    expect(store.sessionExpired).toBe(true)
+
+    await loginAsOwner(store)
+
+    expect(store.sessionExpired).toBe(false)
   })
 })
 

@@ -1,0 +1,33 @@
+# Cabeceras de seguridad para Cloudflare Pages (se aplican a TODAS las rutas).
+#
+# Por qué importa aquí: supabase-js guarda el token de sesión en
+# localStorage, y cualquier JavaScript que corra en la página puede leerlo.
+# El ataque que lo robaría es XSS (que alguien logre inyectar un <script>).
+# La política CSP de abajo le dice al navegador "solo ejecuta scripts que
+# vengan de mi propio dominio", lo que bloquea la mayoría de XSS aunque
+# exista un descuido en el código.
+#
+# - default-src 'self': por defecto, solo recursos de este mismo dominio.
+# - script-src 'self': sin scripts inline ni de terceros.
+# - style-src 'self' 'unsafe-inline': Vuetify y DayPilot inyectan estilos
+#   en línea al renderizar; sin esto la app se ve rota. (Riesgo aceptado:
+#   los estilos inline son mucho menos peligrosos que los scripts inline.)
+# - img-src ... data: blob: https://*.supabase.co: iconos/imágenes
+#   embebidas y fotos de mascotas que vienen de Supabase Storage.
+# - connect-src https://*.supabase.co wss://*.supabase.co: las llamadas a
+#   la API, Auth y Edge Functions de Supabase.
+# - font-src 'self' data: : la fuente de iconos (mdi) se empaqueta con la app.
+# - frame-ancestors 'none' + X-Frame-Options: nadie puede meter la app en
+#   un <iframe> (evita clickjacking).
+# - object-src 'none', base-uri 'self', form-action 'self': cierran vías
+#   clásicas de inyección.
+#
+# Si un día se cambia de dominio de Supabase (dominio propio), hay que
+# actualizar connect-src e img-src, o el navegador bloqueará las llamadas.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000

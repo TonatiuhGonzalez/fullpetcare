@@ -172,7 +172,9 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# false: nadie puede crear su propia cuenta con solo la anon key (que es pública). Los usuarios
+# nuevos se crean únicamente por invitación, desde la Edge Function invite-employee (service_role).
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -216,7 +218,9 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project.
+# OJO: en esta sección "enable_signup" es el interruptor del PROVEEDOR de correo completo, no solo
+# del registro: en false, hasta el LOGIN con correo y contraseña responde "Email logins are disabled"
+# (rompió el CI de RLS). Dejar SIEMPRE en true; el registro público se cierra arriba, en [auth].
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
@@ -268,11 +272,13 @@ max_frequency = "5s"
 # 4152127777 = "123456"
 
 # Configure logged in session timeouts.
-# [auth.sessions]
+[auth.sessions]
 # Force log out after the specified duration.
-# timebox = "24h"
+# Máximo 12 h desde el login: un turno de trabajo. Al pasar, hay que volver a ingresar contraseña.
+timebox = "12h"
 # Force log out if the user has been inactive longer than the specified duration.
-# inactivity_timeout = "8h"
+# 1 h sin usar la app: protege una recepción con la pantalla desatendida.
+inactivity_timeout = "1h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 
 import {
   getCurrentUser,
+  onSessionLost,
   signIn as signInRequest,
   signOut as signOutRequest,
   type AuthUser,
@@ -186,6 +187,7 @@ export const useSessionStore = defineStore('session', () => {
   async function login(email: string, password: string): Promise<void> {
     status.value = 'loading'
     errorMessage.value = null
+    sessionExpired.value = false
     try {
       user.value = await signInRequest(email, password)
       profile.value = await getProfile(user.value.id)
@@ -199,9 +201,42 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function logout(): Promise<void> {
-    await signOutRequest()
-    reset()
-    status.value = 'idle'
+    // "finally": aunque el servidor no responda (sin red), la sesión
+    // LOCAL se limpia siempre — antes, si signOut() lanzaba, reset()
+    // nunca corría y el usuario quedaba "dentro" tras pulsar Salir. El
+    // error se sigue propagando para que la UI pueda avisar.
+    isLoggingOut = true
+    try {
+      await signOutRequest()
+    } finally {
+      isLoggingOut = false
+      reset()
+      status.value = 'idle'
+    }
+  }
+
+  /**
+   * true si la sesión se perdió SIN que el usuario pulsara "Salir"
+   * (token vencido, revocado, timebox, cierre en otra pestaña). Las
+   * pantallas lo usan para mandar a /login con un aviso claro.
+   */
+  const sessionExpired = ref(false)
+  let stopWatchingSession: (() => void) | null = null
+  // signOut() emite SIGNED_OUT ANTES de que reset() corra; sin esta
+  // bandera, un "Salir" normal se confundiría con una sesión vencida.
+  let isLoggingOut = false
+
+  function watchSessionLoss(): void {
+    if (stopWatchingSession) return
+    stopWatchingSession = onSessionLost(() => {
+      // logout() también dispara SIGNED_OUT; ahí user ya es null tras
+      // reset(), o está por serlo — solo interesa la pérdida inesperada
+      // de una sesión que la app creía viva.
+      if (isLoggingOut || user.value === null) return
+      reset()
+      status.value = 'idle'
+      sessionExpired.value = true
+    })
   }
 
   // Evita repetir el arranque si algo dispara ensureInitialized() más de
@@ -214,6 +249,7 @@ export const useSessionStore = defineStore('session', () => {
   function ensureInitialized(): Promise<void> {
     if (!initPromise) {
       initPromise = (async () => {
+        watchSessionLoss()
         status.value = 'loading'
         const existingUser = await getCurrentUser()
         if (existingUser) {
@@ -237,6 +273,7 @@ export const useSessionStore = defineStore('session', () => {
     status,
     errorMessage,
     isAuthenticated,
+    sessionExpired,
     activeMembership,
     role,
     activeBranches,
