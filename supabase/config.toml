@@ -218,8 +218,10 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = false
+# OJO: en esta sección "enable_signup" es el interruptor del PROVEEDOR de correo completo, no solo
+# del registro: en false, hasta el LOGIN con correo y contraseña responde "Email logins are disabled"
+# (rompió el CI de RLS). Dejar SIEMPRE en true; el registro público se cierra arriba, en [auth].
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
