@@ -13,6 +13,8 @@ declare module 'vue-router' {
     requiresFrontDesk?: boolean
     /** Módulo de permisos (fase 9, CLAUDE.md §6.7) que se necesita "ver" para entrar — session.canView() decide, no un rol fijo. */
     requiresPermission?: PermissionModule
+    /** true en las rutas del panel de plataforma (fase 10): solo superadmins de plataforma. */
+    requiresPlatformAdmin?: boolean
   }
 }
 
@@ -96,6 +98,29 @@ export const router = createRouter({
         },
       ],
     },
+    // Panel de superadmin de plataforma (fase 10). Vive fuera de /app: un
+    // superadmin no pertenece a ningún negocio, así que no hay negocio ni
+    // sucursal activos y AppLayout.vue no aplica. El gateo real es la base
+    // (cada RPC revalida is_platform_admin()); este meta solo evita
+    // mostrar un panel vacío a quien de todos modos no podría usarlo.
+    {
+      path: '/superadmin',
+      component: () => import('@/layouts/SuperadminLayout.vue'),
+      meta: { requiresPlatformAdmin: true },
+      children: [
+        { path: '', redirect: '/superadmin/empresas' },
+        {
+          path: 'empresas',
+          name: 'superadmin-empresas',
+          component: () => import('@/pages/superadmin/TenantsPage.vue'),
+        },
+        {
+          path: 'administradores',
+          name: 'superadmin-administradores',
+          component: () => import('@/pages/superadmin/AdminsPage.vue'),
+        },
+      ],
+    },
     // Vista pública (tarea 7.12): NO va dentro de /app — no exige sesión
     // y usa su propio layout, sin nada de la navegación interna (el
     // guard de abajo solo revisa rutas que empiecen con "/app").
@@ -129,10 +154,26 @@ router.beforeEach(async (to) => {
   await session.ensureInitialized()
 
   const isPrivateRoute = to.path.startsWith('/app')
+  const isPlatformRoute = to.matched.some((record) => record.meta.requiresPlatformAdmin)
   const isSelectBusinessRoute = to.path === '/seleccionar-negocio'
 
-  if ((isPrivateRoute || isSelectBusinessRoute) && !session.isAuthenticated) {
+  if ((isPrivateRoute || isPlatformRoute || isSelectBusinessRoute) && !session.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // Panel de plataforma (fase 10): quien no es superadmin no tiene nada que
+  // hacer aquí — se le manda a su agenda, igual que con los demás gateos.
+  if (isPlatformRoute && !session.isPlatformAdmin) {
+    return { path: '/app/agenda' }
+  }
+
+  // Un superadmin que no pertenece a ningún negocio no tiene "agenda" ni
+  // negocio que elegir: su casa es el panel de plataforma. (Sin esto, tras
+  // iniciar sesión — que manda a /app/agenda por default — vería la
+  // pantalla de selección de negocio vacía, o una agenda sin negocio.)
+  const isPlatformOnlyUser = session.isPlatformAdmin && session.memberships.length === 0
+  if (isPrivateRoute && isPlatformOnlyUser) {
+    return { path: '/superadmin' }
   }
 
   if (isPrivateRoute && session.needsBusinessSelection) {
@@ -140,6 +181,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path === '/login' && session.isAuthenticated) {
+    if (isPlatformOnlyUser) return { path: '/superadmin' }
     return session.needsBusinessSelection
       ? { path: '/seleccionar-negocio' }
       : { path: '/app/agenda' }

@@ -231,6 +231,44 @@ le asigna rol y sucursales, sube su credencial de elector, y lo edita después.
 Cualquier otro rol ni ve la pestaña ni puede entrar por URL directa — y cambiar eso
 mañana es una fila en `role_permissions`, no una migración.
 
+### Fase 10 — Superadmin de plataforma
+
+Panel `/superadmin` (misma pantalla de login) para que el equipo de la plataforma
+gestione las empresas registradas: darlas de alta, ver su plan, dueño, fecha de alta y
+vigencia, suspenderlas o darlas de baja, llevar notas internas, ver métricas de uso y
+restablecer la contraseña del dueño. Además, gestionar a los propios superadmins.
+
+**Solo ve datos de la empresa, nunca datos de negocio** (D14). Plan, vigencia y estado
+son **informativos**: plan de texto fijo, vigencia indefinida, y suspender es una
+etiqueta que no bloquea el acceso — bloquearlo implicaría tocar `app.is_member_of()`,
+que usa toda la base, y se decidirá con la gestión real de planes.
+
+- **Esquema:** `platform_admins` (sin `tenant_id`), `tenant_platform_info` (1 a 1 con
+  `tenants`, creada por trigger) y `platform_audit_log`. Las tres con RLS de solo lectura
+  para superadmins; **ninguna con política de escritura**.
+- **RPC** `platform_*` (`SECURITY DEFINER`, revalidan `app.is_platform_admin()` en su
+  primera línea): lista de empresas, métricas (solo conteos), estado con motivo, notas,
+  alta de empresa (todo o nada), superadmins (nunca deja cero), eventos de bitácora.
+- **Edge Function `platform-admin`** (la tercera): una sola con tres acciones. Usa dos
+  clientes — con el JWT de quien llama para verificar y llamar las RPC (así la bitácora
+  registra al superadmin real), y con `service_role` solo para la API de administración
+  de Auth. Genera las contraseñas temporales; se muestran una vez.
+- **Frontend:** `services/platform.ts`, `useSessionStore.isPlatformAdmin`, `lib/platform.ts`
+  (lógica pura con tests), `SuperadminLayout.vue`, `TenantsPage.vue`, `AdminsPage.vue` y
+  cinco diálogos. El detalle de una empresa es un diálogo con pestañas, no una página.
+- **Arranque:** `npm run superadmin:create` (el primer superadmin no puede crearse desde
+  la interfaz) y un superadmin ficticio + un tercer negocio en `seed.sql`. `demo:reset`
+  restaura el estado de plataforma de la semilla y oculta las empresas de una demo.
+
+**Demostrable:** el superadmin entra, ve las empresas con su plan, dueño y estado, da de
+alta una nueva (recibe una contraseña temporal que se ve una sola vez), la suspende con
+un motivo, anota notas, consulta sus métricas y su bitácora, restablece la contraseña del
+dueño (que deja de poder usar la anterior y pierde sus sesiones abiertas) y agrega o
+quita otros superadmins. Un dueño normal no entra a `/superadmin` ni por URL directa.
+
+**Trabajo futuro:** forzar el cambio de contraseña en el primer ingreso del dueño, gestión
+real de planes y vigencia, y bloqueo de acceso por vencimiento o suspensión.
+
 ### Después de v1 (no ahora)
 
 Productos e inventario, CFDI real con un PAC, OpenPay real, WhatsApp Business API,
@@ -378,6 +416,35 @@ tabla (bypass explícito en `app.has_permission()`).
 **Si algún día hace falta una pantalla para editarla:** la tabla y la función ya están
 listas; falta solo la política de INSERT/UPDATE y su UI — mismo patrón que esta misma
 fase le acaba de aplicar a `memberships`/`membership_branches`.
+
+---
+
+### D14 — Superadmin en una tabla aparte (`platform_admins`), no un rol de `memberships`
+
+**Alternativa descartada:** agregar un valor `superadmin` al enum `role` de
+`memberships`.
+**Por qué se descartó:** `memberships` siempre pertenece a un `tenant_id` (§6.1) y
+`app.is_member_of()` la usan todas las políticas de negocio; meter ahí a alguien sin
+negocio rompería ese supuesto y arriesgaría abrir datos de negocio a quien solo debe
+ver datos de la empresa.
+**Por qué la tabla aparte:** el superadmin queda fuera del camino de todas las
+políticas de negocio: no ve `customers`, `pets` ni expedientes aunque una política se
+equivoque, porque ninguna lo menciona. Solo las RPCs `platform_*` lo reconocen, vía
+`app.is_platform_admin()`.
+**Dos correcciones al diseño original, descubiertas al escribir las migraciones:**
+plan/estado/notas NO son columnas de `tenants` (RLS filtra filas, no columnas, y cualquier
+miembro del negocio lee su fila de `tenants`: el dueño habría visto lo que la plataforma
+anota sobre él) y la bitácora NO reutiliza `audit_log` (la lee el dueño y su trigger exige
+`tenant_id`). Ver CLAUDE.md §6.8.
+**Costo aceptado:** `platform_admins` es una excepción a la regla de `tenant_id` en
+toda tabla (igual que `profiles`), y el primer superadmin no puede crearse desde la UI:
+se crea con un script. La Edge Function necesita dos clientes de Supabase para que la
+bitácora registre a la persona correcta.
+**Decisión relacionada:** plan, vigencia y suspensión son informativos en esta fase;
+bloquear acceso implicaría tocar `app.is_member_of()`, que usa toda la base, y se
+decidirá cuando se diseñe la gestión real de planes.
+**Riesgo conocido:** `demo:reset` oculta toda empresa fuera de la semilla; con un cliente
+real dado de alta hay que acotarlo antes de volver a correrlo (CLAUDE.md §10).
 
 ---
 

@@ -355,3 +355,216 @@ por negocio, no hardcodeados; se aprobó una segunda Edge Function).
   pública"), nueva §6.7 (las tres tablas de esta fase), §7.2 (`app.has_permission()`
   junto a las demás funciones `app.*`, y el pendiente de 1.16 ya cerrado); `PLAN.md`
   con la Fase 9 y la decisión `D13`. **Fase 9 completa.**
+
+---
+
+## Fase 10 — Superadmin de plataforma
+
+**Meta: un panel `/superadmin` (misma pantalla de login) para que el equipo de la
+plataforma gestione las empresas registradas: darlas de alta, ver su plan, su dueño y
+su fecha de alta, suspenderlas o darlas de baja, llevar notas internas, ver métricas
+de uso y restablecer la contraseña del dueño.** Prioridad alta. Ya no es "v1 a secas":
+el usuario empezó a agregar características nuevas. Decisiones resueltas con él antes
+de construir:
+
+- Los superadmins viven en una tabla aparte (`platform_admins`), no en `memberships`
+  (un superadmin no pertenece a ningún negocio). Puede haber varios, todos con los
+  mismos permisos.
+- **Solo ven datos de la empresa** (nombre, dueño, plan, estado, conteos). Nunca
+  clientes, mascotas, citas ni expedientes.
+- Plan y vigencia son **informativos**: plan de texto fijo "Básico", vigencia
+  indefinida (`NULL`). Sin tabla de planes y sin bloqueo por vencimiento (a futuro).
+- Suspender / dar de baja es **solo una etiqueta** de estado: no bloquea el acceso de
+  los usuarios de la empresa (a futuro). Las empresas no tienen fecha de baja.
+- Un solo dueño por empresa. El alta captura: nombre de la empresa, nombre de la
+  sucursal, y nombre / correo / teléfono del dueño. Zona horaria fija
+  `America/Mexico_City`. Catálogo de servicios vacío.
+- La contraseña del dueño la genera el sistema (temporal, se muestra una sola vez).
+  Cambiarla al primer ingreso queda como trabajo futuro.
+- Cambiar la contraseña de un admin cierra sus sesiones (revoca sus refresh tokens;
+  un access token ya emitido sigue válido hasta caducar).
+- El primer superadmin se crea con un script, no desde la UI.
+
+- [x] **10.1** 📚 Documentación de alcance: esta fase en `TASKS.md`, `PLAN.md`
+  (Fase 10 y decisión `D14`) y una nota en `CLAUDE.md` §1. Las tablas nuevas y el rol
+  de plataforma se documentan en `CLAUDE.md` §6/§7 al cerrar la fase (10.11), cuando
+  ya existen. _Verificar:_ los tres archivos mencionan la fase.
+- [x] **10.2** 📚 Migraciones `20260924120000_platform_admins.sql` y
+  `20260924120200_tenant_platform_info.sql`: `platform_admins` (sin `tenant_id`,
+  excepción documentada igual que `profiles`), `app.is_platform_admin()`
+  (`SECURITY DEFINER`, explicado), `tenant_platform_info` 1 a 1 con `tenants`
+  (`plan`, `plan_expires_at`, `status`, `status_reason`, `internal_notes`; creada
+  por trigger al insertar un tenant), `platform_audit_log` con su propio trigger
+  `app.log_platform_change()`. RLS solo SELECT, solo superadmins; sin política de
+  escritura (las RPC de 10.3 escriben). **Cambio de diseño respecto al plan
+  original:** plan/estado/notas NO son columnas de `tenants` (cualquier miembro del
+  negocio las leería con `select *`) y la bitácora NO reutiliza `audit_log` (la lee
+  el dueño del negocio y `app.log_change()` exige `tenant_id`). Nombre, teléfono y
+  correo del dueño no se duplican: salen de `profiles`/`auth.users` vía la RPC de
+  10.3. _Verificado:_ `supabase db reset` corre limpio (junto con los tests de
+  10.4).
+- [x] **10.3** 📚 RPCs de plataforma (todas revalidan `app.is_platform_admin()`
+  adentro, `SECURITY DEFINER`; explicado por qué RPC y no tablas directas):
+  `platform_list_tenants` (incluye dueño: nombre, correo, teléfono),
+  `platform_tenant_metrics` (solo conteos; el "mes" se calcula en la zona horaria
+  del negocio, §8.3), `platform_set_tenant_status` (motivo obligatorio salvo al
+  reactivar), `platform_update_notes`, `platform_create_tenant` (tenant + una
+  sucursal + membership del dueño, todo o nada; el usuario de Auth lo crea la Edge
+  Function de 10.5) — `20260924120400_platform_rpcs.sql`. Comprobado a mano en una
+  transacción con rollback; sus tests formales son la 10.4.
+- [x] **10.4** 🧪 Tests de BD — 59 tests nuevos, 255/255 de BD en verde:
+  `platform-rls.spec.ts` (18: `is_platform_admin()`, RLS de las tres tablas,
+  el dueño no ve notas internas ni las encuentra en su `audit_log`, tablas sin
+  escritura directa, bitácora inmutable) y `platform-rpcs.spec.ts` (41: las 5
+  RPC rechazan a dueño, ex-superadmin y `anon`; lista con dueño y negocio sin
+  dueño; métricas solo con conteos y **el mes en la zona horaria del negocio**;
+  motivo obligatorio al suspender; alta con todo o nada). Helpers nuevos:
+  `insertAuthUser`, `makePlatformAdmin`, `tryQuery` (SAVEPOINT). **Validado con
+  mutaciones:** se rompió a propósito el cálculo del mes (UTC) y el chequeo de
+  superadmin de una RPC, y los tests correctos fallaron. Los tests de Edge
+  Functions (`public-pet-view`, `invite-employee`) necesitan `supabase functions
+  serve` corriendo; sin él dan 503, ajeno a esta fase.
+- [x] **10.5** 📚🧪 Edge Function `platform-admin` — UNA sola función con tres
+  acciones (`create_tenant`, `reset_password`, `add_admin`), decidido con el
+  usuario. Revalida `platform_admins` con el JWT de quien llama (paso 1, sin
+  `service_role`); solo después usa la llave secreta, y solo para la API de admin
+  de Auth. Las escrituras de negocio van por las RPC con el JWT del superadmin, para
+  que la bitácora registre al superadmin real como actor (con `service_role`,
+  `auth.uid()` es NULL). El alta crea el usuario **y** llama la RPC en un solo paso
+  (si la RPC falla, borra el usuario huérfano), así que el frontend no coordina dos
+  llamadas. Un correo ya registrado se rechaza con 409 (decisión 3: no secuestrar
+  cuentas). Restablecer: bitácora primero, luego contraseña, luego cierra sesiones.
+  Migración `20260924120600_platform_admin_support.sql`: `revoke_user_sessions`
+  (solo `service_role`), `platform_list_admins`, `platform_add_admin`,
+  `platform_remove_admin` (nunca deja cero superadmins), `platform_log_event` y la
+  columna `event` de la bitácora. Config: `[functions.platform-admin]` en
+  `config.toml`. **Explicar la diferencia entre `callerClient` y `adminClient`.**
+  _Verificado:_ `platform-admin-function.spec.ts` (20 tests HTTP reales),
+  `platform-admin-support.spec.ts` (22, RPC). Probado con mutaciones: quitar el
+  chequeo de superadmin destapó que un no-superadmin podía **sondear qué correos
+  están registrados** (recibía 409 en vez de 403) — hay test que lo impide ahora.
+  Límite conocido: GoTrue ya cierra las sesiones al cambiar la contraseña, así que
+  los tests no distinguen si lo hizo GoTrue o `revoke_user_sessions` (que se
+  conserva como garantía propia). El camino "la RPC falla tras crear el usuario"
+  (limpieza del huérfano) no tiene test: no hay forma honesta de provocarlo.
+- [x] **10.6** 🧪 Generador de contraseña temporal
+  (`supabase/functions/platform-admin/password.ts`, función pura; vive junto a la
+  función y no en `src/lib/` porque la contraseña se genera SIEMPRE en el servidor)
+  con 6 tests (`temporary-password.spec.ts`): longitud, sin caracteres ambiguos,
+  una de cada clase, sin sesgo de módulo, sin repeticiones. Validado con mutación.
+- [x] **10.7** 🧪 `src/services/platform.ts` (empresas, métricas, estado, notas,
+  bitácora, superadmins, y las dos llamadas a la Edge Function) y
+  `useSessionStore.isPlatformAdmin` (un superadmin no necesita elegir negocio;
+  se restaura al recargar; se borra al salir; si no se puede confirmar, el login
+  falla en vez de asumir "no es admin"). `src/types/database.ts` regenerado
+  (solo inserciones). El servicio convierte a tipos de dominio (`camelCase`, `null`
+  donde corresponde: el generador marca todo como `string`) y traduce errores: los
+  mensajes en español de las RPC pasan tal cual, el "permission denied" de Postgres
+  se oculta, y un 404/503/504 del **gateway** ("función apagada") se distingue del
+  404 de **la propia función** ("empresa sin dueño"). _Verificado:_
+  `platform-service.spec.ts` (21 tests contra Supabase local, con sesiones reales),
+  5 tests nuevos en `session.spec.ts`, y `agenda.spec.ts` ahora simula
+  `@/services/platform` (sin eso el CI, que no tiene `.env.local`, fallaba al
+  cargar). Helpers compartidos en `platform-test-helpers.ts`. Probado con
+  mutaciones (store y servicio). Total: 324 tests de BD y 164 unitarios en verde.
+  **Lección de aislamiento:** los tests que modificaban un negocio de la semilla
+  lo dejaban modificado en la base local; ahora usan un negocio desechable
+  (`createScratchTenant`).
+- [x] **10.8** UI `/superadmin` (misma pantalla de login; decisiones tomadas con el
+  usuario: detalle en **un diálogo con pestañas**, contraseña temporal en un
+  **diálogo bloqueante con botón Copiar** que se ve una sola vez, lista con
+  **búsqueda + filtro por estado**, y gestión de superadmins como **pestaña junto a
+  Empresas**). `SuperadminLayout.vue`, `TenantsPage.vue`, `AdminsPage.vue`,
+  `TenantFormDialog.vue`, `TenantDetailDialog.vue` (Datos / Métricas / Notas /
+  Bitácora; las dos últimas cargan al abrirse), `TenantStatusDialog.vue` (motivo
+  obligatorio), `AdminFormDialog.vue`, `TemporaryPasswordDialog.vue`. Router:
+  `/superadmin` con `meta.requiresPlatformAdmin`; un superadmin sin negocio va a
+  `/superadmin` desde el login y desde `/app/*`; quien no lo es, a su agenda. La
+  lógica pura va en `src/lib/platform.ts` con 20 tests (etiquetas, filtro que ignora
+  acentos y mayúsculas, y la traducción de la bitácora a frases; nunca copia el
+  texto de una nota). Las validaciones de correo y teléfono ya existían en
+  `lib/validation.ts`. **La búsqueda cubre empresa Y nombre del dueño** (decisión
+  mía: "por nombre" era ambiguo). _Verificado:_ `vue-tsc`, `npm run lint`,
+  `npm run build` y 184 tests unitarios en verde. **Pendiente para 10.10:** ver la
+  pantalla en un navegador real (los componentes no llevan test, CLAUDE.md §9).
+- [x] **10.9** Primer superadmin y semilla. `scripts/create-superadmin.mjs` (Node,
+  no bash: hay llamadas HTTP y un rollback) + `npm run superadmin:create`: crea el
+  usuario en Auth con contraseña temporal (el MISMO generador que la Edge Function)
+  y su fila en `platform_admins`; rechaza un correo ya registrado; si el segundo
+  paso falla borra el usuario recién creado. `--local` apunta al Supabase local; sin
+  `--local` exige `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (sin prefijo `VITE_`,
+  documentadas en `.env.example`), **una terminal interactiva** y escribir el host
+  para confirmar. `seed.sql` (bloque nuevo al final, lo existente no se tocó):
+  superadmin ficticio `superadmin@fullpetcare.mx` y un tercer negocio, "Mascotas y
+  Mimos", con dueño, suspendido y con notas de ejemplo. `CLAUDE.md` §8.7 y §12
+  actualizados. _Verificado:_ `create-superadmin-script.spec.ts` (8 tests que corren
+  el script de verdad como proceso aparte, incluidos los casos donde DEBE negarse) y
+  ajustes a 3 tests que asumían "cero superadmins". Probado con mutaciones. 332
+  tests de BD en verde, dos corridas seguidas, y la base queda idéntica a la semilla.
+  Límite conocido: el camino "falla el segundo paso y se borra el usuario" no tiene
+  test (no hay forma honesta de provocar ese fallo).
+- [x] **10.10** Verificación de punta a punta en navegador real (Playwright dirigido a
+  mano, fuera del único E2E de CLAUDE.md §9 — flujo secundario, igual que 9.13), con
+  Supabase local, Edge Functions servidas y la UI de esta rama en su propio puerto
+  (el 5173 lo ocupaba el servidor del repo principal). **15/15 pasos:** superadmin
+  entra y cae en `/superadmin/empresas` con las 3 empresas; búsqueda sin acentos y por
+  dueño, filtro por estado; alta con validaciones y diálogo de contraseña (formato
+  correcto, **no se cierra con Esc ni clic afuera**, el botón Copiar deja de verdad la
+  contraseña en el portapapeles); detalle Datos / Métricas / Notas (persisten) /
+  Bitácora (con actor, sin copiar el texto de la nota); el dueño nuevo entra con la
+  temporal y ve su negocio; suspender exige motivo y el dueño **sigue pudiendo
+  trabajar** (es solo etiqueta); restablecer contraseña: la nueva sirve, la vieja no, y
+  **la sesión que el dueño tenía abierta deja de servir** al recargar; un dueño normal
+  no entra a `/superadmin` ni por URL directa; F5 mantiene la sesión; alta y baja de
+  superadmins y el mensaje de "único superadmin"; salir. **0 errores de consola**
+  reales (solo los 4xx esperados). Las **capturas** encontraron 2 defectos que los
+  pasos no podían ver y ya están corregidos: la bitácora cortaba las frases largas
+  ("…pendiente (ej") y el diálogo cambiaba de altura al cambiar de pestaña; y en
+  pantallas angostas la barra se amontonaba (ahora oculta chip y nombre). El panel no
+  se diseñó para móvil (solo la vista pública lo es), pero no desborda la página.
+  **`demo:reset` (opción B, decidida con el usuario):** un bloque nuevo en
+  `demo_reset.sql` devuelve los 3 negocios de la semilla a su estado de plataforma
+  (idempotente: sin cambios no escribe ni bitácora — comprobado corriéndolo dos veces)
+  y oculta las empresas fuera de la semilla. **Riesgo documentado** en `CLAUDE.md` §10
+  y en la confirmación de `demo-reset.sh`: con un cliente real ese paso lo ocultaría;
+  además los correos de dueños creados en una demo siguen registrados (no toca
+  `auth.users`), así que cada demo necesita otro correo.
+- [x] **10.11** Cierre. `CLAUDE.md`: §1 (nota), §3 y §4 (tercera Edge Function, script,
+  carpeta `superadmin`), §6 (excepciones a `tenant_id`) y **§6.8 nueva** (las tres
+  tablas y las decisiones que no se ven en el esquema), **§7.5 nueva** (el superadmin:
+  RLS sin escritura, RPC, los dos clientes de la Edge Function, contraseñas, sesiones),
+  §8.6, §8.7, §10 (advertencia de `demo:reset`) y §12 (comandos). `PLAN.md`: Fase 10
+  reescrita con lo realmente construido y `D14` con las dos correcciones de diseño y el
+  riesgo conocido. _Verificado:_ `npm run lint`, `vue-tsc`, `npm run build`, **184 tests
+  unitarios** y **332 tests de BD** (38 archivos) en verde, esta última corrida **dos
+  veces seguidas** con la base idéntica a la semilla después. Cobertura unitaria:
+  `lib/platform.ts` 96 %, `stores/session.ts` 96 %; `services/platform.ts` figura en 0 %
+  en esa medición porque, como el resto de los servicios, se prueba contra la base real
+  desde `test:db` (21 tests).
+
+  **Qué se puede demostrar (Fase 10):** entrar como `superadmin@fullpetcare.mx` /
+  `Demo1234!` y caer en `/superadmin`; ver las 3 empresas con plan, dueño, alta,
+  vigencia ("Indefinida") y estado; buscar y filtrar; dar de alta una empresa con su
+  sucursal y su dueño (contraseña temporal que se ve una sola vez); iniciar sesión como
+  ese dueño; suspender con motivo, dar de baja y reactivar; anotar notas internas; ver
+  métricas y bitácora; restablecer la contraseña del dueño (la vieja deja de servir y
+  pierde sus sesiones); agregar y quitar superadmins (sin poder quitar al último). Un
+  dueño normal no entra a `/superadmin`. **No se demuestra** (fuera de alcance): bloqueo
+  real por suspensión o vencimiento, gestión de planes, cambio obligatorio de contraseña
+  en el primer ingreso.
+
+  **Pendientes que quedan abiertos (decisión del usuario, no se tocaron):**
+  1. ~~`deploy-functions.yml` solo desplegaba `public-pet-view`~~ **Resuelto:** ahora
+     también despliega `invite-employee` y `platform-admin` (mismo patrón, con
+     `verify_jwt = true` de `config.toml`). Sin probar en la nube: solo corre al mergear
+     a `main`.
+  2. CORS: ninguna de las dos funciones con sesión maneja el preflight (en local lo
+     resuelve Kong); en Supabase hospedado no está verificado.
+  3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
+     para el script de superadmin, unitarios sin `.env.local`).
+  4. `demo:reset` oculta toda empresa fuera de la semilla: acotarlo antes de que entre el
+     primer cliente real (CLAUDE.md §10).
+
+**Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
+ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
+vencimiento o suspensión.

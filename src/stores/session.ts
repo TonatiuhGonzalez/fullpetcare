@@ -14,6 +14,7 @@ import {
 import { getProfile, type MyProfile } from '@/services/profiles'
 import { listMyMemberships, type MembershipSummary } from '@/services/memberships'
 import { listForTenant } from '@/services/permissions'
+import { isPlatformAdmin as fetchIsPlatformAdmin } from '@/services/platform'
 import { hasPermission, type PermissionModule, type RolePermissionRow } from '@/lib/permissions'
 
 const ACTIVE_TENANT_KEY = 'fpc.activeTenantId'
@@ -50,6 +51,11 @@ export const useSessionStore = defineStore('session', () => {
   // información de "mi membresía": son las mismas filas para cualquier
   // colega con el mismo rol en ese negocio.
   const permissions = ref<RolePermissionRow[]>([])
+  // true si la persona es superadmin de plataforma (fase 10). Vive aparte de
+  // memberships a propósito: un superadmin no pertenece a ningún negocio
+  // (PLAN.md D14). Solo gatea la INTERFAZ (/superadmin); la autoridad real
+  // son las RPC, que revalidan en la base.
+  const isPlatformAdmin = ref(false)
   const activeTenantId = ref<string | null>(null)
   const activeBranchId = ref<string | null>(null)
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -66,9 +72,17 @@ export const useSessionStore = defineStore('session', () => {
     () => activeBranches.value.find((b) => b.id === activeBranchId.value) ?? null,
   )
 
-  /** true si ya hay sesión pero todavía falta elegir negocio y/o sucursal. */
+  /**
+   * true si ya hay sesión pero todavía falta elegir negocio y/o sucursal.
+   * Un superadmin de plataforma NUNCA lo necesita: no tiene negocio que
+   * elegir, y sin esta excepción se quedaría atrapado en una pantalla de
+   * selección vacía.
+   */
   const needsBusinessSelection = computed(
-    () => isAuthenticated.value && (!activeTenantId.value || !activeBranchId.value),
+    () =>
+      isAuthenticated.value &&
+      !isPlatformAdmin.value &&
+      (!activeTenantId.value || !activeBranchId.value),
   )
 
   /**
@@ -96,6 +110,7 @@ export const useSessionStore = defineStore('session', () => {
     profile.value = null
     memberships.value = []
     permissions.value = []
+    isPlatformAdmin.value = false
     activeTenantId.value = null
     activeBranchId.value = null
     errorMessage.value = null
@@ -191,6 +206,7 @@ export const useSessionStore = defineStore('session', () => {
     try {
       user.value = await signInRequest(email, password)
       profile.value = await getProfile(user.value.id)
+      isPlatformAdmin.value = await fetchIsPlatformAdmin(user.value.id)
       await loadMemberships()
       status.value = 'ready'
     } catch (e) {
@@ -255,6 +271,7 @@ export const useSessionStore = defineStore('session', () => {
         if (existingUser) {
           user.value = existingUser
           profile.value = await getProfile(existingUser.id)
+          isPlatformAdmin.value = await fetchIsPlatformAdmin(existingUser.id)
           await loadMemberships()
         }
         status.value = 'ready'
@@ -268,6 +285,7 @@ export const useSessionStore = defineStore('session', () => {
     profile,
     memberships,
     permissions,
+    isPlatformAdmin,
     activeTenantId,
     activeBranchId,
     status,
