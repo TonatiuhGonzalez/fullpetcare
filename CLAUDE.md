@@ -35,6 +35,11 @@ Debe recorrerse un flujo completo de principio a fin:
 6. Historial completo de una mascota mezclando ambos tipos de visita
 7. Vista cliente pública (solo lectura) por link con token, optimizada para móvil
 
+> **Actualización (2026-09-24):** después de v1 se agregó la **Fase 10, superadmin de
+> plataforma** (`/superadmin`): gestión de empresas por el equipo de la plataforma,
+> con datos de la empresa únicamente. Ver `TASKS.md` Fase 10, `PLAN.md` D14, y §6.8 y
+> §7.5 de este archivo.
+
 ### Fuera de alcance en v1 (no lo construyas aunque parezca obvio)
 
 - **Venta de productos e inventario.** Decidido explícitamente: v1 es solo servicios.
@@ -86,7 +91,7 @@ Ya está decidido. **No lo cambies sin discutirlo primero.**
 | Rutas           | Vue Router                                | Estándar                                                                       |
 | Estilos         | SASS                                      | Terreno del usuario                                                            |
 | Backend/BD      | Supabase (Postgres, Auth, Storage)        | RLS en Postgres es el aislamiento multi-tenant real; evita escribir un backend |
-| Serverless      | Supabase Edge Functions                   | Vista pública del cliente (§7.4) y alta de acceso de empleados (§10, la `service_role` key nunca toca el frontend) |
+| Serverless      | Supabase Edge Functions                   | Vista pública del cliente (§7.4), alta de acceso de empleados (§10) y administración de plataforma (§7.5). La `service_role` key nunca toca el frontend |
 | Hosting         | Cloudflare Pages                          | Despliegue por git, previews por PR, gratis                                    |
 | CI              | GitHub Actions                            | Integrado a los PRs                                                            |
 | Tests unitarios | Vitest + Vue Test Utils                   | Vitest comparte config con Vite                                                |
@@ -147,11 +152,14 @@ FullPetCare/
 │   ├── seed.sql                 # datos demo locales (ficticios, en español)
 │   ├── seed/demo_reset.sql      # reset de datos de negocio para el demo desplegado
 │   ├── functions/
-│   │   └── public-pet-view/     # Edge Function de la vista cliente
+│   │   ├── public-pet-view/     # Edge Function de la vista cliente
+│   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
+│   │   └── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
 ├── scripts/
 │   ├── demo-reset.sh            # restaura datos demo limpios
+│   ├── create-superadmin.mjs    # crea el PRIMER superadmin de un ambiente (fase 10)
 │   └── gen-types.sh             # regenera src/types/database.ts
 │
 ├── e2e/                         # Playwright: un solo test de flujo completo
@@ -174,7 +182,7 @@ FullPetCare/
     ├── composables/
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
-    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, publico
+    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, publico, superadmin
     └── styles/
 ```
 
@@ -258,8 +266,8 @@ pagar esa complejidad hoy no compra nada.
 Reglas transversales, aplican a **toda** tabla de negocio:
 
 - `id uuid primary key default gen_random_uuid()`
-- `tenant_id uuid not null references tenants(id)` — sin excepción (salvo `tenants` y
-  `profiles`)
+- `tenant_id uuid not null references tenants(id)` — sin excepción (salvo `tenants`,
+  `profiles` y `platform_admins`; `platform_audit_log` lo lleva pero puede ser nulo)
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()` (trigger `set_updated_at`)
 - `deleted_at timestamptz` — borrado suave (§8.5)
@@ -379,6 +387,36 @@ operación de este proyecto que necesita la llave `service_role` desde el fronte
 por eso pasa por una segunda Edge Function (`invite-employee`, §10), nunca por
 PostgREST directo. Ver §7.2 para `app.has_permission()`, la función que decide todo
 esto en la base.
+
+### 6.8 Plataforma (superadmin)
+
+El equipo de la plataforma administra las empresas registradas desde `/superadmin`. Ve
+**datos de la empresa, nunca datos de negocio**: nombre, dueño, plan, estado, notas y
+conteos de uso — jamás clientes, mascotas, citas ni expedientes.
+
+| Tabla                  | Campos clave                                                                                              | Notas                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `platform_admins`      | `user_id` (único, → `auth.users`), `deleted_at`                                                           | Quién es superadmin. **Sin `tenant_id`**: no pertenece a ningún negocio. Varios, todos con el mismo poder |
+| `tenant_platform_info` | `tenant_id` (único, 1 a 1 con `tenants`), `plan`, `plan_expires_at`, `status`, `status_reason`, `internal_notes` | Lo que la plataforma anota de cada negocio. La crea un trigger al insertar un tenant                    |
+| `platform_audit_log`   | `tenant_id` (nulo), `table_name`, `record_id`, `action`, `event`, `actor_user_id`, `old_data`, `new_data`  | Bitácora de plataforma. Solo la leen superadmins                                                         |
+
+Decisiones que no se ven en el esquema:
+
+- **Por qué `tenant_platform_info` es una tabla aparte y no columnas de `tenants`:** RLS
+  filtra filas, no columnas, y `tenants_select` deja leer la fila a cualquier miembro del
+  negocio. Notas internas o un motivo de suspensión en `tenants` los leería el propio dueño.
+- **Por qué `platform_audit_log` no reutiliza `audit_log`:** `audit_log` la lee el dueño de
+  cada negocio y `app.log_change()` exige `tenant_id`.
+- **Nada se duplica:** el nombre y teléfono del dueño salen de `profiles` (de la membresía
+  `owner`), el correo de `auth.users`, y la fecha de alta es `tenants.created_at`.
+- **Plan, vigencia y estado son solo informativos.** El plan es texto (`'Básico'`), la
+  vigencia `NULL` significa indefinida, y `status` (`active`/`suspended`/`closed`) es una
+  etiqueta: **no bloquea el acceso** de los usuarios de la empresa. Bloquearlo implicaría
+  tocar `app.is_member_of()`, que usa toda la base; se decide cuando exista la gestión real
+  de planes. Un test documenta este comportamiento a propósito.
+- **Un solo dueño por empresa.** Zona horaria del alta: `America/Mexico_City`.
+- El primer superadmin no puede crearse desde la interfaz: `npm run superadmin:create`
+  (§12). Los demás los agrega un superadmin desde la pestaña "Superadmins".
 
 ---
 
@@ -515,6 +553,39 @@ Sus pruebas son explícitas y obligatorias: token de otro tenant, token revocado
 expirado, token válido pidiendo otra mascota, token inexistente, y que `anon` no pueda
 leer ninguna tabla directamente.
 
+### 7.5 El superadmin de plataforma
+
+Un superadmin no pertenece a ningún negocio, así que **queda fuera del camino de todas las
+políticas de negocio**: ninguna lo menciona, y por eso no hereda acceso a `customers`,
+`pets` ni `medical_records` aunque una política se equivocara. Solo lo reconocen las
+funciones y políticas de plataforma, vía `app.is_platform_admin()` (`SECURITY DEFINER`,
+sin argumentos: pregunta por `auth.uid()`, nadie puede consultar "¿fulano es admin?").
+
+- **Las tablas de plataforma no tienen política de escritura.** Se lee con RLS solo para
+  superadmins; se escribe únicamente por las RPC `platform_*`, que revalidan
+  `app.is_platform_admin()` en su primera línea (§7.3.4) y a las que se les revoca `EXECUTE`
+  a `anon` y `PUBLIC`.
+- **Las métricas devuelven solo conteos** (`platform_tenant_metrics`); la zona horaria del
+  "mes en curso" es la del negocio, no UTC (§8.3).
+- **Edge Function `platform-admin` (una sola, con tres acciones):** crear una empresa con su
+  dueño, restablecer la contraseña del dueño, agregar un superadmin. Tiene DOS clientes: el
+  `callerClient` (con el JWT de quien llama; respeta RLS y `auth.uid()` es el superadmin)
+  para verificar que es superadmin y llamar las RPC, y el `adminClient` (`service_role`)
+  solo para la API de administración de Auth. Así la bitácora registra al superadmin real
+  como actor (con `service_role`, `auth.uid()` es NULL). Revalida **antes** de tocar nada,
+  para que un no-superadmin no pueda sondear qué correos están registrados.
+- **Contraseñas temporales:** las genera la función (nunca el navegador), se muestran **una
+  sola vez** y no se guardan ni se registran en ningún lado. Un correo ya registrado se
+  rechaza: no se le cambia la contraseña a una cuenta existente.
+- **Al restablecer una contraseña se cierran las sesiones del dueño** (sus refresh tokens);
+  un access token ya emitido sigue válido hasta caducar (1 h por defecto). GoTrue ya lo
+  hace por sí solo al cambiar la contraseña por la API de admin; `revoke_user_sessions()`
+  es un cinturón adicional, ejecutable solo por `service_role`.
+- **Nunca se puede quitar al último superadmin** (`platform_remove_admin`).
+- **Cada acción queda en `platform_audit_log`**, incluidas las que no cambian ninguna fila
+  nuestra (restablecer una contraseña, `platform_log_event`). La bitácora va primero: si no
+  se puede registrar, no se cambia la contraseña.
+
 ---
 
 ## 8. Decisiones innegociables
@@ -592,6 +663,9 @@ qué tabla, qué registro, qué acción, cuándo, y el `old_data` / `new_data` e
 Va en trigger, no en el código de la app: así también registra lo que pase desde un
 script o desde el panel de Supabase.
 
+Las acciones del superadmin van en una bitácora aparte, `platform_audit_log` (§6.8, §7.5),
+con su propio trigger `app.log_platform_change()`.
+
 ### 8.7 Semilla y reset de demo
 
 `npm run demo:reset` restaura datos de ejemplo limpios. El usuario va a enseñar esto
@@ -603,8 +677,13 @@ muchas veces y no debe presentar con basura de la sesión anterior.
 - Demo desplegado: `scripts/demo-reset.sh` borra las tablas de negocio de los tenants de
   demo y las repuebla. **No toca `auth.users`**, para que las credenciales de demo no
   cambien nunca.
-- La semilla incluye **dos tenants**. Uno es el del demo; el otro existe para que el
-  aislamiento sea verificable a ojo y por los tests.
+- La semilla incluye **tres tenants**. Uno es el del demo (Patitas Felices); otro existe
+  para que el aislamiento sea verificable a ojo y por los tests (Huellitas Spa, sin
+  personal a propósito); el tercero (Mascotas y Mimos, fase 10) tiene dueño y estado
+  "suspendida" para dar variedad a la lista del superadmin. La semilla también trae un
+  **superadmin de plataforma** ficticio (`superadmin@fullpetcare.mx`, contraseña de
+  demo). En un ambiente desplegado el primer superadmin se crea con
+  `npm run superadmin:create` (§12), nunca con la semilla.
 
 ---
 
@@ -661,6 +740,13 @@ Meta: **70–80 % de cobertura en `services/`, `stores/` y `lib/`**. Sin meta gl
 
 Producción es el demo. Por eso `demo:reset` apunta ahí y es seguro: no hay datos reales.
 Cuando entre el primer cliente de verdad, esa suposición cambia y hay que revisarlo.
+
+**Ojo con `demo:reset` desde la fase 10:** además de restaurar los datos de Patitas Felices,
+devuelve los 3 negocios de la semilla a su estado original de plataforma y **oculta (borrado
+suave) toda empresa que no sea de esa semilla** — son las que se dieron de alta en una demo.
+Con un cliente real dado de alta, ese paso lo ocultaría junto con las de prueba: hay que
+acotarlo o quitarlo del bloque final de `supabase/seed/demo_reset.sql` ANTES de volver a
+correr `demo:reset`. `scripts/demo-reset.sh` lo avisa al pedir confirmación.
 
 ### Git
 
@@ -757,7 +843,9 @@ npm run build          # build de producción a dist/
 npm run lint           # ESLint + Prettier (lo mismo que corre el CI)
 
 npm run test:unit      # Vitest: lib/, services/, stores/
-npm run test:db        # Vitest: políticas RLS y RPCs, contra Supabase local
+npm run test:db        # Vitest: políticas RLS y RPCs, contra Supabase local. Los tests de
+                       # Edge Functions (*-function.spec.ts, platform-service.spec.ts) piden que
+                       # las funciones estén sirviéndose: si dan 503, corre `supabase functions serve`
 npm run test:e2e       # Playwright: el flujo completo
 npm run test           # unit + db
 
@@ -768,6 +856,11 @@ npm run db:types       # regenera src/types/database.ts desde el esquema local
 npm run db:diff -- x   # genera una migración a partir de cambios locales
 
 npm run demo:reset     # restaura datos demo limpios en el entorno desplegado
+
+# Crea el PRIMER superadmin de plataforma (contraseña temporal, se muestra una vez).
+# --local apunta al Supabase local; sin --local pide SUPABASE_URL y
+# SUPABASE_SERVICE_ROLE_KEY (en .env.local) y confirmar el host escribiéndolo.
+npm run superadmin:create -- --local --email ana@fullpetcare.mx --name "Ana Robles"
 ```
 
 Requisitos en la Mac: Node 22 (`nvm use`), Docker Desktop corriendo, y el CLI de
