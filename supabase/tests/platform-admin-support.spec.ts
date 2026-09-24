@@ -34,30 +34,37 @@ describe('revoke_user_sessions(): solo service_role', () => {
     // ya estaba dentro con la contraseña vieja. Si los refresh tokens no
     // cayeran junto con la sesión, esa persona podría renovar su acceso
     // indefinidamente.
+    //
+    // Se usan dos usuarios CREADOS AQUÍ, dentro de la transacción, y no los de
+    // la semilla: otros tests inician sesión de verdad como el dueño de la
+    // semilla y, si sus clientes no cierran sesión, esas filas de
+    // auth.sessions se acumulan (en el CI había 8 de más y el conteo
+    // "esperado 2" daba 10). Un test que cuenta el estado global de una
+    // tabla compartida depende de qué corrió antes.
     await withTransaction(async (client) => {
+      await insertAuthUser(client, USER_SUPERADMIN, 'victima@sesiones.test')
+      await insertAuthUser(client, USER_SUPERADMIN_2, 'otra@sesiones.test')
       await client.query(
         "insert into auth.sessions (id, user_id) values ('a0000000-0000-4000-8000-0000000000e1', $1), ('a0000000-0000-4000-8000-0000000000e2', $1), ('a0000000-0000-4000-8000-0000000000e3', $2)",
-        [USER_DUENO, USER_GROOMER],
+        [USER_SUPERADMIN, USER_SUPERADMIN_2],
       )
       await client.query(
         "insert into auth.refresh_tokens (token, user_id, session_id) values ('t1', $1::text, 'a0000000-0000-4000-8000-0000000000e1'), ('t3', $2::text, 'a0000000-0000-4000-8000-0000000000e3')",
-        [USER_DUENO, USER_GROOMER],
+        [USER_SUPERADMIN, USER_SUPERADMIN_2],
       )
 
       await setRole(client, 'service_role')
-      const { rows } = await client.query('select revoke_user_sessions($1) as deleted', [USER_DUENO])
+      const { rows } = await client.query('select revoke_user_sessions($1) as deleted', [
+        USER_SUPERADMIN,
+      ])
       expect(rows[0].deleted).toBe(2)
 
       await client.query('reset role')
       const remaining = await client.query(
-        'select user_id from auth.sessions where id in ($1, $2, $3)',
-        [
-          'a0000000-0000-4000-8000-0000000000e1',
-          'a0000000-0000-4000-8000-0000000000e2',
-          'a0000000-0000-4000-8000-0000000000e3',
-        ],
+        'select user_id from auth.sessions where user_id in ($1, $2)',
+        [USER_SUPERADMIN, USER_SUPERADMIN_2],
       )
-      expect(remaining.rows).toEqual([{ user_id: USER_GROOMER }])
+      expect(remaining.rows).toEqual([{ user_id: USER_SUPERADMIN_2 }])
       const tokens = await client.query("select token from auth.refresh_tokens where token in ('t1', 't3')")
       expect(tokens.rows).toEqual([{ token: 't3' }])
     })
