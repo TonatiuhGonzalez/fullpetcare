@@ -439,3 +439,14 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/invite-employee/deno.json"
 entrypoint = "./functions/invite-employee/index.ts"
+
+[functions.platform-admin]
+enabled = true
+# Igual que invite-employee: aquí SÍ hay sesión (quien llama es un
+# superadmin ya autenticado), así que se deja la verificación de JWT de la
+# plataforma prendida — un request sin sesión válida ni siquiera ejecuta
+# el código de la función. Que además sea superadmin lo revalida la propia
+# función (paso 1 de index.ts).
+verify_jwt = true
+import_map = "./functions/platform-admin/deno.json"
+entrypoint = "./functions/platform-admin/index.ts"
