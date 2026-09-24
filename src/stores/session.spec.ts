@@ -45,14 +45,18 @@ vi.mock('@/services/memberships', () => ({
 vi.mock('@/services/permissions', () => ({
   listForTenant: vi.fn(),
 }))
+vi.mock('@/services/platform', () => ({
+  isPlatformAdmin: vi.fn(),
+}))
 
 // Se importan DESPUÉS de los vi.mock() de arriba — en este punto ya no
 // son las funciones reales, son las versiones falsas (vi.fn()) que se
 // configuran abajo con mockResolvedValue().
-import { onSessionLost, signIn, signOut } from '@/services/auth'
+import { getCurrentUser, onSessionLost, signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
 import { listForTenant } from '@/services/permissions'
+import { isPlatformAdmin } from '@/services/platform'
 import type { RolePermissionRow } from '@/lib/permissions'
 
 // Dos membresías de prueba, en tenants distintos — a propósito más de
@@ -90,6 +94,9 @@ beforeEach(() => {
   // Default: sin reglas de permisos configuradas — los tests que no les
   // interesa este tema no tienen que preocuparse por mockearlo aparte.
   vi.mocked(listForTenant).mockResolvedValue([])
+  // Default: nadie es superadmin de plataforma — igual que arriba, solo los
+  // tests de la fase 10 lo cambian.
+  vi.mocked(isPlatformAdmin).mockResolvedValue(false)
 })
 
 describe('login', () => {
@@ -424,5 +431,87 @@ describe('permisos por módulo (fase 9)', () => {
     expect(store.role).toBe('vet')
     expect(store.canView('employees')).toBe(true) // fila explícita, sembrada para tenant-b
     expect(store.canEdit('employees')).toBe(false)
+  })
+})
+
+describe('superadmin de plataforma (fase 10)', () => {
+  const ADMIN = { id: 'admin-1', email: 'superadmin@fullpetcare.mx' }
+
+  function mockAdminSession() {
+    vi.mocked(signIn).mockResolvedValue(ADMIN)
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([])
+    vi.mocked(isPlatformAdmin).mockResolvedValue(true)
+  }
+
+  it('un superadmin queda marcado y NO se le pide elegir negocio', async () => {
+    // Un superadmin no pertenece a ningún negocio (memberships vacío). Sin
+    // la excepción en needsBusinessSelection, el router lo mandaría a
+    // "seleccionar negocio", una pantalla vacía de la que no puede salir:
+    // no podría entrar nunca a /superadmin.
+    mockAdminSession()
+
+    const store = useSessionStore()
+    await store.login(ADMIN.email, 'Demo1234!')
+
+    expect(store.isPlatformAdmin).toBe(true)
+    expect(store.memberships).toEqual([])
+    expect(store.needsBusinessSelection).toBe(false)
+    expect(isPlatformAdmin).toHaveBeenCalledWith('admin-1')
+  })
+
+  it('control: un usuario normal NO es superadmin y sí debe elegir negocio', async () => {
+    // Sin este control, el test anterior pasaría igual si
+    // needsBusinessSelection dejara de exigir elegir negocio a TODOS.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.isPlatformAdmin).toBe(false)
+    expect(store.needsBusinessSelection).toBe(true)
+  })
+
+  it('cerrar sesión borra la marca de superadmin', async () => {
+    // Si sobreviviera al logout, la siguiente persona que iniciara sesión
+    // en el mismo navegador vería /superadmin hasta recargar la página.
+    mockAdminSession()
+    const store = useSessionStore()
+    await store.login(ADMIN.email, 'Demo1234!')
+
+    await store.logout()
+
+    expect(store.isPlatformAdmin).toBe(false)
+  })
+
+  it('al recargar la página se restaura la marca de superadmin junto con la sesión', async () => {
+    // Un superadmin que recarga /superadmin no debe ser expulsado: la
+    // marca se recalcula desde el servidor en ensureInitialized, no se
+    // guarda en localStorage (donde cualquiera podría editarla).
+    mockAdminSession()
+    vi.mocked(getCurrentUser).mockResolvedValue(ADMIN)
+
+    const store = useSessionStore()
+    await store.ensureInitialized()
+
+    expect(store.isPlatformAdmin).toBe(true)
+    expect(store.needsBusinessSelection).toBe(false)
+  })
+
+  it('si no se puede confirmar si es superadmin, el login falla en vez de dejarlo a medias', async () => {
+    // Fallar cerrado: ante un error de red no se asume "no es superadmin"
+    // en silencio (lo dejaría en un limbo sin negocio y sin panel), se
+    // muestra el error como cualquier otro fallo de login.
+    vi.mocked(signIn).mockResolvedValue(ADMIN)
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(isPlatformAdmin).mockRejectedValue(new Error('network'))
+
+    const store = useSessionStore()
+    await expect(store.login(ADMIN.email, 'Demo1234!')).rejects.toThrow('network')
+
+    expect(store.status).toBe('error')
+    expect(store.isPlatformAdmin).toBe(false)
   })
 })

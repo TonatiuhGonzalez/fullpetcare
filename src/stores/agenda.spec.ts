@@ -49,6 +49,11 @@ vi.mock('@/services/memberships', () => ({
 vi.mock('@/services/permissions', () => ({
   listForTenant: vi.fn(),
 }))
+// Lo mismo para services/platform.ts (fase 10): el store de sesión pregunta
+// si la persona es superadmin, y ese servicio también llega a supabase.ts.
+vi.mock('@/services/platform', () => ({
+  isPlatformAdmin: vi.fn().mockResolvedValue(false),
+}))
 
 import { listByDateRange } from '@/services/appointments'
 import { getById as getBranchById } from '@/services/branches'
