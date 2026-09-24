@@ -298,3 +298,95 @@ values
   ('10000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Triple felina', 'cat', 365),
   ('10000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Séxtuple canina', 'dog', 365),
   ('10000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'Bordetella', null, 180);
+
+-- ===========================================================================
+-- Superadmin de plataforma y un tercer negocio (fase 10, tarea 10.9)
+-- ===========================================================================
+-- Solo para desarrollo local y demos: en un ambiente desplegado el PRIMER
+-- superadmin se crea con `npm run superadmin:create` (nadie puede darlo de
+-- alta desde la interfaz cuando todavía no existe ninguno).
+--
+-- Contraseña de estos dos usuarios, igual que los demás de la semilla:
+-- Demo1234!
+--
+-- El superadmin NO pertenece a ningún negocio (PLAN.md D14): por eso no
+-- hay membership para él, y al iniciar sesión cae directo en /superadmin.
+--
+-- Los datos existentes no se tocan: solo se AGREGA un negocio más. Patitas
+-- Felices sigue siendo el del recorrido de demo y Huellitas Spa (sin
+-- personal, a propósito) sigue siendo el de los tests de aislamiento. Este
+-- tercero existe para que la lista de superadmin tenga variedad: un negocio
+-- con dueño y un estado distinto de "activa", con notas internas.
+do $$
+declare
+  v_tenant_mimos    uuid := 'b0000000-0000-4000-8000-000000000003';
+  v_branch_mimos    uuid := 'c0000000-0000-4000-8000-000000000004';
+  v_user_superadmin uuid := 'a2000000-0000-4000-8000-000000000001';
+  v_user_dueno_mimos uuid := 'a3000000-0000-4000-8000-000000000001';
+  v_demo_password   text := 'Demo1234!';
+begin
+  insert into tenants (id, name, legal_name, rfc, tax_regime_code, postal_code, default_cfdi_use, timezone)
+  values (
+    v_tenant_mimos, 'Mascotas y Mimos', 'Mascotas y Mimos S.A. de C.V.',
+    'MMI190630CD3', '601', '64000', 'G03', 'America/Mexico_City'
+  );
+
+  insert into branches (id, tenant_id, name, address, postal_code, phone, timezone)
+  values (
+    v_branch_mimos, v_tenant_mimos, 'Mascotas y Mimos Matriz',
+    'Av. Constitución 1200, Monterrey, N.L.', '64000', '8181810101',
+    'America/Mexico_City'
+  );
+
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at,
+    confirmation_token, recovery_token, email_change_token_new, email_change
+  ) values
+    ('00000000-0000-0000-0000-000000000000', v_user_superadmin, 'authenticated', 'authenticated',
+     'superadmin@fullpetcare.mx', extensions.crypt(v_demo_password, extensions.gen_salt('bf')),
+     now(), '{"provider":"email","providers":["email"]}'::jsonb,
+     jsonb_build_object('full_name', 'Andrea Robles Soto'),
+     now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_user_dueno_mimos, 'authenticated', 'authenticated',
+     'dueno@mascotasymimos.mx', extensions.crypt(v_demo_password, extensions.gen_salt('bf')),
+     now(), '{"provider":"email","providers":["email"]}'::jsonb,
+     jsonb_build_object('full_name', 'Ricardo Salazar Ibarra'),
+     now(), now(), '', '', '', '');
+
+  insert into auth.identities (id, provider_id, user_id, identity_data, provider, created_at, updated_at)
+  values
+    (gen_random_uuid(), v_user_superadmin::text, v_user_superadmin,
+     jsonb_build_object('sub', v_user_superadmin::text, 'email', 'superadmin@fullpetcare.mx'),
+     'email', now(), now()),
+    (gen_random_uuid(), v_user_dueno_mimos::text, v_user_dueno_mimos,
+     jsonb_build_object('sub', v_user_dueno_mimos::text, 'email', 'dueno@mascotasymimos.mx'),
+     'email', now(), now());
+
+  -- El teléfono del dueño vive en su profile (el trigger de auth.users ya
+  -- lo creó); es lo que muestra la lista de superadmin.
+  update profiles set phone = '8181810102' where id = v_user_dueno_mimos;
+
+  insert into memberships (id, tenant_id, user_id, role)
+  values (gen_random_uuid(), v_tenant_mimos, v_user_dueno_mimos, 'owner');
+
+  insert into role_permissions (tenant_id, role, module, can_view, can_edit)
+  values
+    (v_tenant_mimos, 'owner', 'employees', true, true),
+    (v_tenant_mimos, 'receptionist', 'employees', false, false),
+    (v_tenant_mimos, 'groomer', 'employees', false, false),
+    (v_tenant_mimos, 'vet', 'employees', false, false);
+
+  insert into platform_admins (user_id) values (v_user_superadmin);
+
+  -- La fila de tenant_platform_info ya la creó el trigger de `tenants`
+  -- (plan Básico, activa, sin vigencia). Aquí se le da un estado y notas
+  -- de ejemplo, ficticios como todo lo demás. El estado es solo una
+  -- etiqueta: el dueño de este negocio puede seguir entrando.
+  update tenant_platform_info
+  set status = 'suspended',
+      status_reason = 'Pago de la mensualidad pendiente (ejemplo de demo)',
+      internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
+  where tenant_id = v_tenant_mimos;
+end $$;
