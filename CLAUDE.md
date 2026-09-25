@@ -819,6 +819,27 @@ Node sobre shell cuando la lógica crece.
    sin "por si luego". Se extrae cuando duele por tercera vez.
 6. Al terminar una fase, actualizar `TASKS.md` y decir qué se puede demostrar.
 
+### Cómo redactar tareas para el sistema de seguimiento de la empresa
+
+Aplica cada vez que se pida crear o actualizar una tarea en el sistema de seguimiento de
+tareas de la empresa (no a `TASKS.md`, que es documentación técnica del proyecto).
+
+Quien lea la tarea es cualquier compañero de trabajo, no necesariamente alguien que
+conozca el código. Por eso, **tanto el título como la descripción**:
+
+- Se escriben en lenguaje **genérico y entendible**: qué falta o qué se quiere lograr, y
+  por qué importa. No cómo se va a programar.
+- **Evitan** URLs, rutas, variables, endpoints, nombres de funciones, tablas, columnas,
+  componentes o archivos, y números de PR o de commit.
+- Solo incluyen un término técnico cuando es **absolutamente necesario** para entender el
+  contexto de la tarea, y en ese caso lo explican en pocas palabras.
+
+Ejemplo:
+
+- Mal: "Probar reset_password e invite-employee en prod".
+- Bien: "Probar en producción el restablecimiento de contraseña de un dueño y la
+  invitación de empleados".
+
 ### Qué NO hacer sin preguntar
 
 - **No cambiar el stack** ni sustituir una pieza (otro hosting, otro ORM, otro runner).
