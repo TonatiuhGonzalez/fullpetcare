@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
@@ -18,6 +19,9 @@ const titleLabel = computed(() =>
   session.activeBranch ? `${businessName.value} - ${session.activeBranch.name}` : businessName.value,
 )
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
+
+const showChangePassword = ref(false)
+const passwordChangedNotice = ref(false)
 
 async function handleLogout(): Promise<void> {
   // "finally": aunque el servidor no responda, la sesión local ya se
@@ -84,8 +88,24 @@ function handleBranchChange(branchId: unknown): void {
       roleLabel(session.role)
     }}</v-chip>
     <span class="mr-2 text-body-2">{{ userLabel }}</span>
+    <v-btn
+      icon="mdi-lock-reset"
+      variant="text"
+      title="Cambiar contraseña"
+      @click="showChangePassword = true"
+    />
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
+
+  <ChangePasswordDialog
+    v-model="showChangePassword"
+    :email="session.user?.email ?? ''"
+    @changed="passwordChangedNotice = true"
+  />
+
+  <v-snackbar v-model="passwordChangedNotice" color="success" :timeout="4000">
+    Contraseña actualizada.
+  </v-snackbar>
 
   <v-main>
     <router-view />

@@ -84,3 +84,50 @@ export function isValidCURP(value: string): boolean {
     normalized,
   )
 }
+
+// ---------------------------------------------------------------------------
+// Cambio de contraseña propia
+// ---------------------------------------------------------------------------
+
+/**
+ * Largo mínimo de una contraseña nueva. Es la regla de la UI: el servidor
+ * tiene la suya (`minimum_password_length` en supabase/config.toml, 6 en
+ * local) y puede ser más laxa o más estricta según el proyecto; validar aquí
+ * evita mandar al servidor algo que ya sabemos que no queremos, y da el
+ * mensaje en español en vez del error en inglés de Supabase.
+ */
+export const MIN_PASSWORD_LENGTH = 8
+
+export interface PasswordChangeInput {
+  current: string
+  next: string
+  confirm: string
+}
+
+export type PasswordChangeField = 'current' | 'next' | 'confirm'
+
+/**
+ * Problemas del formulario "Cambiar contraseña", por campo. Objeto vacío =
+ * todo bien. Función pura: no toca la red ni compara contra la contraseña
+ * real (eso lo hace el servidor al verificar la actual).
+ *
+ * `next` puede repetir a `current` solo si ambos están vacíos; en ese caso el
+ * error que importa es el de "falta la actual", no el de "es igual".
+ */
+export function passwordChangeProblems(
+  input: PasswordChangeInput,
+): Partial<Record<PasswordChangeField, string>> {
+  const problems: Partial<Record<PasswordChangeField, string>> = {}
+
+  if (input.current === '') problems.current = 'Escribe tu contraseña actual.'
+
+  if (input.next.length < MIN_PASSWORD_LENGTH) {
+    problems.next = `La contraseña nueva debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`
+  } else if (input.next === input.current) {
+    problems.next = 'La contraseña nueva debe ser distinta de la actual.'
+  }
+
+  if (input.confirm !== input.next) problems.confirm = 'Las contraseñas no coinciden.'
+
+  return problems
+}

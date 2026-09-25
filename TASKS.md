@@ -573,6 +573,17 @@ de construir:
      tests en `demo-reset.spec.ts` y `platform-rpcs.spec.ts`). Pendiente menor: la lista del
      panel no muestra qué empresas son demo.
 
+**Cambio de contraseña propia (hallado al probar en prod, 2026-09-25):** hasta entonces
+nadie —ni el superadmin, ni un dueño, ni un empleado— podía cambiar su propia contraseña;
+solo existía el restablecimiento de la contraseña de un dueño por el superadmin. Ahora hay
+un botón "Cambiar contraseña" en la barra de ambos marcos (`AppLayout` y
+`SuperadminLayout`) que abre `ChangePasswordDialog.vue`, para todos los roles. Verifica la
+contraseña actual (volviendo a iniciar sesión con ella), cambia la nueva y cierra las
+demás sesiones de la cuenta. Reglas de forma en `lib/validation.ts#passwordChangeProblems`,
+servicio en `services/auth.ts#changePassword`; tests en `validation.spec.ts` y
+`supabase/tests/auth-service.spec.ts`, y comprobado en navegador contra el Supabase local.
+No fuerza el cambio: la contraseña temporal sigue valiendo hasta que la persona la cambie.
+
 **Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
 ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
 vencimiento o suspensión.
