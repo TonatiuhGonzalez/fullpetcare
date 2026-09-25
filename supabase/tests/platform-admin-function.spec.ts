@@ -45,6 +45,18 @@ async function call(body: unknown, token?: string): Promise<CallResult> {
   return { status: response.status, body: await response.json() }
 }
 
+/** ¿Ese correo tiene pendiente cambiar su contraseña temporal? (lee la base directo) */
+async function mustChangePassword(email: string): Promise<boolean> {
+  const { rows } = await withTransaction((client) =>
+    client.query(
+      `select p.must_change_password from profiles p
+       join auth.users u on u.id = p.id where u.email = $1`,
+      [email],
+    ),
+  )
+  return rows[0].must_change_password
+}
+
 const validCreateTenant = (ownerEmail: string) => ({
   action: 'create_tenant',
   tenantName: 'Estética Prueba',
@@ -180,6 +192,15 @@ describe('platform-admin: create_tenant', () => {
 
     const owner = await signIn(ownerEmail, password)
     expect(owner.error).toBeNull()
+
+    // La contraseña es temporal: el dueño nace marcado y la base no le
+    // muestra su negocio hasta que la cambie (must-change-password.spec.ts
+    // prueba el mecanismo; aquí, que el ALTA lo active de verdad).
+    expect(await mustChangePassword(ownerEmail)).toBe(true)
+    const { data: hidden } = await owner.client.from('tenants').select('id, name')
+    expect(hidden).toEqual([])
+
+    await owner.client.auth.updateUser({ password: 'ContraseñaPropia9' })
     const { data: tenants } = await owner.client.from('tenants').select('id, name')
     expect(tenants).toEqual([{ id: tenantId, name: 'Estética Prueba' }])
 
@@ -285,6 +306,12 @@ describe('platform-admin: reset_password', () => {
     expect((await signIn(ownerEmail, newPassword)).error).toBeNull()
     expect((await signIn(ownerEmail, oldPassword)).error).not.toBeNull()
 
+    // La contraseña restablecida también es temporal. Si el dueño ya había
+    // elegido una propia, la marca estaba apagada: aquí se comprueba que el
+    // restablecimiento la VUELVE a encender (y que el aviso lo confirma).
+    expect(body.mustChangeEnforced).toBe(true)
+    expect(await mustChangePassword(ownerEmail)).toBe(true)
+
     const { error: refreshError } = await freshClient().auth.refreshSession({
       refresh_token: oldRefreshToken,
     })
@@ -338,6 +365,11 @@ describe('platform-admin: add_admin', () => {
 
     const newAdmin = await signIn(email, body.temporaryPassword as string)
     expect(newAdmin.error).toBeNull()
+    // Temporal: hasta cambiarla no puede usar las RPC de plataforma.
+    expect(await mustChangePassword(email)).toBe(true)
+    expect((await newAdmin.client.rpc('platform_list_admins')).error).not.toBeNull()
+
+    await newAdmin.client.auth.updateUser({ password: 'ContraseñaPropia9' })
     const { data: admins, error } = await newAdmin.client.rpc('platform_list_admins')
     expect(error).toBeNull()
     expect((admins as { email: string }[]).map((a) => a.email)).toEqual(

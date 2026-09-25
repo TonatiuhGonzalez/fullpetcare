@@ -591,8 +591,19 @@ contraseña actual (volviendo a iniciar sesión con ella), cambia la nueva y cie
 demás sesiones de la cuenta. Reglas de forma en `lib/validation.ts#passwordChangeProblems`,
 servicio en `services/auth.ts#changePassword`; tests en `validation.spec.ts` y
 `supabase/tests/auth-service.spec.ts`, y comprobado en navegador contra el Supabase local.
-No fuerza el cambio: la contraseña temporal sigue valiendo hasta que la persona la cambie.
+Ese diálogo por sí solo no fuerza el cambio; el cambio obligatorio se agregó después
+(tarea #1904, ver abajo).
 
-**Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
-ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
+**Cambio obligatorio de la contraseña temporal (tarea #1904, 2026-09-25):** dueños y
+superadmins dados de alta (y dueños con contraseña restablecida) deben cambiarla en su
+primer inicio de sesión. Migración `20260925130000_must_change_password.sql`
+(`profiles.must_change_password`, triggers, bloqueo en `is_member_of()` & co.), pantalla
+`/cambiar-contrasena` (`ForcePasswordChangePage.vue`, reutiliza `ChangePasswordDialog`),
+guard del router y `session.completePasswordChange()`. Cuentas existentes no se tocan y
+los empleados invitados quedan fuera. Diseño en `CLAUDE.md` §7.6. Tests:
+`supabase/tests/must-change-password.spec.ts`, ajustes en `platform-admin-function.spec.ts`
+y `create-superadmin-script.spec.ts`, y `session.spec.ts`. Pendiente: comprobar en
+navegador y en producción (la migración es nueva en `main`).
+
+**Trabajo futuro (fuera de esta fase):** gestión real de planes y vigencia, y bloqueo de acceso por
 vencimiento o suspensión.

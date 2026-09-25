@@ -1019,6 +1019,7 @@ export type Database = {
           deleted_at: string | null
           full_name: string
           id: string
+          must_change_password: boolean
           phone: string | null
           updated_at: string
         }
@@ -1028,6 +1029,7 @@ export type Database = {
           deleted_at?: string | null
           full_name: string
           id: string
+          must_change_password?: boolean
           phone?: string | null
           updated_at?: string
         }
@@ -1037,6 +1039,7 @@ export type Database = {
           deleted_at?: string | null
           full_name?: string
           id?: string
+          must_change_password?: boolean
           phone?: string | null
           updated_at?: string
         }

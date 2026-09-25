@@ -63,6 +63,14 @@ export const useSessionStore = defineStore('session', () => {
 
   const isAuthenticated = computed(() => user.value !== null)
 
+  /**
+   * true mientras la persona use una contraseña temporal (dueño o superadmin
+   * recién dado de alta, o dueño con contraseña restablecida). El router la
+   * manda a /cambiar-contrasena y no la deja salir de ahí; la base además le
+   * niega todos los datos de negocio (app.has_pending_password_change()).
+   */
+  const mustChangePassword = computed(() => profile.value?.mustChangePassword === true)
+
   const activeMembership = computed<MembershipSummary | null>(
     () => memberships.value.find((m) => m.tenantId === activeTenantId.value) ?? null,
   )
@@ -199,15 +207,33 @@ export const useSessionStore = defineStore('session', () => {
     writeStorage(ACTIVE_BRANCH_KEY, branchId)
   }
 
+  /**
+   * Carga todo lo que depende de "quién soy" para un usuario ya autenticado.
+   * Si debe cambiar su contraseña temporal, se DETIENE tras leer el profile:
+   * la base ya le niega su lista de negocios y su rol de plataforma, así que
+   * pedirlos solo daría vacíos que la UI confundiría con "sin negocio". Se
+   * vuelve a llamar al terminar el cambio (completePasswordChange).
+   */
+  async function loadAccountContext(userId: string): Promise<void> {
+    profile.value = await getProfile(userId)
+    if (profile.value?.mustChangePassword) return
+    isPlatformAdmin.value = await fetchIsPlatformAdmin(userId)
+    await loadMemberships()
+  }
+
+  /** Se llama justo después de cambiar la contraseña temporal: ahora sí carga negocios y roles. */
+  async function completePasswordChange(): Promise<void> {
+    if (!user.value) return
+    await loadAccountContext(user.value.id)
+  }
+
   async function login(email: string, password: string): Promise<void> {
     status.value = 'loading'
     errorMessage.value = null
     sessionExpired.value = false
     try {
       user.value = await signInRequest(email, password)
-      profile.value = await getProfile(user.value.id)
-      isPlatformAdmin.value = await fetchIsPlatformAdmin(user.value.id)
-      await loadMemberships()
+      await loadAccountContext(user.value.id)
       status.value = 'ready'
     } catch (e) {
       status.value = 'error'
@@ -270,9 +296,7 @@ export const useSessionStore = defineStore('session', () => {
         const existingUser = await getCurrentUser()
         if (existingUser) {
           user.value = existingUser
-          profile.value = await getProfile(existingUser.id)
-          isPlatformAdmin.value = await fetchIsPlatformAdmin(existingUser.id)
-          await loadMemberships()
+          await loadAccountContext(existingUser.id)
         }
         status.value = 'ready'
       })()
@@ -291,6 +315,7 @@ export const useSessionStore = defineStore('session', () => {
     status,
     errorMessage,
     isAuthenticated,
+    mustChangePassword,
     sessionExpired,
     activeMembership,
     role,
@@ -302,6 +327,7 @@ export const useSessionStore = defineStore('session', () => {
     login,
     logout,
     loadMemberships,
+    completePasswordChange,
     selectTenant,
     selectBranch,
     ensureInitialized,

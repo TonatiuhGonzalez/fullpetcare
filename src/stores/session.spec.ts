@@ -112,6 +112,7 @@ describe('login', () => {
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Fernanda Ruiz',
       avatarPath: null,
+      mustChangePassword: false,
     })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
@@ -152,6 +153,7 @@ describe('logout', () => {
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Fernanda Ruiz',
       avatarPath: null,
+      mustChangePassword: false,
     })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
     vi.mocked(signOut).mockResolvedValue(undefined)
@@ -185,8 +187,15 @@ describe('logout', () => {
     // Caso: el usuario pulsa "Salir" sin red y signOut() lanza. Antes, reset()
     // no corría y la persona seguía "dentro" en una recepción compartida.
     // Ahora la sesión local se limpia siempre y el error se sigue propagando.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
     vi.mocked(signOut).mockRejectedValue(new Error('Failed to fetch'))
 
@@ -213,8 +222,15 @@ describe('pérdida de sesión inesperada', () => {
   }
 
   async function loginAsOwner(store: ReturnType<typeof useSessionStore>): Promise<void> {
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
     await store.login('dueno@patitasfelices.mx', 'Demo1234!')
   }
@@ -382,8 +398,15 @@ describe('permisos por módulo (fase 9)', () => {
   it('owner puede ver y editar cualquier módulo, sin necesidad de reglas sembradas', async () => {
     // Mismo bypass que app.has_permission() en Postgres: el dueño nunca
     // depende de que exista una fila en role_permissions.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
 
     const store = useSessionStore()
@@ -395,7 +418,11 @@ describe('permisos por módulo (fase 9)', () => {
 
   it('un rol sin ninguna regla para ese módulo no lo ve (default: no)', async () => {
     vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'vet@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Dr. Vet', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Dr. Vet',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_B])
 
     const store = useSessionStore()
@@ -410,8 +437,15 @@ describe('permisos por módulo (fase 9)', () => {
     // "employees:view" a vet pero tenant-a nunca lo configuró, cambiar
     // de negocio SIN cerrar sesión debe reflejar la regla del NUEVO
     // tenant activo, no arrastrar la de antes.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
     const rowsForTenantB: RolePermissionRow[] = [
@@ -439,7 +473,11 @@ describe('superadmin de plataforma (fase 10)', () => {
 
   function mockAdminSession() {
     vi.mocked(signIn).mockResolvedValue(ADMIN)
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Admin',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([])
     vi.mocked(isPlatformAdmin).mockResolvedValue(true)
   }
@@ -463,8 +501,15 @@ describe('superadmin de plataforma (fase 10)', () => {
   it('control: un usuario normal NO es superadmin y sí debe elegir negocio', async () => {
     // Sin este control, el test anterior pasaría igual si
     // needsBusinessSelection dejara de exigir elegir negocio a TODOS.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
     const store = useSessionStore()
@@ -505,7 +550,11 @@ describe('superadmin de plataforma (fase 10)', () => {
     // en silencio (lo dejaría en un limbo sin negocio y sin panel), se
     // muestra el error como cualquier otro fallo de login.
     vi.mocked(signIn).mockResolvedValue(ADMIN)
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Admin',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(isPlatformAdmin).mockRejectedValue(new Error('network'))
 
     const store = useSessionStore()
@@ -513,5 +562,64 @@ describe('superadmin de plataforma (fase 10)', () => {
 
     expect(store.status).toBe('error')
     expect(store.isPlatformAdmin).toBe(false)
+  })
+})
+
+describe('contraseña temporal', () => {
+  it('con contraseña temporal no pide negocios ni rol de plataforma hasta cambiarla', async () => {
+    // Una persona con contraseña temporal es bloqueada por la base: pedir sus
+    // negocios devolvería vacío, y la UI lo confundiría con "sin negocio" y la
+    // mandaría a una selección vacía. El store debe detenerse tras leer el
+    // profile, y cargar todo solo cuando el cambio de contraseña termine.
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValueOnce({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: true,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Temporal1234')
+
+    expect(store.mustChangePassword).toBe(true)
+    expect(store.isAuthenticated).toBe(true)
+    expect(listMyMemberships).not.toHaveBeenCalled()
+    expect(isPlatformAdmin).not.toHaveBeenCalled()
+
+    // Ya cambió la contraseña: el profile viene sin marca y ahora sí se carga todo.
+    vi.mocked(getProfile).mockResolvedValueOnce({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    await store.completePasswordChange()
+
+    expect(store.mustChangePassword).toBe(false)
+    expect(store.role).toBe('owner')
+  })
+
+  it('sin marca, iniciar sesión carga todo como siempre', async () => {
+    // Guarda contra el error inverso: que el corte anticipado afecte a
+    // quienes NO tienen contraseña temporal (todas las cuentas actuales).
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.mustChangePassword).toBe(false)
+    expect(listMyMemberships).toHaveBeenCalledOnce()
   })
 })

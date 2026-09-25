@@ -279,7 +279,7 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 | --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4)                                                  |
 | `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`     | Sucursal. **Su propia zona horaria** (§8.3)                                                      |
-| `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`                                   | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios |
+| `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`, `must_change_password`           | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios. La marca `must_change_password` se explica en §7.6 |
 | `memberships`         | `tenant_id`, `user_id`, `role`, `is_active`                                                   | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7)                     |
 | `membership_branches` | `membership_id`, `branch_id`                                                                  | A qué sucursales entra. El rol `owner` ve todas sin necesidad de filas aquí                      |
 
@@ -585,6 +585,30 @@ sin argumentos: pregunta por `auth.uid()`, nadie puede consultar "¿fulano es ad
 - **Cada acción queda en `platform_audit_log`**, incluidas las que no cambian ninguna fila
   nuestra (restablecer una contraseña, `platform_log_event`). La bitácora va primero: si no
   se puede registrar, no se cambia la contraseña.
+
+### 7.6 Contraseña temporal obligatoria
+
+Al dar de alta a un dueño o a un superadmin (y al restablecer la contraseña de un dueño)
+la contraseña es temporal, y `profiles.must_change_password` queda en `true`. Mientras
+sea `true`, **la base misma** niega el acceso: `app.is_member_of()`, `role_in()`,
+`can_access_branch()` e `is_platform_admin()` devuelven "no" (vía
+`app.has_pending_password_change()`), así que ni llamando a la API directo se ven o
+escriben datos de negocio. La interfaz solo lo hace cómodo: el router manda a
+`/cambiar-contrasena` y el store no pide negocios hasta terminar.
+
+- **Cómo se pone:** `app_metadata.must_change_password = true` al crear el usuario (la
+  Edge Function `platform-admin` y `scripts/create-superadmin.mjs`); triggers sobre
+  `auth.users` lo copian al profile. Va en `app_metadata` porque solo `service_role` la
+  escribe. En el restablecimiento, la Edge Function la pone **después** de cambiar la
+  contraseña (el trigger de abajo la apaga con cualquier cambio de hash).
+- **Cómo se quita:** un trigger sobre `auth.users` la apaga cuando cambia
+  `encrypted_password`. No hay RPC para "saltarse" el cambio, y `authenticated` no tiene
+  `UPDATE` sobre esa columna (permisos por columna en `profiles`).
+- **Cuentas existentes:** no se tocan (`default false`).
+- **Empleados** invitados con `invite-employee` **no** entran en esto (fuera del alcance
+  de la tarea #1904); sería agregar la misma línea de `app_metadata` allí.
+- Tocar `app.is_member_of()` sí es posible aquí porque es por **persona**, no por
+  negocio; el estado de la empresa (§6.8) sigue sin bloquear nada.
 
 ---
 
