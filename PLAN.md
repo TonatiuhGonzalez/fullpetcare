@@ -210,6 +210,65 @@ de Canela con su foto. Es lo que va a vender el producto en las reuniones.
 _Por qué al final:_ necesita que exista historial real que mostrar, y es la superficie
 más delicada. Se construye cuando el flujo interno ya está firme.
 
+### Fase 9 — Gestión de empleados y permisos por rol
+
+Pedida por el usuario después de v1. Migraciones de `role_permissions`
+(`app.has_permission()`, permisos por negocio en vez de un rol hardcodeado — D13),
+`employee_details` y `employee_documents` (+ bucket de Storage). Cierra el pendiente
+que `memberships`/`membership_branches`/`profiles` dejaron abierto desde la fase 1:
+esas tres tablas ganan aquí sus primeras políticas de INSERT/UPDATE. RPC
+`create_employee_membership()` (membership + sucursales + ficha, todo o nada, mismo
+criterio que `checkout_appointment`). Segunda Edge Function del proyecto,
+`invite-employee` — la única pieza que usa `service_role` desde una acción del
+frontend, porque `auth.admin.inviteUserByEmail` no tiene otra forma de llamarse.
+
+`EmployeesPage.vue` + `EmployeeFormDialog.vue` (un diálogo con pestañas, no pasos).
+"Empleados" en `AppLayout.vue` y la ruta `/app/empleados` se gatean con
+`session.canView('employees')` — un permiso de datos, no un `v-if="role === 'owner'"`.
+
+**Demostrable:** el dueño da de alta un empleado nuevo (correo de invitación real),
+le asigna rol y sucursales, sube su credencial de elector, y lo edita después.
+Cualquier otro rol ni ve la pestaña ni puede entrar por URL directa — y cambiar eso
+mañana es una fila en `role_permissions`, no una migración.
+
+### Fase 10 — Superadmin de plataforma
+
+Panel `/superadmin` (misma pantalla de login) para que el equipo de la plataforma
+gestione las empresas registradas: darlas de alta, ver su plan, dueño, fecha de alta y
+vigencia, suspenderlas o darlas de baja, llevar notas internas, ver métricas de uso y
+restablecer la contraseña del dueño. Además, gestionar a los propios superadmins.
+
+**Solo ve datos de la empresa, nunca datos de negocio** (D14). Plan, vigencia y estado
+son **informativos**: plan de texto fijo, vigencia indefinida, y suspender es una
+etiqueta que no bloquea el acceso — bloquearlo implicaría tocar `app.is_member_of()`,
+que usa toda la base, y se decidirá con la gestión real de planes.
+
+- **Esquema:** `platform_admins` (sin `tenant_id`), `tenant_platform_info` (1 a 1 con
+  `tenants`, creada por trigger) y `platform_audit_log`. Las tres con RLS de solo lectura
+  para superadmins; **ninguna con política de escritura**.
+- **RPC** `platform_*` (`SECURITY DEFINER`, revalidan `app.is_platform_admin()` en su
+  primera línea): lista de empresas, métricas (solo conteos), estado con motivo, notas,
+  alta de empresa (todo o nada), superadmins (nunca deja cero), eventos de bitácora.
+- **Edge Function `platform-admin`** (la tercera): una sola con tres acciones. Usa dos
+  clientes — con el JWT de quien llama para verificar y llamar las RPC (así la bitácora
+  registra al superadmin real), y con `service_role` solo para la API de administración
+  de Auth. Genera las contraseñas temporales; se muestran una vez.
+- **Frontend:** `services/platform.ts`, `useSessionStore.isPlatformAdmin`, `lib/platform.ts`
+  (lógica pura con tests), `SuperadminLayout.vue`, `TenantsPage.vue`, `AdminsPage.vue` y
+  cinco diálogos. El detalle de una empresa es un diálogo con pestañas, no una página.
+- **Arranque:** `npm run superadmin:create` (el primer superadmin no puede crearse desde
+  la interfaz) y un superadmin ficticio + un tercer negocio en `seed.sql`. `demo:reset`
+  restaura el estado de plataforma de la semilla y oculta las empresas de una demo.
+
+**Demostrable:** el superadmin entra, ve las empresas con su plan, dueño y estado, da de
+alta una nueva (recibe una contraseña temporal que se ve una sola vez), la suspende con
+un motivo, anota notas, consulta sus métricas y su bitácora, restablece la contraseña del
+dueño (que deja de poder usar la anterior y pierde sus sesiones abiertas) y agrega o
+quita otros superadmins. Un dueño normal no entra a `/superadmin` ni por URL directa.
+
+**Trabajo futuro:** forzar el cambio de contraseña en el primer ingreso del dueño, gestión
+real de planes y vigencia, y bloqueo de acceso por vencimiento o suspensión.
+
 ### Después de v1 (no ahora)
 
 Productos e inventario, CFDI real con un PAC, OpenPay real, WhatsApp Business API,
@@ -335,6 +394,58 @@ formularios de Vuetify alcanza. La única gráfica (peso de la mascota) se dibuj
 seguridad antes de una demo que como red de cobertura. La cobertura real vive en los
 unitarios y en los tests de RLS.
 
+### D13 — Permisos en una tabla (`role_permissions`), no un rol hardcodeado en código
+
+**Alternativa descartada:** un solo punto de chequeo aislado en código (una función SQL
++ un composable de frontend, ambos comparando `role_in(tenant_id) = 'owner'`), sin
+tabla nueva — la recomendación inicial para la fase 9, antes de discutirlo con el
+usuario.
+**Por qué se descartó esa alternativa:** da casi el mismo beneficio de "un solo lugar
+que cambiar" con mucho menos riesgo, pero el usuario prefirió la tabla — quería que
+"a futuro se puedan modificar los permisos de cada rol" fuera literal desde el día uno,
+no una promesa de que sería fácil migrar después.
+**Por qué la tabla, con `tenant_id` incluido (no global):** cada negocio en esta
+plataforma es independiente (CLAUDE.md §7) — una regla de permisos igual para todos
+los tenants habría sido la primera excepción a eso. `app.has_permission(tenant_id,
+module, action)` reutiliza el mismo `role_in()` que ya usa toda política del proyecto.
+**Costo aceptado:** una tabla más, sin pantalla de administración en esta fase (se
+siembra a mano, mismo criterio que las tablas de tenencia de la fase 1) — y el riesgo
+real de una tabla de permisos: una fila faltante o mal sembrada deja a un rol sin
+acceso a algo que debería tener. Mitigado en parte porque `owner` nunca depende de la
+tabla (bypass explícito en `app.has_permission()`).
+**Si algún día hace falta una pantalla para editarla:** la tabla y la función ya están
+listas; falta solo la política de INSERT/UPDATE y su UI — mismo patrón que esta misma
+fase le acaba de aplicar a `memberships`/`membership_branches`.
+
+---
+
+### D14 — Superadmin en una tabla aparte (`platform_admins`), no un rol de `memberships`
+
+**Alternativa descartada:** agregar un valor `superadmin` al enum `role` de
+`memberships`.
+**Por qué se descartó:** `memberships` siempre pertenece a un `tenant_id` (§6.1) y
+`app.is_member_of()` la usan todas las políticas de negocio; meter ahí a alguien sin
+negocio rompería ese supuesto y arriesgaría abrir datos de negocio a quien solo debe
+ver datos de la empresa.
+**Por qué la tabla aparte:** el superadmin queda fuera del camino de todas las
+políticas de negocio: no ve `customers`, `pets` ni expedientes aunque una política se
+equivoque, porque ninguna lo menciona. Solo las RPCs `platform_*` lo reconocen, vía
+`app.is_platform_admin()`.
+**Dos correcciones al diseño original, descubiertas al escribir las migraciones:**
+plan/estado/notas NO son columnas de `tenants` (RLS filtra filas, no columnas, y cualquier
+miembro del negocio lee su fila de `tenants`: el dueño habría visto lo que la plataforma
+anota sobre él) y la bitácora NO reutiliza `audit_log` (la lee el dueño y su trigger exige
+`tenant_id`). Ver CLAUDE.md §6.8.
+**Costo aceptado:** `platform_admins` es una excepción a la regla de `tenant_id` en
+toda tabla (igual que `profiles`), y el primer superadmin no puede crearse desde la UI:
+se crea con un script. La Edge Function necesita dos clientes de Supabase para que la
+bitácora registre a la persona correcta.
+**Decisión relacionada:** plan, vigencia y suspensión son informativos en esta fase;
+bloquear acceso implicaría tocar `app.is_member_of()`, que usa toda la base, y se
+decidirá cuando se diseñe la gestión real de planes.
+**Riesgo resuelto:** `demo:reset` ocultaba toda empresa fuera de la semilla. Ahora solo oculta
+las marcadas `is_demo` (default `false`, casilla en el alta) — CLAUDE.md §10.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
@@ -350,3 +461,5 @@ unitarios y en los tests de RLS.
 | El CI pasa en Mac y falla en Linux                 | `.nvmrc` compartido, cuidado con mayúsculas en imports, scripts portables                  |
 | El demo se ensucia entre reuniones                 | `npm run demo:reset` antes de cada una                                                     |
 | Migración mala en producción                       | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main`             |
+| Fila faltante/mal sembrada en `role_permissions`   | `owner` nunca depende de la tabla (bypass en `app.has_permission()`); test que confirma que cambiar una fila cambia el resultado sin tocar código |
+| `invite-employee` mal validada = invitación indebida | Revalida permiso con el JWT de quien llama ANTES de tocar `service_role`; el RPC vuelve a revalidar aunque la Edge Function fallara |

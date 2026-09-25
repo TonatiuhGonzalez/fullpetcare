@@ -122,7 +122,7 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **3.5** 🧪 Tests de `datetime.ts`: mismo instante mostrado en CDMX, Tijuana y Cancún; el rango del día de una sucursal no es el mismo que el de otra; cambio de horario de verano en Tijuana — 12 tests nuevos (32/32 en total). De paso, un test atrapó una suposición mía equivocada (Cancún no comparte zona con CDMX, es UTC-5 propia)
 - [x] **3.6** 📚 `lib/availability.ts`: función pura `computeAvailableSlots({ branchHours, existingAppointments, employeeId, durationMinutes, stepMinutes })`. **Explicar por qué esto es una función pura y por qué eso la vuelve trivial de probar** — trabaja en minutos desde medianoche con horas 'HH:mm' locales (la conversión de UTC ya la hizo lib/datetime.ts antes), así que no sabe nada de zonas horarias ni de Date
 - [x] **3.7** 🧪 Tests de `availability.ts` (el mejor material didáctico del proyecto): día vacío; una cita a media mañana parte el día en dos; cita que termina exactamente cuando empezaría otra (¿cabe? sí); servicio más largo que el hueco restante antes de cerrar; empleado con la agenda llena; día en que la sucursal no abre; duración cero — 8 tests nuevos, 40/40 en total, todos en verde a la primera
-- [x] **3.8** `services/services.ts` (catálogo): `listByKind`, `create`, `update`, `deactivate` — `listByKind` trae activos e inactivos (CatalogPage los necesita para reactivar); el paso de agendar filtra `is_active` por su cuenta
+- [x] **3.8** `services/services.ts` (catálogo): `listByKind`, `create`, `update`, `setActive` (antes `deactivate`; alimenta el switch activar/desactivar de CatalogPage, que sustituyó al ícono "Desactivar" y al checkbox "Activo" del dialog) — `listByKind` trae activos e inactivos (CatalogPage los necesita para reactivar); el paso de agendar filtra `is_active` por su cuenta
 - [x] **3.9** 🧪 Tests + RLS de `services` — `services-service.spec.ts` (incluye que recepción NO puede dar de alta, solo owner) y `services-rls.spec.ts` (aislamiento + control). 35/35 tests de BD
 - [x] **3.10** `services/appointments.ts`: `listByDay`, `getById`, `create` (con snapshots), `reschedule`, `cancel`, `changeStatus` — `create`/`reschedule` llaman a funciones de Postgres (`create_appointment`/`reschedule_appointment`, migración `appointment_booking_rpc.sql`) vía `.rpc()` en vez de insertar directo: agendar toca dos tablas relacionadas (cita + snapshots de servicios) y necesita quedar en una sola transacción, algo que PostgREST no da entre dos `.insert()` sueltos desde el cliente. Las funciones viven en el esquema `public` (no `app`) — PostgREST solo expone RPCs de `public`, se descubrió al ver que `supabase gen types` no las encontraba en `app`. Traslape verificado también contra service_role (no solo el rol del cliente) — cubre el caso normal, no las dos-solicitudes-simultáneas-en-el-mismo-segundo (anotado en el comentario de la migración, se resolvería con un `EXCLUDE` constraint que no hace falta para este demo)
 - [x] **3.11** 🧪 Test clave: al crear la cita se copian nombre, precio y duración; si después cambia el precio del servicio, la cita conserva el original — verificado subiendo el precio real después de agendar y confirmando que el snapshot no cambió
@@ -239,3 +239,340 @@ Formato: `- [ ] **N.M** Qué hacer. _Verificar:_ cómo se sabe que quedó._
 - [x] **8.4** Confirmar que ningún secreto quedó en el repo (`git log -p` buscando llaves) — revisado todo el historial (`git log -p --all`) buscando `sb_secret_`/`sb_publishable_`/`sbp_`/JWTs/llaves privadas: cero coincidencias reales. Los dos JWT que sí aparecen son los del demo LOCAL fijo (anon/service_role, derivados del `JWT_SECRET` de ejemplo en `supabase/config.toml`, documentados en el README como no secretos e iguales en cualquier proyecto local). Ningún `.env*` real trackeado, solo `.env.example` con la llave vacía
 - [x] **8.5** README con guion de demo: qué enseñar, en qué orden, y qué decir en cada pantalla — 7 pasos (login → agenda → agendar → atender → cobrar → historial → vista pública), apoyándose en el historial curado de Rocky/Max de `demo_reset.sql` para no construir meses de visitas en vivo
 - [x] **8.6** Correr `demo:reset` y dejar el ambiente listo para la primera reunión — corrido contra `fullpetcare-prod` después del recorrido de la tarea 8.1 (que dejó una cita y una venta reales de prueba); verificado por API que solo quedan las 5 citas del guion fijo de Rocky (4 completadas + 1 agendada) y 0 ventas activas en Sucursal Centro. **v1 completo.**
+
+---
+
+## Fase 9 — Gestión de empleados y permisos por rol
+
+**Meta: un CRUD de empleados (datos personales, acceso, documentos) visible solo para
+el dueño hoy, pero construido para que a futuro se puedan modificar los permisos de
+cada rol sin tocar código.** Pedida por el usuario después de v1; decisiones de diseño
+resueltas con él antes de construir (un "empleado" es la persona que ya tiene
+`membership`/`profile`, no un registro de RH aparte; dar de alta crea el acceso
+completo — invita por correo; documentos como texto + archivo; permisos en una tabla
+por negocio, no hardcodeados; se aprobó una segunda Edge Function).
+
+- [x] **9.1** 📚 Migración `role_permissions.sql`: enum `permission_module` (hoy solo
+  `'employees'`, mismo patrón aditivo que `sale_items.item_type`), tabla
+  `role_permissions` (`tenant_id`, `role`, `module`, `can_view`, `can_edit`), RLS
+  **solo SELECT** (mismo precedente que las tablas de tenencia de la fase 1: sin
+  pantalla de administración todavía, se siembra a mano), y `app.has_permission()`
+  — `stable security definer`, mismo molde que `app.is_member_of()`/`app.role_in()`.
+  **Explicar por qué `owner` siempre regresa `true` sin mirar la tabla, y por qué eso
+  es justo el mismo bypass que ya usa CLAUDE.md §6.1 en todos lados** —
+  `20260910120000_role_permissions.sql`. Semilla en `seed.sql`: los dos tenants demo,
+  módulo `employees`, solo `owner` en `true/true`
+- [x] **9.2** Migración `employee_details.sql`: tabla 1 a 1 con `membership_id`
+  (`birth_date`, `curp`, `rfc`, `voter_id_number`, sin `check` de formato — la
+  validación de forma vive en `lib/validation.ts`, igual que `customers.rfc`), RLS
+  vía `app.has_permission(tenant_id, 'employees', 'view'|'edit')`. Misma trampa de
+  siempre (CLAUDE.md §7.2): sin `and deleted_at is null` en el SELECT, porque esta
+  tabla nace con UPDATE para authenticated — `20260910120200_employee_details.sql`
+- [x] **9.3** 📚 Migración `employee_access_rls.sql`: cierra el pendiente que
+  `rls_tenancy.sql` dejó anotado en la fase 1 (tarea 1.16) — INSERT/UPDATE en
+  `memberships` y `membership_branches`, gateados por `app.has_permission(...,
+  'employees', 'edit')` (no un rol fijo: cambiar quién administra empleados es una
+  fila de datos, no una migración), trigger `memberships_audit` que faltaba, y una
+  política de UPDATE nueva en `profiles` (propio perfil, o quien tenga
+  `employees:edit` sobre un tenant donde esa persona tiene membership activa).
+  **Explicar por qué el permiso de esta migración se pregunta a una tabla en vez de
+  compararse contra `'owner'` directo** — `20260910120400_employee_access_rls.sql`
+- [x] **9.4** Migración `employee_documents.sql`: enum `employee_document_type`
+  (`voter_id`, `address_proof`, `employment_contract`), tabla con
+  `unique(membership_id, document_type)` — un solo archivo vigente por tipo, mismo
+  criterio que `pets.photo_path` (ruta fija + `upsert`, sin huérfanos) — y bucket
+  Storage `employee-documents` (`public: false`, imagen + PDF, 10 MB), con políticas
+  idénticas en forma a `pet_photos_bucket.sql` pero llamando `app.has_permission()`
+  en vez de comparar rol. `uploaded_by` con `default auth.uid()` —
+  `20260910120600_employee_documents.sql`
+- [x] **9.5** Migración `fix_membership_branches_select_for_soft_delete.sql`: al
+  agregarle UPDATE a `membership_branches` (tarea 9.3), su política de SELECT
+  original (fase 1) seguía filtrando `deleted_at is null` — la MISMA trampa de
+  CLAUDE.md §7.2 que ya se había corregido una vez para `customers`/`pets` en la fase
+  2, ahora tocaba pagarla aquí. El filtro se movió a
+  `services/memberships.ts`/`services/employees.ts` (`.is('membership_branches.deleted_at',
+  null)` explícito sobre el recurso embebido) — `20260910121000_...sql`
+- [x] **9.6** 📚 RPC `create_employee_membership()`: crea `membership` +
+  `membership_branches` + `employee_details` en una sola transacción — mismo motivo
+  que `checkout_appointment`/`create_appointment` (PLAN.md §1.2): si la segunda
+  escritura fallara, quedaría un empleado a medias. Revalida
+  `app.has_permission(..., 'employees', 'edit')` adentro (CLAUDE.md §7.3.4, salta
+  RLS), valida que las sucursales pedidas sean del mismo tenant, y da un mensaje
+  claro si la persona ya tenía acceso a este negocio. **Explicar por qué esto NO
+  puede vivir en la Edge Function** — `20260910120800_create_employee_membership_rpc.sql`
+- [x] **9.7** 📚 Edge Function `invite-employee`: el único paso que exige
+  `service_role` (`auth.admin.inviteUserByEmail`) — CLAUDE.md §10, esa llave nunca
+  toca el frontend. A diferencia de `public-pet-view`, aquí SÍ hay sesión: se
+  revalida el permiso con un cliente scoped al JWT de quien llama (RLS normal, NO
+  `@supabase/server` en modo `"user"` — esa librería exige JWKS y este proyecto
+  todavía firma con el secreto clásico, mismo motivo que ya documentaba
+  `public-pet-view` para la anon key). Reutiliza el `userId` si el correo ya estaba
+  registrado (persona que ya trabaja en otro negocio del sistema, CLAUDE.md §6.1).
+  **Explicar la diferencia de auth entre esta función y `public-pet-view`, y qué
+  significa `verify_jwt = true` en `config.toml` aquí** —
+  `supabase/functions/invite-employee/`. Verificado a mano contra Supabase local:
+  alta exitosa, rechazo a quien no tiene permiso, aislamiento entre tenants, y
+  correo repetido reutilizando el id
+- [x] **9.8** 🧪 Tests de RLS/RPC/Edge Function — 38 tests nuevos, 196/196 de BD en
+  verde: `role-permissions-rls.spec.ts` (aislamiento + sin política de escritura),
+  `employee-details-rls.spec.ts` (view/edit por `app.has_permission`, con un caso que
+  prueba que cambiar SOLO una fila de `role_permissions` cambia el resultado sin
+  tocar código), `employee-documents-rls.spec.ts` (tabla + Storage),
+  `memberships-write-rls.spec.ts` (INSERT/UPDATE nuevos + que desactivar corta acceso
+  al instante), `create-employee-membership-rpc.spec.ts` (todo o nada, revalidación
+  de permiso aunque la RPC salte RLS), `invite-employee-function.spec.ts` (HTTP real,
+  mismo patrón que `public-pet-view.spec.ts`)
+- [x] **9.9** `lib/validation.ts#isValidCURP` + `lib/permissions.ts#hasPermission`
+  (la versión "para no mostrar un botón que el backend igual va a rechazar" —
+  CLAUDE.md §6.1 — mismo espíritu que `lib/roles.ts`). 12 tests nuevos, 151/151
+  unitarios en verde
+- [x] **9.10** `useSessionStore` gana `permissions` (cargadas junto al tenant activo)
+  y `canView()`/`canEdit()`; `selectTenant()` pasa a `async` para poder recargarlas al
+  cambiar de negocio sin cerrar sesión. `services/permissions.ts#listForTenant()`
+  nuevo. 3 tests nuevos en `session.spec.ts` (incluido el caso de "mismo rol,
+  resultado distinto" al cambiar de tenant)
+- [x] **9.11** `services/employees.ts` (`list`, `inviteAndCreate`, `update`) y
+  `services/employeeDocuments.ts` (`upload`, `listByMembership`, `getSignedUrl`) —
+  `services/branches.ts` ganó `listByTenant()`. `update()` calcula la diferencia real
+  de sucursales asignadas en vez de "borrar todo e insertar de nuevo" (el
+  `unique(membership_id, branch_id)` no excluye filas borradas suavemente, así que
+  soft-borrar y reinsertar la MISMA sucursal en una sola edición violaría esa
+  restricción)
+- [x] **9.12** `EmployeesPage.vue` (`/app/empleados`) y `EmployeeFormDialog.vue` — un
+  solo diálogo con pestañas (Datos personales / Acceso / Documentos), no pasos,
+  mismo criterio que ya se pidió para agendar una cita (commits #37/#38/#41). Botón
+  "Empleados" en `AppLayout.vue` y guard nuevo en `router/index.ts`
+  (`requiresPermission`), ambos gateados por `session.canView('employees')` — no por
+  un rol fijo
+- [x] **9.13** Verificación de punta a punta en navegador real (Playwright dirigido a
+  mano, sin agregarlo al único E2E de CLAUDE.md §9 — esto es un flujo secundario):
+  login como dueño → aparece "Empleados" → alta de un empleado nuevo (correo real
+  capturado en Mailpit local, `:54324`) → aparece en la lista con su rol → editar un
+  empleado sembrado, subir su credencial de elector, reabrir y confirmar "Ver
+  documento actual" → login como groomer → NO aparece "Empleados" → `/app/empleados`
+  por URL directa redirige a la agenda. Cero errores de consola en todo el recorrido
+- [x] **9.14** Documentación: `CLAUDE.md` §3 (dos Edge Functions, ya no "solo la vista
+  pública"), nueva §6.7 (las tres tablas de esta fase), §7.2 (`app.has_permission()`
+  junto a las demás funciones `app.*`, y el pendiente de 1.16 ya cerrado); `PLAN.md`
+  con la Fase 9 y la decisión `D13`. **Fase 9 completa.**
+
+---
+
+## Fase 10 — Superadmin de plataforma
+
+**Meta: un panel `/superadmin` (misma pantalla de login) para que el equipo de la
+plataforma gestione las empresas registradas: darlas de alta, ver su plan, su dueño y
+su fecha de alta, suspenderlas o darlas de baja, llevar notas internas, ver métricas
+de uso y restablecer la contraseña del dueño.** Prioridad alta. Ya no es "v1 a secas":
+el usuario empezó a agregar características nuevas. Decisiones resueltas con él antes
+de construir:
+
+- Los superadmins viven en una tabla aparte (`platform_admins`), no en `memberships`
+  (un superadmin no pertenece a ningún negocio). Puede haber varios, todos con los
+  mismos permisos.
+- **Solo ven datos de la empresa** (nombre, dueño, plan, estado, conteos). Nunca
+  clientes, mascotas, citas ni expedientes.
+- Plan y vigencia son **informativos**: plan de texto fijo "Básico", vigencia
+  indefinida (`NULL`). Sin tabla de planes y sin bloqueo por vencimiento (a futuro).
+- Suspender / dar de baja es **solo una etiqueta** de estado: no bloquea el acceso de
+  los usuarios de la empresa (a futuro). Las empresas no tienen fecha de baja.
+- Un solo dueño por empresa. El alta captura: nombre de la empresa, nombre de la
+  sucursal, y nombre / correo / teléfono del dueño. Zona horaria fija
+  `America/Mexico_City`. Catálogo de servicios vacío.
+- La contraseña del dueño la genera el sistema (temporal, se muestra una sola vez).
+  Cambiarla al primer ingreso queda como trabajo futuro.
+- Cambiar la contraseña de un admin cierra sus sesiones (revoca sus refresh tokens;
+  un access token ya emitido sigue válido hasta caducar).
+- El primer superadmin se crea con un script, no desde la UI.
+
+- [x] **10.1** 📚 Documentación de alcance: esta fase en `TASKS.md`, `PLAN.md`
+  (Fase 10 y decisión `D14`) y una nota en `CLAUDE.md` §1. Las tablas nuevas y el rol
+  de plataforma se documentan en `CLAUDE.md` §6/§7 al cerrar la fase (10.11), cuando
+  ya existen. _Verificar:_ los tres archivos mencionan la fase.
+- [x] **10.2** 📚 Migraciones `20260924120000_platform_admins.sql` y
+  `20260924120200_tenant_platform_info.sql`: `platform_admins` (sin `tenant_id`,
+  excepción documentada igual que `profiles`), `app.is_platform_admin()`
+  (`SECURITY DEFINER`, explicado), `tenant_platform_info` 1 a 1 con `tenants`
+  (`plan`, `plan_expires_at`, `status`, `status_reason`, `internal_notes`; creada
+  por trigger al insertar un tenant), `platform_audit_log` con su propio trigger
+  `app.log_platform_change()`. RLS solo SELECT, solo superadmins; sin política de
+  escritura (las RPC de 10.3 escriben). **Cambio de diseño respecto al plan
+  original:** plan/estado/notas NO son columnas de `tenants` (cualquier miembro del
+  negocio las leería con `select *`) y la bitácora NO reutiliza `audit_log` (la lee
+  el dueño del negocio y `app.log_change()` exige `tenant_id`). Nombre, teléfono y
+  correo del dueño no se duplican: salen de `profiles`/`auth.users` vía la RPC de
+  10.3. _Verificado:_ `supabase db reset` corre limpio (junto con los tests de
+  10.4).
+- [x] **10.3** 📚 RPCs de plataforma (todas revalidan `app.is_platform_admin()`
+  adentro, `SECURITY DEFINER`; explicado por qué RPC y no tablas directas):
+  `platform_list_tenants` (incluye dueño: nombre, correo, teléfono),
+  `platform_tenant_metrics` (solo conteos; el "mes" se calcula en la zona horaria
+  del negocio, §8.3), `platform_set_tenant_status` (motivo obligatorio salvo al
+  reactivar), `platform_update_notes`, `platform_create_tenant` (tenant + una
+  sucursal + membership del dueño, todo o nada; el usuario de Auth lo crea la Edge
+  Function de 10.5) — `20260924120400_platform_rpcs.sql`. Comprobado a mano en una
+  transacción con rollback; sus tests formales son la 10.4.
+- [x] **10.4** 🧪 Tests de BD — 59 tests nuevos, 255/255 de BD en verde:
+  `platform-rls.spec.ts` (18: `is_platform_admin()`, RLS de las tres tablas,
+  el dueño no ve notas internas ni las encuentra en su `audit_log`, tablas sin
+  escritura directa, bitácora inmutable) y `platform-rpcs.spec.ts` (41: las 5
+  RPC rechazan a dueño, ex-superadmin y `anon`; lista con dueño y negocio sin
+  dueño; métricas solo con conteos y **el mes en la zona horaria del negocio**;
+  motivo obligatorio al suspender; alta con todo o nada). Helpers nuevos:
+  `insertAuthUser`, `makePlatformAdmin`, `tryQuery` (SAVEPOINT). **Validado con
+  mutaciones:** se rompió a propósito el cálculo del mes (UTC) y el chequeo de
+  superadmin de una RPC, y los tests correctos fallaron. Los tests de Edge
+  Functions (`public-pet-view`, `invite-employee`) necesitan `supabase functions
+  serve` corriendo; sin él dan 503, ajeno a esta fase.
+- [x] **10.5** 📚🧪 Edge Function `platform-admin` — UNA sola función con tres
+  acciones (`create_tenant`, `reset_password`, `add_admin`), decidido con el
+  usuario. Revalida `platform_admins` con el JWT de quien llama (paso 1, sin
+  `service_role`); solo después usa la llave secreta, y solo para la API de admin
+  de Auth. Las escrituras de negocio van por las RPC con el JWT del superadmin, para
+  que la bitácora registre al superadmin real como actor (con `service_role`,
+  `auth.uid()` es NULL). El alta crea el usuario **y** llama la RPC en un solo paso
+  (si la RPC falla, borra el usuario huérfano), así que el frontend no coordina dos
+  llamadas. Un correo ya registrado se rechaza con 409 (decisión 3: no secuestrar
+  cuentas). Restablecer: bitácora primero, luego contraseña, luego cierra sesiones.
+  Migración `20260924120600_platform_admin_support.sql`: `revoke_user_sessions`
+  (solo `service_role`), `platform_list_admins`, `platform_add_admin`,
+  `platform_remove_admin` (nunca deja cero superadmins), `platform_log_event` y la
+  columna `event` de la bitácora. Config: `[functions.platform-admin]` en
+  `config.toml`. **Explicar la diferencia entre `callerClient` y `adminClient`.**
+  _Verificado:_ `platform-admin-function.spec.ts` (20 tests HTTP reales),
+  `platform-admin-support.spec.ts` (22, RPC). Probado con mutaciones: quitar el
+  chequeo de superadmin destapó que un no-superadmin podía **sondear qué correos
+  están registrados** (recibía 409 en vez de 403) — hay test que lo impide ahora.
+  Límite conocido: GoTrue ya cierra las sesiones al cambiar la contraseña, así que
+  los tests no distinguen si lo hizo GoTrue o `revoke_user_sessions` (que se
+  conserva como garantía propia). El camino "la RPC falla tras crear el usuario"
+  (limpieza del huérfano) no tiene test: no hay forma honesta de provocarlo.
+- [x] **10.6** 🧪 Generador de contraseña temporal
+  (`supabase/functions/platform-admin/password.ts`, función pura; vive junto a la
+  función y no en `src/lib/` porque la contraseña se genera SIEMPRE en el servidor)
+  con 6 tests (`temporary-password.spec.ts`): longitud, sin caracteres ambiguos,
+  una de cada clase, sin sesgo de módulo, sin repeticiones. Validado con mutación.
+- [x] **10.7** 🧪 `src/services/platform.ts` (empresas, métricas, estado, notas,
+  bitácora, superadmins, y las dos llamadas a la Edge Function) y
+  `useSessionStore.isPlatformAdmin` (un superadmin no necesita elegir negocio;
+  se restaura al recargar; se borra al salir; si no se puede confirmar, el login
+  falla en vez de asumir "no es admin"). `src/types/database.ts` regenerado
+  (solo inserciones). El servicio convierte a tipos de dominio (`camelCase`, `null`
+  donde corresponde: el generador marca todo como `string`) y traduce errores: los
+  mensajes en español de las RPC pasan tal cual, el "permission denied" de Postgres
+  se oculta, y un 404/503/504 del **gateway** ("función apagada") se distingue del
+  404 de **la propia función** ("empresa sin dueño"). _Verificado:_
+  `platform-service.spec.ts` (21 tests contra Supabase local, con sesiones reales),
+  5 tests nuevos en `session.spec.ts`, y `agenda.spec.ts` ahora simula
+  `@/services/platform` (sin eso el CI, que no tiene `.env.local`, fallaba al
+  cargar). Helpers compartidos en `platform-test-helpers.ts`. Probado con
+  mutaciones (store y servicio). Total: 324 tests de BD y 164 unitarios en verde.
+  **Lección de aislamiento:** los tests que modificaban un negocio de la semilla
+  lo dejaban modificado en la base local; ahora usan un negocio desechable
+  (`createScratchTenant`).
+- [x] **10.8** UI `/superadmin` (misma pantalla de login; decisiones tomadas con el
+  usuario: detalle en **un diálogo con pestañas**, contraseña temporal en un
+  **diálogo bloqueante con botón Copiar** que se ve una sola vez, lista con
+  **búsqueda + filtro por estado**, y gestión de superadmins como **pestaña junto a
+  Empresas**). `SuperadminLayout.vue`, `TenantsPage.vue`, `AdminsPage.vue`,
+  `TenantFormDialog.vue`, `TenantDetailDialog.vue` (Datos / Métricas / Notas /
+  Bitácora; las dos últimas cargan al abrirse), `TenantStatusDialog.vue` (motivo
+  obligatorio), `AdminFormDialog.vue`, `TemporaryPasswordDialog.vue`. Router:
+  `/superadmin` con `meta.requiresPlatformAdmin`; un superadmin sin negocio va a
+  `/superadmin` desde el login y desde `/app/*`; quien no lo es, a su agenda. La
+  lógica pura va en `src/lib/platform.ts` con 20 tests (etiquetas, filtro que ignora
+  acentos y mayúsculas, y la traducción de la bitácora a frases; nunca copia el
+  texto de una nota). Las validaciones de correo y teléfono ya existían en
+  `lib/validation.ts`. **La búsqueda cubre empresa Y nombre del dueño** (decisión
+  mía: "por nombre" era ambiguo). _Verificado:_ `vue-tsc`, `npm run lint`,
+  `npm run build` y 184 tests unitarios en verde. **Pendiente para 10.10:** ver la
+  pantalla en un navegador real (los componentes no llevan test, CLAUDE.md §9).
+- [x] **10.9** Primer superadmin y semilla. `scripts/create-superadmin.mjs` (Node,
+  no bash: hay llamadas HTTP y un rollback) + `npm run superadmin:create`: crea el
+  usuario en Auth con contraseña temporal (el MISMO generador que la Edge Function)
+  y su fila en `platform_admins`; rechaza un correo ya registrado; si el segundo
+  paso falla borra el usuario recién creado. `--local` apunta al Supabase local; sin
+  `--local` exige `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (sin prefijo `VITE_`,
+  documentadas en `.env.example`), **una terminal interactiva** y escribir el host
+  para confirmar. `seed.sql` (bloque nuevo al final, lo existente no se tocó):
+  superadmin ficticio `superadmin@fullpetcare.mx` y un tercer negocio, "Mascotas y
+  Mimos", con dueño, suspendido y con notas de ejemplo. `CLAUDE.md` §8.7 y §12
+  actualizados. _Verificado:_ `create-superadmin-script.spec.ts` (8 tests que corren
+  el script de verdad como proceso aparte, incluidos los casos donde DEBE negarse) y
+  ajustes a 3 tests que asumían "cero superadmins". Probado con mutaciones. 332
+  tests de BD en verde, dos corridas seguidas, y la base queda idéntica a la semilla.
+  Límite conocido: el camino "falla el segundo paso y se borra el usuario" no tiene
+  test (no hay forma honesta de provocar ese fallo).
+- [x] **10.10** Verificación de punta a punta en navegador real (Playwright dirigido a
+  mano, fuera del único E2E de CLAUDE.md §9 — flujo secundario, igual que 9.13), con
+  Supabase local, Edge Functions servidas y la UI de esta rama en su propio puerto
+  (el 5173 lo ocupaba el servidor del repo principal). **15/15 pasos:** superadmin
+  entra y cae en `/superadmin/empresas` con las 3 empresas; búsqueda sin acentos y por
+  dueño, filtro por estado; alta con validaciones y diálogo de contraseña (formato
+  correcto, **no se cierra con Esc ni clic afuera**, el botón Copiar deja de verdad la
+  contraseña en el portapapeles); detalle Datos / Métricas / Notas (persisten) /
+  Bitácora (con actor, sin copiar el texto de la nota); el dueño nuevo entra con la
+  temporal y ve su negocio; suspender exige motivo y el dueño **sigue pudiendo
+  trabajar** (es solo etiqueta); restablecer contraseña: la nueva sirve, la vieja no, y
+  **la sesión que el dueño tenía abierta deja de servir** al recargar; un dueño normal
+  no entra a `/superadmin` ni por URL directa; F5 mantiene la sesión; alta y baja de
+  superadmins y el mensaje de "único superadmin"; salir. **0 errores de consola**
+  reales (solo los 4xx esperados). Las **capturas** encontraron 2 defectos que los
+  pasos no podían ver y ya están corregidos: la bitácora cortaba las frases largas
+  ("…pendiente (ej") y el diálogo cambiaba de altura al cambiar de pestaña; y en
+  pantallas angostas la barra se amontonaba (ahora oculta chip y nombre). El panel no
+  se diseñó para móvil (solo la vista pública lo es), pero no desborda la página.
+  **`demo:reset` (opción B, decidida con el usuario):** un bloque nuevo en
+  `demo_reset.sql` devuelve los 3 negocios de la semilla a su estado de plataforma
+  (idempotente: sin cambios no escribe ni bitácora — comprobado corriéndolo dos veces)
+  y oculta las empresas fuera de la semilla. **Riesgo documentado** en `CLAUDE.md` §10
+  y en la confirmación de `demo-reset.sh`: con un cliente real ese paso lo ocultaría;
+  además los correos de dueños creados en una demo siguen registrados (no toca
+  `auth.users`), así que cada demo necesita otro correo.
+- [x] **10.11** Cierre. `CLAUDE.md`: §1 (nota), §3 y §4 (tercera Edge Function, script,
+  carpeta `superadmin`), §6 (excepciones a `tenant_id`) y **§6.8 nueva** (las tres
+  tablas y las decisiones que no se ven en el esquema), **§7.5 nueva** (el superadmin:
+  RLS sin escritura, RPC, los dos clientes de la Edge Function, contraseñas, sesiones),
+  §8.6, §8.7, §10 (advertencia de `demo:reset`) y §12 (comandos). `PLAN.md`: Fase 10
+  reescrita con lo realmente construido y `D14` con las dos correcciones de diseño y el
+  riesgo conocido. _Verificado:_ `npm run lint`, `vue-tsc`, `npm run build`, **184 tests
+  unitarios** y **332 tests de BD** (38 archivos) en verde, esta última corrida **dos
+  veces seguidas** con la base idéntica a la semilla después. Cobertura unitaria:
+  `lib/platform.ts` 96 %, `stores/session.ts` 96 %; `services/platform.ts` figura en 0 %
+  en esa medición porque, como el resto de los servicios, se prueba contra la base real
+  desde `test:db` (21 tests).
+
+  **Qué se puede demostrar (Fase 10):** entrar como `superadmin@fullpetcare.mx` /
+  `Demo1234!` y caer en `/superadmin`; ver las 3 empresas con plan, dueño, alta,
+  vigencia ("Indefinida") y estado; buscar y filtrar; dar de alta una empresa con su
+  sucursal y su dueño (contraseña temporal que se ve una sola vez); iniciar sesión como
+  ese dueño; suspender con motivo, dar de baja y reactivar; anotar notas internas; ver
+  métricas y bitácora; restablecer la contraseña del dueño (la vieja deja de servir y
+  pierde sus sesiones); agregar y quitar superadmins (sin poder quitar al último). Un
+  dueño normal no entra a `/superadmin`. **No se demuestra** (fuera de alcance): bloqueo
+  real por suspensión o vencimiento, gestión de planes, cambio obligatorio de contraseña
+  en el primer ingreso.
+
+  **Pendientes que quedan abiertos (decisión del usuario, no se tocaron):**
+  1. ~~`deploy-functions.yml` solo desplegaba `public-pet-view`~~ **Resuelto:** ahora
+     también despliega `invite-employee` y `platform-admin` (mismo patrón, con
+     `verify_jwt = true` de `config.toml`). Sin probar en la nube: solo corre al mergear
+     a `main`.
+  2. ~~CORS: ninguna de las dos funciones con sesión maneja el preflight~~ **Resuelto en
+     código, sin verificar en la nube:** `supabase/functions/_shared/cors.ts` contesta el
+     `OPTIONS` (204) y añade `Access-Control-Allow-*` a toda respuesta de `invite-employee`
+     y `platform-admin`; probado como función pura en `functions-cors.spec.ts` (por HTTP en
+     local no sirve: Kong contesta antes). **Falta comprobarlo contra staging o prod** tras
+     el primer despliegue: que el preflight pase con `verify_jwt = true` y que el deploy
+     empaquete el import `../_shared/cors.ts`.
+  3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
+     para el script de superadmin, unitarios sin `.env.local`).
+  4. ~~`demo:reset` oculta toda empresa fuera de la semilla~~ **Resuelto:** columna
+     `tenant_platform_info.is_demo` (default `false`), casilla "Empresa de demostración" en
+     el alta, y el reset solo oculta las marcadas (migración `20260925120000_tenant_is_demo.sql`,
+     tests en `demo-reset.spec.ts` y `platform-rpcs.spec.ts`). Pendiente menor: la lista del
+     panel no muestra qué empresas son demo.
+
+**Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
+ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
+vencimiento o suspensión.

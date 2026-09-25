@@ -54,6 +54,25 @@ export const VACCINE_TRIPLE_FELINA = '10000000-0000-4000-8000-000000000002'
 export const VACCINE_SEXTUPLE_CANINA = '10000000-0000-4000-8000-000000000003'
 export const VACCINE_BORDETELLA = '10000000-0000-4000-8000-000000000004'
 
+// Tercer negocio y superadmin SEMBRADOS (fase 10, seed.sql). No confundir con
+// USER_SUPERADMIN de abajo: ese lo crea cada test dentro de su transacción y
+// tiene otro id a propósito, para que nunca choque con el de la semilla.
+export const TENANT_MIMOS = 'b0000000-0000-4000-8000-000000000003'
+export const BRANCH_MIMOS = 'c0000000-0000-4000-8000-000000000004'
+export const USER_DUENO_MIMOS = 'a3000000-0000-4000-8000-000000000001'
+export const USER_SUPERADMIN_DEMO = 'a2000000-0000-4000-8000-000000000001'
+
+// Superadmin de plataforma (fase 10). NO están en seed.sql: cada test que los
+// necesita los crea dentro de su propia transacción con
+// `insertAuthUser()` + `makePlatformAdmin()` (helpers.ts), y el rollback los
+// borra. Así ningún test depende de que la semilla tenga superadmins, y la
+// semilla no necesita uno "solo para los tests".
+export const USER_SUPERADMIN = 'a1000000-0000-4000-8000-000000000001'
+export const USER_SUPERADMIN_2 = 'a1000000-0000-4000-8000-000000000002'
+// El usuario de Auth que la Edge Function `platform-admin` crearía para el
+// dueño de una empresa nueva, justo antes de llamar platform_create_tenant().
+export const USER_NUEVO_DUENO = 'a1000000-0000-4000-8000-000000000003'
+
 // Un id con formato de UUID válido pero que NO existe en ninguna tabla.
 // Sirve para probar "¿qué pasa si busco algo que no existe?" sin
 // depender de que la semilla no haya cambiado.

@@ -17,3 +17,16 @@ export async function getById(id: string): Promise<Branch | null> {
   if (error) throw error
   return data
 }
+
+/** Todas las sucursales activas de un tenant, por nombre — usado por la pantalla de empleados (fase 9) para armar el selector de sucursales. */
+export async function listByTenant(tenantId: string): Promise<Branch[]> {
+  const { data, error } = await supabase
+    .from('branches')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .is('deleted_at', null)
+    .order('name')
+
+  if (error) throw error
+  return data ?? []
+}

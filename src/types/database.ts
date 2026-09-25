@@ -340,6 +340,114 @@ export type Database = {
           },
         ]
       }
+      employee_details: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          curp: string | null
+          deleted_at: string | null
+          id: string
+          membership_id: string
+          rfc: string | null
+          tenant_id: string
+          updated_at: string
+          voter_id_number: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          curp?: string | null
+          deleted_at?: string | null
+          id?: string
+          membership_id: string
+          rfc?: string | null
+          tenant_id: string
+          updated_at?: string
+          voter_id_number?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          curp?: string | null
+          deleted_at?: string | null
+          id?: string
+          membership_id?: string
+          rfc?: string | null
+          tenant_id?: string
+          updated_at?: string
+          voter_id_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_details_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: true
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_details_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_documents: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_type: Database["public"]["Enums"]["employee_document_type"]
+          id: string
+          membership_id: string
+          storage_path: string
+          tenant_id: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type: Database["public"]["Enums"]["employee_document_type"]
+          id?: string
+          membership_id: string
+          storage_path: string
+          tenant_id: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type?: Database["public"]["Enums"]["employee_document_type"]
+          id?: string
+          membership_id?: string
+          storage_path?: string
+          tenant_id?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grooming_records: {
         Row: {
           appointment_id: string
@@ -833,6 +941,77 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      platform_audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id: string | null
+          changed_at: string
+          event: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          changed_at?: string
+          event?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          changed_at?: string
+          event?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -862,6 +1041,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: Database["public"]["Enums"]["permission_module"]
+          role?: Database["public"]["Enums"]["member_role"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -1148,6 +1368,56 @@ export type Database = {
           },
         ]
       }
+      tenant_platform_info: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          internal_notes: string | null
+          is_demo: boolean
+          plan: string
+          plan_expires_at: string | null
+          status: Database["public"]["Enums"]["tenant_status"]
+          status_reason: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          internal_notes?: string | null
+          is_demo?: boolean
+          plan?: string
+          plan_expires_at?: string | null
+          status?: Database["public"]["Enums"]["tenant_status"]
+          status_reason?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          internal_notes?: string | null
+          is_demo?: boolean
+          plan?: string
+          plan_expires_at?: string | null
+          status?: Database["public"]["Enums"]["tenant_status"]
+          status_reason?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_platform_info_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -1355,6 +1625,189 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_employee_membership: {
+        Args: {
+          p_birth_date: string
+          p_branch_ids: string[]
+          p_curp: string
+          p_rfc: string
+          p_role: Database["public"]["Enums"]["member_role"]
+          p_tenant_id: string
+          p_user_id: string
+          p_voter_id_number: string
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "memberships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_add_admin: {
+        Args: { p_user_id: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_admins"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_create_tenant: {
+        Args: {
+          p_branch_name: string
+          p_is_demo?: boolean
+          p_owner_full_name: string
+          p_owner_phone: string
+          p_tenant_name: string
+          p_user_id: string
+        }
+        Returns: {
+          created_at: string
+          default_cfdi_use: string | null
+          deleted_at: string | null
+          id: string
+          legal_name: string | null
+          name: string
+          postal_code: string | null
+          rfc: string | null
+          tax_regime_code: string | null
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_list_admins: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
+      platform_list_tenants: {
+        Args: never
+        Returns: {
+          created_at: string
+          internal_notes: string
+          name: string
+          owner_email: string
+          owner_name: string
+          owner_phone: string
+          owner_user_id: string
+          plan: string
+          plan_expires_at: string
+          status: Database["public"]["Enums"]["tenant_status"]
+          status_reason: string
+          tenant_id: string
+        }[]
+      }
+      platform_log_event: {
+        Args: {
+          p_details: Json
+          p_event: string
+          p_record_id: string
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
+      platform_remove_admin: {
+        Args: { p_user_id: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_admins"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_set_tenant_status: {
+        Args: {
+          p_reason: string
+          p_status: Database["public"]["Enums"]["tenant_status"]
+          p_tenant_id: string
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          internal_notes: string | null
+          is_demo: boolean
+          plan: string
+          plan_expires_at: string | null
+          status: Database["public"]["Enums"]["tenant_status"]
+          status_reason: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenant_platform_info"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_tenant_metrics: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          active_employees_count: number
+          appointments_this_month_count: number
+          branches_count: number
+          customers_count: number
+          last_access_at: string
+          pets_count: number
+        }[]
+      }
+      platform_update_notes: {
+        Args: { p_notes: string; p_tenant_id: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          internal_notes: string | null
+          is_demo: boolean
+          plan: string
+          plan_expires_at: string | null
+          status: Database["public"]["Enums"]["tenant_status"]
+          status_reason: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenant_platform_info"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reschedule_appointment: {
         Args: {
           p_appointment_id: string
@@ -1385,6 +1838,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
     }
     Enums: {
       appointment_status:
@@ -1394,15 +1848,21 @@ export type Database = {
         | "cancelled"
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
+      employee_document_type:
+        | "voter_id"
+        | "address_proof"
+        | "employment_contract"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
+      permission_module: "employees"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       sale_item_type: "service"
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
       share_link_scope: "pet" | "customer"
+      tenant_status: "active" | "suspended" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1541,15 +2001,22 @@ export const Constants = {
         "no_show",
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
+      employee_document_type: [
+        "voter_id",
+        "address_proof",
+        "employment_contract",
+      ],
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
+      permission_module: ["employees"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       sale_item_type: ["service"],
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
       share_link_scope: ["pet", "customer"],
+      tenant_status: ["active", "suspended", "closed"],
     },
   },
 } as const

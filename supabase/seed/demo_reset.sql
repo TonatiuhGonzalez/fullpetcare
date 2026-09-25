@@ -246,3 +246,79 @@ begin
   insert into appointment_services (tenant_id, appointment_id, service_id, name_snapshot, unit_price_cents, quantity, duration_minutes_snapshot)
   select v_tenant_patitas, v_appt_max_proxima, id, name, price_cents, 1, duration_minutes from services where id = v_service_consulta;
 end $$;
+
+-- =============================================================================
+-- Estado de PLATAFORMA (fase 10): lo que el superadmin toca en una demo
+-- =============================================================================
+-- El panel de superadmin permite suspender empresas, cambiar sus notas y dar
+-- de alta empresas nuevas. Sin este bloque, todo eso se quedaría para la
+-- siguiente presentación (CLAUDE.md §8.7: "no debe presentar con basura de
+-- la sesión anterior"). Dos cosas:
+--
+--   1. Los tres negocios de la semilla vuelven a su estado original de
+--      plataforma. Solo se escribe si algo CAMBIÓ (`is distinct from`): un
+--      demo:reset sobre un demo intacto no genera ni una entrada de bitácora.
+--      Las que sí genera (quien corre este script no tiene sesión de usuario)
+--      quedan con actor "Sistema" en la pestaña Bitácora, que es la verdad.
+--   2. Toda empresa que NO sea de la semilla Y esté marcada `is_demo` se
+--      oculta (borrado suave). Son las que se dieron de alta durante una demo
+--      con la casilla "Empresa de demostración" del formulario de alta.
+--
+-- Una empresa SIN esa marca se trata como real y este script no la toca:
+-- `is_demo` nace en false (migración 20260925120000_tenant_is_demo.sql), así
+-- que el riesgo de ocultar a un cliente real por un descuido no existe. El
+-- descuido contrario (no marcar una empresa de demo) solo deja una empresa de
+-- sobra en la lista, que se oculta a mano desde el panel.
+--
+-- Lo que NO hace, a propósito: no toca auth.users (las credenciales de demo
+-- nunca cambian), así que el correo del dueño de una empresa creada en una
+-- demo SIGUE REGISTRADO. Para volver a dar de alta una empresa en la
+-- siguiente demo hay que usar otro correo de dueño.
+do $$
+declare
+  v_tenant_patitas   uuid := 'b0000000-0000-4000-8000-000000000001';
+  v_tenant_huellitas uuid := 'b0000000-0000-4000-8000-000000000002';
+  v_tenant_mimos     uuid := 'b0000000-0000-4000-8000-000000000003';
+  v_seed_tenants     uuid[];
+  v_hidden_names     text;
+begin
+  v_seed_tenants := array[v_tenant_patitas, v_tenant_huellitas, v_tenant_mimos];
+
+  -- Patitas Felices y Huellitas Spa: plan Básico, activas, sin notas.
+  update tenant_platform_info
+  set plan = 'Básico', plan_expires_at = null, status = 'active',
+      status_reason = null, internal_notes = null
+  where tenant_id in (v_tenant_patitas, v_tenant_huellitas)
+    and (plan is distinct from 'Básico' or plan_expires_at is not null
+         or status <> 'active' or status_reason is not null or internal_notes is not null);
+
+  -- Mascotas y Mimos: suspendida, con las notas de ejemplo de seed.sql (existe
+  -- para dar variedad a la lista y a los filtros del superadmin).
+  update tenant_platform_info
+  set plan = 'Básico', plan_expires_at = null, status = 'suspended',
+      status_reason = 'Pago de la mensualidad pendiente (ejemplo de demo)',
+      internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
+  where tenant_id = v_tenant_mimos
+    and (plan is distinct from 'Básico' or plan_expires_at is not null
+         or status <> 'suspended'
+         or status_reason is distinct from 'Pago de la mensualidad pendiente (ejemplo de demo)'
+         or internal_notes is distinct from 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.');
+
+  -- Empresas de demostración dadas de alta durante una demo: se ocultan (borrado suave, se
+  -- pueden recuperar quitando deleted_at). El aviso lista cuáles fueron.
+  -- `is_demo` se consulta en tenant_platform_info (la marca vive ahí, junto
+  -- al resto del estado de plataforma, no en `tenants`).
+  select string_agg(t.name, ', ' order by t.name) into v_hidden_names
+  from tenants t
+  join tenant_platform_info i on i.tenant_id = t.id
+  where t.id <> all (v_seed_tenants) and t.deleted_at is null and i.is_demo;
+
+  update tenants t set deleted_at = now()
+  from tenant_platform_info i
+  where i.tenant_id = t.id
+    and t.id <> all (v_seed_tenants) and t.deleted_at is null and i.is_demo;
+
+  if v_hidden_names is not null then
+    raise notice 'demo_reset: se ocultaron las empresas de demostración: %', v_hidden_names;
+  end if;
+end $$;

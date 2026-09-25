@@ -51,3 +51,36 @@ export function isValidPhone(value: string): boolean {
 export function isValidPostalCode(value: string): boolean {
   return /^\d{5}$/.test(value.trim())
 }
+
+/**
+ * Correo electrónico: solo la FORMA (algo@dominio.ext, sin espacios) — no
+ * intenta reproducir el estándar completo de RFC 5322, que acepta cosas
+ * que ningún formulario real debería dejar pasar. Que el buzón exista de
+ * verdad lo confirma la invitación misma: si rebota, no llega.
+ */
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
+/**
+ * CURP (Clave Única de Registro de Población), 18 caracteres con esta
+ * forma: 4 letras (inicial de apellido paterno, primera vocal interna del
+ * apellido paterno, inicial de apellido materno, inicial del nombre) + 6
+ * dígitos de fecha de nacimiento (AAMMDD) + sexo ('H' u 'M') + 2 letras de
+ * entidad de nacimiento + 3 consonantes internas + 1 diferenciador
+ * (dígito si nació antes del año 2000, letra si nació después) + 1 dígito
+ * verificador.
+ *
+ * Mismo criterio que isValidRFC: valida la FORMA (longitud, tipo de
+ * carácter en cada posición, que el mes/día de la fecha existan), no el
+ * dígito verificador real de RENAPO — reproducirlo es más código del que
+ * vale la pena para un demo, y atrapa igual el 99% de los errores de
+ * captura.
+ */
+export function isValidCURP(value: string): boolean {
+  const normalized = value.trim().toUpperCase()
+
+  return /^[A-Z][AEIOU][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HM][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/.test(
+    normalized,
+  )
+}

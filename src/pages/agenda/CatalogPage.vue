@@ -53,12 +53,25 @@ function openEditService(service: Service): void {
   showFormDialog.value = true
 }
 
-async function handleDeactivate(service: Service): Promise<void> {
+// Ids de los servicios con un cambio de estado en curso: su switch muestra
+// el loader y queda deshabilitado (evita doble clic) mientras se guarda.
+// No se usa `loading` de la tabla para esto: solo se carga esa fila.
+const togglingIds = ref<Set<string>>(new Set())
+
+async function handleToggleActive(service: Service, value: boolean | null): Promise<void> {
+  const isActive = value === true
+  togglingIds.value.add(service.id)
+  errorMessage.value = null
   try {
-    await servicesService.deactivate(service.id)
-    await load()
+    await servicesService.setActive(service.id, isActive)
+    // Solo se actualiza esta fila en memoria, sin volver a pedir la lista.
+    service.is_active = isActive
   } catch {
-    errorMessage.value = 'No se pudo desactivar el servicio. Revisa tu conexión.'
+    // El switch sigue mostrando `service.is_active`, que no cambió: queda
+    // en su valor anterior.
+    errorMessage.value = `No se pudo ${isActive ? 'activar' : 'desactivar'} el servicio. Revisa tu conexión.`
+  } finally {
+    togglingIds.value.delete(service.id)
   }
 }
 
@@ -90,7 +103,12 @@ function handleSaved(): void {
       {{ errorMessage }}
     </v-alert>
 
-    <v-progress-circular v-if="loading" indeterminate color="primary" />
+    <!-- Skeleton con la forma de las filas (título + subtítulo), para que la
+         lista no "salte" al terminar de cargar. -->
+    <v-skeleton-loader
+      v-if="loading"
+      type="list-item-two-line, list-item-two-line, list-item-two-line, list-item-two-line"
+    />
 
     <v-list v-else lines="two">
       <v-list-item v-for="service in services" :key="service.id">
@@ -107,13 +125,15 @@ function handleSaved(): void {
         </template>
         <template v-if="isOwner()" #append>
           <v-btn icon="mdi-pencil" variant="text" size="small" @click="openEditService(service)" />
-          <v-btn
-            v-if="service.is_active"
-            icon="mdi-eye-off"
-            variant="text"
-            size="small"
-            title="Desactivar"
-            @click="handleDeactivate(service)"
+          <v-switch
+            :model-value="service.is_active"
+            :loading="togglingIds.has(service.id)"
+            :disabled="togglingIds.has(service.id)"
+            :aria-label="service.is_active ? 'Desactivar servicio' : 'Activar servicio'"
+            color="primary"
+            density="compact"
+            hide-details
+            @update:model-value="handleToggleActive(service, $event)"
           />
         </template>
       </v-list-item>

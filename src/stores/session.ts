@@ -6,12 +6,16 @@ import { defineStore } from 'pinia'
 
 import {
   getCurrentUser,
+  onSessionLost,
   signIn as signInRequest,
   signOut as signOutRequest,
   type AuthUser,
 } from '@/services/auth'
 import { getProfile, type MyProfile } from '@/services/profiles'
 import { listMyMemberships, type MembershipSummary } from '@/services/memberships'
+import { listForTenant } from '@/services/permissions'
+import { isPlatformAdmin as fetchIsPlatformAdmin } from '@/services/platform'
+import { hasPermission, type PermissionModule, type RolePermissionRow } from '@/lib/permissions'
 
 const ACTIVE_TENANT_KEY = 'fpc.activeTenantId'
 const ACTIVE_BRANCH_KEY = 'fpc.activeBranchId'
@@ -41,6 +45,17 @@ export const useSessionStore = defineStore('session', () => {
   const user = ref<AuthUser | null>(null)
   const profile = ref<MyProfile | null>(null)
   const memberships = ref<MembershipSummary[]>([])
+  // Reglas de permisos del tenant ACTIVO únicamente (fase 9) — se
+  // recarga cada vez que cambia activeTenantId (loadMemberships,
+  // selectTenant). No vive dentro de MembershipSummary porque no es
+  // información de "mi membresía": son las mismas filas para cualquier
+  // colega con el mismo rol en ese negocio.
+  const permissions = ref<RolePermissionRow[]>([])
+  // true si la persona es superadmin de plataforma (fase 10). Vive aparte de
+  // memberships a propósito: un superadmin no pertenece a ningún negocio
+  // (PLAN.md D14). Solo gatea la INTERFAZ (/superadmin); la autoridad real
+  // son las RPC, que revalidan en la base.
+  const isPlatformAdmin = ref(false)
   const activeTenantId = ref<string | null>(null)
   const activeBranchId = ref<string | null>(null)
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -57,15 +72,45 @@ export const useSessionStore = defineStore('session', () => {
     () => activeBranches.value.find((b) => b.id === activeBranchId.value) ?? null,
   )
 
-  /** true si ya hay sesión pero todavía falta elegir negocio y/o sucursal. */
+  /**
+   * true si ya hay sesión pero todavía falta elegir negocio y/o sucursal.
+   * Un superadmin de plataforma NUNCA lo necesita: no tiene negocio que
+   * elegir, y sin esta excepción se quedaría atrapado en una pantalla de
+   * selección vacía.
+   */
   const needsBusinessSelection = computed(
-    () => isAuthenticated.value && (!activeTenantId.value || !activeBranchId.value),
+    () =>
+      isAuthenticated.value &&
+      !isPlatformAdmin.value &&
+      (!activeTenantId.value || !activeBranchId.value),
   )
+
+  /**
+   * true si el rol activo puede VER un módulo (p. ej. "employees", la
+   * pestaña de empleados de la fase 9). Solo gatea la INTERFAZ — la
+   * autoridad real es la política RLS + app.has_permission() en
+   * Postgres; si esto y el backend algún día no coincidieran, el peor
+   * caso es un botón visible que el backend rechaza, nunca lo contrario.
+   */
+  function canView(module: PermissionModule): boolean {
+    return hasPermission(role.value, permissions.value, module, 'view')
+  }
+
+  /** Mismo criterio que canView(), para la acción de EDITAR. */
+  function canEdit(module: PermissionModule): boolean {
+    return hasPermission(role.value, permissions.value, module, 'edit')
+  }
+
+  async function loadPermissionsForActiveTenant(): Promise<void> {
+    permissions.value = activeTenantId.value ? await listForTenant(activeTenantId.value) : []
+  }
 
   function reset(): void {
     user.value = null
     profile.value = null
     memberships.value = []
+    permissions.value = []
+    isPlatformAdmin.value = false
     activeTenantId.value = null
     activeBranchId.value = null
     errorMessage.value = null
@@ -135,9 +180,10 @@ export const useSessionStore = defineStore('session', () => {
     writeStorage(ACTIVE_TENANT_KEY, activeTenantId.value)
 
     resolveActiveBranch()
+    await loadPermissionsForActiveTenant()
   }
 
-  function selectTenant(tenantId: string): void {
+  async function selectTenant(tenantId: string): Promise<void> {
     activeTenantId.value = tenantId
     writeStorage(ACTIVE_TENANT_KEY, tenantId)
     // Cambiar de negocio invalida la sucursal elegida anteriormente —
@@ -145,6 +191,7 @@ export const useSessionStore = defineStore('session', () => {
     activeBranchId.value = null
     writeStorage(ACTIVE_BRANCH_KEY, null)
     resolveActiveBranch()
+    await loadPermissionsForActiveTenant()
   }
 
   function selectBranch(branchId: string): void {
@@ -155,9 +202,11 @@ export const useSessionStore = defineStore('session', () => {
   async function login(email: string, password: string): Promise<void> {
     status.value = 'loading'
     errorMessage.value = null
+    sessionExpired.value = false
     try {
       user.value = await signInRequest(email, password)
       profile.value = await getProfile(user.value.id)
+      isPlatformAdmin.value = await fetchIsPlatformAdmin(user.value.id)
       await loadMemberships()
       status.value = 'ready'
     } catch (e) {
@@ -168,9 +217,42 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function logout(): Promise<void> {
-    await signOutRequest()
-    reset()
-    status.value = 'idle'
+    // "finally": aunque el servidor no responda (sin red), la sesión
+    // LOCAL se limpia siempre — antes, si signOut() lanzaba, reset()
+    // nunca corría y el usuario quedaba "dentro" tras pulsar Salir. El
+    // error se sigue propagando para que la UI pueda avisar.
+    isLoggingOut = true
+    try {
+      await signOutRequest()
+    } finally {
+      isLoggingOut = false
+      reset()
+      status.value = 'idle'
+    }
+  }
+
+  /**
+   * true si la sesión se perdió SIN que el usuario pulsara "Salir"
+   * (token vencido, revocado, timebox, cierre en otra pestaña). Las
+   * pantallas lo usan para mandar a /login con un aviso claro.
+   */
+  const sessionExpired = ref(false)
+  let stopWatchingSession: (() => void) | null = null
+  // signOut() emite SIGNED_OUT ANTES de que reset() corra; sin esta
+  // bandera, un "Salir" normal se confundiría con una sesión vencida.
+  let isLoggingOut = false
+
+  function watchSessionLoss(): void {
+    if (stopWatchingSession) return
+    stopWatchingSession = onSessionLost(() => {
+      // logout() también dispara SIGNED_OUT; ahí user ya es null tras
+      // reset(), o está por serlo — solo interesa la pérdida inesperada
+      // de una sesión que la app creía viva.
+      if (isLoggingOut || user.value === null) return
+      reset()
+      status.value = 'idle'
+      sessionExpired.value = true
+    })
   }
 
   // Evita repetir el arranque si algo dispara ensureInitialized() más de
@@ -183,11 +265,13 @@ export const useSessionStore = defineStore('session', () => {
   function ensureInitialized(): Promise<void> {
     if (!initPromise) {
       initPromise = (async () => {
+        watchSessionLoss()
         status.value = 'loading'
         const existingUser = await getCurrentUser()
         if (existingUser) {
           user.value = existingUser
           profile.value = await getProfile(existingUser.id)
+          isPlatformAdmin.value = await fetchIsPlatformAdmin(existingUser.id)
           await loadMemberships()
         }
         status.value = 'ready'
@@ -200,16 +284,21 @@ export const useSessionStore = defineStore('session', () => {
     user,
     profile,
     memberships,
+    permissions,
+    isPlatformAdmin,
     activeTenantId,
     activeBranchId,
     status,
     errorMessage,
     isAuthenticated,
+    sessionExpired,
     activeMembership,
     role,
     activeBranches,
     activeBranch,
     needsBusinessSelection,
+    canView,
+    canEdit,
     login,
     logout,
     loadMemberships,

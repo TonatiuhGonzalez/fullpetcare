@@ -24,6 +24,11 @@ echo "Se oculta (borrado suave) cualquier cita, venta o partida de una"
 echo "sesión de demo anterior que no sea parte del guion fijo, y se"
 echo "restaura el historial curado de Rocky y Max a su estado original."
 echo
+echo "Del panel de superadmin: los 3 negocios de la semilla vuelven a su"
+echo "estado original (plan, estado y notas), y se OCULTAN (borrado suave)"
+echo "las empresas marcadas como \"de demostración\" que no sean esas 3."
+echo "Las empresas sin esa marca (clientes reales) NO se tocan."
+echo
 read -r -p "¿Continuar? [y/N] " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   echo "Cancelado."

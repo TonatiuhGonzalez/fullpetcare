@@ -30,6 +30,18 @@ del proyecto local al terminar — también se pueden consultar después con
 `supabase status`. La primera vez descarga varias imágenes de Docker y
 tarda unos minutos; las siguientes es cuestión de segundos.
 
+`db:start` **no** levanta las Edge Functions. Si vas a usar algo que pasa por
+una (crear empresas en `/superadmin`, invitar empleados, la vista pública de
+la mascota), abre otra terminal y déjala corriendo:
+
+```bash
+supabase functions serve        # sirve invite-employee, platform-admin y public-pet-view
+```
+
+Sin ese proceso, las llamadas a `/functions/v1/...` fallan con `503 name
+resolution failed`. Hay que volver a levantarlo después de cada `db:stop`
+o `db:reset`. Recarga solo al editar el código de una función.
+
 ### Usuarios de demo (solo en local, ver `supabase/seed.sql`)
 
 Los cuatro tienen la misma contraseña: `Demo1234!`
@@ -156,6 +168,22 @@ local queda enlazado a **staging** por defecto — evita que un `db push`
 manual accidental afecte producción sin querer. Para tocar prod a mano
 (algo excepcional, ya que 1.41 lo automatiza) hay que `link` explícito a
 su `project-ref` primero.
+
+## Limitaciones conocidas en producción
+
+Cosas que funcionan en local pero **no están garantizadas** en los proyectos
+de Supabase en la nube. Si algo de aquí cambia (por ejemplo, se sube a plan
+Pro), actualiza esta tabla.
+
+| Limitación | Local | Nube (`staging` / `prod`) | Qué hacer |
+| --- | --- | --- | --- |
+| **`timebox` (12 h) e `inactivity_timeout` (1 h)** de `[auth.sessions]` en `supabase/config.toml` | Funcionan | **Requieren plan Pro.** En plan gratuito se ignoran: la sesión no caduca por tiempo ni por inactividad (solo por `jwt_expiry` = 1 h, que se renueva solo con el refresh token) | Confirmar el plan del proyecto en el dashboard. Mientras no sea Pro, la sesión solo termina con "Salir" o si se revoca en el servidor |
+| **Ajustes de Auth de `config.toml`** (`enable_signup`, sesiones, etc.) | Se aplican con `db:start` / `db:reset` | **No se aplican solos.** Ningún workflow del repo los sube; hay que fijarlos en el dashboard (Authentication) o con `supabase config push` | Revisar a mano en staging y prod que **el registro público esté desactivado** (`enable_signup = false`) |
+| **Cabeceras de seguridad / CSP** (`public/_headers`) | No aplican (`npm run dev` no lee ese archivo) | Las aplica Cloudflare Pages | Probar en el preview de cada PR con la consola abierta: un error `Refused to load…` significa que la CSP bloqueó algo. La CSP asume URLs `*.supabase.co` |
+
+Una consecuencia práctica: el comportamiento de sesión que se prueba en
+local (caducidad a las 12 h / 1 h sin uso) puede **no** ser el que ve un
+cliente en el demo desplegado.
 
 ## Estructura del repo
 

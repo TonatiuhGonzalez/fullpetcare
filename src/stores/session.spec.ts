@@ -34,6 +34,7 @@ vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),
   getCurrentUser: vi.fn(),
+  onSessionLost: vi.fn(),
 }))
 vi.mock('@/services/profiles', () => ({
   getProfile: vi.fn(),
@@ -41,13 +42,22 @@ vi.mock('@/services/profiles', () => ({
 vi.mock('@/services/memberships', () => ({
   listMyMemberships: vi.fn(),
 }))
+vi.mock('@/services/permissions', () => ({
+  listForTenant: vi.fn(),
+}))
+vi.mock('@/services/platform', () => ({
+  isPlatformAdmin: vi.fn(),
+}))
 
 // Se importan DESPUÉS de los vi.mock() de arriba — en este punto ya no
 // son las funciones reales, son las versiones falsas (vi.fn()) que se
 // configuran abajo con mockResolvedValue().
-import { signIn, signOut } from '@/services/auth'
+import { getCurrentUser, onSessionLost, signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
+import { listForTenant } from '@/services/permissions'
+import { isPlatformAdmin } from '@/services/platform'
+import type { RolePermissionRow } from '@/lib/permissions'
 
 // Dos membresías de prueba, en tenants distintos — a propósito más de
 // una, para que "si solo hay una opción se elige sola" nunca se cuele
@@ -81,6 +91,12 @@ beforeEach(() => {
   // archivo si no se limpia a mano.
   localStorage.clear()
   vi.clearAllMocks()
+  // Default: sin reglas de permisos configuradas — los tests que no les
+  // interesa este tema no tienen que preocuparse por mockearlo aparte.
+  vi.mocked(listForTenant).mockResolvedValue([])
+  // Default: nadie es superadmin de plataforma — igual que arriba, solo los
+  // tests de la fase 10 lo cambian.
+  vi.mocked(isPlatformAdmin).mockResolvedValue(false)
 })
 
 describe('login', () => {
@@ -163,6 +179,94 @@ describe('logout', () => {
     // el mismo navegador) heredaría esa selección sin querer.
     expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
     expect(localStorage.getItem('fpc.activeBranchId')).toBeNull()
+  })
+
+  it('limpia la sesión local aunque el servidor falle al cerrar sesión', async () => {
+    // Caso: el usuario pulsa "Salir" sin red y signOut() lanza. Antes, reset()
+    // no corría y la persona seguía "dentro" en una recepción compartida.
+    // Ahora la sesión local se limpia siempre y el error se sigue propagando.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+    vi.mocked(signOut).mockRejectedValue(new Error('Failed to fetch'))
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    await expect(store.logout()).rejects.toThrow('Failed to fetch')
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
+  })
+})
+
+describe('pérdida de sesión inesperada', () => {
+  // Captura el callback que el store registra con onSessionLost(), para
+  // poder "disparar" desde el test el evento SIGNED_OUT de supabase-js.
+  function captureSessionLostCallback(): () => void {
+    let callback: () => void = () => {}
+    vi.mocked(onSessionLost).mockImplementation((cb) => {
+      callback = cb
+      return () => {}
+    })
+    return () => callback()
+  }
+
+  async function loginAsOwner(store: ReturnType<typeof useSessionStore>): Promise<void> {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+  }
+
+  it('si supabase-js pierde la sesión, limpia el estado y marca sessionExpired', async () => {
+    // Caso: el servidor cerró la sesión (timebox de 12 h, inactividad de 1 h,
+    // token revocado, o logout en otra pestaña). Sin esto la pantalla seguía
+    // mostrando datos de alguien que ya no tiene acceso, hasta la siguiente
+    // consulta rechazada por RLS.
+    const fireSessionLost = captureSessionLostCallback()
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+    expect(store.isAuthenticated).toBe(true)
+
+    fireSessionLost()
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.memberships).toEqual([])
+    expect(localStorage.getItem('fpc.activeTenantId')).toBeNull()
+    expect(store.sessionExpired).toBe(true)
+  })
+
+  it('un "Salir" normal NO se confunde con una sesión vencida', async () => {
+    // signOut() de supabase-js emite SIGNED_OUT antes de que el store limpie
+    // su estado. Si no se distinguiera, cada logout mostraría al siguiente
+    // login el aviso falso "tu sesión terminó por seguridad".
+    const fireSessionLost = captureSessionLostCallback()
+    vi.mocked(signOut).mockImplementation(async () => fireSessionLost())
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+
+    await store.logout()
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.sessionExpired).toBe(false)
+  })
+
+  it('un nuevo login borra el aviso de sesión vencida', async () => {
+    // Si el aviso se quedara encendido, seguiría apareciendo después de
+    // volver a entrar correctamente.
+    const fireSessionLost = captureSessionLostCallback()
+    const store = useSessionStore()
+    await store.ensureInitialized()
+    await loginAsOwner(store)
+    fireSessionLost()
+    expect(store.sessionExpired).toBe(true)
+
+    await loginAsOwner(store)
+
+    expect(store.sessionExpired).toBe(false)
   })
 })
 
@@ -271,5 +375,143 @@ describe('loadMemberships — selección activa', () => {
 
     expect(store.activeTenantId).toBe('tenant-a')
     expect(store.activeBranchId).toBe('branch-a2')
+  })
+})
+
+describe('permisos por módulo (fase 9)', () => {
+  it('owner puede ver y editar cualquier módulo, sin necesidad de reglas sembradas', async () => {
+    // Mismo bypass que app.has_permission() en Postgres: el dueño nunca
+    // depende de que exista una fila en role_permissions.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.canView('employees')).toBe(true)
+    expect(store.canEdit('employees')).toBe(true)
+  })
+
+  it('un rol sin ninguna regla para ese módulo no lo ve (default: no)', async () => {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'vet@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Dr. Vet', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_B])
+
+    const store = useSessionStore()
+    await store.login('vet@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.canView('employees')).toBe(false)
+  })
+
+  it('cambiar de tenant recarga las reglas del negocio nuevo — mismo rol, resultado distinto', async () => {
+    // Esta es la prueba de que el store no "recuerda" el permiso del
+    // tenant anterior: si role_permissions de tenant-b le da
+    // "employees:view" a vet pero tenant-a nunca lo configuró, cambiar
+    // de negocio SIN cerrar sesión debe reflejar la regla del NUEVO
+    // tenant activo, no arrastrar la de antes.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
+
+    const rowsForTenantB: RolePermissionRow[] = [
+      { role: 'vet', module: 'employees', canView: true, canEdit: false },
+    ]
+    vi.mocked(listForTenant).mockImplementation(async (tenantId: string) =>
+      tenantId === 'tenant-b' ? rowsForTenantB : [],
+    )
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    await store.selectTenant('tenant-a')
+    expect(store.canView('employees')).toBe(true) // owner: siempre true
+
+    await store.selectTenant('tenant-b')
+    expect(store.role).toBe('vet')
+    expect(store.canView('employees')).toBe(true) // fila explícita, sembrada para tenant-b
+    expect(store.canEdit('employees')).toBe(false)
+  })
+})
+
+describe('superadmin de plataforma (fase 10)', () => {
+  const ADMIN = { id: 'admin-1', email: 'superadmin@fullpetcare.mx' }
+
+  function mockAdminSession() {
+    vi.mocked(signIn).mockResolvedValue(ADMIN)
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([])
+    vi.mocked(isPlatformAdmin).mockResolvedValue(true)
+  }
+
+  it('un superadmin queda marcado y NO se le pide elegir negocio', async () => {
+    // Un superadmin no pertenece a ningún negocio (memberships vacío). Sin
+    // la excepción en needsBusinessSelection, el router lo mandaría a
+    // "seleccionar negocio", una pantalla vacía de la que no puede salir:
+    // no podría entrar nunca a /superadmin.
+    mockAdminSession()
+
+    const store = useSessionStore()
+    await store.login(ADMIN.email, 'Demo1234!')
+
+    expect(store.isPlatformAdmin).toBe(true)
+    expect(store.memberships).toEqual([])
+    expect(store.needsBusinessSelection).toBe(false)
+    expect(isPlatformAdmin).toHaveBeenCalledWith('admin-1')
+  })
+
+  it('control: un usuario normal NO es superadmin y sí debe elegir negocio', async () => {
+    // Sin este control, el test anterior pasaría igual si
+    // needsBusinessSelection dejara de exigir elegir negocio a TODOS.
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.isPlatformAdmin).toBe(false)
+    expect(store.needsBusinessSelection).toBe(true)
+  })
+
+  it('cerrar sesión borra la marca de superadmin', async () => {
+    // Si sobreviviera al logout, la siguiente persona que iniciara sesión
+    // en el mismo navegador vería /superadmin hasta recargar la página.
+    mockAdminSession()
+    const store = useSessionStore()
+    await store.login(ADMIN.email, 'Demo1234!')
+
+    await store.logout()
+
+    expect(store.isPlatformAdmin).toBe(false)
+  })
+
+  it('al recargar la página se restaura la marca de superadmin junto con la sesión', async () => {
+    // Un superadmin que recarga /superadmin no debe ser expulsado: la
+    // marca se recalcula desde el servidor en ensureInitialized, no se
+    // guarda en localStorage (donde cualquiera podría editarla).
+    mockAdminSession()
+    vi.mocked(getCurrentUser).mockResolvedValue(ADMIN)
+
+    const store = useSessionStore()
+    await store.ensureInitialized()
+
+    expect(store.isPlatformAdmin).toBe(true)
+    expect(store.needsBusinessSelection).toBe(false)
+  })
+
+  it('si no se puede confirmar si es superadmin, el login falla en vez de dejarlo a medias', async () => {
+    // Fallar cerrado: ante un error de red no se asume "no es superadmin"
+    // en silencio (lo dejaría en un limbo sin negocio y sin panel), se
+    // muestra el error como cualquier otro fallo de login.
+    vi.mocked(signIn).mockResolvedValue(ADMIN)
+    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(isPlatformAdmin).mockRejectedValue(new Error('network'))
+
+    const store = useSessionStore()
+    await expect(store.login(ADMIN.email, 'Demo1234!')).rejects.toThrow('network')
+
+    expect(store.status).toBe('error')
+    expect(store.isPlatformAdmin).toBe(false)
   })
 })

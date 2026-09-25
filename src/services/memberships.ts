@@ -45,6 +45,12 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
     )
     .eq('user_id', userId)
     .eq('is_active', true)
+    // membership_branches_select (fase 9, migración
+    // fix_membership_branches_select_for_soft_delete.sql) ya no filtra
+    // "deleted_at is null" — la trampa de CLAUDE.md §7.2, ahora que esa
+    // tabla tiene UPDATE para authenticated. El filtro se hace aquí,
+    // explícito, igual que ya hacen customers.ts/pets.ts.
+    .is('membership_branches.deleted_at', null)
 
   if (error) throw error
 
@@ -120,6 +126,9 @@ export async function listBranchEmployees(
     )
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
+    // Ver el comentario de listMyMemberships(): mismo filtro explícito,
+    // ahora necesario porque membership_branches_select ya no lo hace.
+    .is('membership_branches.deleted_at', null)
 
   if (error) throw error
 
