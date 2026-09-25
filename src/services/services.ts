@@ -48,13 +48,14 @@ export async function update(id: string, changes: ServiceUpdate): Promise<Servic
 }
 
 /**
- * "Desactivar" es DISTINTO de borrar (ver el comentario en la migración
- * services.sql): el servicio sigue existiendo — las citas viejas que lo
- * usaron conservan su nombre y precio vía `*_snapshot` — solo deja de
- * ofrecerse para agendar uno nuevo.
+ * Activa o desactiva un servicio (el switch de CatalogPage). "Desactivar"
+ * es DISTINTO de borrar (ver el comentario en la migración services.sql):
+ * el servicio sigue existiendo — las citas viejas que lo usaron conservan
+ * su nombre y precio vía `*_snapshot` — solo deja de ofrecerse para
+ * agendar uno nuevo. Reactivarlo lo vuelve a ofrecer.
  */
-export async function deactivate(id: string): Promise<void> {
-  const { error } = await supabase.from('services').update({ is_active: false }).eq('id', id)
+export async function setActive(id: string, isActive: boolean): Promise<void> {
+  const { error } = await supabase.from('services').update({ is_active: isActive }).eq('id', id)
 
   if (error) throw error
 }

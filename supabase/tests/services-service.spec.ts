@@ -98,10 +98,11 @@ describe('services/services.ts contra Supabase local', () => {
     expect(veterinary.some((s) => s.name === 'Consulta general')).toBe(true)
   })
 
-  it('deactivate apaga is_active pero el servicio sigue en listByKind', async () => {
+  it('setActive(false) apaga is_active pero el servicio sigue en listByKind', async () => {
     // "Desactivar" no es borrar (CLAUDE.md, migración services.sql): las
     // citas viejas que usaron este servicio necesitan que siga
-    // existiendo, solo ya no se ofrece para agendar una cita nueva.
+    // existiendo, solo ya no se ofrece para agendar una cita nueva. Si
+    // el switch borrara la fila, esas citas perderían su servicio.
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: DUENO_EMAIL,
       password: DUENO_PASSWORD,
@@ -118,11 +119,38 @@ describe('services/services.ts contra Supabase local', () => {
     })
     createdIds.push(created.id)
 
-    await servicesService.deactivate(created.id)
+    await servicesService.setActive(created.id, false)
 
     const list = await servicesService.listByKind(TENANT_PATITAS, 'veterinary')
     const found = list.find((s) => s.id === created.id)
     expect(found).toBeDefined()
     expect(found?.is_active).toBe(false)
+  })
+
+  it('setActive(true) reactiva un servicio desactivado', async () => {
+    // Con el checkbox fuera del dialog, el switch de CatalogPage es la
+    // ÚNICA forma de reactivar. Si esto fallara, un servicio desactivado
+    // por error quedaría fuera del agendado para siempre.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const created = await servicesService.create({
+      tenant_id: TENANT_PATITAS,
+      kind: 'veterinary',
+      name: 'Servicio a reactivar',
+      duration_minutes: 20,
+      price_cents: 15000,
+      tax_rate_bp: 1600,
+    })
+    createdIds.push(created.id)
+
+    await servicesService.setActive(created.id, false)
+    await servicesService.setActive(created.id, true)
+
+    const list = await servicesService.listByKind(TENANT_PATITAS, 'veterinary')
+    expect(list.find((s) => s.id === created.id)?.is_active).toBe(true)
   })
 })

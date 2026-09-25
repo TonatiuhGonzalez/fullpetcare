@@ -26,7 +26,6 @@ const isEditing = computed(() => props.service != null)
 const name = ref('')
 const durationMinutes = ref<number | null>(null)
 const priceInPesos = ref<number | null>(null)
-const isActive = ref(true)
 
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -39,7 +38,6 @@ watch(
     name.value = s?.name ?? ''
     durationMinutes.value = s?.duration_minutes ?? null
     priceInPesos.value = s ? s.price_cents / 100 : null
-    isActive.value = s?.is_active ?? true
     errorMessage.value = null
   },
 )
@@ -58,7 +56,6 @@ async function handleSubmit(): Promise<void> {
       name: name.value,
       duration_minutes: durationMinutes.value,
       price_cents: pesosToCents(priceInPesos.value),
-      is_active: isActive.value,
     }
 
     const saved = props.service
@@ -117,13 +114,6 @@ async function handleSubmit(): Promise<void> {
               />
             </v-col>
           </v-row>
-
-          <v-checkbox
-            v-if="isEditing"
-            v-model="isActive"
-            label="Activo (se ofrece para agendar)"
-            density="compact"
-          />
 
           <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-2">
             {{ errorMessage }}
