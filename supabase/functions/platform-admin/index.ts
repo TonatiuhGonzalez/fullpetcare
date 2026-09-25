@@ -9,7 +9,7 @@
 // superadmin?" — tres funciones serían tres copias de esa revalidación, y
 // la que se olvide de ella es una puerta abierta.
 //
-//   POST { action: 'create_tenant',   tenantName, branchName, ownerFullName, ownerEmail, ownerPhone? }
+//   POST { action: 'create_tenant',   tenantName, branchName, ownerFullName, ownerEmail, ownerPhone?, isDemo? }
 //        → { tenantId, ownerUserId, temporaryPassword }
 //   POST { action: 'reset_password',  tenantId }
 //        → { ownerEmail, temporaryPassword, sessionsRevoked }
@@ -60,6 +60,7 @@ type Body =
       ownerFullName: string;
       ownerEmail: string;
       ownerPhone: string | null;
+      isDemo: boolean;
     }
   | { action: "reset_password"; tenantId: string }
   | { action: "add_admin"; fullName: string; email: string };
@@ -95,6 +96,8 @@ function parseBody(value: unknown): Body | null {
         ownerFullName,
         ownerEmail,
         ownerPhone: text(raw.ownerPhone),
+        // Solo `true` estricto marca demo; cualquier otra cosa (falta, "true", 1) es false.
+        isDemo: raw.isDemo === true,
       };
     }
     case "reset_password": {
@@ -238,6 +241,7 @@ Deno.serve(async (req) => {
         p_branch_name: body.branchName,
         p_owner_full_name: body.ownerFullName,
         p_owner_phone: body.ownerPhone,
+        p_is_demo: body.isDemo,
       });
 
       if (error) {

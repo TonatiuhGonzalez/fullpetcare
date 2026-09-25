@@ -196,6 +196,31 @@ describe('platform-admin: create_tenant', () => {
     })
   })
 
+  it.each([
+    ['isDemo: true', { isDemo: true }, true],
+    ['sin isDemo', {}, false],
+    ["isDemo: 'true' (texto, no booleano)", { isDemo: 'true' }, false],
+  ])('marca la empresa como demo solo con %s', async (_label, extra, expected) => {
+    // Es la marca que usa demo:reset para decidir qué ocultar. Solo el
+    // booleano `true` la activa: cualquier otra cosa (falta, texto, número)
+    // deja la empresa como REAL. Si un valor raro la marcara como demo, un
+    // cliente real podría desaparecer en el siguiente reset.
+    const admin = await createSuperadmin()
+    const ownerEmail = uniqueEmail('dueno.demo')
+
+    const result = await call({ ...validCreateTenant(ownerEmail), ...extra }, admin.token)
+    expect(result.status).toBe(200)
+    created.tenantIds.add(result.body.tenantId as string)
+    created.userIds.add(result.body.ownerUserId as string)
+
+    const { rows } = await withTransaction((client) =>
+      client.query('select is_demo from tenant_platform_info where tenant_id = $1', [
+        result.body.tenantId,
+      ]),
+    )
+    expect(rows).toEqual([{ is_demo: expected }])
+  })
+
   it('un correo YA registrado se rechaza con 409 y NO toca la cuenta existente', async () => {
     // Decisión 3 de la fase: aquí se le pone una contraseña nueva al
     // usuario, y hacerlo sobre una cuenta que ya existe (p. ej. el dueño

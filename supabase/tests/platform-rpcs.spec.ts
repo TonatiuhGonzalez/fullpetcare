@@ -609,4 +609,70 @@ describe('platform_create_tenant()', () => {
       expect(audit.rows).toEqual([{ action: 'INSERT', actor_user_id: USER_SUPERADMIN }])
     })
   })
+
+  it('sin indicarlo, la empresa nace como real (is_demo = false)', async () => {
+    // El default en false es la garantía de seguridad de demo:reset: si el
+    // formulario o la Edge Function olvidan mandar la marca, la empresa se
+    // trata como cliente REAL y el reset no la oculta. Si este test fallara
+    // (default true), un cliente real desaparecería de la lista en el
+    // siguiente reset.
+    await withTransaction(async (client) => {
+      await insertAuthUser(client, USER_NUEVO_DUENO, 'nuevo.dueno@example.test')
+      await asSuperadmin(client)
+
+      const created = await client.query(
+        "select (platform_create_tenant($1, 'Cliente Real SA', 'Matriz', 'Ana', null)).id as tenant_id",
+        [USER_NUEVO_DUENO],
+      )
+
+      await client.query('reset role')
+      const info = await client.query('select is_demo from tenant_platform_info where tenant_id = $1', [
+        created.rows[0].tenant_id,
+      ])
+      expect(info.rows).toEqual([{ is_demo: false }])
+    })
+  })
+
+  it('con p_is_demo = true la empresa queda marcada como de demostración', async () => {
+    // Es la otra mitad: sin esta marca, las empresas que se crean en una
+    // demo nunca se limpiarían solas y la lista del superadmin se llenaría
+    // de basura de presentaciones anteriores.
+    await withTransaction(async (client) => {
+      await insertAuthUser(client, USER_NUEVO_DUENO, 'nuevo.dueno@example.test')
+      await asSuperadmin(client)
+
+      const created = await client.query(
+        "select (platform_create_tenant($1, 'Empresa Demo', 'Matriz', 'Ana', null, true)).id as tenant_id",
+        [USER_NUEVO_DUENO],
+      )
+
+      await client.query('reset role')
+      const info = await client.query('select is_demo from tenant_platform_info where tenant_id = $1', [
+        created.rows[0].tenant_id,
+      ])
+      expect(info.rows).toEqual([{ is_demo: true }])
+    })
+  })
+
+  it('un NULL explícito en p_is_demo no marca la empresa como demo', async () => {
+    // Borde: si algún cliente manda null en vez de omitir el parámetro, el
+    // `coalesce` lo trata como false. Sin él, `if null` en plpgsql se
+    // comporta como falso de todos modos, pero este test fija que así sea
+    // a propósito y no por accidente.
+    await withTransaction(async (client) => {
+      await insertAuthUser(client, USER_NUEVO_DUENO, 'nuevo.dueno@example.test')
+      await asSuperadmin(client)
+
+      const created = await client.query(
+        "select (platform_create_tenant($1, 'Empresa Nula', 'Matriz', 'Ana', null, null)).id as tenant_id",
+        [USER_NUEVO_DUENO],
+      )
+
+      await client.query('reset role')
+      const info = await client.query('select is_demo from tenant_platform_info where tenant_id = $1', [
+        created.rows[0].tenant_id,
+      ])
+      expect(info.rows).toEqual([{ is_demo: false }])
+    })
+  })
 })

@@ -562,8 +562,11 @@ de construir:
      resuelve Kong); en Supabase hospedado no está verificado.
   3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
      para el script de superadmin, unitarios sin `.env.local`).
-  4. `demo:reset` oculta toda empresa fuera de la semilla: acotarlo antes de que entre el
-     primer cliente real (CLAUDE.md §10).
+  4. ~~`demo:reset` oculta toda empresa fuera de la semilla~~ **Resuelto:** columna
+     `tenant_platform_info.is_demo` (default `false`), casilla "Empresa de demostración" en
+     el alta, y el reset solo oculta las marcadas (migración `20260925120000_tenant_is_demo.sql`,
+     tests en `demo-reset.spec.ts` y `platform-rpcs.spec.ts`). Pendiente menor: la lista del
+     panel no muestra qué empresas son demo.
 
 **Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
 ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
