@@ -42,6 +42,8 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 
+import { handleCors } from "../_shared/cors.ts";
+
 // Mismo criterio que INVALID_TOKEN_RESPONSE en public-pet-view: un solo
 // mensaje genérico para "no tienes permiso", sin importar si la razón es
 // que no eres miembro del negocio, o que tu rol no tiene el permiso
@@ -66,7 +68,7 @@ function parseBody(value: unknown): InviteEmployeeBody | null {
   return { tenantId, email: email.trim().toLowerCase(), fullName: fullName.trim() };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(handleCors(async (req) => {
   if (req.method !== "POST") {
     return Response.json({ message: "Método no permitido." }, { status: 405 });
   }
@@ -202,4 +204,4 @@ Deno.serve(async (req) => {
   }
 
   return Response.json({ userId: existing.id });
-});
+}));

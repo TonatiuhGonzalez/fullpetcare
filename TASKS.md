@@ -558,8 +558,13 @@ de construir:
      también despliega `invite-employee` y `platform-admin` (mismo patrón, con
      `verify_jwt = true` de `config.toml`). Sin probar en la nube: solo corre al mergear
      a `main`.
-  2. CORS: ninguna de las dos funciones con sesión maneja el preflight (en local lo
-     resuelve Kong); en Supabase hospedado no está verificado.
+  2. ~~CORS: ninguna de las dos funciones con sesión maneja el preflight~~ **Resuelto en
+     código, sin verificar en la nube:** `supabase/functions/_shared/cors.ts` contesta el
+     `OPTIONS` (204) y añade `Access-Control-Allow-*` a toda respuesta de `invite-employee`
+     y `platform-admin`; probado como función pura en `functions-cors.spec.ts` (por HTTP en
+     local no sirve: Kong contesta antes). **Falta comprobarlo contra staging o prod** tras
+     el primer despliegue: que el preflight pase con `verify_jwt = true` y que el deploy
+     empaquete el import `../_shared/cors.ts`.
   3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
      para el script de superadmin, unitarios sin `.env.local`).
   4. ~~`demo:reset` oculta toda empresa fuera de la semilla~~ **Resuelto:** columna
