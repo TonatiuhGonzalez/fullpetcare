@@ -47,3 +47,50 @@ export function onSessionLost(callback: () => void): () => void {
   })
   return () => data.subscription.unsubscribe()
 }
+
+/**
+ * La contraseña actual que escribió la persona no es la correcta. Clase
+ * propia (no un Error suelto) para que la UI la distinga de "no hay red" o
+ * "contraseña débil" y ponga el mensaje en el campo correcto.
+ */
+export class InvalidCurrentPasswordError extends Error {
+  constructor() {
+    super('La contraseña actual no es correcta.')
+    this.name = 'InvalidCurrentPasswordError'
+  }
+}
+
+/**
+ * Cambia la contraseña de la persona con sesión abierta.
+ *
+ * Pasos, y por qué cada uno:
+ * 1. Verifica la contraseña ACTUAL volviendo a iniciar sesión con ella.
+ *    `auth.updateUser` por sí solo NO la pide (basta con tener sesión), así
+ *    que sin este paso una sesión olvidada en un equipo compartido bastaría
+ *    para quedarse con la cuenta. Iniciar sesión otra vez con el mismo
+ *    usuario solo renueva la sesión; no cambia quién es.
+ * 2. Cambia la contraseña.
+ * 3. Cierra las OTRAS sesiones de esa cuenta (otros navegadores/equipos),
+ *    no la actual: si alguien más tenía la contraseña vieja, queda fuera. Si
+ *    este paso falla, la contraseña YA cambió: se registra y no se lanza,
+ *    para no decirle a la persona que falló algo que sí se hizo.
+ */
+export async function changePassword(
+  email: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  })
+  if (verifyError) throw new InvalidCurrentPasswordError()
+
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+  if (updateError) throw updateError
+
+  const { error: othersError } = await supabase.auth.signOut({ scope: 'others' })
+  if (othersError) {
+    console.error('changePassword: no se pudieron cerrar las otras sesiones', othersError)
+  }
+}

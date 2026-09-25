@@ -3,15 +3,19 @@
 // (Empresas y Superadmins) y la salida. A diferencia de AppLayout.vue no hay
 // negocio ni sucursal activos: un superadmin no pertenece a ninguno
 // (PLAN.md D14), así que aquí no existe selector de sucursal.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const router = useRouter()
 
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
+
+const showChangePassword = ref(false)
+const passwordChangedNotice = ref(false)
 
 async function handleLogout(): Promise<void> {
   // "finally": aunque el servidor no responda, la sesión local ya se limpió
@@ -39,8 +43,24 @@ async function handleLogout(): Promise<void> {
          escritorio (solo la vista pública de mascotas es mobile-first). -->
     <v-chip class="mr-4 d-none d-sm-flex" size="small" variant="tonal">Superadmin</v-chip>
     <span class="mr-2 text-body-2 d-none d-md-inline">{{ userLabel }}</span>
+    <v-btn
+      icon="mdi-lock-reset"
+      variant="text"
+      title="Cambiar contraseña"
+      @click="showChangePassword = true"
+    />
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
+
+  <ChangePasswordDialog
+    v-model="showChangePassword"
+    :email="session.user?.email ?? ''"
+    @changed="passwordChangedNotice = true"
+  />
+
+  <v-snackbar v-model="passwordChangedNotice" color="success" :timeout="4000">
+    Contraseña actualizada.
+  </v-snackbar>
 
   <v-main>
     <router-view />

@@ -6,6 +6,8 @@ import {
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
+  MIN_PASSWORD_LENGTH,
+  passwordChangeProblems,
 } from './validation'
 
 describe('isValidEmail', () => {
@@ -162,5 +164,53 @@ describe('isValidPostalCode', () => {
 
   it('rechaza letras', () => {
     expect(isValidPostalCode('0310A')).toBe(false)
+  })
+})
+
+describe('passwordChangeProblems', () => {
+  const valid = { current: 'Temporal123', next: 'MiNuevaClave9', confirm: 'MiNuevaClave9' }
+
+  it('no reporta problemas cuando todo está bien', () => {
+    // Camino feliz mínimo: si esto fallara, nadie podría cambiar su
+    // contraseña aunque escribiera todo correcto.
+    expect(passwordChangeProblems(valid)).toEqual({})
+  })
+
+  it('exige la contraseña actual', () => {
+    // Sin pedirla, cualquiera que encuentre una sesión abierta en un equipo
+    // compartido (la recepción de la veterinaria) podría cambiar la
+    // contraseña del dueño y dejarlo fuera.
+    expect(passwordChangeProblems({ ...valid, current: '' }).current).toBeDefined()
+  })
+
+  it('rechaza una contraseña nueva más corta que el mínimo', () => {
+    // Borde: exactamente MIN-1 caracteres falla y exactamente MIN pasa.
+    const short = 'a'.repeat(MIN_PASSWORD_LENGTH - 1)
+    const exact = 'a'.repeat(MIN_PASSWORD_LENGTH)
+    expect(passwordChangeProblems({ ...valid, next: short, confirm: short }).next).toBeDefined()
+    expect(passwordChangeProblems({ ...valid, next: exact, confirm: exact }).next).toBeUndefined()
+  })
+
+  it('rechaza una contraseña nueva igual a la actual', () => {
+    // Cambiar la contraseña por la misma no cambia nada, pero la persona
+    // creería que ya se renovó. Con una temporal, sería dejar la que
+    // el superadmin ya vio.
+    const same = 'Temporal123'
+    expect(passwordChangeProblems({ current: same, next: same, confirm: same }).next).toBeDefined()
+  })
+
+  it('rechaza una confirmación que no coincide', () => {
+    // El error de dedo clásico: si no se pide confirmar, una contraseña
+    // mal escrita se guarda y la persona queda fuera de su cuenta.
+    expect(passwordChangeProblems({ ...valid, confirm: 'MiNuevaClave8' }).confirm).toBeDefined()
+  })
+
+  it('con todo vacío marca la actual, la nueva y no confunde "igual" con "falta"', () => {
+    // Borde: formulario recién abierto y enviado. Dos vacíos son "iguales",
+    // pero el mensaje útil es "escribe tu contraseña actual", no "es igual".
+    const problems = passwordChangeProblems({ current: '', next: '', confirm: '' })
+    expect(problems.current).toBe('Escribe tu contraseña actual.')
+    expect(problems.next).toContain('al menos')
+    expect(problems.confirm).toBeUndefined()
   })
 })
