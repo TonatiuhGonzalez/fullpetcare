@@ -278,9 +278,14 @@ describe('platform_remove_admin()', () => {
       await client.query('select platform_add_admin($1)', [USER_SUPERADMIN_2])
       await client.query('select platform_remove_admin($1)', [USER_SUPERADMIN_2])
 
+      // Se ordena por `action` (INSERT antes que UPDATE en el enum) y no por
+      // `changed_at`: dentro de una transacción now() es el mismo instante para
+      // todas las filas, así que ordenar por fecha deja el orden al azar y el
+      // test pasaba en local pero fallaba en CI.
       const { rows } = await client.query(
         `select action, actor_user_id from platform_audit_log
-         where table_name = 'platform_admins' and actor_user_id is not null order by changed_at`,
+         where table_name = 'platform_admins' and actor_user_id is not null
+         order by action`,
       )
       expect(rows).toEqual([
         { action: 'INSERT', actor_user_id: USER_SUPERADMIN },
