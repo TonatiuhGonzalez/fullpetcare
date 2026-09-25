@@ -556,17 +556,26 @@ de construir:
   **Pendientes que quedan abiertos (decisión del usuario, no se tocaron):**
   1. ~~`deploy-functions.yml` solo desplegaba `public-pet-view`~~ **Resuelto:** ahora
      también despliega `invite-employee` y `platform-admin` (mismo patrón, con
-     `verify_jwt = true` de `config.toml`). Sin probar en la nube: solo corre al mergear
-     a `main`.
+     `verify_jwt = true` de `config.toml`). **Verificado en la nube (2026-09-25):** al
+     mergear el PR #50 a `main`, "Desplegar Edge Functions a producción" y "Desplegar
+     migraciones a producción" terminaron en verde (11 migraciones aplicadas en prod).
   2. ~~CORS: ninguna de las dos funciones con sesión maneja el preflight~~ **Resuelto en
-     código, sin verificar en la nube:** `supabase/functions/_shared/cors.ts` contesta el
+     código y verificado en la nube (2026-09-25):** `supabase/functions/_shared/cors.ts` contesta el
      `OPTIONS` (204) y añade `Access-Control-Allow-*` a toda respuesta de `invite-employee`
      y `platform-admin`; probado como función pura en `functions-cors.spec.ts` (por HTTP en
-     local no sirve: Kong contesta antes). **Falta comprobarlo contra staging o prod** tras
-     el primer despliegue: que el preflight pase con `verify_jwt = true` y que el deploy
-     empaquete el import `../_shared/cors.ts`.
-  3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
-     para el script de superadmin, unitarios sin `.env.local`).
+     local no sirve: Kong contesta antes). Ya en prod, un `OPTIONS` sin JWT a
+     `platform-admin` y a `invite-employee` responde 204 con `Access-Control-Allow-Origin`,
+     así que el preflight pasa con `verify_jwt = true` y el deploy sí empaquetó
+     `../_shared/cors.ts`.
+  3. ~~No se pudo comprobar el CI real desde aquí~~ **Resuelto:** el PR #50
+     (`develop` → `main`) pasó "Lint y pruebas" y "E2E (Playwright)" en GitHub Actions, y el
+     CI de `main` posterior también.
+
+  **Comprobado en producción (2026-09-25):** el primer superadmin se creó con
+  `npm run superadmin:create` contra `fullpetcare-prod` (con la llave `sb_secret_`; el
+  script no necesitó ajustes), entró a `/superadmin`, y el alta de una empresa de prueba
+  funcionó de punta a punta. Sin comprobar todavía en prod: `reset_password` de un dueño e
+  `invite-employee`.
   4. ~~`demo:reset` oculta toda empresa fuera de la semilla~~ **Resuelto:** columna
      `tenant_platform_info.is_demo` (default `false`), casilla "Empresa de demostración" en
      el alta, y el reset solo oculta las marcadas (migración `20260925120000_tenant_is_demo.sql`,
