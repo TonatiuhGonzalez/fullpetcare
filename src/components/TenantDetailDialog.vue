@@ -248,9 +248,11 @@ async function confirmReset(): Promise<void> {
       email: result.ownerEmail,
       password: result.temporaryPassword,
       // La contraseña YA cambió aunque esto falle: se avisa, no se oculta.
-      warning: result.sessionsRevoked
-        ? null
-        : 'La contraseña cambió, pero no se pudieron cerrar las sesiones que el dueño tenía abiertas.',
+      warning: !result.sessionsRevoked
+        ? 'La contraseña cambió, pero no se pudieron cerrar las sesiones que el dueño tenía abiertas.'
+        : !result.mustChangeEnforced
+          ? 'La contraseña cambió, pero no se pudo exigir que el dueño la cambie al entrar.'
+          : null,
     }
     passwordDialogOpen.value = true
     emit('changed')

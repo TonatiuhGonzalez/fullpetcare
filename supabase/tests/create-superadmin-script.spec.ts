@@ -90,6 +90,13 @@ describe('create-superadmin --local', () => {
 
     const { client, error } = await signIn(email, password!)
     expect(error).toBeNull()
+    // La contraseña impresa es temporal: el script marca la cuenta y la base
+    // no la deja administrar la plataforma hasta que la cambie. Si el script
+    // olvidara la marca, el primer superadmin de producción seguiría con la
+    // contraseña impresa en la terminal para siempre.
+    expect((await client.rpc('platform_list_admins')).error).not.toBeNull()
+    await client.auth.updateUser({ password: 'ContraseñaPropia9' })
+
     const { data: admins, error: rpcError } = await client.rpc('platform_list_admins')
     expect(rpcError).toBeNull()
     expect((admins as { email: string; full_name: string }[]).find((a) => a.email === email)).toMatchObject({

@@ -130,6 +130,10 @@ const createResponse = await fetch(`${baseUrl}/auth/v1/admin/users`, {
     // `full_name` es lo que lee el trigger app.handle_new_auth_user() para
     // crear el profile.
     user_metadata: { full_name: fullName },
+    // Contraseña temporal: el trigger de alta marca el profile y la persona
+    // debe cambiarla en su primer inicio de sesión. app_metadata solo la
+    // escribe la llave service_role (el usuario no puede quitársela).
+    app_metadata: { must_change_password: true },
   }),
 }).catch((error) => fail(`No se pudo conectar a ${baseUrl}: ${error.message}`))
 
@@ -177,5 +181,6 @@ Superadmin creado.
   Correo:               ${email}
   Contraseña temporal:  ${password}
 
-Cópiala ahora: no se puede volver a ver. Entra en /login con ese correo.
+Cópiala ahora: no se puede volver a ver. Entra en /login con ese correo;
+el sistema le pedirá cambiarla en el primer inicio de sesión.
 `)

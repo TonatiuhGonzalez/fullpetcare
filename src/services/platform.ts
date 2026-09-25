@@ -88,6 +88,8 @@ export interface ResetPasswordResult {
   temporaryPassword: string
   /** false si la contraseña cambió pero no se pudieron cerrar las sesiones abiertas. */
   sessionsRevoked: boolean
+  /** false si la contraseña cambió pero no se pudo exigir el cambio en el primer ingreso. */
+  mustChangeEnforced: boolean
 }
 
 export interface NewAdminResult {
