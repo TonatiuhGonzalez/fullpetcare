@@ -29,6 +29,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSessionStore } from './session'
 import type { MembershipSummary } from '@/services/memberships'
+import type { TenantNotice } from '@/services/tenantAccess'
 
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
@@ -642,7 +643,7 @@ describe('avisos de acceso (#1905)', () => {
     graceEndsAt: null,
   }
 
-  async function loginWith(memberships: MembershipSummary[], notices = [BLOCKED]) {
+  async function loginWith(memberships: MembershipSummary[], notices: TenantNotice[] = [BLOCKED]) {
     vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'x@y.mx' })
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Ana',
