@@ -30,6 +30,18 @@ del proyecto local al terminar — también se pueden consultar después con
 `supabase status`. La primera vez descarga varias imágenes de Docker y
 tarda unos minutos; las siguientes es cuestión de segundos.
 
+`db:start` **no** levanta las Edge Functions. Si vas a usar algo que pasa por
+una (crear empresas en `/superadmin`, invitar empleados, la vista pública de
+la mascota), abre otra terminal y déjala corriendo:
+
+```bash
+supabase functions serve        # sirve invite-employee, platform-admin y public-pet-view
+```
+
+Sin ese proceso, las llamadas a `/functions/v1/...` fallan con `503 name
+resolution failed`. Hay que volver a levantarlo después de cada `db:stop`
+o `db:reset`. Recarga solo al editar el código de una función.
+
 ### Usuarios de demo (solo en local, ver `supabase/seed.sql`)
 
 Los cuatro tienen la misma contraseña: `Demo1234!`
