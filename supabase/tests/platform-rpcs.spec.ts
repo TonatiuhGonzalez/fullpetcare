@@ -52,10 +52,24 @@ const ALL_RPC_CALLS: [string, string, unknown[]][] = [
   ['platform_tenant_metrics', 'select * from platform_tenant_metrics($1)', [TENANT_PATITAS]],
   [
     'platform_set_tenant_status',
-    "select * from platform_set_tenant_status($1, 'suspended', 'prueba')",
+    `select * from platform_set_tenant_status($1, 'suspended', (select id from cancellation_reasons where kind = 'non_payment'), 'prueba')`,
     [TENANT_PATITAS],
   ],
-  ['platform_update_notes', "select * from platform_update_notes($1, 'x')", [TENANT_PATITAS]],
+  [
+    'platform_create_reason',
+    "select * from platform_create_reason('Motivo de prueba')",
+    [],
+  ],
+  [
+    'platform_update_reason',
+    "select * from platform_update_reason((select id from cancellation_reasons limit 1), 'X', true)",
+    [],
+  ],
+  [
+    'platform_update_notes',
+    "select * from platform_update_notes($1, 'x')",
+    [TENANT_PATITAS],
+  ],
   [
     'platform_create_tenant',
     "select * from platform_create_tenant($1, 'Intruso SA', 'Matriz', 'Intruso', null)",
@@ -353,52 +367,97 @@ describe('platform_tenant_metrics()', () => {
 })
 
 describe('platform_set_tenant_status()', () => {
-  it('suspender guarda el estado y el motivo (sin espacios sobrantes)', async () => {
-    // El motivo es lo que hace útil la bitácora ("¿por qué se suspendió
-    // esta cuenta hace tres meses?").
+  it('suspender guarda el motivo público (copia del catálogo) y el comentario interno', async () => {
+    // El motivo público es lo que verá el cliente; el comentario es solo del
+    // superadmin. Si se mezclaran, el cliente leería notas internas.
     await withTransaction(async (client) => {
       await asSuperadmin(client)
       const { rows } = await client.query(
-        "select status, status_reason from platform_set_tenant_status($1, 'suspended', '  Falta de pago  ')",
+        `select status, public_reason, status_reason
+           from platform_set_tenant_status($1, 'suspended', (select id from cancellation_reasons where kind = 'non_payment'), '  Debe 2 meses  ')`,
         [TENANT_PATITAS],
       )
-      expect(rows).toEqual([{ status: 'suspended', status_reason: 'Falta de pago' }])
+      expect(rows).toEqual([
+        {
+          status: 'suspended',
+          public_reason: 'Falta de pago',
+          status_reason: 'Debe 2 meses',
+        },
+      ])
+    })
+  })
+
+  it('el comentario interno es opcional', async () => {
+    // Exigirlo obligaría a inventar texto; lo importante es el motivo público.
+    await withTransaction(async (client) => {
+      await asSuperadmin(client)
+      const { rows } = await client.query(
+        `select status_reason from platform_set_tenant_status($1, 'closed', (select id from cancellation_reasons where kind = 'non_payment'), '  ')`,
+        [TENANT_PATITAS],
+      )
+      expect(rows).toEqual([{ status_reason: null }])
     })
   })
 
   it.each([
-    ['suspended', "'   '"],
     ['suspended', 'null'],
-    ['closed', "''"],
-  ])('%s con motivo %s se rechaza', async (status, reason) => {
-    // Sin motivo obligatorio, la bitácora se llenaría de "suspendido"
-    // sin explicación, justo cuando más se necesita saber por qué.
+    ['closed', 'null'],
+  ])('%s sin motivo público (%s) se rechaza', async (status, reason) => {
+    // Sin motivo, el cliente vería un bloqueo sin explicación: justo lo que
+    // este diseño quiere evitar.
     await withTransaction(async (client) => {
       await asSuperadmin(client)
       expect(
         await tryQuery(
           client,
-          `select * from platform_set_tenant_status($1, '${status}', ${reason})`,
+          `select * from platform_set_tenant_status($1, '${status}', ${reason}, null)`,
           [TENANT_PATITAS],
         ),
-      ).toMatch(/Indica el motivo/i)
+      ).toMatch(/Elige el motivo/i)
     })
   })
 
-  it('reactivar limpia el motivo (el anterior queda en la bitácora)', async () => {
-    // Si el motivo viejo se quedara, un negocio "activo" mostraría
-    // "Falta de pago" en su detalle. Pero tampoco se pierde: el UPDATE lo
-    // deja en old_data de platform_audit_log.
+  it('un motivo desactivado o inexistente se rechaza', async () => {
+    // Desactivar un motivo significa "ya no se ofrece": si aún se aceptara,
+    // alguien con la pantalla abierta desde antes lo seguiría usando.
     await withTransaction(async (client) => {
       await asSuperadmin(client)
-      await client.query("select platform_set_tenant_status($1, 'closed', 'Cierre voluntario')", [
-        TENANT_PATITAS,
-      ])
-      const { rows } = await client.query(
-        "select status, status_reason from platform_set_tenant_status($1, 'active', 'ignorado')",
+      await client.query(
+        "select platform_update_reason((select id from cancellation_reasons where kind = 'non_payment'), 'Falta de pago', false)",
+      )
+      expect(
+        await tryQuery(
+          client,
+          `select * from platform_set_tenant_status($1, 'suspended', (select id from cancellation_reasons where kind = 'non_payment'), null)`,
+          [TENANT_PATITAS],
+        ),
+      ).toMatch(/Elige el motivo/i)
+      expect(
+        await tryQuery(
+          client,
+          `select * from platform_set_tenant_status($1, 'suspended', $2, null)`,
+          [TENANT_PATITAS, NONEXISTENT_UUID],
+        ),
+      ).toMatch(/Elige el motivo/i)
+    })
+  })
+
+  it('reactivar limpia motivo público y comentario (quedan en la bitácora)', async () => {
+    // Si el motivo viejo se quedara, un negocio "activo" mostraría "Falta de
+    // pago". Pero tampoco se pierde: el UPDATE lo deja en old_data.
+    await withTransaction(async (client) => {
+      await asSuperadmin(client)
+      await client.query(
+        "select platform_set_tenant_status($1, 'closed', (select id from cancellation_reasons where kind = 'non_payment'), 'Cierre voluntario')",
         [TENANT_PATITAS],
       )
-      expect(rows).toEqual([{ status: 'active', status_reason: null }])
+      const { rows } = await client.query(
+        "select status, status_reason, public_reason from platform_set_tenant_status($1, 'active', null, 'ignorado')",
+        [TENANT_PATITAS],
+      )
+      expect(rows).toEqual([
+        { status: 'active', status_reason: null, public_reason: null },
+      ])
 
       const audit = await client.query(
         `select old_data ->> 'status_reason' as previous
@@ -410,34 +469,17 @@ describe('platform_set_tenant_status()', () => {
     })
   })
 
-  it('un negocio suspendido o dado de baja SIGUE operando: el estado es solo una etiqueta', async () => {
-    // Decisión explícita de la fase 10: por ahora no se bloquea el acceso.
-    // Este test documenta esa decisión: el día que se implemente el
-    // bloqueo real, este test debe cambiar a propósito, no romperse por
-    // sorpresa a alguien que toque `app.is_member_of()`.
-    await withTransaction(async (client) => {
-      await asSuperadmin(client)
-      await client.query("select platform_set_tenant_status($1, 'closed', 'Baja de prueba')", [
-        TENANT_PATITAS,
-      ])
-
-      await setRole(client, 'authenticated', USER_DUENO)
-      const { rows } = await client.query('select id from customers where tenant_id = $1', [
-        TENANT_PATITAS,
-      ])
-      expect(rows.length).toBeGreaterThan(0)
-    })
-  })
-
   it('un negocio que no existe da un error legible', async () => {
     // Un UPDATE sobre 0 filas no falla solo: sin este chequeo la UI
     // mostraría "guardado" para un negocio inexistente.
     await withTransaction(async (client) => {
       await asSuperadmin(client)
       expect(
-        await tryQuery(client, "select * from platform_set_tenant_status($1, 'active', null)", [
-          NONEXISTENT_UUID,
-        ]),
+        await tryQuery(
+          client,
+          "select * from platform_set_tenant_status($1, 'active', null, null)",
+          [NONEXISTENT_UUID],
+        ),
       ).toMatch(/La empresa no existe/i)
     })
   })
@@ -673,6 +715,59 @@ describe('platform_create_tenant()', () => {
         created.rows[0].tenant_id,
       ])
       expect(info.rows).toEqual([{ is_demo: false }])
+    })
+  })
+})
+
+describe('catálogo de motivos (platform_create_reason / platform_update_reason)', () => {
+  it('crear un motivo lo deja activo y de tipo "other"', async () => {
+    // Las automatizaciones dependen de los tipos non_payment/customer_request:
+    // un motivo creado a mano nunca debe hacerse pasar por uno de ellos.
+    await withTransaction(async (client) => {
+      await asSuperadmin(client)
+      const { rows } = await client.query(
+        "select label, kind, is_active from platform_create_reason('  Mudanza  ')",
+      )
+      expect(rows).toEqual([{ label: 'Mudanza', kind: 'other', is_active: true }])
+    })
+  })
+
+  it('un texto en blanco se rechaza', async () => {
+    // Un motivo vacío aparecería como una opción sin nombre en el selector.
+    await withTransaction(async (client) => {
+      await asSuperadmin(client)
+      expect(
+        await tryQuery(client, "select * from platform_create_reason('   ')"),
+      ).toMatch(/Escribe el texto/i)
+    })
+  })
+
+  it('renombrar un motivo NO cambia lo que ya vio un negocio', async () => {
+    // Se guarda una copia del texto (snapshot): si se reescribiera el
+    // historial, la bitácora diría algo distinto a lo que se le mostró al cliente.
+    await withTransaction(async (client) => {
+      await asSuperadmin(client)
+      await client.query(
+        "select platform_set_tenant_status($1, 'suspended', (select id from cancellation_reasons where kind = 'non_payment'), null)",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "select platform_update_reason((select id from cancellation_reasons where kind = 'non_payment'), 'Adeudo', true)",
+      )
+      const { rows } = await client.query(
+        'select public_reason from tenant_platform_info where tenant_id = $1',
+        [TENANT_PATITAS],
+      )
+      expect(rows).toEqual([{ public_reason: 'Falta de pago' }])
+    })
+  })
+
+  it('un dueño de negocio no puede leer el catálogo directamente', async () => {
+    // El catálogo es de plataforma: RLS solo deja leerlo a superadmins.
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_DUENO)
+      const { rows } = await client.query('select id from cancellation_reasons')
+      expect(rows).toEqual([])
     })
   })
 })

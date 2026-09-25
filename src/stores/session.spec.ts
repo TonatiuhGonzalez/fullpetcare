@@ -29,6 +29,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSessionStore } from './session'
 import type { MembershipSummary } from '@/services/memberships'
+import type { TenantNotice } from '@/services/tenantAccess'
 
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
@@ -41,6 +42,10 @@ vi.mock('@/services/profiles', () => ({
 }))
 vi.mock('@/services/memberships', () => ({
   listMyMemberships: vi.fn(),
+}))
+vi.mock('@/services/tenantAccess', () => ({
+  listMyTenantNotices: vi.fn(),
+  cancelMyTenant: vi.fn(),
 }))
 vi.mock('@/services/permissions', () => ({
   listForTenant: vi.fn(),
@@ -55,6 +60,7 @@ vi.mock('@/services/platform', () => ({
 import { getCurrentUser, onSessionLost, signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
+import { cancelMyTenant, listMyTenantNotices } from '@/services/tenantAccess'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin } from '@/services/platform'
 import type { RolePermissionRow } from '@/lib/permissions'
@@ -97,6 +103,8 @@ beforeEach(() => {
   // Default: nadie es superadmin de plataforma — igual que arriba, solo los
   // tests de la fase 10 lo cambian.
   vi.mocked(isPlatformAdmin).mockResolvedValue(false)
+  // Default: ningún negocio bloqueado — solo los tests de #1905 lo cambian.
+  vi.mocked(listMyTenantNotices).mockResolvedValue([])
 })
 
 describe('login', () => {
@@ -621,5 +629,87 @@ describe('contraseña temporal', () => {
 
     expect(store.mustChangePassword).toBe(false)
     expect(listMyMemberships).toHaveBeenCalledOnce()
+  })
+})
+
+describe('avisos de acceso (#1905)', () => {
+  const BLOCKED = {
+    tenantId: 'tenant-x',
+    tenantName: 'Mascotas y Mimos',
+    role: 'owner' as const,
+    notice: 'blocked' as const,
+    publicReason: 'Falta de pago',
+    planExpiresAt: null,
+    graceEndsAt: null,
+  }
+
+  async function loginWith(memberships: MembershipSummary[], notices: TenantNotice[] = [BLOCKED]) {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'x@y.mx' })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Ana',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue(memberships)
+    vi.mocked(listMyTenantNotices).mockResolvedValue(notices)
+    const store = useSessionStore()
+    await store.login('x@y.mx', 'Demo1234!')
+    return store
+  }
+
+  it('con todos sus negocios dados de baja queda en "solo bloqueados"', async () => {
+    // El router usa esta bandera para dejarlo en /login con el aviso. Si no se
+    // activara, caería en la selección de negocio con una lista vacía y sin explicación.
+    const store = await loginWith([])
+    expect(store.isBlockedOnly).toBe(true)
+    expect(store.restrictingNotices).toEqual([BLOCKED])
+  })
+
+  it('con un negocio activo además del dado de baja NO queda bloqueado', async () => {
+    // Un empleado con dos negocios no debe perder el que sí funciona.
+    const store = await loginWith([MEMBERSHIP_A])
+    expect(store.isBlockedOnly).toBe(false)
+  })
+
+  it('un negocio en solo lectura sí se puede abrir (no cuenta como bloqueado)', async () => {
+    // En solo lectura la persona conserva el acceso a su información; si el
+    // router la dejara en /login, sería justo el "secuestro" que se quiere evitar.
+    const store = await loginWith(
+      [MEMBERSHIP_A],
+      [{ ...BLOCKED, tenantId: 'tenant-a', notice: 'read_only' }],
+    )
+    expect(store.isBlockedOnly).toBe(false)
+    expect(store.restrictingNotices).toHaveLength(1)
+  })
+
+  it('los avisos preventivos no abren el diálogo del login, pero sí el banner', async () => {
+    // "Por vencer" y "gracia" solo informan: restrictingNotices (que decide el
+    // diálogo) los ignora, y activeNotice (el banner) sí los ve.
+    const store = await loginWith(
+      [MEMBERSHIP_A],
+      [{ ...BLOCKED, tenantId: 'tenant-a', notice: 'grace' }],
+    )
+    expect(store.restrictingNotices).toEqual([])
+    expect(store.activeNotice?.notice).toBe('grace')
+  })
+
+  it('al cerrar sesión se olvidan los avisos', async () => {
+    // Si se quedaran, la siguiente persona en el mismo navegador vería el
+    // aviso de un negocio que no es suyo.
+    const store = await loginWith([])
+    vi.mocked(signOut).mockResolvedValue(undefined)
+    await store.logout()
+    expect(store.tenantNotices).toEqual([])
+    expect(store.isBlockedOnly).toBe(false)
+  })
+
+  it('cancelar el negocio activo llama a la base y cierra la sesión', async () => {
+    // Tras dar de baja, dejar la sesión abierta mostraría una app vacía.
+    const store = await loginWith([MEMBERSHIP_A], [])
+    vi.mocked(cancelMyTenant).mockResolvedValue(undefined)
+    vi.mocked(signOut).mockResolvedValue(undefined)
+    await store.cancelActiveTenant('Cierro el local')
+    expect(cancelMyTenant).toHaveBeenCalledWith('tenant-a', 'Cierro el local')
+    expect(store.isAuthenticated).toBe(false)
   })
 })

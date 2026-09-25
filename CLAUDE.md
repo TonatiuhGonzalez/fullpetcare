@@ -409,11 +409,34 @@ Decisiones que no se ven en el esquema:
   cada negocio y `app.log_change()` exige `tenant_id`.
 - **Nada se duplica:** el nombre y teléfono del dueño salen de `profiles` (de la membresía
   `owner`), el correo de `auth.users`, y la fecha de alta es `tenants.created_at`.
-- **Plan, vigencia y estado son solo informativos.** El plan es texto (`'Básico'`), la
-  vigencia `NULL` significa indefinida, y `status` (`active`/`suspended`/`closed`) es una
-  etiqueta: **no bloquea el acceso** de los usuarios de la empresa. Bloquearlo implicaría
-  tocar `app.is_member_of()`, que usa toda la base; se decide cuando exista la gestión real
-  de planes. Un test documenta este comportamiento a propósito.
+- **Estado y vigencia limitan el acceso (tarea #1905).** El plan sigue siendo texto
+  informativo, pero `app.tenant_access_level()` calcula un nivel por negocio:
+  `full`; `grace` (vigencia vencida hace menos de 2 días: todo funciona + aviso);
+  `read_only` (suspendido, o vencido y sin gracia: se ve todo, no se escribe); y
+  `blocked` (dado de baja: no se ve nada). Vigencia `NULL` es indefinida y nunca limita.
+  - **Lectura:** `app.is_member_of()`, `role_in()` y `can_access_branch()` niegan solo en
+    `blocked` (mismo mecanismo que §7.6, pero por negocio).
+  - **Escritura:** el trigger `enforce_tenant_writable` (BEFORE INSERT/UPDATE) está en
+    `tenants` y en toda tabla con `tenant_id` salvo bitácoras y `tenant_platform_info`;
+    un test falla si una tabla nueva lo omite. Solo frena a personas (`auth.uid()` no
+    nulo): la semilla y las Edge Functions con `service_role` siguen escribiendo. No cubre
+    Storage (subir fotos/documentos sigue permitido en solo lectura).
+  - **Motivo público vs. comentarios internos:** al suspender o dar de baja se elige un
+    motivo del catálogo `cancellation_reasons` (tabla de plataforma, sin `tenant_id`, RPC
+    `platform_create_reason`/`platform_update_reason`); su texto se COPIA a
+    `tenant_platform_info.public_reason` (snapshot). `status_reason` pasa a ser el
+    comentario interno, opcional. El negocio solo ve el motivo público
+    (`my_tenant_notices()`, nunca notas ni comentarios).
+  - **Automatización:** `pg_cron` ejecuta a diario (06:00 UTC) `app.suspend_expired_tenants()`,
+    que pasa a `suspended` con el motivo `non_payment` a los negocios con vigencia vencida y
+    gracia terminada (bitácora con actor nulo = sistema). Es cinturón: el solo lectura ya
+    se calcula al vuelo aunque el job no corra.
+  - **Cancelación por el dueño:** `cancel_my_tenant()` (solo el dueño activo) lo pasa a
+    `closed` con el motivo `customer_request`. Irreversible para el negocio: solo un
+    superadmin reactiva.
+  - **Interfaz:** al iniciar sesión, diálogo si hay negocios en solo lectura o de baja; banner
+    dentro de la app para "vence en 3 días o menos", gracia y solo lectura. "Pagar ahora"
+    es un mock (solo avisa "pronto"). Los superadmins no se ven afectados (usan RPC `platform_*`).
 - **Un solo dueño por empresa.** Zona horaria del alta: `America/Mexico_City`.
 - El primer superadmin no puede crearse desde la interfaz: `npm run superadmin:create`
   (§12). Los demás los agrega un superadmin desde la pestaña "Superadmins".
@@ -608,7 +631,7 @@ escriben datos de negocio. La interfaz solo lo hace cómodo: el router manda a
 - **Empleados** invitados con `invite-employee` **no** entran en esto (fuera del alcance
   de la tarea #1904); sería agregar la misma línea de `app_metadata` allí.
 - Tocar `app.is_member_of()` sí es posible aquí porque es por **persona**, no por
-  negocio; el estado de la empresa (§6.8) sigue sin bloquear nada.
+  negocio; el estado de la empresa (§6.8) también la bloquea, con `app.is_tenant_blocked()`.
 
 ---
 
