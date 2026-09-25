@@ -177,6 +177,7 @@ const statusDialogOpen = ref(false)
 const statusTarget = ref<Exclude<TenantStatus, 'active'>>('suspended')
 const statusSaving = ref(false)
 const statusError = ref<string | null>(null)
+const statusReasons = ref<platformService.CancellationReason[]>([])
 
 const otherStatuses = computed<TenantStatus[]>(() =>
   (['active', 'suspended', 'closed'] as TenantStatus[]).filter((s) => s !== props.tenant?.status),
@@ -194,7 +195,7 @@ async function requestStatusChange(target: TenantStatus): Promise<void> {
   if (target === 'active') {
     // Reactivar no pide motivo.
     try {
-      await platformService.setTenantStatus(props.tenant.id, 'active', null)
+      await platformService.setTenantStatus(props.tenant.id, 'active', null, null)
       emit('changed')
     } catch (e) {
       actionError.value = e instanceof Error ? e.message : 'No se pudo reactivar la empresa.'
@@ -203,15 +204,31 @@ async function requestStatusChange(target: TenantStatus): Promise<void> {
   }
   statusTarget.value = target
   statusError.value = null
+  try {
+    // Solo se ofrecen los motivos activos: desactivar uno es "ya no se usa".
+    statusReasons.value = (await platformService.listReasons()).filter((r) => r.isActive)
+  } catch (e) {
+    actionError.value =
+      e instanceof Error ? e.message : 'No se pudieron cargar los motivos.'
+    return
+  }
   statusDialogOpen.value = true
 }
 
-async function confirmStatusChange(reason: string): Promise<void> {
+async function confirmStatusChange(
+  publicReasonId: string,
+  comment: string,
+): Promise<void> {
   if (!props.tenant) return
   statusSaving.value = true
   statusError.value = null
   try {
-    await platformService.setTenantStatus(props.tenant.id, statusTarget.value, reason)
+    await platformService.setTenantStatus(
+      props.tenant.id,
+      statusTarget.value,
+      publicReasonId,
+      comment || null,
+    )
     statusDialogOpen.value = false
     emit('changed')
   } catch (e) {
@@ -320,8 +337,14 @@ function handlePasswordDialogToggle(open: boolean): void {
                 <div class="text-caption text-medium-emphasis">Vigencia</div>
                 <div>{{ formatPlanExpiry(tenant.planExpiresAt) }}</div>
               </v-col>
-              <v-col v-if="tenant.statusReason" cols="12">
-                <div class="text-caption text-medium-emphasis">Motivo del estado actual</div>
+              <v-col v-if="tenant.publicReason" cols="12" sm="6">
+                <div class="text-caption text-medium-emphasis">
+                  Motivo público (lo ve el cliente)
+                </div>
+                <div>{{ tenant.publicReason }}</div>
+              </v-col>
+              <v-col v-if="tenant.statusReason" cols="12" sm="6">
+                <div class="text-caption text-medium-emphasis">Comentarios internos</div>
                 <div>{{ tenant.statusReason }}</div>
               </v-col>
             </v-row>
@@ -448,6 +471,7 @@ function handlePasswordDialogToggle(open: boolean): void {
     v-model="statusDialogOpen"
     :tenant-name="tenant.name"
     :target-status="statusTarget"
+    :reasons="statusReasons"
     :saving="statusSaving"
     :error-message="statusError"
     @confirm="confirmStatusChange"

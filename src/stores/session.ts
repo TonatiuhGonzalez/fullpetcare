@@ -13,6 +13,12 @@ import {
 } from '@/services/auth'
 import { getProfile, type MyProfile } from '@/services/profiles'
 import { listMyMemberships, type MembershipSummary } from '@/services/memberships'
+import {
+  cancelMyTenant,
+  listMyTenantNotices,
+  type TenantNotice,
+} from '@/services/tenantAccess'
+import { noticeRestrictsAccess } from '@/lib/tenantNotices'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin as fetchIsPlatformAdmin } from '@/services/platform'
 import { hasPermission, type PermissionModule, type RolePermissionRow } from '@/lib/permissions'
@@ -45,6 +51,10 @@ export const useSessionStore = defineStore('session', () => {
   const user = ref<AuthUser | null>(null)
   const profile = ref<MyProfile | null>(null)
   const memberships = ref<MembershipSummary[]>([])
+  // Avisos de acceso de los negocios de la persona: por vencer, en gracia, en
+  // solo lectura o dados de baja (estos últimos la base los oculta de
+  // `memberships`, así que aquí es la única pista de que existen).
+  const tenantNotices = ref<TenantNotice[]>([])
   // Reglas de permisos del tenant ACTIVO únicamente (fase 9) — se
   // recarga cada vez que cambia activeTenantId (loadMemberships,
   // selectTenant). No vive dentro de MembershipSummary porque no es
@@ -63,6 +73,24 @@ export const useSessionStore = defineStore('session', () => {
 
   const isAuthenticated = computed(() => user.value !== null)
 
+  /** Avisos que limitan el acceso (solo lectura o baja): los que abren el diálogo del login. */
+  const restrictingNotices = computed(() =>
+    tenantNotices.value.filter((n) => noticeRestrictsAccess(n.notice)),
+  )
+
+  /**
+   * true si la persona ya inició sesión pero TODOS sus negocios están dados de
+   * baja: no hay nada que mostrarle salvo el aviso. (Un negocio en solo
+   * lectura SÍ se puede abrir; un superadmin nunca cae aquí.)
+   */
+  const isBlockedOnly = computed(
+    () =>
+      isAuthenticated.value &&
+      !isPlatformAdmin.value &&
+      memberships.value.length === 0 &&
+      tenantNotices.value.some((n) => n.notice === 'blocked'),
+  )
+
   /**
    * true mientras la persona use una contraseña temporal (dueño o superadmin
    * recién dado de alta, o dueño con contraseña restablecida). El router la
@@ -75,6 +103,10 @@ export const useSessionStore = defineStore('session', () => {
     () => memberships.value.find((m) => m.tenantId === activeTenantId.value) ?? null,
   )
   const role = computed(() => activeMembership.value?.role ?? null)
+  /** Aviso del negocio activo (por vencer, gracia o solo lectura), para el banner. */
+  const activeNotice = computed<TenantNotice | null>(
+    () => tenantNotices.value.find((n) => n.tenantId === activeTenantId.value) ?? null,
+  )
   const activeBranches = computed(() => activeMembership.value?.branches ?? [])
   const activeBranch = computed(
     () => activeBranches.value.find((b) => b.id === activeBranchId.value) ?? null,
@@ -117,6 +149,7 @@ export const useSessionStore = defineStore('session', () => {
     user.value = null
     profile.value = null
     memberships.value = []
+    tenantNotices.value = []
     permissions.value = []
     isPlatformAdmin.value = false
     activeTenantId.value = null
@@ -174,6 +207,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!user.value) return
 
     memberships.value = await listMyMemberships(user.value.id)
+    tenantNotices.value = await listMyTenantNotices()
 
     const storedTenantId = readStorage(ACTIVE_TENANT_KEY)
     const validStoredTenant = memberships.value.find((m) => m.tenantId === storedTenantId)
@@ -242,6 +276,17 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /**
+   * El dueño da de baja el negocio activo y la sesión se cierra: desde ese
+   * momento la base ya no le muestra nada de ese negocio. Solo el superadmin
+   * puede reactivarlo.
+   */
+  async function cancelActiveTenant(comment: string | null): Promise<void> {
+    if (!activeTenantId.value) return
+    await cancelMyTenant(activeTenantId.value, comment)
+    await logout()
+  }
+
   async function logout(): Promise<void> {
     // "finally": aunque el servidor no responda (sin red), la sesión
     // LOCAL se limpia siempre — antes, si signOut() lanzaba, reset()
@@ -308,6 +353,11 @@ export const useSessionStore = defineStore('session', () => {
     user,
     profile,
     memberships,
+    tenantNotices,
+    restrictingNotices,
+    activeNotice,
+    isBlockedOnly,
+    cancelActiveTenant,
     permissions,
     isPlatformAdmin,
     activeTenantId,

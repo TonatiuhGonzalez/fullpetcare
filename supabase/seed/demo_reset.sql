@@ -287,20 +287,24 @@ begin
   -- Patitas Felices y Huellitas Spa: plan Básico, activas, sin notas.
   update tenant_platform_info
   set plan = 'Básico', plan_expires_at = null, status = 'active',
-      status_reason = null, internal_notes = null
+      status_reason = null, internal_notes = null,
+      public_reason_id = null, public_reason = null
   where tenant_id in (v_tenant_patitas, v_tenant_huellitas)
     and (plan is distinct from 'Básico' or plan_expires_at is not null
-         or status <> 'active' or status_reason is not null or internal_notes is not null);
+         or status <> 'active' or status_reason is not null or internal_notes is not null
+         or public_reason is not null);
 
   -- Mascotas y Mimos: suspendida, con las notas de ejemplo de seed.sql (existe
   -- para dar variedad a la lista y a los filtros del superadmin).
   update tenant_platform_info
   set plan = 'Básico', plan_expires_at = null, status = 'suspended',
       status_reason = 'Pago de la mensualidad pendiente (ejemplo de demo)',
+      public_reason_id = (select id from cancellation_reasons where kind = 'non_payment' order by created_at limit 1),
+      public_reason = 'Falta de pago',
       internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
   where tenant_id = v_tenant_mimos
     and (plan is distinct from 'Básico' or plan_expires_at is not null
-         or status <> 'suspended'
+         or status <> 'suspended' or public_reason is distinct from 'Falta de pago'
          or status_reason is distinct from 'Pago de la mensualidad pendiente (ejemplo de demo)'
          or internal_notes is distinct from 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.');
 

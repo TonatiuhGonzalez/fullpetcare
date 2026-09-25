@@ -29,12 +29,22 @@ export interface PlatformTenant {
   /** null = vigencia indefinida (todas las empresas hoy). */
   planExpiresAt: string | null
   status: TenantStatus
+  /** Comentarios INTERNOS del cambio de estado: solo los ve el superadmin. */
   statusReason: string | null
+  /** Motivo PÚBLICO (del catálogo): es el que ve el negocio al iniciar sesión. */
+  publicReason: string | null
   internalNotes: string | null
   ownerUserId: string | null
   ownerName: string | null
   ownerEmail: string | null
   ownerPhone: string | null
+}
+
+export interface CancellationReason {
+  id: string
+  label: string
+  kind: 'non_payment' | 'customer_request' | 'other'
+  isActive: boolean
 }
 
 export interface TenantMetrics {
@@ -207,6 +217,7 @@ export async function listTenants(): Promise<PlatformTenant[]> {
     planExpiresAt: (row.plan_expires_at as string | null) ?? null,
     status: row.status,
     statusReason: (row.status_reason as string | null) ?? null,
+    publicReason: (row.public_reason as string | null) ?? null,
     internalNotes: (row.internal_notes as string | null) ?? null,
     ownerUserId: (row.owner_user_id as string | null) ?? null,
     ownerName: (row.owner_name as string | null) ?? null,
@@ -233,22 +244,68 @@ export async function getTenantMetrics(tenantId: string): Promise<TenantMetrics>
 }
 
 /**
- * Suspende, da de baja o reactiva un negocio. El motivo es obligatorio salvo
- * al reactivar (lo valida la base). Es solo una etiqueta: no bloquea el
- * acceso de los usuarios del negocio (decisión de la fase 10).
+ * Suspende, da de baja o reactiva un negocio. Al suspender o dar de baja hay
+ * que elegir un motivo PÚBLICO del catálogo (lo valida la base); el comentario
+ * es interno y opcional. Suspendido = solo lectura; de baja = sin acceso.
  */
 export async function setTenantStatus(
   tenantId: string,
   status: TenantStatus,
-  reason: string | null,
+  publicReasonId: string | null,
+  comment: string | null,
 ): Promise<void> {
   const { error } = await supabase.rpc('platform_set_tenant_status', {
     p_tenant_id: tenantId,
     p_status: status,
-    // El tipo generado no admite null aunque Postgres sí (ver arriba).
-    p_reason: reason as string,
+    // Los tipos generados no admiten null aunque Postgres sí (ver arriba).
+    p_public_reason_id: publicReasonId as string,
+    p_comment: comment as string,
   })
   if (error) throw new Error(friendlyRpcMessage(error))
+}
+
+// -----------------------------------------------------------------------------
+// Catálogo de motivos
+// -----------------------------------------------------------------------------
+
+function toReason(row: {
+  id: string
+  label: string
+  kind: CancellationReason['kind']
+  is_active: boolean
+}): CancellationReason {
+  return { id: row.id, label: row.label, kind: row.kind, isActive: row.is_active }
+}
+
+/** Todos los motivos (activos e inactivos). La política RLS solo deja leerlos a superadmins. */
+export async function listReasons(): Promise<CancellationReason[]> {
+  const { data, error } = await supabase
+    .from('cancellation_reasons')
+    .select('id, label, kind, is_active')
+    .is('deleted_at', null)
+    .order('created_at')
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return data.map(toReason)
+}
+
+export async function createReason(label: string): Promise<CancellationReason> {
+  const { data, error } = await supabase.rpc('platform_create_reason', { p_label: label })
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return toReason(data)
+}
+
+export async function updateReason(
+  id: string,
+  label: string,
+  isActive: boolean,
+): Promise<CancellationReason> {
+  const { data, error } = await supabase.rpc('platform_update_reason', {
+    p_id: id,
+    p_label: label,
+    p_is_active: isActive,
+  })
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return toReason(data)
 }
 
 export async function updateTenantNotes(tenantId: string, notes: string): Promise<void> {

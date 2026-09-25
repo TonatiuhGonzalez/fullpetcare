@@ -400,6 +400,8 @@ begin
 
   update tenant_platform_info
   set status = 'suspended',
+      public_reason_id = (select id from cancellation_reasons where kind = 'non_payment' order by created_at limit 1),
+      public_reason = 'Falta de pago',
       status_reason = 'Pago de la mensualidad pendiente (ejemplo de demo)',
       internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
   where tenant_id = v_tenant_mimos;

@@ -275,6 +275,36 @@ export type Database = {
           },
         ]
       }
+      cancellation_reasons: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["cancellation_reason_kind"]
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["cancellation_reason_kind"]
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["cancellation_reason_kind"]
+          label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           cfdi_use: string | null
@@ -1380,6 +1410,8 @@ export type Database = {
           is_demo: boolean
           plan: string
           plan_expires_at: string | null
+          public_reason: string | null
+          public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
           status_reason: string | null
           tenant_id: string
@@ -1393,6 +1425,8 @@ export type Database = {
           is_demo?: boolean
           plan?: string
           plan_expires_at?: string | null
+          public_reason?: string | null
+          public_reason_id?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
           status_reason?: string | null
           tenant_id: string
@@ -1406,12 +1440,21 @@ export type Database = {
           is_demo?: boolean
           plan?: string
           plan_expires_at?: string | null
+          public_reason?: string | null
+          public_reason_id?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
           status_reason?: string | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tenant_platform_info_public_reason_id_fkey"
+            columns: ["public_reason_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_reasons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tenant_platform_info_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -1583,6 +1626,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_my_tenant: {
+        Args: { p_comment?: string; p_tenant_id: string }
+        Returns: undefined
+      }
       checkout_appointment: {
         Args: {
           p_appointment_id: string
@@ -1656,6 +1703,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      my_tenant_notices: {
+        Args: never
+        Returns: {
+          grace_ends_at: string
+          notice: string
+          plan_expires_at: string
+          public_reason: string
+          role: Database["public"]["Enums"]["member_role"]
+          tenant_id: string
+          tenant_name: string
+        }[]
+      }
       platform_add_admin: {
         Args: { p_user_id: string }
         Returns: {
@@ -1668,6 +1727,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "platform_admins"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_create_reason: {
+        Args: { p_label: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["cancellation_reason_kind"]
+          label: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cancellation_reasons"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1722,6 +1799,7 @@ export type Database = {
           owner_user_id: string
           plan: string
           plan_expires_at: string
+          public_reason: string
           status: Database["public"]["Enums"]["tenant_status"]
           status_reason: string
           tenant_id: string
@@ -1754,7 +1832,8 @@ export type Database = {
       }
       platform_set_tenant_status: {
         Args: {
-          p_reason: string
+          p_comment: string
+          p_public_reason_id: string
           p_status: Database["public"]["Enums"]["tenant_status"]
           p_tenant_id: string
         }
@@ -1766,6 +1845,8 @@ export type Database = {
           is_demo: boolean
           plan: string
           plan_expires_at: string | null
+          public_reason: string | null
+          public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
           status_reason: string | null
           tenant_id: string
@@ -1799,6 +1880,8 @@ export type Database = {
           is_demo: boolean
           plan: string
           plan_expires_at: string | null
+          public_reason: string | null
+          public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
           status_reason: string | null
           tenant_id: string
@@ -1807,6 +1890,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "tenant_platform_info"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_update_reason: {
+        Args: { p_id: string; p_is_active: boolean; p_label: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["cancellation_reason_kind"]
+          label: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cancellation_reasons"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1851,6 +1952,7 @@ export type Database = {
         | "cancelled"
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
+      cancellation_reason_kind: "non_payment" | "customer_request" | "other"
       employee_document_type:
         | "voter_id"
         | "address_proof"
@@ -2004,6 +2106,7 @@ export const Constants = {
         "no_show",
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
+      cancellation_reason_kind: ["non_payment", "customer_request", "other"],
       employee_document_type: [
         "voter_id",
         "address_proof",

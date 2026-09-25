@@ -36,6 +36,7 @@ async function handleLogout(): Promise<void> {
     </v-app-bar-title>
 
     <v-btn to="/superadmin/empresas" variant="text" class="mr-1">Empresas</v-btn>
+    <v-btn to="/superadmin/motivos" variant="text" class="mr-1">Motivos</v-btn>
     <v-btn to="/superadmin/administradores" variant="text" class="mr-4">Superadmins</v-btn>
 
     <!-- En pantallas angostas la barra no alcanza para el chip y el nombre, y

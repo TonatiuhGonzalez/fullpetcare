@@ -122,6 +122,11 @@ export const router = createRouter({
           component: () => import('@/pages/superadmin/TenantsPage.vue'),
         },
         {
+          path: 'motivos',
+          name: 'superadmin-motivos',
+          component: () => import('@/pages/superadmin/ReasonsPage.vue'),
+        },
+        {
           path: 'administradores',
           name: 'superadmin-administradores',
           component: () => import('@/pages/superadmin/AdminsPage.vue'),
@@ -187,6 +192,13 @@ router.beforeEach(async (to) => {
     if (!session.mustChangePassword && isForcePasswordRoute) {
       return { path: '/app/agenda' }
     }
+  }
+
+  // Todos sus negocios están suspendidos, dados de baja o vencidos: no hay
+  // nada que mostrarle salvo el aviso, que vive en /login (LoginPage abre el
+  // diálogo solo). Se le deja ahí, y la vista pública /c/:token no se toca.
+  if (session.isBlockedOnly && !to.path.startsWith('/c/')) {
+    return to.path === '/login' ? true : { path: '/login' }
   }
 
   // Panel de plataforma (fase 10): quien no es superadmin no tiene nada que

@@ -372,10 +372,13 @@ de construir:
   mismos permisos.
 - **Solo ven datos de la empresa** (nombre, dueño, plan, estado, conteos). Nunca
   clientes, mascotas, citas ni expedientes.
-- Plan y vigencia son **informativos**: plan de texto fijo "Básico", vigencia
-  indefinida (`NULL`). Sin tabla de planes y sin bloqueo por vencimiento (a futuro).
-- Suspender / dar de baja es **solo una etiqueta** de estado: no bloquea el acceso de
-  los usuarios de la empresa (a futuro). Las empresas no tienen fecha de baja.
+- Plan de texto fijo "Básico", vigencia indefinida (`NULL`), sin tabla de planes.
+- Suspender o vencer la vigencia (pasada la gracia de 2 días) deja la empresa en **solo lectura**;
+  darla de baja (o que el dueño cancele) le **niega todo el acceso** (tarea #1905, migraciones
+  `20260925140000` a `20260925170000`, pruebas en `tenant-blocking.spec.ts`). Motivo público
+  del catálogo (pestaña "Motivos") + comentarios internos; suspensión automática diaria con
+  `pg_cron`; banner 3 días antes de vencer. "Pagar ahora" es un mock. Las empresas no tienen
+  fecha de baja.
 - Un solo dueño por empresa. El alta captura: nombre de la empresa, nombre de la
   sucursal, y nombre / correo / teléfono del dueño. Zona horaria fija
   `America/Mexico_City`. Catálogo de servicios vacío.
@@ -605,5 +608,4 @@ los empleados invitados quedan fuera. Diseño en `CLAUDE.md` §7.6. Tests:
 y `create-superadmin-script.spec.ts`, y `session.spec.ts`. Pendiente: comprobar en
 navegador y en producción (la migración es nueva en `main`).
 
-**Trabajo futuro (fuera de esta fase):** gestión real de planes y vigencia, y bloqueo de acceso por
-vencimiento o suspensión.
+**Trabajo futuro (fuera de esta fase):** gestión real de planes y vigencia.
