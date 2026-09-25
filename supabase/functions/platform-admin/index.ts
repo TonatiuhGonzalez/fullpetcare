@@ -43,6 +43,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { handleCors } from "../_shared/cors.ts";
 import { generateTemporaryPassword } from "./password.ts";
 
 const FORBIDDEN_RESPONSE = { message: "No tienes permiso para administrar la plataforma." };
@@ -162,7 +163,7 @@ function rpcErrorResponse(error: { code?: string; message: string }): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(handleCors(async (req) => {
   if (req.method !== "POST") {
     return Response.json({ message: "Método no permitido." }, { status: 405 });
   }
@@ -366,4 +367,4 @@ Deno.serve(async (req) => {
       });
     }
   }
-});
+}));
