@@ -384,6 +384,20 @@ begin
   -- (plan Básico, activa, sin vigencia). Aquí se le da un estado y notas
   -- de ejemplo, ficticios como todo lo demás. El estado es solo una
   -- etiqueta: el dueño de este negocio puede seguir entrando.
+  -- Las 3 empresas de la semilla son de demostración (`demo:reset` las
+  -- excluye por id de todos modos; la marca es por coherencia con prod, donde
+  -- la migración is_demo las marcó).
+  -- El trigger de bitácora se apaga solo para esta marca: es preparación de la
+  -- semilla, no un cambio de nadie (mismo criterio que la migración is_demo).
+  alter table tenant_platform_info disable trigger tenant_platform_info_audit;
+  update tenant_platform_info set is_demo = true
+  where tenant_id in (
+    'b0000000-0000-4000-8000-000000000001',
+    'b0000000-0000-4000-8000-000000000002',
+    v_tenant_mimos
+  );
+  alter table tenant_platform_info enable trigger tenant_platform_info_audit;
+
   update tenant_platform_info
   set status = 'suspended',
       status_reason = 'Pago de la mensualidad pendiente (ejemplo de demo)',

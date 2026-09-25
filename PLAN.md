@@ -443,8 +443,8 @@ bitácora registre a la persona correcta.
 **Decisión relacionada:** plan, vigencia y suspensión son informativos en esta fase;
 bloquear acceso implicaría tocar `app.is_member_of()`, que usa toda la base, y se
 decidirá cuando se diseñe la gestión real de planes.
-**Riesgo conocido:** `demo:reset` oculta toda empresa fuera de la semilla; con un cliente
-real dado de alta hay que acotarlo antes de volver a correrlo (CLAUDE.md §10).
+**Riesgo resuelto:** `demo:reset` ocultaba toda empresa fuera de la semilla. Ahora solo oculta
+las marcadas `is_demo` (default `false`, casilla en el alta) — CLAUDE.md §10.
 
 ---
 

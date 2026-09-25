@@ -26,9 +26,8 @@ echo "restaura el historial curado de Rocky y Max a su estado original."
 echo
 echo "Del panel de superadmin: los 3 negocios de la semilla vuelven a su"
 echo "estado original (plan, estado y notas), y se OCULTAN (borrado suave)"
-echo "TODAS las empresas que no sean esas 3. Eso solo es correcto mientras"
-echo "producción sea puro demo (CLAUDE.md §10): con un cliente real dado de"
-echo "alta, NO corras este script sin antes acotar ese paso."
+echo "las empresas marcadas como \"de demostración\" que no sean esas 3."
+echo "Las empresas sin esa marca (clientes reales) NO se tocan."
 echo
 read -r -p "¿Continuar? [y/N] " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then

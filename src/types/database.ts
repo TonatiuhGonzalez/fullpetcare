@@ -1374,6 +1374,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           internal_notes: string | null
+          is_demo: boolean
           plan: string
           plan_expires_at: string | null
           status: Database["public"]["Enums"]["tenant_status"]
@@ -1386,6 +1387,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           internal_notes?: string | null
+          is_demo?: boolean
           plan?: string
           plan_expires_at?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
@@ -1398,6 +1400,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           internal_notes?: string | null
+          is_demo?: boolean
           plan?: string
           plan_expires_at?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
@@ -1669,6 +1672,7 @@ export type Database = {
       platform_create_tenant: {
         Args: {
           p_branch_name: string
+          p_is_demo?: boolean
           p_owner_full_name: string
           p_owner_phone: string
           p_tenant_name: string
@@ -1756,6 +1760,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           internal_notes: string | null
+          is_demo: boolean
           plan: string
           plan_expires_at: string | null
           status: Database["public"]["Enums"]["tenant_status"]
@@ -1788,6 +1793,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           internal_notes: string | null
+          is_demo: boolean
           plan: string
           plan_expires_at: string | null
           status: Database["public"]["Enums"]["tenant_status"]

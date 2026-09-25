@@ -260,13 +260,15 @@ end $$;
 --      demo:reset sobre un demo intacto no genera ni una entrada de bitácora.
 --      Las que sí genera (quien corre este script no tiene sesión de usuario)
 --      quedan con actor "Sistema" en la pestaña Bitácora, que es la verdad.
---   2. Toda empresa que NO sea de la semilla se oculta (borrado suave). Son
---      las que se dieron de alta durante una demo.
+--   2. Toda empresa que NO sea de la semilla Y esté marcada `is_demo` se
+--      oculta (borrado suave). Son las que se dieron de alta durante una demo
+--      con la casilla "Empresa de demostración" del formulario de alta.
 --
--- ⚠ (2) ASUME QUE PRODUCCIÓN ES SOLO DEMO (CLAUDE.md §10). El día que entre
--- el primer cliente real, este bloque lo ocultaría junto con las empresas de
--- prueba: hay que borrarlo o acotarlo ANTES de correr demo:reset con un
--- cliente real dado de alta. scripts/demo-reset.sh lo avisa al confirmar.
+-- Una empresa SIN esa marca se trata como real y este script no la toca:
+-- `is_demo` nace en false (migración 20260925120000_tenant_is_demo.sql), así
+-- que el riesgo de ocultar a un cliente real por un descuido no existe. El
+-- descuido contrario (no marcar una empresa de demo) solo deja una empresa de
+-- sobra en la lista, que se oculta a mano desde el panel.
 --
 -- Lo que NO hace, a propósito: no toca auth.users (las credenciales de demo
 -- nunca cambian), así que el correo del dueño de una empresa creada en una
@@ -302,16 +304,21 @@ begin
          or status_reason is distinct from 'Pago de la mensualidad pendiente (ejemplo de demo)'
          or internal_notes is distinct from 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.');
 
-  -- Empresas dadas de alta durante una demo: se ocultan (borrado suave, se
+  -- Empresas de demostración dadas de alta durante una demo: se ocultan (borrado suave, se
   -- pueden recuperar quitando deleted_at). El aviso lista cuáles fueron.
-  select string_agg(name, ', ' order by name) into v_hidden_names
-  from tenants
-  where id <> all (v_seed_tenants) and deleted_at is null;
+  -- `is_demo` se consulta en tenant_platform_info (la marca vive ahí, junto
+  -- al resto del estado de plataforma, no en `tenants`).
+  select string_agg(t.name, ', ' order by t.name) into v_hidden_names
+  from tenants t
+  join tenant_platform_info i on i.tenant_id = t.id
+  where t.id <> all (v_seed_tenants) and t.deleted_at is null and i.is_demo;
 
-  update tenants set deleted_at = now()
-  where id <> all (v_seed_tenants) and deleted_at is null;
+  update tenants t set deleted_at = now()
+  from tenant_platform_info i
+  where i.tenant_id = t.id
+    and t.id <> all (v_seed_tenants) and t.deleted_at is null and i.is_demo;
 
   if v_hidden_names is not null then
-    raise notice 'demo_reset: se ocultaron las empresas fuera de la semilla: %', v_hidden_names;
+    raise notice 'demo_reset: se ocultaron las empresas de demostración: %', v_hidden_names;
   end if;
 end $$;

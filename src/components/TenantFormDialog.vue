@@ -23,6 +23,7 @@ const branchName = ref('')
 const ownerFullName = ref('')
 const ownerEmail = ref('')
 const ownerPhone = ref('')
+const isDemo = ref(false)
 
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -65,6 +66,7 @@ watch(
     ownerFullName.value = ''
     ownerEmail.value = ''
     ownerPhone.value = ''
+    isDemo.value = false
     errorMessage.value = null
     showValidation.value = false
   },
@@ -87,6 +89,7 @@ async function handleSubmit(): Promise<void> {
       ownerFullName: ownerFullName.value.trim(),
       ownerEmail: ownerEmail.value.trim(),
       ownerPhone: ownerPhone.value.trim() || null,
+      isDemo: isDemo.value,
     })
     emit('created', {
       tenantName: tenantName.value.trim(),
@@ -145,6 +148,13 @@ async function handleSubmit(): Promise<void> {
             label="Teléfono"
             type="tel"
             :error-messages="errorsFor('ownerPhone')"
+          />
+          <v-checkbox
+            v-model="isDemo"
+            label="Empresa de demostración"
+            hint="Márcala solo si es de prueba: 'npm run demo:reset' la oculta. Una empresa sin marcar se trata como cliente real y el reset no la toca."
+            persistent-hint
+            density="compact"
           />
 
           <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-2">

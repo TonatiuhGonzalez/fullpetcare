@@ -72,6 +72,8 @@ export interface NewTenantInput {
   ownerFullName: string
   ownerEmail: string
   ownerPhone: string | null
+  /** true = `demo:reset` puede ocultarla. Default false: se trata como cliente real. */
+  isDemo?: boolean
 }
 
 export interface NewTenantResult {

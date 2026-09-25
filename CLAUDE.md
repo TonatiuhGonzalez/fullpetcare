@@ -743,10 +743,13 @@ Cuando entre el primer cliente de verdad, esa suposición cambia y hay que revis
 
 **Ojo con `demo:reset` desde la fase 10:** además de restaurar los datos de Patitas Felices,
 devuelve los 3 negocios de la semilla a su estado original de plataforma y **oculta (borrado
-suave) toda empresa que no sea de esa semilla** — son las que se dieron de alta en una demo.
-Con un cliente real dado de alta, ese paso lo ocultaría junto con las de prueba: hay que
-acotarlo o quitarlo del bloque final de `supabase/seed/demo_reset.sql` ANTES de volver a
-correr `demo:reset`. `scripts/demo-reset.sh` lo avisa al pedir confirmación.
+suave) solo las empresas marcadas `is_demo`** (columna de `tenant_platform_info`, migración
+`20260925120000_tenant_is_demo.sql`) que no sean de esa semilla — son las que se dieron de
+alta en una demo con la casilla "Empresa de demostración" del formulario. `is_demo` nace en
+`false`, así que una empresa sin marcar se trata como cliente real y el reset no la toca:
+olvidar la casilla en una empresa de demo solo deja una empresa de sobra (se oculta a mano
+desde el panel), nunca borra a un cliente. Aun así, ese paso sigue tocando producción:
+no marques como demo una empresa real.
 
 ### Git
 
