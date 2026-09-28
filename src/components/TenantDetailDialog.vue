@@ -12,17 +12,20 @@
 import { computed, ref, watch } from 'vue'
 
 import * as platformService from '@/services/platform'
-import type { PlatformAuditEntry, PlatformTenant, TenantMetrics } from '@/services/platform'
+import type { PlatformAuditEntry, PlatformTenant, Plan, TenantMetrics } from '@/services/platform'
 import {
+  billingPeriodLabel,
   describeAuditEntry,
   formatPlanExpiry,
   formatPlatformDate,
   formatPlatformDateTime,
   tenantStatusColor,
   tenantStatusLabel,
+  type BillingPeriod,
   type TenantStatus,
 } from '@/lib/platform'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
+import TenantPlanDialog from '@/components/TenantPlanDialog.vue'
 import TenantStatusDialog from '@/components/TenantStatusDialog.vue'
 
 const props = defineProps<{
@@ -177,6 +180,7 @@ const statusDialogOpen = ref(false)
 const statusTarget = ref<Exclude<TenantStatus, 'active'>>('suspended')
 const statusSaving = ref(false)
 const statusError = ref<string | null>(null)
+const statusReasons = ref<platformService.CancellationReason[]>([])
 
 const otherStatuses = computed<TenantStatus[]>(() =>
   (['active', 'suspended', 'closed'] as TenantStatus[]).filter((s) => s !== props.tenant?.status),
@@ -194,7 +198,7 @@ async function requestStatusChange(target: TenantStatus): Promise<void> {
   if (target === 'active') {
     // Reactivar no pide motivo.
     try {
-      await platformService.setTenantStatus(props.tenant.id, 'active', null)
+      await platformService.setTenantStatus(props.tenant.id, 'active', null, null)
       emit('changed')
     } catch (e) {
       actionError.value = e instanceof Error ? e.message : 'No se pudo reactivar la empresa.'
@@ -203,21 +207,73 @@ async function requestStatusChange(target: TenantStatus): Promise<void> {
   }
   statusTarget.value = target
   statusError.value = null
+  try {
+    // Solo se ofrecen los motivos activos: desactivar uno es "ya no se usa".
+    statusReasons.value = (await platformService.listReasons()).filter((r) => r.isActive)
+  } catch (e) {
+    actionError.value =
+      e instanceof Error ? e.message : 'No se pudieron cargar los motivos.'
+    return
+  }
   statusDialogOpen.value = true
 }
 
-async function confirmStatusChange(reason: string): Promise<void> {
+async function confirmStatusChange(
+  publicReasonId: string,
+  comment: string,
+): Promise<void> {
   if (!props.tenant) return
   statusSaving.value = true
   statusError.value = null
   try {
-    await platformService.setTenantStatus(props.tenant.id, statusTarget.value, reason)
+    await platformService.setTenantStatus(
+      props.tenant.id,
+      statusTarget.value,
+      publicReasonId,
+      comment || null,
+    )
     statusDialogOpen.value = false
     emit('changed')
   } catch (e) {
     statusError.value = e instanceof Error ? e.message : 'No se pudo cambiar el estado.'
   } finally {
     statusSaving.value = false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Plan y vigencia (tarea #1906)
+// ---------------------------------------------------------------------------
+const planDialogOpen = ref(false)
+const planSaving = ref(false)
+const planError = ref<string | null>(null)
+const availablePlans = ref<Plan[]>([])
+
+async function openPlanDialog(): Promise<void> {
+  actionError.value = null
+  planError.value = null
+  try {
+    // Solo se ofrecen los planes activos: uno desactivado es "ya no se asigna".
+    availablePlans.value = (await platformService.listPlans()).filter((p) => p.isActive)
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : 'No se pudieron cargar los planes.'
+    return
+  }
+  planDialogOpen.value = true
+}
+
+async function confirmPlanChange(planId: string, billingPeriod: BillingPeriod): Promise<void> {
+  if (!props.tenant) return
+  planSaving.value = true
+  planError.value = null
+  try {
+    await platformService.setTenantPlan(props.tenant.id, planId, billingPeriod)
+    planDialogOpen.value = false
+    emit('changed')
+  } catch (e) {
+    planError.value = e instanceof Error ? e.message : 'No se pudo cambiar el plan.'
+  } finally {
+    planSaving.value = false
   }
 }
 
@@ -248,9 +304,11 @@ async function confirmReset(): Promise<void> {
       email: result.ownerEmail,
       password: result.temporaryPassword,
       // La contraseña YA cambió aunque esto falle: se avisa, no se oculta.
-      warning: result.sessionsRevoked
-        ? null
-        : 'La contraseña cambió, pero no se pudieron cerrar las sesiones que el dueño tenía abiertas.',
+      warning: !result.sessionsRevoked
+        ? 'La contraseña cambió, pero no se pudieron cerrar las sesiones que el dueño tenía abiertas.'
+        : !result.mustChangeEnforced
+          ? 'La contraseña cambió, pero no se pudo exigir que el dueño la cambie al entrar.'
+          : null,
     }
     passwordDialogOpen.value = true
     emit('changed')
@@ -315,11 +373,31 @@ function handlePasswordDialogToggle(open: boolean): void {
                 <div>{{ tenant.plan }}</div>
               </v-col>
               <v-col cols="12" sm="6">
+                <div class="text-caption text-medium-emphasis">Forma de pago</div>
+                <div>{{ billingPeriodLabel(tenant.billingPeriod) }}</div>
+              </v-col>
+              <v-col cols="12" sm="6">
                 <div class="text-caption text-medium-emphasis">Vigencia</div>
                 <div>{{ formatPlanExpiry(tenant.planExpiresAt) }}</div>
               </v-col>
-              <v-col v-if="tenant.statusReason" cols="12">
-                <div class="text-caption text-medium-emphasis">Motivo del estado actual</div>
+              <v-col cols="12">
+                <v-btn
+                  prepend-icon="mdi-tag-outline"
+                  variant="tonal"
+                  size="small"
+                  @click="openPlanDialog"
+                >
+                  Cambiar plan
+                </v-btn>
+              </v-col>
+              <v-col v-if="tenant.publicReason" cols="12" sm="6">
+                <div class="text-caption text-medium-emphasis">
+                  Motivo público (lo ve el cliente)
+                </div>
+                <div>{{ tenant.publicReason }}</div>
+              </v-col>
+              <v-col v-if="tenant.statusReason" cols="12" sm="6">
+                <div class="text-caption text-medium-emphasis">Comentarios internos</div>
                 <div>{{ tenant.statusReason }}</div>
               </v-col>
             </v-row>
@@ -446,9 +524,22 @@ function handlePasswordDialogToggle(open: boolean): void {
     v-model="statusDialogOpen"
     :tenant-name="tenant.name"
     :target-status="statusTarget"
+    :reasons="statusReasons"
     :saving="statusSaving"
     :error-message="statusError"
     @confirm="confirmStatusChange"
+  />
+
+  <TenantPlanDialog
+    v-if="tenant"
+    v-model="planDialogOpen"
+    :tenant-name="tenant.name"
+    :plans="availablePlans"
+    :current-plan-id="tenant.planId"
+    :current-billing-period="tenant.billingPeriod"
+    :saving="planSaving"
+    :error-message="planError"
+    @confirm="confirmPlanChange"
   />
 
   <v-dialog v-model="confirmResetOpen" max-width="460">

@@ -19,15 +19,20 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/services/supabase'
 import {
   addAdmin,
+  createPlan,
   createTenant,
   getTenantMetrics,
   isPlatformAdmin,
   listAdmins,
   listAuditLog,
+  listPlans,
   listTenants,
   removeAdmin,
   resetOwnerPassword,
+  listReasons,
+  setTenantPlan,
   setTenantStatus,
+  updatePlan,
   updateTenantNotes,
 } from '@/services/platform'
 import { closePool, runCommitted } from './helpers'
@@ -125,10 +130,13 @@ describe('listTenants', () => {
       id: TENANT_PATITAS,
       name: 'Patitas Felices',
       createdAt: expect.any(String),
+      planId: expect.any(String),
       plan: 'Básico',
+      billingPeriod: 'indefinite',
       planExpiresAt: null,
       status: 'active',
       statusReason: null,
+      publicReason: null,
       internalNotes: null,
       ownerUserId: USER_DUENO,
       ownerName: 'Fernanda Ruiz Gómez',
@@ -185,13 +193,13 @@ describe('getTenantMetrics', () => {
 
 describe('setTenantStatus y updateTenantNotes', () => {
   it('suspender sin motivo se rechaza con el mensaje de la base, en español', async () => {
-    // "Indica el motivo." lo escribe la RPC (código 23514). Si el servicio
+    // "Elige el motivo." lo escribe la RPC (código 23514). Si el servicio
     // lo tragara y mostrara un error genérico, la persona no sabría qué
     // campo le falta llenar.
     await signInAsSuperadmin()
     const tenantId = await createScratchTenant()
-    await expect(setTenantStatus(tenantId, 'suspended', '  ')).rejects.toThrow(
-      'Indica el motivo.',
+    await expect(setTenantStatus(tenantId, 'suspended', null, null)).rejects.toThrow(
+      'Elige el motivo.',
     )
   })
 
@@ -199,16 +207,25 @@ describe('setTenantStatus y updateTenantNotes', () => {
     await signInAsSuperadmin()
     const tenantId = await createScratchTenant()
 
-    await setTenantStatus(tenantId, 'suspended', 'Falta de pago')
+    const reason = (await listReasons()).find((r) => r.kind === 'non_payment')!
+    await setTenantStatus(tenantId, 'suspended', reason.id, 'Debe dos meses')
     let scratch = (await listTenants()).find((t) => t.id === tenantId)
-    expect(scratch).toMatchObject({ status: 'suspended', statusReason: 'Falta de pago' })
+    expect(scratch).toMatchObject({
+      status: 'suspended',
+      publicReason: 'Falta de pago',
+      statusReason: 'Debe dos meses',
+    })
 
     // `null` como motivo al reactivar: el tipo generado no lo admite pero
     // Postgres sí (ver comentario en platform.ts) — si esa conversión se
     // rompiera, reactivar fallaría en el navegador.
-    await setTenantStatus(tenantId, 'active', null)
+    await setTenantStatus(tenantId, 'active', null, null)
     scratch = (await listTenants()).find((t) => t.id === tenantId)
-    expect(scratch).toMatchObject({ status: 'active', statusReason: null })
+    expect(scratch).toMatchObject({
+      status: 'active',
+      statusReason: null,
+      publicReason: null,
+    })
   })
 
   it('las notas se guardan y texto en blanco vuelve a null', async () => {
@@ -225,6 +242,62 @@ describe('setTenantStatus y updateTenantNotes', () => {
   })
 })
 
+describe('listPlans, createPlan, updatePlan y setTenantPlan (tarea #1906)', () => {
+  it('listPlans devuelve el catálogo en tipos de dominio, con el plan Básico de la semilla', async () => {
+    await signInAsSuperadmin()
+    const plans = await listPlans()
+    expect(plans).toContainEqual({ id: expect.any(String), name: 'Básico', isActive: true })
+  })
+
+  it('createPlan lo agrega activo, y setTenantPlan lo asigna a un negocio con vigencia indeterminada', async () => {
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+
+    const plan = await createPlan('Pro Servicio')
+    created.planIds.add(plan.id)
+    expect(plan.isActive).toBe(true)
+
+    await setTenantPlan(tenantId, plan.id, 'indefinite')
+    const scratch = (await listTenants()).find((t) => t.id === tenantId)
+    expect(scratch).toMatchObject({
+      planId: plan.id,
+      plan: 'Pro Servicio',
+      billingPeriod: 'indefinite',
+      planExpiresAt: null,
+    })
+  })
+
+  it('mensual/anual calculan la vigencia solas: la base ya no recibe una fecha', async () => {
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+    const plan = await createPlan('Anual Servicio')
+    created.planIds.add(plan.id)
+
+    await setTenantPlan(tenantId, plan.id, 'yearly')
+    const scratch = (await listTenants()).find((t) => t.id === tenantId)
+    expect(scratch?.billingPeriod).toBe('yearly')
+    expect(scratch?.planExpiresAt).not.toBeNull()
+    // No hace falta el valor exacto aquí: platform-rpcs.spec.ts ya prueba que
+    // es hoy + 1 año contra `now()` de la base. Esto solo confirma que el
+    // servicio no manda ni pide una fecha en el camino.
+  })
+
+  it('un plan desactivado se rechaza con el mensaje de la base, en español', async () => {
+    // "Elige un plan activo." lo escribe la RPC (código 23514): sin este
+    // chequeo, la persona con el diálogo abierto desde antes podría seguir
+    // asignando un plan que ya se quitó de la lista.
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+    const plan = await createPlan('Descontinuado Servicio')
+    created.planIds.add(plan.id)
+    await updatePlan(plan.id, plan.name, false)
+
+    await expect(setTenantPlan(tenantId, plan.id, 'indefinite')).rejects.toThrow(
+      'Elige un plan activo.',
+    )
+  })
+})
+
 describe('listAuditLog', () => {
   it('trae la bitácora de UNA empresa, con lo más reciente primero y el superadmin como actor', async () => {
     // La pestaña Bitácora depende del orden (lo último arriba) y de quién
@@ -233,7 +306,8 @@ describe('listAuditLog', () => {
     const admin = await signInAsSuperadmin()
     const tenantId = await createScratchTenant()
     await updateTenantNotes(tenantId, 'primera nota')
-    await setTenantStatus(tenantId, 'suspended', 'segundo cambio')
+    const reason = (await listReasons()).find((r) => r.kind === 'other')!
+    await setTenantStatus(tenantId, 'suspended', reason.id, 'segundo cambio')
 
     const log = await listAuditLog(tenantId)
 

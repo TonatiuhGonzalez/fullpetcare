@@ -9,6 +9,7 @@
 import { formatDate, formatTime } from './datetime'
 
 export type TenantStatus = 'active' | 'suspended' | 'closed'
+export type BillingPeriod = 'monthly' | 'yearly' | 'indefinite'
 
 // El panel no tiene una sucursal cuya zona horaria usar (CLAUDE.md §8.3
 // pide mostrar en la zona de la sucursal), así que las fechas de
@@ -50,6 +51,21 @@ export function formatPlatformDateTime(isoInstant: string): string {
 /** Vigencia del plan: `null` significa indefinida (todas las empresas hoy). */
 export function formatPlanExpiry(expiresAt: string | null): string {
   return expiresAt === null ? 'Indefinida' : formatPlatformDate(expiresAt)
+}
+
+const BILLING_PERIOD_LABELS: Record<BillingPeriod, string> = {
+  monthly: 'Mensual',
+  yearly: 'Anual',
+  indefinite: 'Indeterminado',
+}
+
+/**
+ * Forma de pago del plan asignado. La vigencia (`plan_expires_at`) NO se
+ * captura aparte: la calcula sola `platform_set_tenant_plan` a partir de
+ * esto (mensual = +1 mes, anual = +1 año, indeterminado = sin vencimiento).
+ */
+export function billingPeriodLabel(period: BillingPeriod): string {
+  return BILLING_PERIOD_LABELS[period]
 }
 
 // -----------------------------------------------------------------------------
@@ -175,7 +191,8 @@ function describeInfoUpdate(
   if (asText(before.internal_notes) !== asText(after.internal_notes)) {
     changes.push('Actualizó las notas internas.')
   }
-  if (before.plan !== after.plan) changes.push('Cambió el plan.')
+  if (before.plan_name_snapshot !== after.plan_name_snapshot) changes.push('Cambió el plan.')
+  if (before.billing_period !== after.billing_period) changes.push('Cambió la forma de pago.')
   if (before.plan_expires_at !== after.plan_expires_at) changes.push('Cambió la vigencia del plan.')
 
   return changes.length > 0 ? changes : ['Actualizó los datos de la empresa.']

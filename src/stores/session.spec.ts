@@ -29,6 +29,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSessionStore } from './session'
 import type { MembershipSummary } from '@/services/memberships'
+import type { TenantNotice } from '@/services/tenantAccess'
 
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
@@ -41,6 +42,10 @@ vi.mock('@/services/profiles', () => ({
 }))
 vi.mock('@/services/memberships', () => ({
   listMyMemberships: vi.fn(),
+}))
+vi.mock('@/services/tenantAccess', () => ({
+  listMyTenantNotices: vi.fn(),
+  cancelMyTenant: vi.fn(),
 }))
 vi.mock('@/services/permissions', () => ({
   listForTenant: vi.fn(),
@@ -55,6 +60,7 @@ vi.mock('@/services/platform', () => ({
 import { getCurrentUser, onSessionLost, signIn, signOut } from '@/services/auth'
 import { getProfile } from '@/services/profiles'
 import { listMyMemberships } from '@/services/memberships'
+import { cancelMyTenant, listMyTenantNotices } from '@/services/tenantAccess'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin } from '@/services/platform'
 import type { RolePermissionRow } from '@/lib/permissions'
@@ -97,6 +103,8 @@ beforeEach(() => {
   // Default: nadie es superadmin de plataforma — igual que arriba, solo los
   // tests de la fase 10 lo cambian.
   vi.mocked(isPlatformAdmin).mockResolvedValue(false)
+  // Default: ningún negocio bloqueado — solo los tests de #1905 lo cambian.
+  vi.mocked(listMyTenantNotices).mockResolvedValue([])
 })
 
 describe('login', () => {
@@ -112,6 +120,7 @@ describe('login', () => {
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Fernanda Ruiz',
       avatarPath: null,
+      mustChangePassword: false,
     })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
@@ -152,6 +161,7 @@ describe('logout', () => {
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Fernanda Ruiz',
       avatarPath: null,
+      mustChangePassword: false,
     })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
     vi.mocked(signOut).mockResolvedValue(undefined)
@@ -185,8 +195,15 @@ describe('logout', () => {
     // Caso: el usuario pulsa "Salir" sin red y signOut() lanza. Antes, reset()
     // no corría y la persona seguía "dentro" en una recepción compartida.
     // Ahora la sesión local se limpia siempre y el error se sigue propagando.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
     vi.mocked(signOut).mockRejectedValue(new Error('Failed to fetch'))
 
@@ -213,8 +230,15 @@ describe('pérdida de sesión inesperada', () => {
   }
 
   async function loginAsOwner(store: ReturnType<typeof useSessionStore>): Promise<void> {
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
     await store.login('dueno@patitasfelices.mx', 'Demo1234!')
   }
@@ -382,8 +406,15 @@ describe('permisos por módulo (fase 9)', () => {
   it('owner puede ver y editar cualquier módulo, sin necesidad de reglas sembradas', async () => {
     // Mismo bypass que app.has_permission() en Postgres: el dueño nunca
     // depende de que exista una fila en role_permissions.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
 
     const store = useSessionStore()
@@ -395,7 +426,11 @@ describe('permisos por módulo (fase 9)', () => {
 
   it('un rol sin ninguna regla para ese módulo no lo ve (default: no)', async () => {
     vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'vet@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Dr. Vet', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Dr. Vet',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_B])
 
     const store = useSessionStore()
@@ -410,8 +445,15 @@ describe('permisos por módulo (fase 9)', () => {
     // "employees:view" a vet pero tenant-a nunca lo configuró, cambiar
     // de negocio SIN cerrar sesión debe reflejar la regla del NUEVO
     // tenant activo, no arrastrar la de antes.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
     const rowsForTenantB: RolePermissionRow[] = [
@@ -439,7 +481,11 @@ describe('superadmin de plataforma (fase 10)', () => {
 
   function mockAdminSession() {
     vi.mocked(signIn).mockResolvedValue(ADMIN)
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Admin',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([])
     vi.mocked(isPlatformAdmin).mockResolvedValue(true)
   }
@@ -463,8 +509,15 @@ describe('superadmin de plataforma (fase 10)', () => {
   it('control: un usuario normal NO es superadmin y sí debe elegir negocio', async () => {
     // Sin este control, el test anterior pasaría igual si
     // needsBusinessSelection dejara de exigir elegir negocio a TODOS.
-    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'dueno@patitasfelices.mx' })
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Fernanda Ruiz', avatarPath: null })
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A, MEMBERSHIP_B])
 
     const store = useSessionStore()
@@ -505,7 +558,11 @@ describe('superadmin de plataforma (fase 10)', () => {
     // en silencio (lo dejaría en un limbo sin negocio y sin panel), se
     // muestra el error como cualquier otro fallo de login.
     vi.mocked(signIn).mockResolvedValue(ADMIN)
-    vi.mocked(getProfile).mockResolvedValue({ fullName: 'Admin', avatarPath: null })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Admin',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
     vi.mocked(isPlatformAdmin).mockRejectedValue(new Error('network'))
 
     const store = useSessionStore()
@@ -513,5 +570,146 @@ describe('superadmin de plataforma (fase 10)', () => {
 
     expect(store.status).toBe('error')
     expect(store.isPlatformAdmin).toBe(false)
+  })
+})
+
+describe('contraseña temporal', () => {
+  it('con contraseña temporal no pide negocios ni rol de plataforma hasta cambiarla', async () => {
+    // Una persona con contraseña temporal es bloqueada por la base: pedir sus
+    // negocios devolvería vacío, y la UI lo confundiría con "sin negocio" y la
+    // mandaría a una selección vacía. El store debe detenerse tras leer el
+    // profile, y cargar todo solo cuando el cambio de contraseña termine.
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValueOnce({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: true,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Temporal1234')
+
+    expect(store.mustChangePassword).toBe(true)
+    expect(store.isAuthenticated).toBe(true)
+    expect(listMyMemberships).not.toHaveBeenCalled()
+    expect(isPlatformAdmin).not.toHaveBeenCalled()
+
+    // Ya cambió la contraseña: el profile viene sin marca y ahora sí se carga todo.
+    vi.mocked(getProfile).mockResolvedValueOnce({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    await store.completePasswordChange()
+
+    expect(store.mustChangePassword).toBe(false)
+    expect(store.role).toBe('owner')
+  })
+
+  it('sin marca, iniciar sesión carga todo como siempre', async () => {
+    // Guarda contra el error inverso: que el corte anticipado afecte a
+    // quienes NO tienen contraseña temporal (todas las cuentas actuales).
+    vi.mocked(signIn).mockResolvedValue({
+      id: 'user-1',
+      email: 'dueno@patitasfelices.mx',
+    })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Fernanda Ruiz',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue([MEMBERSHIP_A])
+
+    const store = useSessionStore()
+    await store.login('dueno@patitasfelices.mx', 'Demo1234!')
+
+    expect(store.mustChangePassword).toBe(false)
+    expect(listMyMemberships).toHaveBeenCalledOnce()
+  })
+})
+
+describe('avisos de acceso (#1905)', () => {
+  const BLOCKED = {
+    tenantId: 'tenant-x',
+    tenantName: 'Mascotas y Mimos',
+    role: 'owner' as const,
+    notice: 'blocked' as const,
+    publicReason: 'Falta de pago',
+    planExpiresAt: null,
+    graceEndsAt: null,
+  }
+
+  async function loginWith(memberships: MembershipSummary[], notices: TenantNotice[] = [BLOCKED]) {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'x@y.mx' })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Ana',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue(memberships)
+    vi.mocked(listMyTenantNotices).mockResolvedValue(notices)
+    const store = useSessionStore()
+    await store.login('x@y.mx', 'Demo1234!')
+    return store
+  }
+
+  it('con todos sus negocios dados de baja queda en "solo bloqueados"', async () => {
+    // El router usa esta bandera para dejarlo en /login con el aviso. Si no se
+    // activara, caería en la selección de negocio con una lista vacía y sin explicación.
+    const store = await loginWith([])
+    expect(store.isBlockedOnly).toBe(true)
+    expect(store.restrictingNotices).toEqual([BLOCKED])
+  })
+
+  it('con un negocio activo además del dado de baja NO queda bloqueado', async () => {
+    // Un empleado con dos negocios no debe perder el que sí funciona.
+    const store = await loginWith([MEMBERSHIP_A])
+    expect(store.isBlockedOnly).toBe(false)
+  })
+
+  it('un negocio en solo lectura sí se puede abrir (no cuenta como bloqueado)', async () => {
+    // En solo lectura la persona conserva el acceso a su información; si el
+    // router la dejara en /login, sería justo el "secuestro" que se quiere evitar.
+    const store = await loginWith(
+      [MEMBERSHIP_A],
+      [{ ...BLOCKED, tenantId: 'tenant-a', notice: 'read_only' }],
+    )
+    expect(store.isBlockedOnly).toBe(false)
+    expect(store.restrictingNotices).toHaveLength(1)
+  })
+
+  it('los avisos preventivos no abren el diálogo del login, pero sí el banner', async () => {
+    // "Por vencer" y "gracia" solo informan: restrictingNotices (que decide el
+    // diálogo) los ignora, y activeNotice (el banner) sí los ve.
+    const store = await loginWith(
+      [MEMBERSHIP_A],
+      [{ ...BLOCKED, tenantId: 'tenant-a', notice: 'grace' }],
+    )
+    expect(store.restrictingNotices).toEqual([])
+    expect(store.activeNotice?.notice).toBe('grace')
+  })
+
+  it('al cerrar sesión se olvidan los avisos', async () => {
+    // Si se quedaran, la siguiente persona en el mismo navegador vería el
+    // aviso de un negocio que no es suyo.
+    const store = await loginWith([])
+    vi.mocked(signOut).mockResolvedValue(undefined)
+    await store.logout()
+    expect(store.tenantNotices).toEqual([])
+    expect(store.isBlockedOnly).toBe(false)
+  })
+
+  it('cancelar el negocio activo llama a la base y cierra la sesión', async () => {
+    // Tras dar de baja, dejar la sesión abierta mostraría una app vacía.
+    const store = await loginWith([MEMBERSHIP_A], [])
+    vi.mocked(cancelMyTenant).mockResolvedValue(undefined)
+    vi.mocked(signOut).mockResolvedValue(undefined)
+    await store.cancelActiveTenant('Cierro el local')
+    expect(cancelMyTenant).toHaveBeenCalledWith('tenant-a', 'Cierro el local')
+    expect(store.isAuthenticated).toBe(false)
   })
 })

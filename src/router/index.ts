@@ -28,6 +28,13 @@ export const router = createRouter({
       component: () => import('@/pages/auth/LoginPage.vue'),
     },
     {
+      // Pantalla obligatoria tras el primer inicio de sesión con contraseña
+      // temporal (ver el guard de abajo).
+      path: '/cambiar-contrasena',
+      name: 'force-password-change',
+      component: () => import('@/pages/auth/ForcePasswordChangePage.vue'),
+    },
+    {
       path: '/seleccionar-negocio',
       name: 'select-business',
       component: () => import('@/pages/auth/SelectBusinessPage.vue'),
@@ -115,6 +122,16 @@ export const router = createRouter({
           component: () => import('@/pages/superadmin/TenantsPage.vue'),
         },
         {
+          path: 'motivos',
+          name: 'superadmin-motivos',
+          component: () => import('@/pages/superadmin/ReasonsPage.vue'),
+        },
+        {
+          path: 'planes',
+          name: 'superadmin-planes',
+          component: () => import('@/pages/superadmin/PlansPage.vue'),
+        },
+        {
           path: 'administradores',
           name: 'superadmin-administradores',
           component: () => import('@/pages/superadmin/AdminsPage.vue'),
@@ -156,9 +173,37 @@ router.beforeEach(async (to) => {
   const isPrivateRoute = to.path.startsWith('/app')
   const isPlatformRoute = to.matched.some((record) => record.meta.requiresPlatformAdmin)
   const isSelectBusinessRoute = to.path === '/seleccionar-negocio'
+  const isForcePasswordRoute = to.path === '/cambiar-contrasena'
 
-  if ((isPrivateRoute || isPlatformRoute || isSelectBusinessRoute) && !session.isAuthenticated) {
+  if (
+    (isPrivateRoute ||
+      isPlatformRoute ||
+      isSelectBusinessRoute ||
+      isForcePasswordRoute) &&
+    !session.isAuthenticated
+  ) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // Contraseña temporal: hasta cambiarla, la única pantalla permitida es la
+  // de cambio (y la vista pública /c/:token, que no usa sesión). Va antes de
+  // los demás gateos porque para esta persona aún no se cargaron ni negocios
+  // ni rol de plataforma. Quien ya la cambió y entra a mano a esa pantalla
+  // se manda a su casa.
+  if (session.isAuthenticated && !to.path.startsWith('/c/')) {
+    if (session.mustChangePassword && !isForcePasswordRoute) {
+      return { path: '/cambiar-contrasena' }
+    }
+    if (!session.mustChangePassword && isForcePasswordRoute) {
+      return { path: '/app/agenda' }
+    }
+  }
+
+  // Todos sus negocios están suspendidos, dados de baja o vencidos: no hay
+  // nada que mostrarle salvo el aviso, que vive en /login (LoginPage abre el
+  // diálogo solo). Se le deja ahí, y la vista pública /c/:token no se toca.
+  if (session.isBlockedOnly && !to.path.startsWith('/c/')) {
+    return to.path === '/login' ? true : { path: '/login' }
   }
 
   // Panel de plataforma (fase 10): quien no es superadmin no tiene nada que

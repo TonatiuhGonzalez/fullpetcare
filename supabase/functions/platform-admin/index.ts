@@ -137,6 +137,11 @@ async function createAuthUser(
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName },
+    // La contraseña es temporal: el trigger de alta la copia a
+    // profiles.must_change_password y la persona debe cambiarla al entrar.
+    // Va en app_metadata (no en user_metadata) porque solo la llave
+    // service_role puede escribirla; el propio usuario no.
+    app_metadata: { must_change_password: true },
   });
 
   if (error) {
@@ -360,10 +365,25 @@ Deno.serve(handleCors(async (req) => {
         p_user_id: ownerUserId,
       });
 
+      // Marca al dueño para que la cambie al entrar. Va DESPUÉS de cambiar la
+      // contraseña a propósito: un trigger apaga esta marca cada vez que
+      // cambia el hash de la contraseña (incluido este cambio), así que
+      // ponerla antes no serviría. Si esto falla la contraseña YA cambió:
+      // igual que arriba, se responde 200 avisando en vez de perder la
+      // contraseña nueva.
+      const { error: markError } = await adminClient
+        .from("profiles")
+        .update({ must_change_password: true })
+        .eq("id", ownerUserId);
+      if (markError) {
+        console.error("platform-admin: no se pudo marcar el cambio obligatorio", ownerUserId);
+      }
+
       return Response.json({
         ownerEmail,
         temporaryPassword: password,
         sessionsRevoked: !revokeError,
+        mustChangeEnforced: !markError,
       });
     }
   }

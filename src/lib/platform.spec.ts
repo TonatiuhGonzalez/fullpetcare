@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  billingPeriodLabel,
   describeAuditEntry,
   filterTenants,
   formatPlanExpiry,
@@ -34,6 +35,17 @@ describe('formatPlanExpiry', () => {
     // (UTC−6): la fecha debe salir "15", no "16" (CLAUDE.md §8.3, la
     // conversión de zona es solo al mostrar).
     expect(formatPlanExpiry('2026-07-16T03:00:00Z')).toBe('15 de julio de 2026')
+  })
+})
+
+describe('billingPeriodLabel', () => {
+  it('tiene etiqueta en español para las tres formas de pago', () => {
+    // Si se agregara una cuarta forma de pago al enum de la base y faltara
+    // aquí, el selector del diálogo "Cambiar plan" saldría con una opción
+    // vacía.
+    expect(billingPeriodLabel('monthly')).toBe('Mensual')
+    expect(billingPeriodLabel('yearly')).toBe('Anual')
+    expect(billingPeriodLabel('indefinite')).toBe('Indeterminado')
   })
 })
 
@@ -171,6 +183,34 @@ describe('describeAuditEntry', () => {
       newData: { status: 'active', internal_notes: 'Cliente moroso, no renovar' },
     })
     expect(result).toEqual(['Actualizó las notas internas.'])
+  })
+
+  it('cambiar el plan, la forma de pago o la vigencia se describen por separado (tarea #1906)', () => {
+    // plan_name_snapshot (no plan_id) es la señal: comparar el id crudo
+    // confundiría a cualquiera que leyera la bitácora, y además cambia
+    // siempre junto con el nombre.
+    expect(
+      describeAuditEntry({
+        ...base,
+        action: 'UPDATE',
+        tableName: 'tenant_platform_info',
+        oldData: { plan_name_snapshot: 'Básico', billing_period: 'indefinite', plan_expires_at: null },
+        newData: { plan_name_snapshot: 'Pro', billing_period: 'indefinite', plan_expires_at: null },
+      }),
+    ).toEqual(['Cambió el plan.'])
+
+    // Reasignar el MISMO plan pero con otra forma de pago: la vigencia
+    // cambia junto con ella (platform_set_tenant_plan la recalcula), así
+    // que deben verse las dos frases, no solo una.
+    expect(
+      describeAuditEntry({
+        ...base,
+        action: 'UPDATE',
+        tableName: 'tenant_platform_info',
+        oldData: { plan_name_snapshot: 'Pro', billing_period: 'indefinite', plan_expires_at: null },
+        newData: { plan_name_snapshot: 'Pro', billing_period: 'monthly', plan_expires_at: '2026-12-31T23:59:00Z' },
+      }),
+    ).toEqual(['Cambió la forma de pago.', 'Cambió la vigencia del plan.'])
   })
 
   it('un UPDATE con varios cambios los lista todos', () => {

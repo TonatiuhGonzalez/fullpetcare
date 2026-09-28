@@ -54,6 +54,12 @@ vi.mock('@/services/permissions', () => ({
 vi.mock('@/services/platform', () => ({
   isPlatformAdmin: vi.fn().mockResolvedValue(false),
 }))
+// Y para services/tenantAccess.ts (#1905): el store de sesión pide los avisos
+// de acceso del negocio, y ese servicio también llega a supabase.ts.
+vi.mock('@/services/tenantAccess', () => ({
+  listMyTenantNotices: vi.fn().mockResolvedValue([]),
+  cancelMyTenant: vi.fn(),
+}))
 
 import { listByDateRange } from '@/services/appointments'
 import { getById as getBranchById } from '@/services/branches'

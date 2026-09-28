@@ -13,11 +13,14 @@ const props = defineProps<{
   modelValue: boolean
   /** Correo de la sesión: hace falta para verificar la contraseña actual. */
   email: string
+  /** true en el cambio obligatorio (contraseña temporal): no se puede cerrar ni cancelar, solo salir. */
+  required?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   changed: []
+  leave: []
 }>()
 
 const current = ref('')
@@ -73,7 +76,8 @@ async function handleSubmit(): Promise<void> {
   try {
     await changePassword(props.email, current.value, next.value)
     emit('changed')
-    close()
+    // En el cambio obligatorio el padre decide cuándo termina (tras recargar la sesión).
+    if (!props.required) close()
   } catch (e) {
     if (e instanceof InvalidCurrentPasswordError) {
       currentServerError.value = 'La contraseña actual no es correcta.'
@@ -94,6 +98,7 @@ async function handleSubmit(): Promise<void> {
   <v-dialog
     :model-value="modelValue"
     max-width="440"
+    :persistent="required"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-card>
@@ -143,8 +148,13 @@ async function handleSubmit(): Promise<void> {
 
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" :disabled="saving" @click="close">Cancelar</v-btn>
-        <v-btn color="primary" :loading="saving" @click="handleSubmit">Cambiar contraseña</v-btn>
+        <v-btn v-if="required" variant="text" :disabled="saving" @click="emit('leave')">
+          Salir
+        </v-btn>
+        <v-btn v-else variant="text" :disabled="saving" @click="close">Cancelar</v-btn>
+        <v-btn color="primary" :loading="saving" @click="handleSubmit"
+          >Cambiar contraseña</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>

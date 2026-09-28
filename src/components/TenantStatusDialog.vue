@@ -6,28 +6,33 @@
 import { computed, ref, watch } from 'vue'
 
 import { tenantStatusLabel, type TenantStatus } from '@/lib/platform'
+import type { CancellationReason } from '@/services/platform'
 
 const props = defineProps<{
   modelValue: boolean
   tenantName: string
   targetStatus: Exclude<TenantStatus, 'active'>
+  /** Motivos activos del catálogo: el elegido es el que verá el cliente. */
+  reasons: CancellationReason[]
   saving: boolean
   errorMessage: string | null
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  confirm: [reason: string]
+  confirm: [publicReasonId: string, comment: string]
 }>()
 
-const reason = ref('')
+const reasonId = ref<string | null>(null)
+const comment = ref('')
 const showValidation = ref(false)
 
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      reason.value = ''
+      reasonId.value = null
+      comment.value = ''
       showValidation.value = false
     }
   },
@@ -39,8 +44,8 @@ const title = computed(() =>
 
 function handleConfirm(): void {
   showValidation.value = true
-  if (reason.value.trim() === '') return
-  emit('confirm', reason.value.trim())
+  if (!reasonId.value) return
+  emit('confirm', reasonId.value, comment.value.trim())
 }
 </script>
 
@@ -60,16 +65,29 @@ function handleConfirm(): void {
           >.
         </p>
         <p class="text-body-2 text-medium-emphasis mb-4">
-          Por ahora es solo una etiqueta: los usuarios de la empresa seguirán pudiendo entrar. Se
-          puede revertir en cualquier momento.
+          {{
+            targetStatus === 'suspended'
+              ? 'Los usuarios podrán consultar su información pero no hacer cambios.'
+              : 'Los usuarios dejarán de poder ver su información.'
+          }}
+          Verán el motivo que elijas al iniciar sesión. Se puede revertir en cualquier
+          momento.
         </p>
 
+        <v-select
+          v-model="reasonId"
+          :items="reasons"
+          item-title="label"
+          item-value="id"
+          label="Motivo que verá el cliente *"
+          :error-messages="showValidation && !reasonId ? ['Elige el motivo.'] : []"
+        />
+
         <v-textarea
-          v-model="reason"
-          label="Motivo *"
-          rows="3"
+          v-model="comment"
+          label="Comentarios internos (opcional, solo los ves tú)"
+          rows="2"
           auto-grow
-          :error-messages="showValidation && reason.trim() === '' ? ['Indica el motivo.'] : []"
         />
 
         <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal">

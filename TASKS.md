@@ -372,10 +372,18 @@ de construir:
   mismos permisos.
 - **Solo ven datos de la empresa** (nombre, dueño, plan, estado, conteos). Nunca
   clientes, mascotas, citas ni expedientes.
-- Plan y vigencia son **informativos**: plan de texto fijo "Básico", vigencia
-  indefinida (`NULL`). Sin tabla de planes y sin bloqueo por vencimiento (a futuro).
-- Suspender / dar de baja es **solo una etiqueta** de estado: no bloquea el acceso de
-  los usuarios de la empresa (a futuro). Las empresas no tienen fecha de baja.
+- Plan de texto fijo "Básico", vigencia indefinida (`NULL`), sin tabla de planes.
+  **Actualizado (tarea #1906):** catálogo real de planes (tabla `plans`, administrado
+  por el superadmin) y forma de pago (`billing_period`: mensual/anual/indeterminado)
+  que la vigencia calcula sola al asignarse — ya no se escribe una fecha a mano. El
+  plan sigue siendo solo informativo: no limita nada por sí solo (el acceso lo sigue
+  decidiendo el estado + la vigencia, #1905). Ver más abajo.
+- Suspender o vencer la vigencia (pasada la gracia de 2 días) deja la empresa en **solo lectura**;
+  darla de baja (o que el dueño cancele) le **niega todo el acceso** (tarea #1905, migraciones
+  `20260925140000` a `20260925170000`, pruebas en `tenant-blocking.spec.ts`). Motivo público
+  del catálogo (pestaña "Motivos") + comentarios internos; suspensión automática diaria con
+  `pg_cron`; banner 3 días antes de vencer. "Pagar ahora" es un mock. Las empresas no tienen
+  fecha de baja.
 - Un solo dueño por empresa. El alta captura: nombre de la empresa, nombre de la
   sucursal, y nombre / correo / teléfono del dueño. Zona horaria fija
   `America/Mexico_City`. Catálogo de servicios vacío.
@@ -556,17 +564,26 @@ de construir:
   **Pendientes que quedan abiertos (decisión del usuario, no se tocaron):**
   1. ~~`deploy-functions.yml` solo desplegaba `public-pet-view`~~ **Resuelto:** ahora
      también despliega `invite-employee` y `platform-admin` (mismo patrón, con
-     `verify_jwt = true` de `config.toml`). Sin probar en la nube: solo corre al mergear
-     a `main`.
+     `verify_jwt = true` de `config.toml`). **Verificado en la nube (2026-09-25):** al
+     mergear el PR #50 a `main`, "Desplegar Edge Functions a producción" y "Desplegar
+     migraciones a producción" terminaron en verde (11 migraciones aplicadas en prod).
   2. ~~CORS: ninguna de las dos funciones con sesión maneja el preflight~~ **Resuelto en
-     código, sin verificar en la nube:** `supabase/functions/_shared/cors.ts` contesta el
+     código y verificado en la nube (2026-09-25):** `supabase/functions/_shared/cors.ts` contesta el
      `OPTIONS` (204) y añade `Access-Control-Allow-*` a toda respuesta de `invite-employee`
      y `platform-admin`; probado como función pura en `functions-cors.spec.ts` (por HTTP en
-     local no sirve: Kong contesta antes). **Falta comprobarlo contra staging o prod** tras
-     el primer despliegue: que el preflight pase con `verify_jwt = true` y que el deploy
-     empaquete el import `../_shared/cors.ts`.
-  3. No se pudo comprobar el CI real desde aquí (Edge Runtime, Node con type stripping
-     para el script de superadmin, unitarios sin `.env.local`).
+     local no sirve: Kong contesta antes). Ya en prod, un `OPTIONS` sin JWT a
+     `platform-admin` y a `invite-employee` responde 204 con `Access-Control-Allow-Origin`,
+     así que el preflight pasa con `verify_jwt = true` y el deploy sí empaquetó
+     `../_shared/cors.ts`.
+  3. ~~No se pudo comprobar el CI real desde aquí~~ **Resuelto:** el PR #50
+     (`develop` → `main`) pasó "Lint y pruebas" y "E2E (Playwright)" en GitHub Actions, y el
+     CI de `main` posterior también.
+
+  **Comprobado en producción (2026-09-25):** el primer superadmin se creó con
+  `npm run superadmin:create` contra `fullpetcare-prod` (con la llave `sb_secret_`; el
+  script no necesitó ajustes), entró a `/superadmin`, y el alta de una empresa de prueba
+  funcionó de punta a punta. Sin comprobar todavía en prod: `reset_password` de un dueño e
+  `invite-employee`.
   4. ~~`demo:reset` oculta toda empresa fuera de la semilla~~ **Resuelto:** columna
      `tenant_platform_info.is_demo` (default `false`), casilla "Empresa de demostración" en
      el alta, y el reset solo oculta las marcadas (migración `20260925120000_tenant_is_demo.sql`,
@@ -582,8 +599,46 @@ contraseña actual (volviendo a iniciar sesión con ella), cambia la nueva y cie
 demás sesiones de la cuenta. Reglas de forma en `lib/validation.ts#passwordChangeProblems`,
 servicio en `services/auth.ts#changePassword`; tests en `validation.spec.ts` y
 `supabase/tests/auth-service.spec.ts`, y comprobado en navegador contra el Supabase local.
-No fuerza el cambio: la contraseña temporal sigue valiendo hasta que la persona la cambie.
+Ese diálogo por sí solo no fuerza el cambio; el cambio obligatorio se agregó después
+(tarea #1904, ver abajo).
 
-**Trabajo futuro (fuera de esta fase):** forzar el cambio de contraseña en el primer
-ingreso del dueño, gestión real de planes y vigencia, y bloqueo de acceso por
-vencimiento o suspensión.
+**Cambio obligatorio de la contraseña temporal (tarea #1904, 2026-09-25):** dueños y
+superadmins dados de alta (y dueños con contraseña restablecida) deben cambiarla en su
+primer inicio de sesión. Migración `20260925130000_must_change_password.sql`
+(`profiles.must_change_password`, triggers, bloqueo en `is_member_of()` & co.), pantalla
+`/cambiar-contrasena` (`ForcePasswordChangePage.vue`, reutiliza `ChangePasswordDialog`),
+guard del router y `session.completePasswordChange()`. Cuentas existentes no se tocan y
+los empleados invitados quedan fuera. Diseño en `CLAUDE.md` §7.6. Tests:
+`supabase/tests/must-change-password.spec.ts`, ajustes en `platform-admin-function.spec.ts`
+y `create-superadmin-script.spec.ts`, y `session.spec.ts`. Pendiente: comprobar en
+navegador y en producción (la migración es nueva en `main`).
+
+**Catálogo real de planes y forma de pago (tarea #1906, 2026-09-28):** hasta entonces
+`tenant_platform_info.plan` era texto libre fijo en "Básico" y nadie podía cambiarlo
+(no existía ni una RPC que escribiera esa columna) ni fijar `plan_expires_at`. Modelo
+decidido con el usuario: catálogo administrado por el superadmin (tabla `plans`, mismo
+patrón que `cancellation_reasons` de #1905 — pestaña "Planes"); al asignar un plan se
+elige también su **forma de pago** (`billing_period`: `monthly`/`yearly`/`indefinite`)
+y la base CALCULA la vigencia sola desde ese momento (mensual +1 mes, anual +1 año,
+indeterminado sin vencimiento) — ya no se escribe una fecha a mano. En el mundo real la
+forma de pago la elige el dueño al suscribirse (mensual o anual); indeterminado es de
+uso interno del superadmin. Hoy no existe una pantalla de autoservicio para el dueño
+(fuera de alcance), así que las tres las sigue asignando el superadmin desde
+`/superadmin`, igual que ya asigna el plan y el estado. El plan sigue siendo SOLO
+INFORMATIVO — sin cuotas de uso por plan, que queda fuera de esta tarea.
+Migración `20260928120000_plans_catalog.sql`: `tenant_platform_info.plan_id` (FK) +
+`plan_name_snapshot` (copia del nombre al asignar, igual que
+`appointment_services.name_snapshot`, para que renombrar un plan no reescriba lo que
+ya vio una empresa) + `billing_period` reemplazan la columna `plan`; RPCs
+`platform_set_tenant_plan` (recibe la forma de pago, no una fecha), `platform_create_plan`
+y `platform_update_plan`. Diálogo "Cambiar plan" en el detalle de la empresa
+(`TenantPlanDialog.vue`) fija plan + forma de pago en una sola llamada; la vigencia ya
+no se captura ahí. Diseño en `CLAUDE.md` §6.8. Tests: `platform-rls.spec.ts` (RLS del
+catálogo, default `indefinite`), `platform-rpcs.spec.ts` (las 3 RPC nuevas, que mensual/anual
+calculan la fecha contra `now()` de la propia transacción, snapshot al renombrar),
+`platform-service.spec.ts` y `platform.spec.ts` (`billingPeriodLabel`, bitácora).
+Se actualizó `supabase/seed/demo_reset.sql` (usaba la columna `plan` eliminada).
+Comprobado en navegador contra Supabase local: asignar un plan mensual a una empresa y
+ver la vigencia calculada (hoy + 1 mes) reflejada en el detalle y en la lista.
+
+**Trabajo futuro (fuera de esta fase):** cuotas de uso por plan (sucursales, empleados…).

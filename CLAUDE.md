@@ -279,7 +279,7 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 | --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4)                                                  |
 | `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`     | Sucursal. **Su propia zona horaria** (§8.3)                                                      |
-| `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`                                   | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios |
+| `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`, `must_change_password`           | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios. La marca `must_change_password` se explica en §7.6 |
 | `memberships`         | `tenant_id`, `user_id`, `role`, `is_active`                                                   | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7)                     |
 | `membership_branches` | `membership_id`, `branch_id`                                                                  | A qué sucursales entra. El rol `owner` ve todas sin necesidad de filas aquí                      |
 
@@ -397,7 +397,8 @@ conteos de uso — jamás clientes, mascotas, citas ni expedientes.
 | Tabla                  | Campos clave                                                                                              | Notas                                                                                                   |
 | ---------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `platform_admins`      | `user_id` (único, → `auth.users`), `deleted_at`                                                           | Quién es superadmin. **Sin `tenant_id`**: no pertenece a ningún negocio. Varios, todos con el mismo poder |
-| `tenant_platform_info` | `tenant_id` (único, 1 a 1 con `tenants`), `plan`, `plan_expires_at`, `status`, `status_reason`, `internal_notes` | Lo que la plataforma anota de cada negocio. La crea un trigger al insertar un tenant                    |
+| `plans`                | `name`, `is_active`                                                                                        | Catálogo de planes (tarea #1906). Tabla de plataforma, sin `tenant_id`, mismo patrón que `cancellation_reasons` |
+| `tenant_platform_info` | `tenant_id` (único, 1 a 1 con `tenants`), `plan_id` (→ `plans`), `plan_name_snapshot`, `billing_period`, `plan_expires_at`, `status`, `status_reason`, `internal_notes` | Lo que la plataforma anota de cada negocio. La crea un trigger al insertar un tenant                    |
 | `platform_audit_log`   | `tenant_id` (nulo), `table_name`, `record_id`, `action`, `event`, `actor_user_id`, `old_data`, `new_data`  | Bitácora de plataforma. Solo la leen superadmins                                                         |
 
 Decisiones que no se ven en el esquema:
@@ -409,11 +410,51 @@ Decisiones que no se ven en el esquema:
   cada negocio y `app.log_change()` exige `tenant_id`.
 - **Nada se duplica:** el nombre y teléfono del dueño salen de `profiles` (de la membresía
   `owner`), el correo de `auth.users`, y la fecha de alta es `tenants.created_at`.
-- **Plan, vigencia y estado son solo informativos.** El plan es texto (`'Básico'`), la
-  vigencia `NULL` significa indefinida, y `status` (`active`/`suspended`/`closed`) es una
-  etiqueta: **no bloquea el acceso** de los usuarios de la empresa. Bloquearlo implicaría
-  tocar `app.is_member_of()`, que usa toda la base; se decide cuando exista la gestión real
-  de planes. Un test documenta este comportamiento a propósito.
+- **Estado y vigencia limitan el acceso (tarea #1905).** El plan sigue siendo texto
+  informativo, pero `app.tenant_access_level()` calcula un nivel por negocio:
+  `full`; `grace` (vigencia vencida hace menos de 2 días: todo funciona + aviso);
+  `read_only` (suspendido, o vencido y sin gracia: se ve todo, no se escribe); y
+  `blocked` (dado de baja: no se ve nada). Vigencia `NULL` es indefinida y nunca limita.
+  - **Lectura:** `app.is_member_of()`, `role_in()` y `can_access_branch()` niegan solo en
+    `blocked` (mismo mecanismo que §7.6, pero por negocio).
+  - **Escritura:** el trigger `enforce_tenant_writable` (BEFORE INSERT/UPDATE) está en
+    `tenants` y en toda tabla con `tenant_id` salvo bitácoras y `tenant_platform_info`;
+    un test falla si una tabla nueva lo omite. Solo frena a personas (`auth.uid()` no
+    nulo): la semilla y las Edge Functions con `service_role` siguen escribiendo. No cubre
+    Storage (subir fotos/documentos sigue permitido en solo lectura).
+  - **Motivo público vs. comentarios internos:** al suspender o dar de baja se elige un
+    motivo del catálogo `cancellation_reasons` (tabla de plataforma, sin `tenant_id`, RPC
+    `platform_create_reason`/`platform_update_reason`); su texto se COPIA a
+    `tenant_platform_info.public_reason` (snapshot). `status_reason` pasa a ser el
+    comentario interno, opcional. El negocio solo ve el motivo público
+    (`my_tenant_notices()`, nunca notas ni comentarios).
+  - **Automatización:** `pg_cron` ejecuta a diario (06:00 UTC) `app.suspend_expired_tenants()`,
+    que pasa a `suspended` con el motivo `non_payment` a los negocios con vigencia vencida y
+    gracia terminada (bitácora con actor nulo = sistema). Es cinturón: el solo lectura ya
+    se calcula al vuelo aunque el job no corra.
+  - **Cancelación por el dueño:** `cancel_my_tenant()` (solo el dueño activo) lo pasa a
+    `closed` con el motivo `customer_request`. Irreversible para el negocio: solo un
+    superadmin reactiva.
+  - **Interfaz:** al iniciar sesión, diálogo si hay negocios en solo lectura o de baja; banner
+    dentro de la app para "vence en 3 días o menos", gracia y solo lectura. "Pagar ahora"
+    es un mock (solo avisa "pronto"). Los superadmins no se ven afectados (usan RPC `platform_*`).
+- **Catálogo real de planes (tarea #1906).** `plans` reemplaza el texto libre que tenía
+  `tenant_platform_info.plan`: el superadmin administra el catálogo (pestaña "Planes",
+  RPC `platform_create_plan`/`platform_update_plan`). `platform_set_tenant_plan` asigna
+  un plan y una **forma de pago** (`billing_period`, enum `monthly`/`yearly`/`indefinite`)
+  en una sola llamada, y la base CALCULA la vigencia sola desde ese momento: mensual
+  +1 mes, anual +1 año, indeterminado la deja en `NULL` — ya no se recibe una fecha.
+  En el mundo real la forma de pago la elige el DUEÑO al suscribirse (mensual o anual);
+  `indefinite` es de uso interno del superadmin (negocios de cortesía, internos) y hoy,
+  al no existir una pantalla de autoservicio para el dueño (fuera de alcance en v1), es
+  el superadmin quien asigna cualquiera de las tres desde `/superadmin`, igual que ya
+  asigna el plan y el estado. `plan_id` es la FK viva; `plan_name_snapshot` es una COPIA
+  del nombre al momento de asignarlo (igual que `appointment_services.name_snapshot`,
+  §6.3): renombrar un plan en el catálogo no reescribe lo que ya tiene asignado una
+  empresa. El plan sigue siendo **solo informativo**: no limita nada por sí solo — el
+  acceso lo sigue decidiendo el estado +
+  la vigencia (#1905, arriba). Un plan ya asignado no se borra, se desactiva
+  (`is_active`) y deja de ofrecerse para asignaciones nuevas.
 - **Un solo dueño por empresa.** Zona horaria del alta: `America/Mexico_City`.
 - El primer superadmin no puede crearse desde la interfaz: `npm run superadmin:create`
   (§12). Los demás los agrega un superadmin desde la pestaña "Superadmins".
@@ -585,6 +626,30 @@ sin argumentos: pregunta por `auth.uid()`, nadie puede consultar "¿fulano es ad
 - **Cada acción queda en `platform_audit_log`**, incluidas las que no cambian ninguna fila
   nuestra (restablecer una contraseña, `platform_log_event`). La bitácora va primero: si no
   se puede registrar, no se cambia la contraseña.
+
+### 7.6 Contraseña temporal obligatoria
+
+Al dar de alta a un dueño o a un superadmin (y al restablecer la contraseña de un dueño)
+la contraseña es temporal, y `profiles.must_change_password` queda en `true`. Mientras
+sea `true`, **la base misma** niega el acceso: `app.is_member_of()`, `role_in()`,
+`can_access_branch()` e `is_platform_admin()` devuelven "no" (vía
+`app.has_pending_password_change()`), así que ni llamando a la API directo se ven o
+escriben datos de negocio. La interfaz solo lo hace cómodo: el router manda a
+`/cambiar-contrasena` y el store no pide negocios hasta terminar.
+
+- **Cómo se pone:** `app_metadata.must_change_password = true` al crear el usuario (la
+  Edge Function `platform-admin` y `scripts/create-superadmin.mjs`); triggers sobre
+  `auth.users` lo copian al profile. Va en `app_metadata` porque solo `service_role` la
+  escribe. En el restablecimiento, la Edge Function la pone **después** de cambiar la
+  contraseña (el trigger de abajo la apaga con cualquier cambio de hash).
+- **Cómo se quita:** un trigger sobre `auth.users` la apaga cuando cambia
+  `encrypted_password`. No hay RPC para "saltarse" el cambio, y `authenticated` no tiene
+  `UPDATE` sobre esa columna (permisos por columna en `profiles`).
+- **Cuentas existentes:** no se tocan (`default false`).
+- **Empleados** invitados con `invite-employee` **no** entran en esto (fuera del alcance
+  de la tarea #1904); sería agregar la misma línea de `app_metadata` allí.
+- Tocar `app.is_member_of()` sí es posible aquí porque es por **persona**, no por
+  negocio; el estado de la empresa (§6.8) también la bloquea, con `app.is_tenant_blocked()`.
 
 ---
 
@@ -818,6 +883,27 @@ Node sobre shell cuando la lógica crece.
 5. Nada de abstracciones especulativas. Sin capa de repositorios, sin factory patterns,
    sin "por si luego". Se extrae cuando duele por tercera vez.
 6. Al terminar una fase, actualizar `TASKS.md` y decir qué se puede demostrar.
+
+### Cómo redactar tareas para el sistema de seguimiento de la empresa
+
+Aplica cada vez que se pida crear o actualizar una tarea en el sistema de seguimiento de
+tareas de la empresa (no a `TASKS.md`, que es documentación técnica del proyecto).
+
+Quien lea la tarea es cualquier compañero de trabajo, no necesariamente alguien que
+conozca el código. Por eso, **tanto el título como la descripción**:
+
+- Se escriben en lenguaje **genérico y entendible**: qué falta o qué se quiere lograr, y
+  por qué importa. No cómo se va a programar.
+- **Evitan** URLs, rutas, variables, endpoints, nombres de funciones, tablas, columnas,
+  componentes o archivos, y números de PR o de commit.
+- Solo incluyen un término técnico cuando es **absolutamente necesario** para entender el
+  contexto de la tarea, y en ese caso lo explican en pocas palabras.
+
+Ejemplo:
+
+- Mal: "Probar reset_password e invite-employee en prod".
+- Bien: "Probar en producción el restablecimiento de contraseña de un dueño y la
+  invitación de empleados".
 
 ### Qué NO hacer sin preguntar
 

@@ -2,7 +2,9 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import CancelAccountDialog from '@/components/CancelAccountDialog.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
@@ -19,6 +21,43 @@ const titleLabel = computed(() =>
   session.activeBranch ? `${businessName.value} - ${session.activeBranch.name}` : businessName.value,
 )
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
+
+// Banner de vigencia / gracia / solo lectura del negocio activo (tarea #1905).
+const banner = computed(() => {
+  const n = session.activeNotice
+  if (!n) return null
+  return {
+    text: noticeText(
+      n,
+      session.activeMembership?.tenantTimezone ?? 'America/Mexico_City',
+    ),
+    severity: noticeSeverity(n.notice),
+    // Solo el dueño puede regularizar el pago.
+    canPay: n.role === 'owner',
+  }
+})
+// MOCK: aún no hay pasarela de pago (CLAUDE.md §1).
+const showPayMock = ref(false)
+
+// Cancelar la cuenta: solo el dueño.
+const showCancel = ref(false)
+const cancelSaving = ref(false)
+const cancelError = ref<string | null>(null)
+
+async function handleCancelAccount(comment: string): Promise<void> {
+  cancelSaving.value = true
+  cancelError.value = null
+  try {
+    await session.cancelActiveTenant(comment || null)
+    showCancel.value = false
+    await router.push('/login')
+  } catch {
+    cancelError.value =
+      'No se pudo cancelar la cuenta. Revisa tu conexión e inténtalo de nuevo.'
+  } finally {
+    cancelSaving.value = false
+  }
+}
 
 const showChangePassword = ref(false)
 const passwordChangedNotice = ref(false)
@@ -94,8 +133,27 @@ function handleBranchChange(branchId: unknown): void {
       title="Cambiar contraseña"
       @click="showChangePassword = true"
     />
+    <v-btn
+      v-if="session.role === 'owner'"
+      icon="mdi-account-cancel-outline"
+      variant="text"
+      title="Cancelar mi cuenta"
+      @click="showCancel = true"
+    />
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
+
+  <CancelAccountDialog
+    v-model="showCancel"
+    :tenant-name="businessName"
+    :saving="cancelSaving"
+    :error-message="cancelError"
+    @confirm="handleCancelAccount"
+  />
+
+  <v-snackbar v-model="showPayMock" :timeout="4000">
+    El pago en línea estará disponible pronto.
+  </v-snackbar>
 
   <ChangePasswordDialog
     v-model="showChangePassword"
@@ -108,6 +166,21 @@ function handleBranchChange(branchId: unknown): void {
   </v-snackbar>
 
   <v-main>
+    <v-alert
+      v-if="banner"
+      :type="banner.severity"
+      variant="tonal"
+      density="compact"
+      rounded="0"
+      class="ma-0"
+    >
+      {{ banner.text }}
+      <template v-if="banner.canPay" #append>
+        <v-btn size="small" variant="flat" color="primary" @click="showPayMock = true">
+          Pagar ahora
+        </v-btn>
+      </template>
+    </v-alert>
     <router-view />
   </v-main>
 </template>
