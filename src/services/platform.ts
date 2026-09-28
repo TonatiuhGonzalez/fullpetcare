@@ -14,6 +14,7 @@ import { supabase } from './supabase'
 import type { Database } from '@/types/database'
 
 export type TenantStatus = Database['public']['Enums']['tenant_status']
+export type BillingPeriod = Database['public']['Enums']['plan_billing_period']
 
 // El generador de tipos marca como `string` a secas las columnas que en
 // Postgres pueden ser NULL (mismo motivo que explica employees.ts). Aquí se
@@ -25,7 +26,11 @@ export interface PlatformTenant {
   name: string
   /** Fecha de alta de la empresa (ISO). */
   createdAt: string
+  planId: string
+  /** Copia del nombre del plan al momento de asignarlo (tenant_platform_info.plan_name_snapshot). */
   plan: string
+  /** Mensual/anual calculan planExpiresAt solos al asignarse; indeterminado la deja en null. */
+  billingPeriod: BillingPeriod
   /** null = vigencia indefinida (todas las empresas hoy). */
   planExpiresAt: string | null
   status: TenantStatus
@@ -44,6 +49,12 @@ export interface CancellationReason {
   id: string
   label: string
   kind: 'non_payment' | 'customer_request' | 'other'
+  isActive: boolean
+}
+
+export interface Plan {
+  id: string
+  name: string
   isActive: boolean
 }
 
@@ -213,7 +224,9 @@ export async function listTenants(): Promise<PlatformTenant[]> {
     id: row.tenant_id,
     name: row.name,
     createdAt: row.created_at,
+    planId: row.plan_id,
     plan: row.plan,
+    billingPeriod: row.billing_period,
     planExpiresAt: (row.plan_expires_at as string | null) ?? null,
     status: row.status,
     statusReason: (row.status_reason as string | null) ?? null,
@@ -262,6 +275,60 @@ export async function setTenantStatus(
     p_comment: comment as string,
   })
   if (error) throw new Error(friendlyRpcMessage(error))
+}
+
+/**
+ * Asigna un plan del catálogo y su forma de pago; la base CALCULA la
+ * vigencia sola (mensual = +1 mes, anual = +1 año, indeterminado = null)
+ * desde hoy. Solo informativo: no limita el acceso por sí solo (eso lo hace
+ * el estado + la vigencia, ver #1905).
+ */
+export async function setTenantPlan(
+  tenantId: string,
+  planId: string,
+  billingPeriod: BillingPeriod,
+): Promise<void> {
+  const { error } = await supabase.rpc('platform_set_tenant_plan', {
+    p_tenant_id: tenantId,
+    p_plan_id: planId,
+    p_billing_period: billingPeriod,
+  })
+  if (error) throw new Error(friendlyRpcMessage(error))
+}
+
+// -----------------------------------------------------------------------------
+// Catálogo de planes
+// -----------------------------------------------------------------------------
+
+function toPlan(row: { id: string; name: string; is_active: boolean }): Plan {
+  return { id: row.id, name: row.name, isActive: row.is_active }
+}
+
+/** Todos los planes (activos e inactivos). La política RLS solo deja leerlos a superadmins. */
+export async function listPlans(): Promise<Plan[]> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('id, name, is_active')
+    .is('deleted_at', null)
+    .order('created_at')
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return data.map(toPlan)
+}
+
+export async function createPlan(name: string): Promise<Plan> {
+  const { data, error } = await supabase.rpc('platform_create_plan', { p_name: name })
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return toPlan(data)
+}
+
+export async function updatePlan(id: string, name: string, isActive: boolean): Promise<Plan> {
+  const { data, error } = await supabase.rpc('platform_update_plan', {
+    p_id: id,
+    p_name: name,
+    p_is_active: isActive,
+  })
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return toPlan(data)
 }
 
 // -----------------------------------------------------------------------------

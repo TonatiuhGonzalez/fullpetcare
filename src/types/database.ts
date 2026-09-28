@@ -971,6 +971,33 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_admins: {
         Row: {
           created_at: string
@@ -1403,13 +1430,15 @@ export type Database = {
       }
       tenant_platform_info: {
         Row: {
+          billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           deleted_at: string | null
           id: string
           internal_notes: string | null
           is_demo: boolean
-          plan: string
           plan_expires_at: string | null
+          plan_id: string
+          plan_name_snapshot: string
           public_reason: string | null
           public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
@@ -1418,13 +1447,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_period?: Database["public"]["Enums"]["plan_billing_period"]
           created_at?: string
           deleted_at?: string | null
           id?: string
           internal_notes?: string | null
           is_demo?: boolean
-          plan?: string
           plan_expires_at?: string | null
+          plan_id: string
+          plan_name_snapshot: string
           public_reason?: string | null
           public_reason_id?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
@@ -1433,13 +1464,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_period?: Database["public"]["Enums"]["plan_billing_period"]
           created_at?: string
           deleted_at?: string | null
           id?: string
           internal_notes?: string | null
           is_demo?: boolean
-          plan?: string
           plan_expires_at?: string | null
+          plan_id?: string
+          plan_name_snapshot?: string
           public_reason?: string | null
           public_reason_id?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
@@ -1448,6 +1481,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tenant_platform_info_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tenant_platform_info_public_reason_id_fkey"
             columns: ["public_reason_id"]
@@ -1731,6 +1771,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      platform_create_plan: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "plans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       platform_create_reason: {
         Args: { p_label: string }
         Returns: {
@@ -1790,6 +1847,7 @@ export type Database = {
       platform_list_tenants: {
         Args: never
         Returns: {
+          billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           internal_notes: string
           name: string
@@ -1799,6 +1857,7 @@ export type Database = {
           owner_user_id: string
           plan: string
           plan_expires_at: string
+          plan_id: string
           public_reason: string
           status: Database["public"]["Enums"]["tenant_status"]
           status_reason: string
@@ -1830,6 +1889,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      platform_set_tenant_plan: {
+        Args: {
+          p_billing_period: Database["public"]["Enums"]["plan_billing_period"]
+          p_plan_id: string
+          p_tenant_id: string
+        }
+        Returns: {
+          billing_period: Database["public"]["Enums"]["plan_billing_period"]
+          created_at: string
+          deleted_at: string | null
+          id: string
+          internal_notes: string | null
+          is_demo: boolean
+          plan_expires_at: string | null
+          plan_id: string
+          plan_name_snapshot: string
+          public_reason: string | null
+          public_reason_id: string | null
+          status: Database["public"]["Enums"]["tenant_status"]
+          status_reason: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenant_platform_info"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       platform_set_tenant_status: {
         Args: {
           p_comment: string
@@ -1838,13 +1927,15 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: {
+          billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           deleted_at: string | null
           id: string
           internal_notes: string | null
           is_demo: boolean
-          plan: string
           plan_expires_at: string | null
+          plan_id: string
+          plan_name_snapshot: string
           public_reason: string | null
           public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
@@ -1873,13 +1964,15 @@ export type Database = {
       platform_update_notes: {
         Args: { p_notes: string; p_tenant_id: string }
         Returns: {
+          billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           deleted_at: string | null
           id: string
           internal_notes: string | null
           is_demo: boolean
-          plan: string
           plan_expires_at: string | null
+          plan_id: string
+          plan_name_snapshot: string
           public_reason: string | null
           public_reason_id: string | null
           status: Database["public"]["Enums"]["tenant_status"]
@@ -1890,6 +1983,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "tenant_platform_info"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      platform_update_plan: {
+        Args: { p_id: string; p_is_active: boolean; p_name: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "plans"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1963,6 +2073,7 @@ export type Database = {
       permission_module: "employees"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
+      plan_billing_period: "monthly" | "yearly" | "indefinite"
       sale_item_type: "service"
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
@@ -2118,6 +2229,7 @@ export const Constants = {
       permission_module: ["employees"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
+      plan_billing_period: ["monthly", "yearly", "indefinite"],
       sale_item_type: ["service"],
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],

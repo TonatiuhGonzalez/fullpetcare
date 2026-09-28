@@ -143,7 +143,7 @@ describe('platform_admins: quién puede leer y escribir', () => {
 })
 
 describe('tenant_platform_info: lo que la plataforma anota de cada negocio', () => {
-  it('cada negocio nace con su fila de plataforma: plan Básico, activo, vigencia indefinida', async () => {
+  it('cada negocio nace con su fila de plataforma: plan Básico, forma de pago indeterminada, activo, vigencia indefinida', async () => {
     // Si el trigger de `tenants` no la creara, un negocio dado de alta
     // por seed.sql, un script o el panel de Supabase no aparecería en la
     // lista del superadmin: existiría pero sería invisible para quien lo
@@ -154,10 +154,17 @@ describe('tenant_platform_info: lo que la plataforma anota de cada negocio', () 
       ])
 
       const { rows } = await client.query(
-        'select plan, status, plan_expires_at from tenant_platform_info where tenant_id = $1',
+        'select plan_name_snapshot, billing_period, status, plan_expires_at from tenant_platform_info where tenant_id = $1',
         ['b0000000-0000-4000-8000-0000000000aa'],
       )
-      expect(rows).toEqual([{ plan: 'Básico', status: 'active', plan_expires_at: null }])
+      expect(rows).toEqual([
+        {
+          plan_name_snapshot: 'Básico',
+          billing_period: 'indefinite',
+          status: 'active',
+          plan_expires_at: null,
+        },
+      ])
     })
   })
 
@@ -338,6 +345,50 @@ describe('platform_audit_log: la bitácora de plataforma', () => {
       await setRole(client, 'anon')
       const { rows } = await client.query('select id from platform_audit_log')
       expect(rows).toHaveLength(0)
+    })
+  })
+})
+
+describe('plans: el catálogo de la tarea #1906', () => {
+  it('solo un superadmin lo lee; el dueño de un negocio ve cero filas', async () => {
+    // Es tabla de PLATAFORMA (sin tenant_id), mismo criterio que
+    // cancellation_reasons: si un dueño pudiera leerla vería los planes que
+    // NO tiene asignados (información de la plataforma, no de su negocio).
+    await withTransaction(async (client) => {
+      await makePlatformAdmin(client, USER_SUPERADMIN)
+
+      await setRole(client, 'authenticated', USER_DUENO)
+      const asOwner = await client.query('select id from plans')
+      expect(asOwner.rows).toHaveLength(0)
+
+      await setRole(client, 'authenticated', USER_SUPERADMIN)
+      const asAdmin = await client.query("select name from plans where name = 'Básico'")
+      expect(asAdmin.rows).toEqual([{ name: 'Básico' }])
+    })
+  })
+
+  it('el visitante anónimo ve cero filas', async () => {
+    await withTransaction(async (client) => {
+      await setRole(client, 'anon')
+      const { rows } = await client.query('select id from plans')
+      expect(rows).toHaveLength(0)
+    })
+  })
+
+  it('nadie escribe la tabla directo: solo las RPC platform_create_plan / platform_update_plan', async () => {
+    // Sin esto, cualquiera con acceso de superadmin podría inventar un plan
+    // sin pasar por la validación de nombre en blanco de la RPC.
+    await withTransaction(async (client) => {
+      await makePlatformAdmin(client, USER_SUPERADMIN)
+      await setRole(client, 'authenticated', USER_SUPERADMIN)
+
+      expect(
+        await tryQuery(client, "insert into plans (name) values ('Intruso')"),
+      ).toMatch(/row-level security/i)
+      const upd = await client.query("update plans set name = 'x' where name = 'Básico'")
+      expect(upd.rowCount).toBe(0)
+      const del = await client.query('delete from plans')
+      expect(del.rowCount).toBe(0)
     })
   })
 })

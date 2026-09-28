@@ -19,16 +19,20 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/services/supabase'
 import {
   addAdmin,
+  createPlan,
   createTenant,
   getTenantMetrics,
   isPlatformAdmin,
   listAdmins,
   listAuditLog,
+  listPlans,
   listTenants,
   removeAdmin,
   resetOwnerPassword,
   listReasons,
+  setTenantPlan,
   setTenantStatus,
+  updatePlan,
   updateTenantNotes,
 } from '@/services/platform'
 import { closePool, runCommitted } from './helpers'
@@ -126,7 +130,9 @@ describe('listTenants', () => {
       id: TENANT_PATITAS,
       name: 'Patitas Felices',
       createdAt: expect.any(String),
+      planId: expect.any(String),
       plan: 'Básico',
+      billingPeriod: 'indefinite',
       planExpiresAt: null,
       status: 'active',
       statusReason: null,
@@ -233,6 +239,62 @@ describe('setTenantStatus y updateTenantNotes', () => {
 
     await updateTenantNotes(tenantId, '   ')
     expect((await listTenants()).find((t) => t.id === tenantId)?.internalNotes).toBeNull()
+  })
+})
+
+describe('listPlans, createPlan, updatePlan y setTenantPlan (tarea #1906)', () => {
+  it('listPlans devuelve el catálogo en tipos de dominio, con el plan Básico de la semilla', async () => {
+    await signInAsSuperadmin()
+    const plans = await listPlans()
+    expect(plans).toContainEqual({ id: expect.any(String), name: 'Básico', isActive: true })
+  })
+
+  it('createPlan lo agrega activo, y setTenantPlan lo asigna a un negocio con vigencia indeterminada', async () => {
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+
+    const plan = await createPlan('Pro Servicio')
+    created.planIds.add(plan.id)
+    expect(plan.isActive).toBe(true)
+
+    await setTenantPlan(tenantId, plan.id, 'indefinite')
+    const scratch = (await listTenants()).find((t) => t.id === tenantId)
+    expect(scratch).toMatchObject({
+      planId: plan.id,
+      plan: 'Pro Servicio',
+      billingPeriod: 'indefinite',
+      planExpiresAt: null,
+    })
+  })
+
+  it('mensual/anual calculan la vigencia solas: la base ya no recibe una fecha', async () => {
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+    const plan = await createPlan('Anual Servicio')
+    created.planIds.add(plan.id)
+
+    await setTenantPlan(tenantId, plan.id, 'yearly')
+    const scratch = (await listTenants()).find((t) => t.id === tenantId)
+    expect(scratch?.billingPeriod).toBe('yearly')
+    expect(scratch?.planExpiresAt).not.toBeNull()
+    // No hace falta el valor exacto aquí: platform-rpcs.spec.ts ya prueba que
+    // es hoy + 1 año contra `now()` de la base. Esto solo confirma que el
+    // servicio no manda ni pide una fecha en el camino.
+  })
+
+  it('un plan desactivado se rechaza con el mensaje de la base, en español', async () => {
+    // "Elige un plan activo." lo escribe la RPC (código 23514): sin este
+    // chequeo, la persona con el diálogo abierto desde antes podría seguir
+    // asignando un plan que ya se quitó de la lista.
+    await signInAsSuperadmin()
+    const tenantId = await createScratchTenant()
+    const plan = await createPlan('Descontinuado Servicio')
+    created.planIds.add(plan.id)
+    await updatePlan(plan.id, plan.name, false)
+
+    await expect(setTenantPlan(tenantId, plan.id, 'indefinite')).rejects.toThrow(
+      'Elige un plan activo.',
+    )
   })
 })
 

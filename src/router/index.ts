@@ -127,6 +127,11 @@ export const router = createRouter({
           component: () => import('@/pages/superadmin/ReasonsPage.vue'),
         },
         {
+          path: 'planes',
+          name: 'superadmin-planes',
+          component: () => import('@/pages/superadmin/PlansPage.vue'),
+        },
+        {
           path: 'administradores',
           name: 'superadmin-administradores',
           component: () => import('@/pages/superadmin/AdminsPage.vue'),

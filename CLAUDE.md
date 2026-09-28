@@ -397,7 +397,8 @@ conteos de uso — jamás clientes, mascotas, citas ni expedientes.
 | Tabla                  | Campos clave                                                                                              | Notas                                                                                                   |
 | ---------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `platform_admins`      | `user_id` (único, → `auth.users`), `deleted_at`                                                           | Quién es superadmin. **Sin `tenant_id`**: no pertenece a ningún negocio. Varios, todos con el mismo poder |
-| `tenant_platform_info` | `tenant_id` (único, 1 a 1 con `tenants`), `plan`, `plan_expires_at`, `status`, `status_reason`, `internal_notes` | Lo que la plataforma anota de cada negocio. La crea un trigger al insertar un tenant                    |
+| `plans`                | `name`, `is_active`                                                                                        | Catálogo de planes (tarea #1906). Tabla de plataforma, sin `tenant_id`, mismo patrón que `cancellation_reasons` |
+| `tenant_platform_info` | `tenant_id` (único, 1 a 1 con `tenants`), `plan_id` (→ `plans`), `plan_name_snapshot`, `billing_period`, `plan_expires_at`, `status`, `status_reason`, `internal_notes` | Lo que la plataforma anota de cada negocio. La crea un trigger al insertar un tenant                    |
 | `platform_audit_log`   | `tenant_id` (nulo), `table_name`, `record_id`, `action`, `event`, `actor_user_id`, `old_data`, `new_data`  | Bitácora de plataforma. Solo la leen superadmins                                                         |
 
 Decisiones que no se ven en el esquema:
@@ -437,6 +438,23 @@ Decisiones que no se ven en el esquema:
   - **Interfaz:** al iniciar sesión, diálogo si hay negocios en solo lectura o de baja; banner
     dentro de la app para "vence en 3 días o menos", gracia y solo lectura. "Pagar ahora"
     es un mock (solo avisa "pronto"). Los superadmins no se ven afectados (usan RPC `platform_*`).
+- **Catálogo real de planes (tarea #1906).** `plans` reemplaza el texto libre que tenía
+  `tenant_platform_info.plan`: el superadmin administra el catálogo (pestaña "Planes",
+  RPC `platform_create_plan`/`platform_update_plan`). `platform_set_tenant_plan` asigna
+  un plan y una **forma de pago** (`billing_period`, enum `monthly`/`yearly`/`indefinite`)
+  en una sola llamada, y la base CALCULA la vigencia sola desde ese momento: mensual
+  +1 mes, anual +1 año, indeterminado la deja en `NULL` — ya no se recibe una fecha.
+  En el mundo real la forma de pago la elige el DUEÑO al suscribirse (mensual o anual);
+  `indefinite` es de uso interno del superadmin (negocios de cortesía, internos) y hoy,
+  al no existir una pantalla de autoservicio para el dueño (fuera de alcance en v1), es
+  el superadmin quien asigna cualquiera de las tres desde `/superadmin`, igual que ya
+  asigna el plan y el estado. `plan_id` es la FK viva; `plan_name_snapshot` es una COPIA
+  del nombre al momento de asignarlo (igual que `appointment_services.name_snapshot`,
+  §6.3): renombrar un plan en el catálogo no reescribe lo que ya tiene asignado una
+  empresa. El plan sigue siendo **solo informativo**: no limita nada por sí solo — el
+  acceso lo sigue decidiendo el estado +
+  la vigencia (#1905, arriba). Un plan ya asignado no se borra, se desactiva
+  (`is_active`) y deja de ofrecerse para asignaciones nuevas.
 - **Un solo dueño por empresa.** Zona horaria del alta: `America/Mexico_City`.
 - El primer superadmin no puede crearse desde la interfaz: `npm run superadmin:create`
   (§12). Los demás los agrega un superadmin desde la pestaña "Superadmins".
