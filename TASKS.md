@@ -373,6 +373,11 @@ de construir:
 - **Solo ven datos de la empresa** (nombre, dueño, plan, estado, conteos). Nunca
   clientes, mascotas, citas ni expedientes.
 - Plan de texto fijo "Básico", vigencia indefinida (`NULL`), sin tabla de planes.
+  **Actualizado (tarea #1906):** catálogo real de planes (tabla `plans`, administrado
+  por el superadmin) y forma de pago (`billing_period`: mensual/anual/indeterminado)
+  que la vigencia calcula sola al asignarse — ya no se escribe una fecha a mano. El
+  plan sigue siendo solo informativo: no limita nada por sí solo (el acceso lo sigue
+  decidiendo el estado + la vigencia, #1905). Ver más abajo.
 - Suspender o vencer la vigencia (pasada la gracia de 2 días) deja la empresa en **solo lectura**;
   darla de baja (o que el dueño cancele) le **niega todo el acceso** (tarea #1905, migraciones
   `20260925140000` a `20260925170000`, pruebas en `tenant-blocking.spec.ts`). Motivo público
@@ -608,4 +613,32 @@ los empleados invitados quedan fuera. Diseño en `CLAUDE.md` §7.6. Tests:
 y `create-superadmin-script.spec.ts`, y `session.spec.ts`. Pendiente: comprobar en
 navegador y en producción (la migración es nueva en `main`).
 
-**Trabajo futuro (fuera de esta fase):** gestión real de planes y vigencia.
+**Catálogo real de planes y forma de pago (tarea #1906, 2026-09-28):** hasta entonces
+`tenant_platform_info.plan` era texto libre fijo en "Básico" y nadie podía cambiarlo
+(no existía ni una RPC que escribiera esa columna) ni fijar `plan_expires_at`. Modelo
+decidido con el usuario: catálogo administrado por el superadmin (tabla `plans`, mismo
+patrón que `cancellation_reasons` de #1905 — pestaña "Planes"); al asignar un plan se
+elige también su **forma de pago** (`billing_period`: `monthly`/`yearly`/`indefinite`)
+y la base CALCULA la vigencia sola desde ese momento (mensual +1 mes, anual +1 año,
+indeterminado sin vencimiento) — ya no se escribe una fecha a mano. En el mundo real la
+forma de pago la elige el dueño al suscribirse (mensual o anual); indeterminado es de
+uso interno del superadmin. Hoy no existe una pantalla de autoservicio para el dueño
+(fuera de alcance), así que las tres las sigue asignando el superadmin desde
+`/superadmin`, igual que ya asigna el plan y el estado. El plan sigue siendo SOLO
+INFORMATIVO — sin cuotas de uso por plan, que queda fuera de esta tarea.
+Migración `20260928120000_plans_catalog.sql`: `tenant_platform_info.plan_id` (FK) +
+`plan_name_snapshot` (copia del nombre al asignar, igual que
+`appointment_services.name_snapshot`, para que renombrar un plan no reescriba lo que
+ya vio una empresa) + `billing_period` reemplazan la columna `plan`; RPCs
+`platform_set_tenant_plan` (recibe la forma de pago, no una fecha), `platform_create_plan`
+y `platform_update_plan`. Diálogo "Cambiar plan" en el detalle de la empresa
+(`TenantPlanDialog.vue`) fija plan + forma de pago en una sola llamada; la vigencia ya
+no se captura ahí. Diseño en `CLAUDE.md` §6.8. Tests: `platform-rls.spec.ts` (RLS del
+catálogo, default `indefinite`), `platform-rpcs.spec.ts` (las 3 RPC nuevas, que mensual/anual
+calculan la fecha contra `now()` de la propia transacción, snapshot al renombrar),
+`platform-service.spec.ts` y `platform.spec.ts` (`billingPeriodLabel`, bitácora).
+Se actualizó `supabase/seed/demo_reset.sql` (usaba la columna `plan` eliminada).
+Comprobado en navegador contra Supabase local: asignar un plan mensual a una empresa y
+ver la vigencia calculada (hoy + 1 mes) reflejada en el detalle y en la lista.
+
+**Trabajo futuro (fuera de esta fase):** cuotas de uso por plan (sucursales, empleados…).

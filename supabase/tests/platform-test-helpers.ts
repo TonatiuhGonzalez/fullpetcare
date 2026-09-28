@@ -31,14 +31,21 @@ export const adminClient = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
 )
 
-export const created = { userIds: new Set<string>(), tenantIds: new Set<string>() }
-
+export const created = {
+  userIds: new Set<string>(),
+  tenantIds: new Set<string>(),
+  // Planes creados con platform_create_plan (tarea #1906): se limpian
+  // aparte porque no tienen dueño ni tenant que arrastre su borrado.
+  planIds: new Set<string>(),
+}
 
 export async function cleanupPlatformTestData(): Promise<void> {
   const userIds = [...created.userIds]
   const tenantIds = [...created.tenantIds]
+  const planIds = [...created.planIds]
   created.userIds.clear()
   created.tenantIds.clear()
+  created.planIds.clear()
 
   await runCommitted(async (client) => {
     await client.query('set local session_replication_role = replica')
@@ -64,6 +71,9 @@ export async function cleanupPlatformTestData(): Promise<void> {
     await client.query('delete from tenant_platform_info where tenant_id = any($1)', [tenantIds])
     await client.query('delete from tenants where id = any($1)', [tenantIds])
     await client.query('delete from platform_admins where user_id = any($1)', [userIds])
+    // Después de borrar tenant_platform_info (arriba): mientras un negocio
+    // todavía tuviera el plan asignado, el FK impediría borrarlo.
+    await client.query('delete from plans where id = any($1)', [planIds])
   })
   for (const id of userIds) await adminClient.auth.admin.deleteUser(id)
 }
