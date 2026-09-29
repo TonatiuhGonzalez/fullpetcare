@@ -231,6 +231,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          is_active: boolean
           name: string
           opening_hours: Json
           phone: string | null
@@ -244,6 +245,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name: string
           opening_hours?: Json
           phone?: string | null
@@ -257,6 +259,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name?: string
           opening_hours?: Json
           phone?: string | null

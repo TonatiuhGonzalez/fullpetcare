@@ -8,6 +8,7 @@
 // había probado contra la base real.
 import { describe, expect, it } from 'vitest'
 
+import * as branchesService from '@/services/branches'
 import * as membershipsService from '@/services/memberships'
 import { supabase } from '@/services/supabase'
 
@@ -47,6 +48,41 @@ describe('services/memberships.ts contra Supabase local', () => {
     )
 
     await supabase.auth.signOut()
+  })
+
+  it('listMyMemberships: una sucursal deshabilitada NO se ofrece para trabajar (tarea #1959)', async () => {
+    // Qué se rompería en producción: el dueño deshabilita una sucursal desde
+    // configuración pero el selector de la barra y la agenda la seguirían
+    // ofreciendo, y se podrían agendar citas en una sucursal deshabilitada.
+    const { error } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (error) throw error
+
+    const created = await branchesService.create(TENANT_PATITAS, {
+      name: 'Sucursal temporal de prueba',
+      address: null,
+      postalCode: null,
+      phone: null,
+      timezone: 'America/Mexico_City',
+      openingHours: {},
+    })
+
+    try {
+      await branchesService.setActive(created.id, false)
+      const [patitas] = await membershipsService.listMyMemberships(USER_DUENO)
+      expect(patitas.branches.map((b) => b.id)).not.toContain(created.id)
+    } finally {
+      // Esta prueba usa una sesión real (los datos quedan guardados). Las
+      // sucursales no se borran físicamente, así que se oculta con borrado
+      // suave para no ensuciar a las demás pruebas.
+      await supabase
+        .from('branches')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', created.id)
+      await supabase.auth.signOut()
+    }
   })
 
   it('listMyMemberships: un groomer solo ve LAS sucursales que sí tiene en membership_branches', async () => {
