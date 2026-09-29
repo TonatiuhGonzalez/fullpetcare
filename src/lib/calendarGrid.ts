@@ -1,11 +1,11 @@
 // Aritmética pura para decidir QUÉ rango de fechas y de horas debe pintar
-// la agenda (rediseño con @daypilot/daypilot-lite-vue: DayPilotScheduler
-// para dueño/recepción, DayPilotCalendar para groomer/vet — ver
+// la agenda (EventCalendar: vista de línea de tiempo por empleado para
+// dueño/recepción, vista semanal para groomer/vet — ver
 // components/EmployeeDayScheduler.vue y EmployeeWeekCalendar.vue). Nada
-// de esto lee el reloj del sistema ni sabe de DayPilot: todo depende
+// de esto lee el reloj del sistema ni sabe de EventCalendar: todo depende
 // solo de sus argumentos, así que se prueba sin levantar nada (CLAUDE.md
 // §4 y §9). El acomodo de citas traslapadas (columnas lado a lado) ya no
-// vive aquí — el propio DayPilotScheduler/DayPilotCalendar lo resuelve
+// vive aquí — el propio EventCalendar lo resuelve
 // solo, es justo la razón de usar un componente de verdad en vez del
 // grid hecho a mano de la versión anterior.
 import { addDays, format } from 'date-fns'
@@ -61,11 +61,11 @@ export function visibleHourRange(dailyHours: Array<BranchHours | null>): HourRan
 }
 
 /**
- * Un evento ya traducido al vocabulario de DayPilot (EmployeeDayScheduler.vue,
+ * Un evento ya traducido al vocabulario de EventCalendar (EmployeeDayScheduler.vue,
  * EmployeeWeekCalendar.vue) — lo arma AgendaPage.vue a partir de un
  * AppointmentWithNames. `start`/`end` YA son hora local de la sucursal
  * SIN zona (lib/datetime.ts#toNaiveLocalIso) — ninguno de los dos
- * componentes de DayPilot sabe nada de timezones. `resource` solo lo usa
+ * componentes sabe nada de timezones. `resource` solo lo usa
  * EmployeeDayScheduler (el id de fila/empleado); EmployeeWeekCalendar lo
  * ignora, ahí cada groomer/vet solo ve sus propias citas.
  */
@@ -76,4 +76,15 @@ export interface CalendarBlock {
   text: string
   color: string
   resource?: string
+}
+
+/**
+ * Minutos desde medianoche → 'HH:MM', el formato que EventCalendar espera
+ * en `slotMinTime` / `slotMaxTime` (recortan de verdad las horas fuera del
+ * horario de la sucursal en vez de solo atenuarlas).
+ */
+export function minutesToSlotTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }

@@ -3,7 +3,7 @@
 // puro afuera, sin Supabase ni fecha del sistema.
 import { describe, expect, it } from 'vitest'
 
-import { consecutiveDates, visibleHourRange } from './calendarGrid'
+import { consecutiveDates, minutesToSlotTime, visibleHourRange } from './calendarGrid'
 
 describe('consecutiveDates', () => {
   it('da N días seguidos empezando EXACTAMENTE en la fecha dada, sin alinear a lunes', () => {
@@ -73,5 +73,21 @@ describe('visibleHourRange', () => {
       startMinutes: 9 * 60,
       endMinutes: 18 * 60,
     })
+  })
+})
+
+describe('minutesToSlotTime', () => {
+  it('rellena con ceros horas y minutos de un dígito', () => {
+    // 9:05 → '09:05'. Si saliera '9:5', EventCalendar no podría leerlo
+    // como duración y la agenda arrancaría a medianoche en vez de a la
+    // hora de apertura de la sucursal.
+    expect(minutesToSlotTime(9 * 60 + 5)).toBe('09:05')
+  })
+
+  it('acepta el cierre a medianoche (24:00)', () => {
+    // Una sucursal que cierra a las 24:00 da 1440 minutos: debe salir
+    // '24:00' (valor válido para slotMaxTime), no '00:00', que dejaría
+    // la grilla con rango vacío.
+    expect(minutesToSlotTime(24 * 60)).toBe('24:00')
   })
 })

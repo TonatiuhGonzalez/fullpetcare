@@ -112,23 +112,25 @@ Las aprobadas hasta ahora:
   dependencia de fechas.
 - `pg` (dev) — cliente Postgres para los tests de RLS, que necesitan conectarse como
   roles distintos.
-- `@daypilot/daypilot-lite-vue` — componente real de calendario/scheduler para la
-  agenda (2026-09-08, pedido explícitamente por el usuario tras rechazar la primera
-  versión hecha a mano con Vuetify/CSS). Apache-2.0, gratuita ("Lite"), sin marca de
-  agua ni límite de uso. Incluye `DayPilotCalendar` (semana, horas verticales — vista
-  de groomer/vet) y `DayPilotScheduler` (filas de recursos, horas horizontales — vista
-  de dueño/recepción). El paquete no publica su `.d.ts` en `types`/`typings` de
-  `package.json`, pero TypeScript lo encuentra solo (mismo nombre de archivo que
-  `main`) gracias a `skipLibCheck: true` ya heredado de `@vue/tsconfig`.
-  Nota (mismo día): se probó cambiar a `@schedule-x/calendar` porque el Scheduler de
-  DayPilot Lite no puede OCULTAR las horas fuera del horario de la sucursal (solo
-  atenuarlas — esa función es de DayPilot Pro). Schedule-X sí recorta de verdad las
-  horas (`dayBoundaries`, gratis), pero al usuario no le gustó el resultado visual —
-  se regresó a DayPilot el mismo día. Si se retoma Schedule-X en el futuro: su
-  "resource view" (filas de empleados) **también** es de paga (confirmado en su repo,
-  la carpeta de vistas de código abierto no trae ninguna vista de recursos), y hay que
-  fijar `timezone` explícito en `createCalendar()` o muestra las citas en la zona del
-  navegador en vez de la de la sucursal.
+- `@event-calendar/core` — componente de calendario/scheduler para la agenda
+  (2026-09-29, pedido por el usuario; reemplaza a `@daypilot/daypilot-lite-vue`, que se
+  usó desde 2026-09-08). MIT, gratuita, sin marca de agua. Incluye la vista
+  `timeGridWeek` (columnas = días, horas verticales — vista de groomer/vet) y la de
+  línea de tiempo por recurso `resourceTimelineDay` (filas = empleados, horas
+  horizontales — vista de dueño/recepción), que en otras librerías (FullCalendar,
+  Schedule-X) son de paga. `slotMinTime`/`slotMaxTime` RECORTAN las horas fuera del
+  horario de la sucursal (DayPilot Lite solo podía atenuarlas). Está hecha en Svelte
+  (`svelte` entra como dependencia interna) y no es un componente Vue: se monta con
+  `createCalendar()` sobre un elemento del DOM y se actualiza con `setOption()`
+  (`components/EmployeeDayScheduler.vue` y `EmployeeWeekCalendar.vue`).
+  Trampas conocidas: (1) el paquete `@event-calendar/build` es un script global sin
+  exports, no sirve con Vite; usar `core`. (2) El reset global de Vuetify pone
+  `background-repeat: no-repeat` a todo y borra las líneas de la cuadrícula (que son
+  degradados repetidos): los componentes lo corrigen con `background-repeat`. (3) Las
+  citas llegan como hora local de la sucursal SIN zona y se pintan tal cual; por eso
+  no se activa `nowIndicator` (usaría el reloj del navegador). (4) La opción `views`
+  solo se lee al crear el calendario. Historial: se descartó `@schedule-x/calendar`
+  (no gustó el resultado visual y su vista de recursos también es de paga).
 - `eslint`, `prettier`, `eslint-plugin-vue`, `vitest`, `@vue/test-utils`,
   `@playwright/test`, `vite-plugin-vuetify` — herramientas.
 

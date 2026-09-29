@@ -9,7 +9,7 @@
 #
 # - default-src 'self': por defecto, solo recursos de este mismo dominio.
 # - script-src 'self': sin scripts inline ni de terceros.
-# - style-src 'self' 'unsafe-inline': Vuetify y DayPilot inyectan estilos
+# - style-src 'self' 'unsafe-inline': Vuetify y EventCalendar inyectan estilos
 #   en línea al renderizar; sin esto la app se ve rota. (Riesgo aceptado:
 #   los estilos inline son mucho menos peligrosos que los scripts inline.)
 # - img-src ... data: blob: https://*.supabase.co: iconos/imágenes
