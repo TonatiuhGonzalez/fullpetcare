@@ -171,6 +171,39 @@ export async function create(args: NewAppointmentArgs): Promise<Appointment> {
   return data
 }
 
+export interface NewWalkInArgs extends NewAppointmentArgs {
+  isUrgent?: boolean
+}
+
+/**
+ * Registra una visita sin cita (tarea #1969). Igual que create(), pero
+ * llama a `create_walk_in_appointment` (migración `walk_in_appointments.sql`),
+ * que marca la cita como `is_walk_in` y decide su estado: en curso si
+ * empieza ya, agendada si el cliente espera a que se libere el empleado.
+ */
+export async function createWalkIn(args: NewWalkInArgs): Promise<Appointment> {
+  const { data, error } = await supabase.rpc('create_walk_in_appointment', {
+    p_tenant_id: args.tenantId,
+    p_branch_id: args.branchId,
+    p_customer_id: args.customerId,
+    p_pet_id: args.petId,
+    p_kind: args.kind,
+    p_employee_user_id: args.employeeUserId,
+    p_starts_at: args.startsAt.toISOString(),
+    p_ends_at: args.endsAt.toISOString(),
+    p_is_urgent: args.isUrgent ?? false,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mismo caso que create(): el tipo generado marca p_notes como string no-nulable; Postgres sí acepta null.
+    p_notes: (args.notes ?? null) as any,
+    p_services: args.services.map((s) => ({
+      service_id: s.serviceId,
+      quantity: s.quantity ?? 1,
+    })),
+  })
+
+  if (error) throw error
+  return data
+}
+
 export async function reschedule(id: string, startsAt: Date, endsAt: Date): Promise<Appointment> {
   const { data, error } = await supabase.rpc('reschedule_appointment', {
     p_appointment_id: id,

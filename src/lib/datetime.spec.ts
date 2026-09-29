@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  branchToday,
   dayRangeUtc,
   formatDate,
   formatTime,
@@ -130,5 +131,17 @@ describe('toNaiveLocalIso', () => {
     expect(toNaiveLocalIso('2026-07-16T01:00:00Z', 'America/Mexico_City')).toBe(
       '2026-07-15T19:00:00',
     )
+  })
+})
+
+describe('branchToday', () => {
+  it('a la misma hora UTC, "hoy" puede ser un día distinto según la sucursal', () => {
+    // 03:00 UTC del 16 de julio: en Tijuana (UTC-7 en verano) todavía son
+    // las 20:00 del 15, pero en Tokio (UTC+9) ya son las 12:00 del 16. Si
+    // branchToday usara la fecha del navegador o de UTC, la agenda de una
+    // visita sin cita pediría el día equivocado a partir de cierta hora.
+    const instant = new Date('2026-07-16T03:00:00Z')
+    expect(branchToday('America/Tijuana', instant)).toBe('2026-07-15')
+    expect(branchToday('Asia/Tokyo', instant)).toBe('2026-07-16')
   })
 })
