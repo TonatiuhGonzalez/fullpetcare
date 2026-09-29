@@ -1,8 +1,14 @@
 <script setup lang="ts">
 // Alta y edición de mascota, con foto y preferencias de corte (tarea
 // 2.19). Mismo patrón que CustomerFormDialog.vue.
+//
+// Si recibe `customerId`, el dueño ya está decidido (se abrió desde la
+// ficha del cliente). Si no, muestra un selector para elegirlo entre los
+// clientes ya registrados (se abrió desde la pestaña Mascotas).
 import { computed, ref, watch } from 'vue'
 
+import * as customersService from '@/services/customers'
+import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
 import { speciesLabel } from '@/lib/petLabels'
@@ -14,7 +20,7 @@ type PetSex = Database['public']['Enums']['pet_sex']
 const props = defineProps<{
   modelValue: boolean
   tenantId: string
-  customerId: string
+  customerId?: string
   pet?: Pet | null
 }>()
 
@@ -45,6 +51,13 @@ const groomingNotes = ref('')
 const medicalAlerts = ref('')
 const photoFile = ref<File | null>(null)
 
+const needsOwnerPicker = computed(() => !props.customerId)
+const ownerId = ref<string | null>(null)
+const customers = ref<Customer[]>([])
+const ownerOptions = computed(() =>
+  customers.value.map((c) => ({ value: c.id, title: `${c.first_name} ${c.last_name}` })),
+)
+
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -62,15 +75,30 @@ watch(
     groomingNotes.value = p?.grooming_notes ?? ''
     medicalAlerts.value = p?.medical_alerts ?? ''
     photoFile.value = null
+    ownerId.value = null
     errorMessage.value = null
+    if (needsOwnerPicker.value) loadCustomers()
   },
 )
+
+async function loadCustomers(): Promise<void> {
+  try {
+    customers.value = await customersService.list(props.tenantId)
+  } catch {
+    errorMessage.value = 'No se pudo cargar la lista de clientes. Revisa tu conexión.'
+  }
+}
 
 function close(): void {
   emit('update:modelValue', false)
 }
 
 async function handleSubmit(): Promise<void> {
+  const owner = props.customerId ?? ownerId.value
+  if (!props.pet && !owner) {
+    errorMessage.value = 'Elige al dueño de la mascota.'
+    return
+  }
   saving.value = true
   errorMessage.value = null
   try {
@@ -91,10 +119,18 @@ async function handleSubmit(): Promise<void> {
     // fila exista.
     let saved = props.pet
       ? await petsService.update(props.pet.id, payload)
-      : await petsService.create({ ...payload, tenant_id: props.tenantId, customer_id: props.customerId })
+      : await petsService.create({
+          ...payload,
+          tenant_id: props.tenantId,
+          customer_id: owner as string,
+        })
 
     if (photoFile.value) {
-      const photoPath = await petsService.uploadPhoto(props.tenantId, saved.id, photoFile.value)
+      const photoPath = await petsService.uploadPhoto(
+        props.tenantId,
+        saved.id,
+        photoFile.value,
+      )
       saved = await petsService.update(saved.id, { photo_path: photoPath })
     }
 
@@ -120,6 +156,14 @@ async function handleSubmit(): Promise<void> {
       <v-card-text>
         <v-form @submit.prevent="handleSubmit">
           <v-text-field v-model="name" label="Nombre" required />
+
+          <v-autocomplete
+            v-if="needsOwnerPicker && !isEditing"
+            v-model="ownerId"
+            :items="ownerOptions"
+            label="Dueño"
+            no-data-text="No hay clientes. Primero da de alta al dueño en la pestaña Clientes."
+          />
 
           <v-row dense>
             <v-col cols="6">
@@ -161,7 +205,13 @@ async function handleSubmit(): Promise<void> {
             prepend-icon="mdi-camera"
           />
 
-          <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-2">
+          <v-alert
+            v-if="errorMessage"
+            type="error"
+            density="compact"
+            variant="tonal"
+            class="mb-2"
+          >
             {{ errorMessage }}
           </v-alert>
         </v-form>

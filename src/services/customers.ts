@@ -25,7 +25,7 @@ export async function list(tenantId: string): Promise<Customer[]> {
 }
 
 /**
- * Busca clientes cuyo nombre O apellido EMPIEZA con `term` (no
+ * Busca clientes cuyo nombre, apellido, teléfono O correo EMPIEZA con `term` (no
  * "contiene en cualquier parte" — ver el comentario del índice en la
  * migración `customers.sql` para el porqué). Cadena vacía o solo
  * espacios devuelve la lista completa, igual que `list()` — así el
@@ -36,15 +36,17 @@ export async function search(tenantId: string, term: string): Promise<Customer[]
   const trimmed = term.trim()
   if (trimmed === '') return list(tenantId)
 
-  // .or() arma un WHERE con OR entre las dos condiciones — "empieza con
-  // el término, ya sea en el nombre o en el apellido". El "%" al final
-  // es el comodín de SQL para "lo que sea después".
+  // .or() arma un WHERE con OR entre las condiciones — "empieza con
+  // el término, ya sea en el nombre, apellido, teléfono o correo". El
+  // "%" al final es el comodín de SQL para "lo que sea después".
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
-    .or(`first_name.ilike.${trimmed}%,last_name.ilike.${trimmed}%`)
+    .or(
+      `first_name.ilike.${trimmed}%,last_name.ilike.${trimmed}%,phone.ilike.${trimmed}%,email.ilike.${trimmed}%`,
+    )
     .order('last_name')
     .order('first_name')
 
