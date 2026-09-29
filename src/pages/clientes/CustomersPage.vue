@@ -7,15 +7,26 @@
 // es simple y suficientemente rápido (CLAUDE.md §11, "simple sobre
 // elegante").
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import PetsPanel from './PetsPanel.vue'
 
 const session = useSessionStore()
 const router = useRouter()
+const route = useRoute()
+
+// La pestaña vive en la URL (?tab=mascotas) para que, al volver desde la
+// ficha de una mascota con "atrás", se regrese a la misma pestaña.
+const tab = ref<'clientes' | 'mascotas'>(
+  route.query.tab === 'mascotas' ? 'mascotas' : 'clientes',
+)
+watch(tab, (value) => {
+  router.replace({ query: value === 'mascotas' ? { tab: value } : {} })
+})
 
 const customers = ref<Customer[]>([])
 const loading = ref(false)
@@ -78,42 +89,62 @@ function handleSaved(): void {
     <div class="d-flex align-center mb-4">
       <h1 class="text-h5">Clientes</h1>
       <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openNewCustomer">
+      <v-btn
+        v-if="tab === 'clientes'"
+        color="primary"
+        prepend-icon="mdi-plus"
+        @click="openNewCustomer"
+      >
         Nuevo cliente
       </v-btn>
     </div>
 
-    <v-text-field
-      v-model="searchTerm"
-      label="Buscar por nombre o apellido"
-      prepend-inner-icon="mdi-magnify"
-      density="compact"
-      variant="outlined"
-      clearable
-      class="mb-4"
-      style="max-width: 420px"
-    />
+    <v-tabs v-model="tab" class="mb-4">
+      <v-tab value="clientes">Clientes</v-tab>
+      <v-tab value="mascotas">Mascotas</v-tab>
+    </v-tabs>
 
-    <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
-      {{ errorMessage }}
-    </v-alert>
+    <PetsPanel v-if="tab === 'mascotas'" />
 
-    <v-data-table
-      :headers="headers"
-      :items="rows"
-      :loading="loading"
-      no-data-text="No hay clientes que coincidan con la búsqueda."
-      loading-text="Cargando clientes…"
-      @click:row="handleRowClick"
-    >
-      <!-- Sintaxis de corchetes en vez de "#item.fullName": el "." en un
+    <template v-else>
+      <v-text-field
+        v-model="searchTerm"
+        label="Buscar por nombre, teléfono o correo"
+        prepend-inner-icon="mdi-magnify"
+        density="compact"
+        variant="outlined"
+        clearable
+        class="mb-4"
+        style="max-width: 420px"
+      />
+
+      <v-alert
+        v-if="errorMessage"
+        type="error"
+        density="compact"
+        variant="tonal"
+        class="mb-4"
+      >
+        {{ errorMessage }}
+      </v-alert>
+
+      <v-data-table
+        :headers="headers"
+        :items="rows"
+        :loading="loading"
+        no-data-text="No hay clientes que coincidan con la búsqueda."
+        loading-text="Cargando clientes…"
+        @click:row="handleRowClick"
+      >
+        <!-- Sintaxis de corchetes en vez de "#item.fullName": el "." en un
            nombre de slot corto se interpreta como si fuera un modificador
            de directiva (que v-slot no soporta), así que hay que pasar el
            nombre completo como una expresión dinámica. -->
-      <template #[`item.fullName`]="{ item }">
-        <span class="font-weight-medium">{{ item.fullName }}</span>
-      </template>
-    </v-data-table>
+        <template #[`item.fullName`]="{ item }">
+          <span class="font-weight-medium">{{ item.fullName }}</span>
+        </template>
+      </v-data-table>
+    </template>
 
     <CustomerFormDialog
       v-model="showFormDialog"
