@@ -126,6 +126,16 @@ export function toNaiveLocalIso(utcInstant: Date | string, branchTimezone: strin
   return format(toBranchTime(utcInstant, branchTimezone), "yyyy-MM-dd'T'HH:mm:ss")
 }
 
+/**
+ * El día calendario de HOY en la sucursal ('YYYY-MM-DD'). No es el "hoy"
+ * del navegador: a las 23:30 en Mérida ya es mañana en Tijuana... o
+ * viceversa. Se necesita para pedir la agenda del día correcto al
+ * registrar una visita sin cita (tarea #1969).
+ */
+export function branchToday(branchTimezone: string, now: Date = new Date()): string {
+  return format(toBranchTime(now, branchTimezone), 'yyyy-MM-dd')
+}
+
 /** Fecha local de la sucursal en español ("15 de julio de 2026"). */
 export function formatDate(utcInstant: Date | string, branchTimezone: string): string {
   return format(toBranchTime(utcInstant, branchTimezone), "d 'de' MMMM 'de' yyyy", {

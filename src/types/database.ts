@@ -108,6 +108,8 @@ export type Database = {
           employee_user_id: string
           ends_at: string
           id: string
+          is_urgent: boolean
+          is_walk_in: boolean
           kind: Database["public"]["Enums"]["service_kind"]
           notes: string | null
           pet_id: string
@@ -125,6 +127,8 @@ export type Database = {
           employee_user_id: string
           ends_at: string
           id?: string
+          is_urgent?: boolean
+          is_walk_in?: boolean
           kind: Database["public"]["Enums"]["service_kind"]
           notes?: string | null
           pet_id: string
@@ -142,6 +146,8 @@ export type Database = {
           employee_user_id?: string
           ends_at?: string
           id?: string
+          is_urgent?: boolean
+          is_walk_in?: boolean
           kind?: Database["public"]["Enums"]["service_kind"]
           notes?: string | null
           pet_id?: string
@@ -1744,6 +1750,8 @@ export type Database = {
           employee_user_id: string
           ends_at: string
           id: string
+          is_urgent: boolean
+          is_walk_in: boolean
           kind: Database["public"]["Enums"]["service_kind"]
           notes: string | null
           pet_id: string
@@ -1783,6 +1791,46 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "memberships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_walk_in_appointment: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string
+          p_employee_user_id: string
+          p_ends_at: string
+          p_is_urgent: boolean
+          p_kind: Database["public"]["Enums"]["service_kind"]
+          p_notes: string
+          p_pet_id: string
+          p_services: Json
+          p_starts_at: string
+          p_tenant_id: string
+        }
+        Returns: {
+          branch_id: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          deleted_at: string | null
+          employee_user_id: string
+          ends_at: string
+          id: string
+          is_urgent: boolean
+          is_walk_in: boolean
+          kind: Database["public"]["Enums"]["service_kind"]
+          notes: string | null
+          pet_id: string
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "appointments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2095,6 +2143,8 @@ export type Database = {
           employee_user_id: string
           ends_at: string
           id: string
+          is_urgent: boolean
+          is_walk_in: boolean
           kind: Database["public"]["Enums"]["service_kind"]
           notes: string | null
           pet_id: string

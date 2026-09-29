@@ -26,6 +26,7 @@ import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
+import WalkInDialog from '@/components/WalkInDialog.vue'
 import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
@@ -112,6 +113,15 @@ const schedulerRows = computed<SchedulerRow[]>(() =>
   employees.value.map((e) => ({ id: e.userId, name: e.fullName })),
 )
 
+// Marca de texto al inicio del bloque para las visitas sin cita (tarea
+// #1969): el color ya significa "estado" (statusColors), así que el origen
+// de la cita va en el texto, sin tocar los componentes del calendario.
+function appointmentBadge(appointment: Appointment): string {
+  if (appointment.is_urgent) return '🚨 Urgente · '
+  if (appointment.is_walk_in) return '🚶 Sin cita · '
+  return ''
+}
+
 // Los bloques que pintan EmployeeDayScheduler.vue / EmployeeWeekCalendar.vue
 // — ninguno de los dos sabe nada de citas ni de zonas horarias.
 // toNaiveLocalIso (lib/datetime.ts) resuelve la hora de LA SUCURSAL antes
@@ -122,7 +132,7 @@ const calendarBlocks = computed<CalendarBlock[]>(() =>
     id: appointment.id,
     start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
     end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
-    text: `${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
+    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
     color: statusColors[displayStatus(appointment)],
     resource: appointment.employee_user_id,
   })),
@@ -192,6 +202,7 @@ const visibleRangeLabel = computed(() => {
 })
 
 const showNewAppointmentDialog = ref(false)
+const showWalkInDialog = ref(false)
 
 function goToNewAppointment(): void {
   showNewAppointmentDialog.value = true
@@ -253,6 +264,15 @@ function handleAppointmentCreated(appointment: Appointment): void {
       <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
            lo rechaza para groomer/vet (create_appointment()), esto solo
            evita mostrar un botón que termina en un error. -->
+      <v-btn
+        v-if="isFrontDeskView"
+        variant="outlined"
+        color="primary"
+        prepend-icon="mdi-walk"
+        @click="showWalkInDialog = true"
+      >
+        Llegada sin cita
+      </v-btn>
       <v-btn
         v-if="isFrontDeskView"
         color="primary"
@@ -343,6 +363,9 @@ function handleAppointmentCreated(appointment: Appointment): void {
     </v-card>
 
     <NewAppointmentDialog v-model="showNewAppointmentDialog" @created="handleAppointmentCreated" />
+    <!-- Mismo manejador: recargar el rango y abrir el detalle de la cita
+         recién creada (para una visita en curso, ahí mismo se pasa a atender). -->
+    <WalkInDialog v-model="showWalkInDialog" @created="handleAppointmentCreated" />
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"

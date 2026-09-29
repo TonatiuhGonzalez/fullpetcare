@@ -317,6 +317,8 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - **Una cita es de un solo tipo** (`kind`). Si la mascota va a baño y a consulta, son dos
   citas del mismo cliente, que pueden cobrarse en un mismo ticket.
 - `status`: `scheduled` | `in_progress` | `completed` | `cancelled` | `no_show`.
+- `is_walk_in` / `is_urgent` (booleanos, default `false`): una visita sin cita es una cita normal
+  marcada así (`create_walk_in_appointment`), para que atender, cobrar e historial no cambien.
 - `*_snapshot`: al agendar se **copia** nombre, precio y duración del servicio. Si mañana
   suben el precio del baño, las citas viejas conservan el suyo. Un ticket histórico
   nunca cambia de monto.
