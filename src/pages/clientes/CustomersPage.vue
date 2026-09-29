@@ -13,14 +13,15 @@ import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import CustomerDetailDialog from '@/components/CustomerDetailDialog.vue'
 import PetsPanel from './PetsPanel.vue'
 
 const session = useSessionStore()
 const router = useRouter()
 const route = useRoute()
 
-// La pestaña vive en la URL (?tab=mascotas) para que, al volver desde la
-// ficha de una mascota con "atrás", se regrese a la misma pestaña.
+// La pestaña vive en la URL (?tab=mascotas) para que, al recargar la
+// página, se conserve la misma pestaña.
 const tab = ref<'clientes' | 'mascotas'>(
   route.query.tab === 'mascotas' ? 'mascotas' : 'clientes',
 )
@@ -33,6 +34,8 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
+const showDetailDialog = ref(false)
+const selectedCustomerId = ref<string | null>(null)
 
 const headers = [
   { title: 'Nombre', key: 'fullName' },
@@ -76,7 +79,8 @@ function openNewCustomer(): void {
 }
 
 function handleRowClick(_event: Event, { item }: { item: Customer }): void {
-  router.push(`/app/clientes/${item.id}`)
+  selectedCustomerId.value = item.id
+  showDetailDialog.value = true
 }
 
 function handleSaved(): void {
@@ -146,6 +150,11 @@ function handleSaved(): void {
       </v-data-table>
     </template>
 
+    <CustomerDetailDialog
+      v-model="showDetailDialog"
+      :customer-id="selectedCustomerId"
+      @changed="load"
+    />
     <CustomerFormDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"

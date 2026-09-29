@@ -36,10 +36,6 @@ import { test, expect } from '@playwright/test'
 const DUENO_EMAIL = 'dueno@patitasfelices.mx'
 const DUENO_PASSWORD = 'Demo1234!'
 
-// Ids fijos de la semilla de demo (supabase/tests/fixtures.ts): Sofía
-// Ramírez Castillo, su perro Rocky, y el servicio "Baño".
-const PET_ROCKY_ID = 'e0000000-0000-4000-8000-000000000001'
-
 /**
  * El siguiente día HÁBIL (mañana, saltando domingo) como "aaaa-mm-dd".
  *
@@ -202,6 +198,9 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // 6. El historial de Rocky ve esta visita, con la nota que se acaba de
   // escribir — prueba que services/petHistory.ts (fase 6) refleja la cita
   // recién cobrada, no solo que "algo" se guardó.
-  await page.goto(`/app/mascotas/${PET_ROCKY_ID}`)
+  // La ficha de la mascota es un diálogo (tarea #1968): se abre desde la
+  // pestaña "Mascotas" de Clientes, ya no hay ruta propia.
+  await page.goto('/app/clientes?tab=mascotas')
+  await page.getByRole('row', { name: /Rocky/ }).click()
   await expect(page.getByText(groomerNotes)).toBeVisible()
 })

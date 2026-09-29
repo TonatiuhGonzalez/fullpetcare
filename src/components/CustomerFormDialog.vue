@@ -2,7 +2,7 @@
 // Alta y edición de cliente (tarea 2.17). Componente tonto: recibe el
 // cliente a editar (o nada, para alta) por prop, y avisa con un evento
 // cuando se guardó — no decide qué pasa después (eso lo hace quien lo
-// use: CustomersPage o CustomerDetailPage). No importa supabase.ts
+// use: CustomersPage o CustomerDetailDialog). No importa supabase.ts
 // directo, habla con services/customers.ts (CLAUDE.md §4).
 import { computed, ref, watch } from 'vue'
 

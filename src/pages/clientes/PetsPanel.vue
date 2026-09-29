@@ -4,7 +4,6 @@
 // la pestaña de clientes, trae todo y filtra en el navegador (CLAUDE.md
 // §11, "simple sobre elegante"): son decenas de registros por tenant.
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import * as customersService from '@/services/customers'
 import * as petsService from '@/services/pets'
@@ -12,10 +11,10 @@ import type { Pet } from '@/services/pets'
 import { matchesPetSearch } from '@/lib/petSearch'
 import { speciesLabel } from '@/lib/petLabels'
 import { useSessionStore } from '@/stores/session'
+import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 
 const session = useSessionStore()
-const router = useRouter()
 
 const pets = ref<Pet[]>([])
 const ownerNames = ref<Record<string, string>>({})
@@ -23,6 +22,8 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
+const showDetailDialog = ref(false)
+const selectedPetId = ref<string | null>(null)
 
 const headers = [
   { title: 'Nombre', key: 'name' },
@@ -63,7 +64,8 @@ async function load(): Promise<void> {
 onMounted(load)
 
 function handleRowClick(_event: Event, { item }: { item: Pet }): void {
-  router.push(`/app/mascotas/${item.id}`)
+  selectedPetId.value = item.id
+  showDetailDialog.value = true
 }
 </script>
 
@@ -109,6 +111,7 @@ function handleRowClick(_event: Event, { item }: { item: Pet }): void {
       </template>
     </v-data-table>
 
+    <PetDetailDialog v-model="showDetailDialog" :pet-id="selectedPetId" @changed="load" />
     <PetFormDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"

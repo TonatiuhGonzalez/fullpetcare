@@ -68,7 +68,7 @@ type TimelineEntryType = 'grooming' | 'veterinary' | 'vaccination' | 'weight'
 
 /**
  * Qué tipos de evento del historial de una mascota puede ver un rol
- * (PetDetailPage.vue > PetTimeline.vue). groomer: solo lo que él mismo
+ * (PetDetailDialog.vue > PetTimeline.vue). groomer: solo lo que él mismo
  * hace (estética) — ni siquiera las visitas de veterinaria, cartilla o
  * peso, que son información clínica. vet: lo suyo (veterinaria) más
  * cartilla y peso (parte normal de una consulta). owner/receptionist ven
