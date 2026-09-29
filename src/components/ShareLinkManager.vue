@@ -31,7 +31,7 @@ const publicUrl = computed(() =>
 
 // Un link no tiene sucursal propia (igual que una vacunación, fase 6) —
 // se muestra en la de la sesión activa, mismo criterio que
-// PetDetailPage.vue usa para el resto de la ficha.
+// PetDetailDialog.vue usa para el resto de la ficha.
 const displayTimezone = computed(() => session.activeBranch?.timezone ?? 'America/Mexico_City')
 
 async function load(): Promise<void> {

@@ -84,18 +84,6 @@ export const router = createRouter({
           meta: { requiresFrontDesk: true },
         },
         {
-          path: 'clientes/:id',
-          name: 'cliente-detalle',
-          component: () => import('@/pages/clientes/CustomerDetailPage.vue'),
-          props: true,
-        },
-        {
-          path: 'mascotas/:id',
-          name: 'mascota-detalle',
-          component: () => import('@/pages/clientes/PetDetailPage.vue'),
-          props: true,
-        },
-        {
           path: 'empleados',
           name: 'empleados',
           component: () => import('@/pages/empleados/EmployeesPage.vue'),
