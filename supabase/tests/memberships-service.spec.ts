@@ -8,9 +8,11 @@
 // había probado contra la base real.
 import { describe, expect, it } from 'vitest'
 
+import * as branchesService from '@/services/branches'
 import * as membershipsService from '@/services/memberships'
 import { supabase } from '@/services/supabase'
 
+import { runCommitted } from './helpers'
 import {
   BRANCH_CENTRO,
   BRANCH_DEL_VALLE,
@@ -49,6 +51,41 @@ describe('services/memberships.ts contra Supabase local', () => {
     await supabase.auth.signOut()
   })
 
+  it('listMyMemberships: una sucursal deshabilitada NO se ofrece para trabajar (tarea #1959)', async () => {
+    // Qué se rompería en producción: el dueño deshabilita una sucursal desde
+    // configuración pero el selector de la barra y la agenda la seguirían
+    // ofreciendo, y se podrían agendar citas en una sucursal deshabilitada.
+    const { error } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (error) throw error
+
+    const created = await branchesService.create(TENANT_PATITAS, {
+      name: 'Sucursal temporal de prueba',
+      address: null,
+      postalCode: null,
+      phone: null,
+      timezone: 'America/Mexico_City',
+      openingHours: {},
+    })
+
+    try {
+      await branchesService.setActive(created.id, false)
+      const [patitas] = await membershipsService.listMyMemberships(USER_DUENO)
+      expect(patitas.branches.map((b) => b.id)).not.toContain(created.id)
+    } finally {
+      // Esta prueba usa una sesión real (los datos quedan guardados) y el
+      // dueño no puede borrar sucursales por RLS, así que se borra con la
+      // conexión directa para no ensuciar a las demás pruebas (p. ej. la de
+      // aislamiento, que cuenta las sucursales del tenant).
+      await runCommitted((client) =>
+        client.query('delete from branches where id = $1', [created.id]),
+      )
+      await supabase.auth.signOut()
+    }
+  })
+
   it('listMyMemberships: un groomer solo ve LAS sucursales que sí tiene en membership_branches', async () => {
     const { error } = await supabase.auth.signInWithPassword({
       email: 'groomer@patitasfelices.mx',
@@ -73,8 +110,14 @@ describe('services/memberships.ts contra Supabase local', () => {
     })
     if (error) throw error
 
-    const centro = await membershipsService.listBranchEmployees(TENANT_PATITAS, BRANCH_CENTRO)
-    const delValle = await membershipsService.listBranchEmployees(TENANT_PATITAS, BRANCH_DEL_VALLE)
+    const centro = await membershipsService.listBranchEmployees(
+      TENANT_PATITAS,
+      BRANCH_CENTRO,
+    )
+    const delValle = await membershipsService.listBranchEmployees(
+      TENANT_PATITAS,
+      BRANCH_DEL_VALLE,
+    )
 
     const centroIds = centro.map((e) => e.userId).sort()
     const delValleIds = delValle.map((e) => e.userId).sort()

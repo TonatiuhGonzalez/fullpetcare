@@ -15,6 +15,8 @@ declare module 'vue-router' {
     requiresPermission?: PermissionModule
     /** true en las rutas del panel de plataforma (fase 10): solo superadmins de plataforma. */
     requiresPlatformAdmin?: boolean
+    /** true si solo el dueño del negocio entra (configuración de empresa y sucursales, tarea #1959). */
+    requiresOwner?: boolean
   }
 }
 
@@ -102,6 +104,34 @@ export const router = createRouter({
           // real es por PERMISO, no por rol: cambiar quién entra aquí es
           // una fila de datos, no una edición de este archivo.
           meta: { requiresPermission: 'employees' },
+        },
+        {
+          // Configuración (tarea #1959): la ven todos los roles, pero cada
+          // sección se gatea aparte. "Empresa y sucursales" es solo del dueño
+          // (política RLS de branches); "Cuenta" es de cualquiera.
+          path: 'configuracion',
+          component: () => import('@/pages/configuracion/SettingsPage.vue'),
+          children: [
+            {
+              path: '',
+              // Cada quien aterriza en la primera sección que puede ver.
+              redirect: () =>
+                useSessionStore().role === 'owner'
+                  ? '/app/configuracion/sucursales'
+                  : '/app/configuracion/cuenta',
+            },
+            {
+              path: 'sucursales',
+              name: 'configuracion-sucursales',
+              component: () => import('@/pages/configuracion/BranchesSettingsPage.vue'),
+              meta: { requiresOwner: true },
+            },
+            {
+              path: 'cuenta',
+              name: 'configuracion-cuenta',
+              component: () => import('@/pages/configuracion/AccountSettingsPage.vue'),
+            },
+          ],
         },
       ],
     },
@@ -254,6 +284,13 @@ router.beforeEach(async (to) => {
   // poder ver nada en ella.
   if (to.meta.requiresPermission && !session.canView(to.meta.requiresPermission)) {
     return { path: '/app/agenda' }
+  }
+
+  // Secciones solo del dueño (configuración de sucursales): quien no lo es
+  // cae en "Cuenta", que sí puede ver. La política RLS de branches ya le
+  // negaría escribir; esto solo evita una pantalla que no podría usar.
+  if (to.matched.some((record) => record.meta.requiresOwner) && session.role !== 'owner') {
+    return { path: '/app/configuracion/cuenta' }
   }
 
   return true
