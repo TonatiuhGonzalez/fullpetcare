@@ -68,6 +68,18 @@ export interface TenantMetrics {
   lastAccessAt: string | null
 }
 
+export interface FeedbackReport {
+  id: string
+  tenantId: string
+  tenantName: string
+  userName: string | null
+  userEmail: string | null
+  message: string
+  /** Ruta de la captura en Storage; null si no adjuntó. Se abre con getFeedbackScreenshotUrl(). */
+  screenshotPath: string | null
+  createdAt: string
+}
+
 export interface PlatformAdminUser {
   userId: string
   email: string
@@ -444,4 +456,33 @@ export function addAdmin(input: { fullName: string; email: string }): Promise<Ne
 export async function removeAdmin(userId: string): Promise<void> {
   const { error } = await supabase.rpc('platform_remove_admin', { p_user_id: userId })
   if (error) throw new Error(friendlyRpcMessage(error))
+}
+
+// -----------------------------------------------------------------------------
+// Reportes de errores y sugerencias (tarea #1958)
+// -----------------------------------------------------------------------------
+
+/** Reportes de todos los negocios, del más reciente al más antiguo (RPC platform_list_feedback). */
+export async function listFeedback(): Promise<FeedbackReport[]> {
+  const { data, error } = await supabase.rpc('platform_list_feedback')
+  if (error) throw new Error(friendlyRpcMessage(error))
+  return data.map((row) => ({
+    id: row.id,
+    tenantId: row.tenant_id,
+    tenantName: row.tenant_name,
+    userName: row.user_name,
+    userEmail: row.user_email,
+    message: row.message,
+    screenshotPath: row.screenshot_path,
+    createdAt: row.created_at,
+  }))
+}
+
+/** URL firmada de una captura — el bucket es privado, igual que pets.ts#getPhotoUrl. */
+export async function getFeedbackScreenshotUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('feedback-screenshots')
+    .createSignedUrl(path, 60)
+  if (error) throw new Error(GENERIC_ERROR)
+  return data.signedUrl
 }

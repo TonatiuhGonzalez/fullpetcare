@@ -358,6 +358,7 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `share_links` | `tenant_id`, `scope` (`pet`\|`customer`), `pet_id`, `customer_id`, `token_hash`, `token_prefix`, `expires_at`, `revoked_at`, `created_by`, `access_count`, `last_accessed_at` |
 | `audit_log`   | `tenant_id`, `table_name`, `record_id`, `action`, `actor_user_id`, `changed_at`, `old_data jsonb`, `new_data jsonb`                                                           |
+| `feedback_reports` | `tenant_id`, `user_id`, `message`, `screenshot_path` | Reportes de errores/sugerencias (tarea #1958). Los miembros solo INSERTAN (a nombre suyo); nadie del negocio los lee. El superadmin los lee por la RPC `platform_list_feedback` (pestaña "Reportes"); la captura va al bucket privado `feedback-screenshots` |
 
 `share_links` **nunca guarda el token en claro**, solo su SHA-256 (§7.4).
 

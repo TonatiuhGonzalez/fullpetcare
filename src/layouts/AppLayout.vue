@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
@@ -37,6 +38,9 @@ const banner = computed(() => {
 // MOCK: aún no hay pasarela de pago (CLAUDE.md §1).
 const showPayMock = ref(false)
 
+const showFeedback = ref(false)
+const feedbackSentNotice = ref(false)
+
 async function handleLogout(): Promise<void> {
   // "finally": aunque el servidor no responda, la sesión local ya se
   // limpió en session.logout() — hay que salir de la pantalla igual.
@@ -54,10 +58,23 @@ function handleBranchChange(branchId: unknown): void {
 
 <template>
   <v-app-bar color="primary" density="comfortable">
-    <v-app-bar-title>
+    <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
+         botón de reportes quedaría pegado a la navegación, lejos del nombre.
+         El v-spacer de abajo empuja la navegación a la derecha. -->
+    <v-app-bar-title style="flex: 0 1 auto">
       <v-icon icon="mdi-paw" class="mr-2" />
       {{ titleLabel }}
     </v-app-bar-title>
+    <v-btn
+      prepend-icon="mdi-message-alert-outline"
+      variant="tonal"
+      size="small"
+      class="ml-4"
+      @click="showFeedback = true"
+    >
+      Reportar error o sugerencia
+    </v-btn>
+    <v-spacer />
 
     <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
          (agenda y clientes). Un v-navigation-drawer completo se agrega
@@ -115,6 +132,16 @@ function handleBranchChange(branchId: unknown): void {
 
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
+  </v-snackbar>
+
+  <FeedbackDialog
+    v-model="showFeedback"
+    :tenant-id="session.activeMembership?.tenantId ?? ''"
+    @sent="feedbackSentNotice = true"
+  />
+
+  <v-snackbar v-model="feedbackSentNotice" color="success" :timeout="4000">
+    ¡Gracias! Recibimos tu comentario.
   </v-snackbar>
 
   <v-main>
