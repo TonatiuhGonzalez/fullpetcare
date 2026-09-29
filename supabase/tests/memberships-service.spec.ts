@@ -12,6 +12,7 @@ import * as branchesService from '@/services/branches'
 import * as membershipsService from '@/services/memberships'
 import { supabase } from '@/services/supabase'
 
+import { runCommitted } from './helpers'
 import {
   BRANCH_CENTRO,
   BRANCH_DEL_VALLE,
@@ -74,13 +75,13 @@ describe('services/memberships.ts contra Supabase local', () => {
       const [patitas] = await membershipsService.listMyMemberships(USER_DUENO)
       expect(patitas.branches.map((b) => b.id)).not.toContain(created.id)
     } finally {
-      // Esta prueba usa una sesión real (los datos quedan guardados). Las
-      // sucursales no se borran físicamente, así que se oculta con borrado
-      // suave para no ensuciar a las demás pruebas.
-      await supabase
-        .from('branches')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', created.id)
+      // Esta prueba usa una sesión real (los datos quedan guardados) y el
+      // dueño no puede borrar sucursales por RLS, así que se borra con la
+      // conexión directa para no ensuciar a las demás pruebas (p. ej. la de
+      // aislamiento, que cuenta las sucursales del tenant).
+      await runCommitted((client) =>
+        client.query('delete from branches where id = $1', [created.id]),
+      )
       await supabase.auth.signOut()
     }
   })
@@ -109,8 +110,14 @@ describe('services/memberships.ts contra Supabase local', () => {
     })
     if (error) throw error
 
-    const centro = await membershipsService.listBranchEmployees(TENANT_PATITAS, BRANCH_CENTRO)
-    const delValle = await membershipsService.listBranchEmployees(TENANT_PATITAS, BRANCH_DEL_VALLE)
+    const centro = await membershipsService.listBranchEmployees(
+      TENANT_PATITAS,
+      BRANCH_CENTRO,
+    )
+    const delValle = await membershipsService.listBranchEmployees(
+      TENANT_PATITAS,
+      BRANCH_DEL_VALLE,
+    )
 
     const centroIds = centro.map((e) => e.userId).sort()
     const delValleIds = delValle.map((e) => e.userId).sort()
