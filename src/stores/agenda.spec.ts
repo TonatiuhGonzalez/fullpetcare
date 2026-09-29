@@ -100,6 +100,8 @@ function makeAppointment(overrides: Partial<AppointmentWithNames>): AppointmentW
     created_at: '2027-01-01T00:00:00Z',
     updated_at: '2027-01-01T00:00:00Z',
     deleted_at: null,
+    is_walk_in: false,
+    is_urgent: false,
     customerName: 'Sofía Ramírez',
     petName: 'Rocky',
     ...overrides,
@@ -145,7 +147,7 @@ describe('useAgendaStore — dueño/recepción (un solo día, navegable)', () =>
   })
 
   it('visibleDates es un arreglo de UN solo día: activeDate', async () => {
-    // La vista de dueño/recepción es DayPilotScheduler (un día, filas =
+    // La vista de dueño/recepción es la línea de tiempo (un día, filas =
     // empleados) — si visibleDates devolviera más de un día, el store
     // pediría citas de más de lo que la pantalla necesita.
     setupSession()

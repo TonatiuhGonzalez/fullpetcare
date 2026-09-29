@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Agenda (rediseño 2026-09-08, pedido explícito tras rechazar la
 // versión anterior hecha a mano): dos vistas distintas según el rol,
-// ambas con @daypilot/daypilot-lite-vue (CLAUDE.md §3).
+// ambas con EventCalendar, @event-calendar/core (CLAUDE.md §3).
 //
-// - Dueño/recepción: EmployeeDayScheduler.vue (DayPilotScheduler) — un
+// - Dueño/recepción: EmployeeDayScheduler.vue (resourceTimelineDay) — un
 //   solo día navegable, filas = empleados, columnas = horas de ese día.
-// - Groomer/vet: EmployeeWeekCalendar.vue (DayPilotCalendar) — sin
+// - Groomer/vet: EmployeeWeekCalendar.vue (timeGridWeek) — sin
 //   navegación, siempre "hoy + 6 días", columnas = días, filas = horas.
 //
 // stores/agenda.ts decide QUÉ rango de fechas corresponde según el rol
@@ -26,7 +26,9 @@ import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
+import WalkInDialog from '@/components/WalkInDialog.vue'
 import AppointmentDialog from '@/components/AppointmentDialog.vue'
+import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
 
@@ -112,17 +114,26 @@ const schedulerRows = computed<SchedulerRow[]>(() =>
   employees.value.map((e) => ({ id: e.userId, name: e.fullName })),
 )
 
+// Marca de texto al inicio del bloque para las visitas sin cita (tarea
+// #1969): el color ya significa "estado" (statusColors), así que el origen
+// de la cita va en el texto, sin tocar los componentes del calendario.
+function appointmentBadge(appointment: Appointment): string {
+  if (appointment.is_urgent) return '🚨 Urgente · '
+  if (appointment.is_walk_in) return '🚶 Sin cita · '
+  return ''
+}
+
 // Los bloques que pintan EmployeeDayScheduler.vue / EmployeeWeekCalendar.vue
 // — ninguno de los dos sabe nada de citas ni de zonas horarias.
 // toNaiveLocalIso (lib/datetime.ts) resuelve la hora de LA SUCURSAL antes
-// de dársela a DayPilot (CLAUDE.md §8.3): DayPilot no tiene ningún
-// concepto de timezone, toma el string tal cual como "hora de pared".
+// de dársela al calendario (CLAUDE.md §8.3): EventCalendar lee el string
+// sin zona como "hora de pared" del navegador y lo pinta igual.
 const calendarBlocks = computed<CalendarBlock[]>(() =>
   agenda.appointments.map((appointment) => ({
     id: appointment.id,
     start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
     end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
-    text: `${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
+    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
     color: statusColors[displayStatus(appointment)],
     resource: appointment.employee_user_id,
   })),
@@ -192,6 +203,7 @@ const visibleRangeLabel = computed(() => {
 })
 
 const showNewAppointmentDialog = ref(false)
+const showWalkInDialog = ref(false)
 
 function goToNewAppointment(): void {
   showNewAppointmentDialog.value = true
@@ -203,6 +215,14 @@ function goToNewAppointment(): void {
 // página aparte. Se reutiliza también justo después de agendar una cita
 // nueva, para no mezclar "crear" (diálogo) con "ver detalle" (antes
 // página, ahora también diálogo).
+const showPetDialog = ref(false)
+const selectedPetId = ref<string | null>(null)
+
+function openPetDialog(petId: string): void {
+  selectedPetId.value = petId
+  showPetDialog.value = true
+}
+
 const showAppointmentDialog = ref(false)
 const selectedAppointmentId = ref<string | null>(null)
 
@@ -255,6 +275,15 @@ function handleAppointmentCreated(appointment: Appointment): void {
            evita mostrar un botón que termina en un error. -->
       <v-btn
         v-if="isFrontDeskView"
+        variant="outlined"
+        color="primary"
+        prepend-icon="mdi-walk"
+        @click="showWalkInDialog = true"
+      >
+        Llegada sin cita
+      </v-btn>
+      <v-btn
+        v-if="isFrontDeskView"
         color="primary"
         prepend-icon="mdi-plus"
         @click="goToNewAppointment"
@@ -270,7 +299,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <!-- 'idle' cuenta como "todavía cargando" aquí: es el instante entre
          el primer render y que onMounted() dispare initFromSession().
          Sin esto, EmployeeDayScheduler/EmployeeWeekCalendar montaban con
-         agenda.activeDate todavía en null (fecha vacía), y DayPilot
+         agenda.activeDate todavía en null (fecha vacía), y el calendario
          tronaba tratando de parsear un string vacío como fecha
          (verificado a mano en el navegador). -->
     <v-progress-circular
@@ -288,7 +317,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
          cambia y Vue monta EmployeeWeekCalendar en vez de
          EmployeeDayScheduler con agenda.visibleDates ya en [] (depende
          de session.activeBranches, stores/agenda.ts) — start-date llega
-         vacío y DayPilot truena igual que antes. agenda.status se queda
+         vacío y el calendario truena igual que antes. agenda.status se queda
          en 'ready' en ese instante (el store de agenda no se resetea al
          cerrar sesión), así que sin este segundo chequeo el de arriba no
          lo detecta. Verificado a mano: sin esto, el logout deja la URL en
@@ -329,7 +358,8 @@ function handleAppointmentCreated(appointment: Appointment): void {
         <v-list-item
           v-for="vaccine in upcomingVaccines"
           :key="vaccine.vaccinationId"
-          :to="`/app/mascotas/${vaccine.petId}`"
+          link
+          @click="openPetDialog(vaccine.petId)"
         >
           <template #title>{{ vaccine.petName }} · {{ vaccine.vaccineName }}</template>
           <template #subtitle>Próxima dosis: {{ vaccine.nextDueDate }}</template>
@@ -343,6 +373,10 @@ function handleAppointmentCreated(appointment: Appointment): void {
     </v-card>
 
     <NewAppointmentDialog v-model="showNewAppointmentDialog" @created="handleAppointmentCreated" />
+    <!-- Mismo manejador: recargar el rango y abrir el detalle de la cita
+         recién creada (para una visita en curso, ahí mismo se pasa a atender). -->
+    <WalkInDialog v-model="showWalkInDialog" @created="handleAppointmentCreated" />
+    <PetDetailDialog v-model="showPetDialog" :pet-id="selectedPetId" />
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"

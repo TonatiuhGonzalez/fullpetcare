@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  branchToday,
   dayRangeUtc,
   formatDate,
   formatTime,
@@ -101,10 +102,10 @@ describe('toBranchTime', () => {
 })
 
 describe('toNaiveLocalIso', () => {
-  it('da la hora local de la sucursal como texto SIN zona, para dársela a DayPilot', () => {
-    // DayPilot (components/EmployeeDayScheduler.vue,
-    // EmployeeWeekCalendar.vue) no sabe nada de zonas horarias: pinta
-    // cualquier string que reciba tal cual, como hora "de pared". Si
+  it('da la hora local de la sucursal como texto SIN zona, para dársela al calendario', () => {
+    // El calendario (components/EmployeeDayScheduler.vue,
+    // EmployeeWeekCalendar.vue) pinta cualquier string sin zona que reciba
+    // tal cual, como hora "de pared". Si
     // esto le pasara el string UTC original en vez de resolver primero
     // la hora de LA SUCURSAL, la cita se dibujaría en la fila/columna
     // equivocada para cualquier sucursal que no esté en UTC-0.
@@ -115,7 +116,7 @@ describe('toNaiveLocalIso', () => {
 
   it('el mismo instante da un texto distinto en sucursales de zonas distintas', () => {
     // Mismo caso que formatTime, pero para el string que consume
-    // DayPilot: es la garantía de que dos sucursales no acaban
+    // el calendario: es la garantía de que dos sucursales no acaban
     // compartiendo casilla en la grilla por error.
     const instant = '2026-07-15T20:30:00Z'
     expect(toNaiveLocalIso(instant, 'America/Mexico_City')).toBe('2026-07-15T14:30:00')
@@ -130,5 +131,17 @@ describe('toNaiveLocalIso', () => {
     expect(toNaiveLocalIso('2026-07-16T01:00:00Z', 'America/Mexico_City')).toBe(
       '2026-07-15T19:00:00',
     )
+  })
+})
+
+describe('branchToday', () => {
+  it('a la misma hora UTC, "hoy" puede ser un día distinto según la sucursal', () => {
+    // 03:00 UTC del 16 de julio: en Tijuana (UTC-7 en verano) todavía son
+    // las 20:00 del 15, pero en Tokio (UTC+9) ya son las 12:00 del 16. Si
+    // branchToday usara la fecha del navegador o de UTC, la agenda de una
+    // visita sin cita pediría el día equivocado a partir de cierta hora.
+    const instant = new Date('2026-07-16T03:00:00Z')
+    expect(branchToday('America/Tijuana', instant)).toBe('2026-07-15')
+    expect(branchToday('Asia/Tokyo', instant)).toBe('2026-07-16')
   })
 })

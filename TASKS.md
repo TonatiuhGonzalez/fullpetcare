@@ -660,4 +660,23 @@ Tijuana); solo el nombre es obligatorio (dirección, CP y teléfono son opcional
 si se capturan); una sucursal debe abrir al menos un día. Pendiente: comprobar la pantalla en
 navegador; fuera de esta tarea, dar de baja la suscripción o eliminar la cuenta por completo.
 
+**Visitas sin cita (tarea #1969, 2026-09-29):** botón "Llegada sin cita" en la agenda (solo
+dueño/recepción) que abre `WalkInDialog.vue`: alta rápida de cliente (nombre, apellido y teléfono
+de 10 dígitos, siempre obligatorios) y mascota (nombre y especie), o elegir una ya registrada;
+tipo, servicios, urgente (sí/no) y notas. No se elige horario: la visita empieza ahora, y la lista
+de empleados muestra quién está libre ya o cuánto espera (`lib/walkIn.ts`, función pura). Si se
+elige a alguien ocupado, la cita queda `scheduled` para cuando se libere. Migración
+`20260929120000_walk_in_appointments.sql`: columnas `appointments.is_walk_in` e `is_urgent` (default
+`false`, citas existentes intactas) y la función `create_walk_in_appointment`, que **llama** a
+`create_appointment` (mismas validaciones y snapshots) y luego marca la cita y decide el estado
+(`in_progress` si empieza en ≤ 2 min, medido con el reloj de la base). En la agenda, el bloque lleva
+la marca "🚶 Sin cita" o "🚨 Urgente". Tests: `lib/walkIn.spec.ts`, `branchToday` en
+`lib/datetime.spec.ts` y `supabase/tests/walk-in-service.spec.ts` (estado inicial, urgente,
+traslape, inicio en el pasado, groomer rechazado, `anon` rechazado). Decisiones de detalle tomadas
+sin preguntar: el apellido también es obligatorio porque `customers.last_name` es `not null`; el
+alta de cliente y mascota no es atómica con la cita (si la cita falla, el cliente queda y el
+reintento lo reutiliza); no se restringe al horario de apertura (una emergencia puede llegar fuera
+de horario); un cliente ya registrado sin teléfono no se obliga a completarlo. Pendiente: probar la
+pantalla en navegador; fuera de esta tarea, fila de espera con turnos y aviso por mensaje.
+
 **Trabajo futuro (fuera de esta fase):** cuotas de uso por plan (sucursales, empleados…).

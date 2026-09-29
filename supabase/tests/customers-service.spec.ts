@@ -102,6 +102,27 @@ describe('services/customers.ts contra Supabase local', () => {
     expect(results.some((c) => c.last_name === 'Cruz Mendoza')).toBe(true)
   })
 
+  it('search también encuentra por teléfono y por correo', async () => {
+    // La pestaña Clientes promete buscar por nombre, teléfono o correo
+    // (tarea #1967). Se crea un cliente con teléfono y correo únicos para
+    // no depender de la semilla; si el OR de search() no incluyera esas
+    // columnas, recepción no podría encontrar a un cliente por su número.
+    const created = await customers.create({
+      tenant_id: TENANT_PATITAS,
+      first_name: 'Busqueda',
+      last_name: 'Contacto',
+      phone: '5599887766',
+      email: 'busqueda.contacto@example.com',
+    })
+    createdIds.push(created.id)
+
+    const byPhone = await customers.search(TENANT_PATITAS, '559988')
+    expect(byPhone.some((c) => c.id === created.id)).toBe(true)
+
+    const byEmail = await customers.search(TENANT_PATITAS, 'busqueda.con')
+    expect(byEmail.some((c) => c.id === created.id)).toBe(true)
+  })
+
   it('el borrado suave saca al cliente de list() pero la fila sigue en la base', async () => {
     // Este es el caso que de verdad importa de borrado suave (CLAUDE.md
     // §8.5): que "desaparecer" para la app no signifique "desaparecer"
