@@ -11,6 +11,7 @@ const route = useRoute()
 
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const submitting = ref(false)
 const showBlocked = ref(false)
 const showPayMock = ref(false)
@@ -80,8 +81,11 @@ async function handleSubmit(): Promise<void> {
         <v-text-field
           v-model="password"
           label="Contraseña"
-          type="password"
+          :type="showPassword ? 'text' : 'password'"
+          :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
           autocomplete="current-password"
+          @click:append-inner="showPassword = !showPassword"
           required
           class="mb-2"
         />
