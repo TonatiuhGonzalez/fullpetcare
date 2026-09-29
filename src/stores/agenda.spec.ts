@@ -100,6 +100,8 @@ function makeAppointment(overrides: Partial<AppointmentWithNames>): AppointmentW
     created_at: '2027-01-01T00:00:00Z',
     updated_at: '2027-01-01T00:00:00Z',
     deleted_at: null,
+    is_walk_in: false,
+    is_urgent: false,
     customerName: 'Sofía Ramírez',
     petName: 'Rocky',
     ...overrides,
