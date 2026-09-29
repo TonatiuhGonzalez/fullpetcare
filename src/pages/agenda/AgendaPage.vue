@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Agenda (rediseño 2026-09-08, pedido explícito tras rechazar la
 // versión anterior hecha a mano): dos vistas distintas según el rol,
-// ambas con @daypilot/daypilot-lite-vue (CLAUDE.md §3).
+// ambas con EventCalendar, @event-calendar/core (CLAUDE.md §3).
 //
-// - Dueño/recepción: EmployeeDayScheduler.vue (DayPilotScheduler) — un
+// - Dueño/recepción: EmployeeDayScheduler.vue (resourceTimelineDay) — un
 //   solo día navegable, filas = empleados, columnas = horas de ese día.
-// - Groomer/vet: EmployeeWeekCalendar.vue (DayPilotCalendar) — sin
+// - Groomer/vet: EmployeeWeekCalendar.vue (timeGridWeek) — sin
 //   navegación, siempre "hoy + 6 días", columnas = días, filas = horas.
 //
 // stores/agenda.ts decide QUÉ rango de fechas corresponde según el rol
@@ -126,8 +126,8 @@ function appointmentBadge(appointment: Appointment): string {
 // Los bloques que pintan EmployeeDayScheduler.vue / EmployeeWeekCalendar.vue
 // — ninguno de los dos sabe nada de citas ni de zonas horarias.
 // toNaiveLocalIso (lib/datetime.ts) resuelve la hora de LA SUCURSAL antes
-// de dársela a DayPilot (CLAUDE.md §8.3): DayPilot no tiene ningún
-// concepto de timezone, toma el string tal cual como "hora de pared".
+// de dársela al calendario (CLAUDE.md §8.3): EventCalendar lee el string
+// sin zona como "hora de pared" del navegador y lo pinta igual.
 const calendarBlocks = computed<CalendarBlock[]>(() =>
   agenda.appointments.map((appointment) => ({
     id: appointment.id,
@@ -299,7 +299,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <!-- 'idle' cuenta como "todavía cargando" aquí: es el instante entre
          el primer render y que onMounted() dispare initFromSession().
          Sin esto, EmployeeDayScheduler/EmployeeWeekCalendar montaban con
-         agenda.activeDate todavía en null (fecha vacía), y DayPilot
+         agenda.activeDate todavía en null (fecha vacía), y el calendario
          tronaba tratando de parsear un string vacío como fecha
          (verificado a mano en el navegador). -->
     <v-progress-circular
@@ -317,7 +317,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
          cambia y Vue monta EmployeeWeekCalendar en vez de
          EmployeeDayScheduler con agenda.visibleDates ya en [] (depende
          de session.activeBranches, stores/agenda.ts) — start-date llega
-         vacío y DayPilot truena igual que antes. agenda.status se queda
+         vacío y el calendario truena igual que antes. agenda.status se queda
          en 'ready' en ese instante (el store de agenda no se resetea al
          cerrar sesión), así que sin este segundo chequeo el de arriba no
          lo detecta. Verificado a mano: sin esto, el logout deja la URL en

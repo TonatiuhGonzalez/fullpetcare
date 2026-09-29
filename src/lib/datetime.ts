@@ -112,13 +112,13 @@ export function formatTime(utcInstant: Date | string, branchTimezone: string): s
 
 /**
  * La hora local de la sucursal como texto SIN zona ("2026-07-15T14:30:00"
- * — sin 'Z' ni offset). DayPilot (components/EmployeeDayScheduler.vue,
- * EmployeeWeekCalendar.vue) no tiene ningún concepto de zona horaria:
- * toma cualquier string así tal cual, como si fuera "la hora del reloj
- * de pared", sin convertir nada. Por eso hay que dárselo YA resuelto a
+ * — sin 'Z' ni offset). El calendario (EventCalendar, en
+ * components/EmployeeDayScheduler.vue y EmployeeWeekCalendar.vue) lee un
+ * string así como "la hora del reloj de pared" del navegador y lo pinta
+ * igual, sin convertir nada. Por eso hay que dárselo YA resuelto a
  * la hora de LA SUCURSAL (vía toBranchTime) — si se le pasara el string
  * UTC original (o un instante convertido a la zona del navegador),
- * DayPilot lo pintaría en la fila/columna de hora equivocada para
+ * lo pintaría en la fila/columna de hora equivocada para
  * cualquier sucursal que no esté en la misma zona que quien mira la
  * pantalla (el mismo caso Tijuana-vs-CDMX que motiva todo este archivo).
  */

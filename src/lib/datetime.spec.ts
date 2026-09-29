@@ -102,10 +102,10 @@ describe('toBranchTime', () => {
 })
 
 describe('toNaiveLocalIso', () => {
-  it('da la hora local de la sucursal como texto SIN zona, para dársela a DayPilot', () => {
-    // DayPilot (components/EmployeeDayScheduler.vue,
-    // EmployeeWeekCalendar.vue) no sabe nada de zonas horarias: pinta
-    // cualquier string que reciba tal cual, como hora "de pared". Si
+  it('da la hora local de la sucursal como texto SIN zona, para dársela al calendario', () => {
+    // El calendario (components/EmployeeDayScheduler.vue,
+    // EmployeeWeekCalendar.vue) pinta cualquier string sin zona que reciba
+    // tal cual, como hora "de pared". Si
     // esto le pasara el string UTC original en vez de resolver primero
     // la hora de LA SUCURSAL, la cita se dibujaría en la fila/columna
     // equivocada para cualquier sucursal que no esté en UTC-0.
@@ -116,7 +116,7 @@ describe('toNaiveLocalIso', () => {
 
   it('el mismo instante da un texto distinto en sucursales de zonas distintas', () => {
     // Mismo caso que formatTime, pero para el string que consume
-    // DayPilot: es la garantía de que dos sucursales no acaban
+    // el calendario: es la garantía de que dos sucursales no acaban
     // compartiendo casilla en la grilla por error.
     const instant = '2026-07-15T20:30:00Z'
     expect(toNaiveLocalIso(instant, 'America/Mexico_City')).toBe('2026-07-15T14:30:00')

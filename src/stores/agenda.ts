@@ -13,9 +13,9 @@
 // Rediseño 2026-09-08 (pedido explícito del usuario): el RANGO de fechas
 // visible ahora depende del ROL, no solo de un día elegido a mano —
 // dueño/recepción navegan un solo día (EmployeeDayScheduler.vue,
-// DayPilotScheduler: filas = empleados, columnas = horas de ese día);
+// vista de línea de tiempo: filas = empleados, columnas = horas de ese día);
 // groomer/vet ven siempre una ventana fija de 7 días empezando HOY
-// (EmployeeWeekCalendar.vue, DayPilotCalendar: columnas = días, filas =
+// (EmployeeWeekCalendar.vue, vista semanal: columnas = días, filas =
 // horas), sin selector de fecha ni flechas — decisión explícita: su
 // agenda ya son solo SUS citas (RLS, role_permission_hardening.sql), no
 // tiene caso dejarlos "navegar" a semanas viejas.
