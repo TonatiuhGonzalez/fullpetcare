@@ -231,6 +231,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          is_active: boolean
           name: string
           opening_hours: Json
           phone: string | null
@@ -244,6 +245,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name: string
           opening_hours?: Json
           phone?: string | null
@@ -257,6 +259,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name?: string
           opening_hours?: Json
           phone?: string | null
@@ -471,6 +474,47 @@ export type Database = {
           },
           {
             foreignKeyName: "employee_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_reports: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          message: string
+          screenshot_path: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          message: string
+          screenshot_path?: string | null
+          tenant_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          message?: string
+          screenshot_path?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_reports_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1842,6 +1886,20 @@ export type Database = {
           email: string
           full_name: string
           user_id: string
+        }[]
+      }
+      platform_list_feedback: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          message: string
+          screenshot_path: string
+          tenant_id: string
+          tenant_name: string
+          user_email: string
+          user_id: string
+          user_name: string
         }[]
       }
       platform_list_tenants: {
