@@ -641,4 +641,23 @@ Se actualizó `supabase/seed/demo_reset.sql` (usaba la columna `plan` eliminada)
 Comprobado en navegador contra Supabase local: asignar un plan mensual a una empresa y
 ver la vigencia calculada (hoy + 1 mes) reflejada en el detalle y en la lista.
 
+**Vista de configuración (tarea #1959, 2026-09-28):** el engrane de la barra (`/app/configuracion`)
+reemplaza los botones "Cambiar contraseña" y "Cancelar mi cuenta", que se movieron tal cual a la
+sección "Cuenta" (`AccountSettingsPage.vue`, todos los roles; cancelar solo el dueño). La otra
+sección, "Empresa y sucursales" (`BranchesSettingsPage.vue`, solo el dueño), muestra los datos de
+la empresa en solo lectura y permite añadir, editar (todos los datos y el horario),
+deshabilitar y volver a habilitar sucursales. Migración `20260928150000_branch_settings.sql`:
+columna `branches.is_active`, políticas INSERT/UPDATE solo para `owner`, auditoría, y el trigger
+`prevent_disabling_branch_in_use` que **bloquea deshabilitar** una sucursal con citas pendientes a
+futuro, con empleados asignados o que sea la última activa (vive en la base, no en la pantalla).
+Una sucursal deshabilitada desaparece del selector de la barra, de la agenda y de la asignación de
+empleados, pero conserva su historial. Lógica pura del formulario en `lib/branchSettings.ts`.
+Tests: `supabase/tests/branches-settings-rls.spec.ts` (quién escribe y los cuatro bloqueos, más
+los bordes de citas pasadas/canceladas), `memberships-service.spec.ts` (una deshabilitada no se
+ofrece) y `lib/branchSettings.spec.ts`. Decisiones tomadas sin preguntar por ser de detalle: las
+zonas horarias ofrecidas son las cuatro de CLAUDE.md §8.3 (Ciudad de México, Cancún, Hermosillo,
+Tijuana); solo el nombre es obligatorio (dirección, CP y teléfono son opcionales pero se validan
+si se capturan); una sucursal debe abrir al menos un día. Pendiente: comprobar la pantalla en
+navegador; fuera de esta tarea, dar de baja la suscripción o eliminar la cuenta por completo.
+
 **Trabajo futuro (fuera de esta fase):** cuotas de uso por plan (sucursales, empleados…).

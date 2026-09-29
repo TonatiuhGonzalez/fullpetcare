@@ -278,7 +278,7 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 | Tabla                 | Campos clave                                                                                  | Notas                                                                                            |
 | --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4)                                                  |
-| `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`     | Sucursal. **Su propia zona horaria** (§8.3)                                                      |
+| `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`, `is_active` | Sucursal. **Su propia zona horaria** (§8.3). Solo el dueño la crea y edita; `is_active` la deshabilita (nunca si tiene citas pendientes, empleados asignados o es la última activa: trigger en la base) |
 | `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`, `must_change_password`           | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios. La marca `must_change_password` se explica en §7.6 |
 | `memberships`         | `tenant_id`, `user_id`, `role`, `is_active`                                                   | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7)                     |
 | `membership_branches` | `membership_id`, `branch_id`                                                                  | A qué sucursales entra. El rol `owner` ve todas sin necesidad de filas aquí                      |
@@ -358,6 +358,7 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `share_links` | `tenant_id`, `scope` (`pet`\|`customer`), `pet_id`, `customer_id`, `token_hash`, `token_prefix`, `expires_at`, `revoked_at`, `created_by`, `access_count`, `last_accessed_at` |
 | `audit_log`   | `tenant_id`, `table_name`, `record_id`, `action`, `actor_user_id`, `changed_at`, `old_data jsonb`, `new_data jsonb`                                                           |
+| `feedback_reports` | `tenant_id`, `user_id`, `message`, `screenshot_path` | Reportes de errores/sugerencias (tarea #1958). Los miembros solo INSERTAN (a nombre suyo); nadie del negocio los lee. El superadmin los lee por la RPC `platform_list_feedback` (pestaña "Reportes"); la captura va al bucket privado `feedback-screenshots` |
 
 `share_links` **nunca guarda el token en claro**, solo su SHA-256 (§7.4).
 

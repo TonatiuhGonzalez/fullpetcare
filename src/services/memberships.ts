@@ -40,7 +40,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
       role,
       tenant_id,
       tenants ( name, timezone ),
-      membership_branches ( branches ( id, name, timezone ) )
+      membership_branches ( branches ( id, name, timezone, is_active ) )
     `,
     )
     .eq('user_id', userId)
@@ -59,9 +59,11 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
   for (const row of data ?? []) {
     if (!row.tenants) continue // no debería pasar (la FK es NOT NULL), pero TS no lo sabe
 
+    // Una sucursal deshabilitada (tarea #1959) no se ofrece para trabajar.
     let branches: BranchSummary[] = (row.membership_branches ?? [])
       .map((mb) => mb.branches)
-      .filter((b): b is BranchSummary => b !== null)
+      .filter((b) => b !== null && b.is_active)
+      .map((b) => ({ id: b!.id, name: b!.name, timezone: b!.timezone }))
 
     if (row.role === 'owner') {
       // El dueño no tiene filas en membership_branches: ve todas las
@@ -88,6 +90,7 @@ async function listAllBranches(tenantId: string): Promise<BranchSummary[]> {
     .from('branches')
     .select('id, name, timezone')
     .eq('tenant_id', tenantId)
+    .eq('is_active', true)
     .is('deleted_at', null)
     .order('name')
 

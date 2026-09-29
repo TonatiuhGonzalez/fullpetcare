@@ -2,8 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import CancelAccountDialog from '@/components/CancelAccountDialog.vue'
-import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
@@ -39,28 +38,8 @@ const banner = computed(() => {
 // MOCK: aún no hay pasarela de pago (CLAUDE.md §1).
 const showPayMock = ref(false)
 
-// Cancelar la cuenta: solo el dueño.
-const showCancel = ref(false)
-const cancelSaving = ref(false)
-const cancelError = ref<string | null>(null)
-
-async function handleCancelAccount(comment: string): Promise<void> {
-  cancelSaving.value = true
-  cancelError.value = null
-  try {
-    await session.cancelActiveTenant(comment || null)
-    showCancel.value = false
-    await router.push('/login')
-  } catch {
-    cancelError.value =
-      'No se pudo cancelar la cuenta. Revisa tu conexión e inténtalo de nuevo.'
-  } finally {
-    cancelSaving.value = false
-  }
-}
-
-const showChangePassword = ref(false)
-const passwordChangedNotice = ref(false)
+const showFeedback = ref(false)
+const feedbackSentNotice = ref(false)
 
 async function handleLogout(): Promise<void> {
   // "finally": aunque el servidor no responda, la sesión local ya se
@@ -79,10 +58,23 @@ function handleBranchChange(branchId: unknown): void {
 
 <template>
   <v-app-bar color="primary" density="comfortable">
-    <v-app-bar-title>
+    <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
+         botón de reportes quedaría pegado a la navegación, lejos del nombre.
+         El v-spacer de abajo empuja la navegación a la derecha. -->
+    <v-app-bar-title style="flex: 0 1 auto">
       <v-icon icon="mdi-paw" class="mr-2" />
       {{ titleLabel }}
     </v-app-bar-title>
+    <v-btn
+      prepend-icon="mdi-message-alert-outline"
+      variant="tonal"
+      size="small"
+      class="ml-4"
+      @click="showFeedback = true"
+    >
+      Reportar error o sugerencia
+    </v-btn>
+    <v-spacer />
 
     <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
          (agenda y clientes). Un v-navigation-drawer completo se agrega
@@ -127,42 +119,29 @@ function handleBranchChange(branchId: unknown): void {
       roleLabel(session.role)
     }}</v-chip>
     <span class="mr-2 text-body-2">{{ userLabel }}</span>
+    <!-- Configuración (tarea #1959): reemplaza los botones de cambiar
+         contraseña y cancelar cuenta, que ahora viven en su sección "Cuenta". -->
     <v-btn
-      icon="mdi-lock-reset"
+      to="/app/configuracion"
+      icon="mdi-cog-outline"
       variant="text"
-      title="Cambiar contraseña"
-      @click="showChangePassword = true"
-    />
-    <v-btn
-      v-if="session.role === 'owner'"
-      icon="mdi-account-cancel-outline"
-      variant="text"
-      title="Cancelar mi cuenta"
-      @click="showCancel = true"
+      title="Configuración"
     />
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
-
-  <CancelAccountDialog
-    v-model="showCancel"
-    :tenant-name="businessName"
-    :saving="cancelSaving"
-    :error-message="cancelError"
-    @confirm="handleCancelAccount"
-  />
 
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
   </v-snackbar>
 
-  <ChangePasswordDialog
-    v-model="showChangePassword"
-    :email="session.user?.email ?? ''"
-    @changed="passwordChangedNotice = true"
+  <FeedbackDialog
+    v-model="showFeedback"
+    :tenant-id="session.activeMembership?.tenantId ?? ''"
+    @sent="feedbackSentNotice = true"
   />
 
-  <v-snackbar v-model="passwordChangedNotice" color="success" :timeout="4000">
-    Contraseña actualizada.
+  <v-snackbar v-model="feedbackSentNotice" color="success" :timeout="4000">
+    ¡Gracias! Recibimos tu comentario.
   </v-snackbar>
 
   <v-main>
