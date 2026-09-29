@@ -76,9 +76,9 @@ cero filas. Ese test existe desde la fase 1, antes de que haya casi nada que pro
 /app/citas/:id                detalle
 /app/citas/:id/atender        ficha según kind (estética o veterinaria)
 /app/citas/:id/cobrar         resumen, pago simulado, ticket
-/app/clientes                 lista y búsqueda
-/app/clientes/:id             cliente y sus mascotas
-/app/mascotas/:id             historial mezclado + cartilla
+/app/clientes                 lista y búsqueda (pestañas Clientes/Mascotas); la ficha de
+                              cliente y la de mascota (historial mezclado + cartilla) son
+                              diálogos, sin ruta propia (tarea #1968)
 /app/catalogo                 servicios
 /c/:token                     PÚBLICA — sin login, solo lectura, layout móvil
 ```

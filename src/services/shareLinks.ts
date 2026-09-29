@@ -35,8 +35,7 @@
 // Por qué el UUID de la mascota no sirve como link
 // =============================================================================
 // Un UUID v4 también es aleatorio, pero NO es secreto: viaja en cada
-// respuesta de la API, en la URL de `/app/mascotas/:id`, en los logs del
-// navegador... cualquiera con acceso a la app (o a una captura de
+// respuesta de la API, en los logs del navegador... cualquiera con acceso a la app (o a una captura de
 // pantalla) lo ve. Un token dedicado, en cambio, solo existe para ESTE
 // propósito: se puede revocar (`revoked_at`) o dejar expirar
 // (`expires_at`) sin tocar la mascota ni el resto del sistema, y saber el

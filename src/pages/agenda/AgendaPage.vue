@@ -28,6 +28,7 @@ import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
 import AppointmentDialog from '@/components/AppointmentDialog.vue'
+import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
 
@@ -214,6 +215,14 @@ function goToNewAppointment(): void {
 // página aparte. Se reutiliza también justo después de agendar una cita
 // nueva, para no mezclar "crear" (diálogo) con "ver detalle" (antes
 // página, ahora también diálogo).
+const showPetDialog = ref(false)
+const selectedPetId = ref<string | null>(null)
+
+function openPetDialog(petId: string): void {
+  selectedPetId.value = petId
+  showPetDialog.value = true
+}
+
 const showAppointmentDialog = ref(false)
 const selectedAppointmentId = ref<string | null>(null)
 
@@ -349,7 +358,8 @@ function handleAppointmentCreated(appointment: Appointment): void {
         <v-list-item
           v-for="vaccine in upcomingVaccines"
           :key="vaccine.vaccinationId"
-          :to="`/app/mascotas/${vaccine.petId}`"
+          link
+          @click="openPetDialog(vaccine.petId)"
         >
           <template #title>{{ vaccine.petName }} · {{ vaccine.vaccineName }}</template>
           <template #subtitle>Próxima dosis: {{ vaccine.nextDueDate }}</template>
@@ -366,6 +376,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <!-- Mismo manejador: recargar el rango y abrir el detalle de la cita
          recién creada (para una visita en curso, ahí mismo se pasa a atender). -->
     <WalkInDialog v-model="showWalkInDialog" @created="handleAppointmentCreated" />
+    <PetDetailDialog v-model="showPetDialog" :pet-id="selectedPetId" />
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"
