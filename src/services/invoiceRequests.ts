@@ -17,8 +17,9 @@ export interface InvoiceCustomerData {
 }
 
 /**
- * c_FormaPago del SAT: 01 efectivo, 03 transferencia, 04 tarjeta (v1 no
- * distingue crédito/débito, así que "card" mapea al código de crédito),
+ * c_FormaPago del SAT: 01 efectivo, 03 transferencia, 04 tarjeta de crédito,
+ * 28 tarjeta de débito (la elige quien cobra y viaja en el pago; si falta, como
+ * en pagos anteriores a esa columna, "card" cae al código de crédito),
  * 06 cuando la venta se cubrió con MÁS DE UNA forma de pago (CLAUDE.md
  * §8.4 lista los códigos que sí distingue el proyecto; "06" es del mismo
  * catálogo del SAT, para el caso real de un pago mixto efectivo+tarjeta).
@@ -30,7 +31,7 @@ function paymentFormCode(payments: NewPayment[]): string {
   const codeByMethod: Record<string, string> = {
     cash: '01',
     transfer_spei: '03',
-    card: '04',
+    card: payments[0]?.paymentFormCode ?? '04',
     openpay: '04',
   }
   return codeByMethod[payments[0]?.method ?? 'cash'] ?? '01'

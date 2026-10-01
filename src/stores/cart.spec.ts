@@ -6,14 +6,26 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useCartStore } from './cart'
-import type { CheckoutLineItem, CheckoutSummary, Ticket } from '@/services/checkout'
+import type {
+  CheckoutLineItem,
+  CheckoutSummary,
+  SellableProduct,
+  Ticket,
+} from '@/services/checkout'
 
 vi.mock('@/services/checkout', () => ({
   buildSummary: vi.fn(),
   charge: vi.fn(),
+  chargeCounterSale: vi.fn(),
+  listSellableProducts: vi.fn(),
 }))
 
-import { buildSummary, charge } from '@/services/checkout'
+import {
+  buildSummary,
+  charge,
+  chargeCounterSale,
+  listSellableProducts,
+} from '@/services/checkout'
 
 // Baño, $250.00 con IVA al 16% incluido — mismos números que
 // lib/money.spec.ts (splitTaxIncluded(25000, 1600) = 21552 neto + 3448 IVA).
@@ -36,6 +48,8 @@ beforeEach(() => {
   setActivePinia(createPinia())
   vi.mocked(buildSummary).mockReset()
   vi.mocked(charge).mockReset()
+  vi.mocked(chargeCounterSale).mockReset()
+  vi.mocked(listSellableProducts).mockReset()
 })
 
 describe('loadAppointment', () => {
@@ -193,6 +207,7 @@ describe('checkout', () => {
       appointmentId: 'appt-1',
       payments: [{ method: 'cash', amountCents: 23000 }],
       discountCents: 2000,
+      products: [], // sin productos extra: el cobro de solo servicios sigue igual
     })
     expect(result).toBe(ticket)
     // El carrito queda listo para la SIGUIENTE cita, no arrastra la anterior.
@@ -204,5 +219,102 @@ describe('checkout', () => {
     const cart = useCartStore()
     await expect(cart.checkout()).rejects.toThrow(/no hay ninguna cita/i)
     expect(charge).not.toHaveBeenCalled()
+  })
+})
+
+// Alimento, $100.00 con IVA al 16% incluido, 3 piezas en existencia.
+const ALIMENTO: SellableProduct = {
+  id: 'product-alimento',
+  name: 'Alimento 2 kg',
+  sku: null,
+  priceCents: 10000,
+  taxRateBp: 1600,
+  stock: 3,
+}
+
+describe('productos en el ticket (tarea 11.11)', () => {
+  it('suma el producto al total con su propio IVA, junto al servicio', async () => {
+    // Qué se rompería: el total en pantalla no coincidiría con el que guarda la base.
+    vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+
+    expect(cart.addProduct(ALIMENTO, 2)).toBe(true)
+
+    expect(cart.totalCents).toBe(25000 + 20000)
+    // IVA por partida: 3448 (baño) + 2759 (20000 - round(20000 x 10000 / 11600)).
+    expect(cart.taxCents).toBe(3448 + 2759)
+  })
+
+  it('no deja agregar más piezas que la existencia, ni un producto sin existencia', () => {
+    // Qué se rompería: ofrecer en el ticket algo que la base va a rechazar al cobrar.
+    const cart = useCartStore()
+
+    expect(cart.addProduct({ ...ALIMENTO, stock: 0 })).toBe(false)
+    expect(cart.addProduct(ALIMENTO, 3)).toBe(true)
+    expect(cart.addProduct(ALIMENTO, 1)).toBe(false) // ya hay 3 de 3
+    expect(cart.productItems[0].quantity).toBe(3)
+  })
+
+  it('agregar dos veces el mismo producto suma su cantidad en una sola partida', () => {
+    const cart = useCartStore()
+    cart.addProduct(ALIMENTO, 1)
+    cart.addProduct(ALIMENTO, 1)
+
+    expect(cart.productItems).toHaveLength(1)
+    expect(cart.productItems[0].quantity).toBe(2)
+  })
+
+  it('cambiar la cantidad respeta el tope y quitar el producto lo saca del total', () => {
+    const cart = useCartStore()
+    cart.addProduct(ALIMENTO, 1)
+
+    expect(cart.setProductQuantity(ALIMENTO.id, 4)).toBe(false)
+    expect(cart.setProductQuantity(ALIMENTO.id, 0)).toBe(false)
+    expect(cart.setProductQuantity(ALIMENTO.id, 2)).toBe(true)
+    expect(cart.totalCents).toBe(20000)
+
+    cart.removeProduct(ALIMENTO.id)
+    expect(cart.totalCents).toBe(0)
+  })
+
+  it('una venta de mostrador cobra solo productos, sin cita', async () => {
+    // Qué se rompería: un cliente que solo compra un producto no podría cobrarse.
+    vi.mocked(chargeCounterSale).mockResolvedValue({} as Ticket)
+    const cart = useCartStore()
+    cart.loadCounterSale('branch-1', 'customer-1')
+    cart.addProduct(ALIMENTO, 2)
+    cart.addPayment({ method: 'cash', amountCents: 20000 })
+
+    await cart.checkout()
+
+    expect(charge).not.toHaveBeenCalled()
+    expect(chargeCounterSale).toHaveBeenCalledWith({
+      branchId: 'branch-1',
+      customerId: 'customer-1',
+      products: [{ productId: 'product-alimento', quantity: 2 }],
+      payments: [{ method: 'cash', amountCents: 20000 }],
+      discountCents: 0,
+    })
+    expect(cart.productItems).toEqual([]) // el carrito queda limpio
+  })
+
+  it('el cobro de una cita manda sus productos extra', async () => {
+    vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
+    vi.mocked(charge).mockResolvedValue({} as Ticket)
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+    cart.addProduct(ALIMENTO, 1)
+    cart.addPayment({ method: 'card', amountCents: 35000, paymentFormCode: '28' })
+
+    await cart.checkout()
+
+    expect(charge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointmentId: 'appt-1',
+        products: [{ productId: 'product-alimento', quantity: 1 }],
+        payments: [{ method: 'card', amountCents: 35000, paymentFormCode: '28' }],
+      }),
+    )
   })
 })

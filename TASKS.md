@@ -795,19 +795,19 @@ HMH Four: tareas #2036 a #2048.
 
 ### 11C. Vender productos en el cobro
 
-- [ ] **11.10** 📚🧪 Migración de `sale_items` (`item_type = 'product'`, `product_id` nullable,
+- [x] **11.10** 📚🧪 Migración de `sale_items` (`item_type = 'product'`, `product_id` nullable,
   `check` de exactamente uno) y RPC de cobro extendida: calcula IVA por partida con la misma función
   de §8.2, crea los movimientos de venta al pagar y los inversos al cancelar. **Todo o nada.** Tests:
   venta mixta servicio + producto cuadra al centavo; cancelar devuelve la existencia exacta; un producto con existencia 0 se rechaza
   (en la base, no solo en la pantalla) y una cantidad mayor a la existencia también; producto de otro tenant o sucursal rechazado; dos cobros
   simultáneos del mismo producto no pierden un movimiento. _Verificar:_ verde; los tests de cobro de
-  la fase 5 siguen verdes **sin modificarlos** (prueba de que la migración fue aditiva).
-- [ ] **11.11** Carrito y cobro con productos: agregar producto al resumen de cobro, cantidad, aviso de
+  la fase 5 siguen verdes **sin modificarlos** (prueba de que la migración fue aditiva). **Hecho 2026-10-03 (#2041):** migraciones `sale_item_product_type` y `sale_products_checkout`. `checkout_appointment()` gana `p_products` (default `[]`: quien la llama como antes obtiene lo mismo); lo común a cita y mostrador vive en dos auxiliares internos (`app.add_product_items`, `app.finalize_sale`). Nueva RPC `checkout_counter_sale()` (venta sin cita; **pide un cliente registrado**, el "público en general" llega con 11.20). La existencia que baja al pagar es un movimiento `sale`; al cancelar una venta pagada la devuelve un **trigger** sobre `sales` (no una RPC: así un UPDATE directo tampoco puede saltarse la devolución) con un `sale_reversal` por el neto exacto, idempotente. Tests en `checkout-products-rpc.spec.ts`. La prueba de dos cobros simultáneos del mismo producto no se repitió aquí: el candado vive en el trigger de `stock_movements` (11.5/11.6).
+- [x] **11.11** Carrito y cobro con productos: agregar producto al resumen de cobro, cantidad, aviso de
   stock; el ticket los desglosa. `lib/money.ts` no cambia (es la prueba de que el diseño aguantó). **Al cobrar con tarjeta se elige
   crédito o débito** (decisión #5): columna nueva `payment_form_code` en `payments`, obligatoria cuando
   `method = 'card'`; test de que no se puede registrar un pago con tarjeta sin ella.
   _Verificar:_ el E2E existente (agendar → atender → cobrar) sigue verde, y una venta de solo mostrador
-  (sin cita) se cobra y descuenta stock.
+  (sin cita) se cobra y descuenta stock. **Hecho 2026-10-03 (#2041):** `payments.payment_form_code` (check `NOT VALID`: los pagos con tarjeta anteriores no se inventan un valor; los nuevos lo exigen en la RPC y en la tabla; efectivo `01` y transferencia `03` se derivan solos) y la factura precarga ese código. Pantalla: `CheckoutPage` cobra cita + productos y, sin `id`, la venta de mostrador (`/app/venta-mostrador`, menú "Venta de mostrador", solo recepción/dueño). **Único cambio a un test existente:** el de `checkout-rpc.spec.ts` que pagaba con tarjeta sin tipo ahora manda `payment_form_code` (es justo lo que la regla nueva prohíbe). **Pendiente de verificar:** el E2E (Playwright) y la pantalla en navegador no se corrieron en esta sesión.
 
 ### 11C-bis. Insumos usados en la atención veterinaria
 
