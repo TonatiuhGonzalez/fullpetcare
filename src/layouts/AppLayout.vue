@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
+import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
@@ -38,6 +39,26 @@ const banner = computed(() => {
 // MOCK: aún no hay pasarela de pago (CLAUDE.md §1).
 const showPayMock = ref(false)
 
+// Opciones del menú lateral. "Clientes" solo para owner/receptionist
+// (isFrontDesk) — groomer/vet no tienen el listado completo (router/index.ts
+// ya redirige si llegan por URL directa; esto es solo para no mostrar un
+// link a algo a lo que de todos modos no pueden entrar).
+// "Empleados" (fase 9): gateado por PERMISO, no por rol fijo — hoy solo el
+// dueño tiene "employees:view" (role_permissions, sembrado en seed.sql),
+// pero a futuro un negocio podría dárselo a otro rol sin tocar este archivo
+// (CLAUDE.md §6.7).
+const menuOpen = ref(false)
+const menuItems = computed<SideMenuItem[]>(() => [
+  { title: 'Agenda', icon: 'mdi-calendar-month-outline', to: '/app/agenda' },
+  ...(isFrontDesk(session.role)
+    ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
+    : []),
+  { title: 'Catálogo', icon: 'mdi-clipboard-list-outline', to: '/app/catalogo' },
+  ...(session.canView('employees')
+    ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
+    : []),
+])
+
 const showFeedback = ref(false)
 const feedbackSentNotice = ref(false)
 
@@ -58,9 +79,12 @@ function handleBranchChange(branchId: unknown): void {
 
 <template>
   <v-app-bar color="primary" density="comfortable">
+    <!-- Hamburguesa: solo en pantallas angostas, donde el menú lateral está
+         oculto y se abre como cajón. -->
+    <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
     <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
-         botón de reportes quedaría pegado a la navegación, lejos del nombre.
-         El v-spacer de abajo empuja la navegación a la derecha. -->
+         botón de reportes quedaría pegado a lo de la derecha, lejos del nombre.
+         El v-spacer de abajo empuja el resto a la derecha. -->
     <v-app-bar-title style="flex: 0 1 auto">
       <v-icon icon="mdi-paw" class="mr-2" />
       {{ titleLabel }}
@@ -75,27 +99,6 @@ function handleBranchChange(branchId: unknown): void {
       Reportar error o sugerencia
     </v-btn>
     <v-spacer />
-
-    <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
-         (agenda y clientes). Un v-navigation-drawer completo se agrega
-         cuando haya suficientes secciones para justificarlo.
-
-         "Clientes" solo para owner/receptionist (isFrontDesk) — groomer/
-         vet no tienen el listado completo (router/index.ts ya redirige
-         si llegan por URL directa; esto es solo para no mostrar un link
-         a algo a lo que de todos modos no pueden entrar). -->
-    <v-btn to="/app/agenda" variant="text" class="mr-1">Agenda</v-btn>
-    <v-btn v-if="isFrontDesk(session.role)" to="/app/clientes" variant="text" class="mr-1">
-      Clientes
-    </v-btn>
-    <v-btn to="/app/catalogo" variant="text" class="mr-1">Catálogo</v-btn>
-    <!-- "Empleados" (fase 9): gateado por PERMISO, no por rol fijo — hoy
-         solo el dueño tiene "employees:view" (role_permissions,
-         sembrado en seed.sql), pero a futuro un negocio podría dárselo a
-         otro rol sin tocar este archivo (CLAUDE.md §6.7). -->
-    <v-btn v-if="session.canView('employees')" to="/app/empleados" variant="text" class="mr-4">
-      Empleados
-    </v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
          elegir — con una sola, el título de arriba ya la muestra
@@ -129,6 +132,8 @@ function handleBranchChange(branchId: unknown): void {
     />
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
+
+  <SideMenu v-model:open="menuOpen" :items="menuItems" />
 
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
