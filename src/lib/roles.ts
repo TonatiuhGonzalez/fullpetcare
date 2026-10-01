@@ -79,3 +79,12 @@ export function visibleTimelineTypes(role: MemberRole | null): TimelineEntryType
   if (role === 'vet') return ['veterinary', 'vaccination', 'weight']
   return ['grooming', 'veterinary', 'vaccination', 'weight']
 }
+
+/**
+ * true si el rol puede registrar los productos y medicamentos usados en una
+ * consulta (tarea 11.13): solo dueño y veterinario. Es lo mismo que exige la RPC
+ * add_appointment_product(); esto solo evita mostrar un apartado que se rechazaría.
+ */
+export function canRegisterSupplies(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'vet'
+}
