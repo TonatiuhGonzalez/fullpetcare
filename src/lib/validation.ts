@@ -131,3 +131,28 @@ export function passwordChangeProblems(
 
   return problems
 }
+
+export interface PasswordResetInput {
+  next: string
+  confirm: string
+}
+
+export type PasswordResetField = 'next' | 'confirm'
+
+/**
+ * Problemas del formulario "Elige tu nueva contraseña" (recuperación por
+ * correo). Igual que `passwordChangeProblems` pero SIN contraseña actual:
+ * quien olvidó la contraseña no la tiene, y entró con el enlace del correo.
+ */
+export function passwordResetProblems(
+  input: PasswordResetInput,
+): Partial<Record<PasswordResetField, string>> {
+  const problems: Partial<Record<PasswordResetField, string>> = {}
+
+  if (input.next.length < MIN_PASSWORD_LENGTH) {
+    problems.next = `La contraseña nueva debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`
+  }
+  if (input.confirm !== input.next) problems.confirm = 'Las contraseñas no coinciden.'
+
+  return problems
+}

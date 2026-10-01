@@ -30,6 +30,18 @@ export const router = createRouter({
       component: () => import('@/pages/auth/LoginPage.vue'),
     },
     {
+      // Recuperación por correo (tarea #1907): se pide el enlace…
+      path: '/recuperar-contrasena',
+      name: 'forgot-password',
+      component: () => import('@/pages/auth/ForgotPasswordPage.vue'),
+    },
+    {
+      // …y el enlace del correo regresa aquí, ya con sesión de recuperación.
+      path: '/restablecer-contrasena',
+      name: 'reset-password',
+      component: () => import('@/pages/auth/ResetPasswordPage.vue'),
+    },
+    {
       // Pantalla obligatoria tras el primer inicio de sesión con contraseña
       // temporal (ver el guard de abajo).
       path: '/cambiar-contrasena',
