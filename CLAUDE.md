@@ -375,6 +375,11 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 | `payments`         | `tenant_id`, `sale_id`, `method`, `amount_cents`, `reference`, `status`, `paid_at`                                                                                               |
 | `invoice_requests` | `tenant_id`, `sale_id`, `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `payment_form_code`, `payment_method_code`, `status`, `fiscal_uuid`                   |
 
+- **Existencias (fase 11, `stock_movements`):** la existencia por sucursal es la suma de una
+  bitácora inmutable (`stock_movements`: sin UPDATE ni DELETE, ni para `service_role`), no una
+  columna. La vista `product_stock` (`security_invoker`) la calcula, con 0 si no hay movimientos.
+  Un trigger impide dejarla en negativo. Los usuarios solo insertan `purchase`, `adjustment` y
+  `loss`; `sale`/`consumption` los generarán las RPC (tareas 11.10 y 11.12).
 - `item_type` es enum con un solo valor hoy (`service`). Cuando entren productos se
   agrega `product` y una columna `product_id` nullable: migración aditiva, sin tocar
   ventas existentes.

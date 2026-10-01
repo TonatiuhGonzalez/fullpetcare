@@ -165,6 +165,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "appointments_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -772,6 +779,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_branches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "membership_branches_membership_id_fkey"
@@ -1396,6 +1410,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sales_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "sales_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -1536,6 +1557,88 @@ export type Database = {
           },
           {
             foreignKeyName: "share_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string
+          id: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          product_id: string
+          quantity: number
+          reason: string | null
+          sale_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          product_id: string
+          quantity: number
+          reason?: string | null
+          sale_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["stock_movement_type"]
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          sale_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1778,7 +1881,23 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      product_stock: {
+        Row: {
+          branch_id: string | null
+          product_id: string | null
+          stock: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cancel_my_tenant: {
@@ -2251,6 +2370,14 @@ export type Database = {
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
       share_link_scope: "pet" | "customer"
+      stock_movement_type:
+        | "purchase"
+        | "sale"
+        | "sale_reversal"
+        | "consumption"
+        | "consumption_reversal"
+        | "adjustment"
+        | "loss"
       tenant_status: "active" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -2407,6 +2534,15 @@ export const Constants = {
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
       share_link_scope: ["pet", "customer"],
+      stock_movement_type: [
+        "purchase",
+        "sale",
+        "sale_reversal",
+        "consumption",
+        "consumption_reversal",
+        "adjustment",
+        "loss",
+      ],
       tenant_status: ["active", "suspended", "closed"],
     },
   },

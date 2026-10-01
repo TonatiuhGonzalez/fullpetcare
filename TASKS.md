@@ -772,22 +772,22 @@ HMH Four: tareas #2036 a #2048.
   permiso no escribe; borrado suave funciona (cuidado con la trampa de §7.2: SELECT sin filtrar
   `deleted_at` si hay UPDATE para un rol normal); no hay política de DELETE. _Verificar:_ verde, y
   se rompe a propósito una política para ver que el test falla (mutación, como en 10.4). **Hecho:** `products-rls.spec.ts` (25 tests); con `products_select using (true)` fallan 3.
-- [ ] **11.5** 📚 Migración `stock_movements`: bitácora inmutable (sin UPDATE/DELETE, trigger
+- [x] **11.5** 📚 Migración `stock_movements`: bitácora inmutable (sin UPDATE/DELETE, trigger
   `prevent_hard_delete()` + trigger que rechaza UPDATE), `branch_id` + `product_id`, tipo enum,
   cantidad entera con signo (`check <> 0`), referencia opcional a `sale_id`. Vista `product_stock`
   (`security_invoker`, explicar por qué: que RLS del que consulta aplique, no la del dueño de la
-  vista). Con `app.log_change()` y `enforce_tenant_writable`. _Verificar:_ `db:reset` limpio.
-- [ ] **11.6** 🧪 Tests de `stock_movements`: aislamiento por tenant y por sucursal; no se puede
+  vista). Con `app.log_change()` y `enforce_tenant_writable`. _Verificar:_ `db:reset` limpio. **Hecho 2026-10-02 (#2039):** migración `stock_movements` (sin `updated_at`/`deleted_at`: es inmutable). Además de lo pedido: `check` de signo según el tipo, motivo obligatorio en `adjustment`/`loss`, trigger que impide dejar la existencia en negativo (con candado por producto y sucursal para dos ventas simultáneas), e INSERT directo solo de `purchase`/`adjustment`/`loss` (venta y consumo los generarán las RPC de 11.10 y 11.12). La vista `product_stock` trae una fila por producto activo y sucursal activa, con 0 si no hay movimientos.
+- [x] **11.6** 🧪 Tests de `stock_movements`: aislamiento por tenant y por sucursal; no se puede
   actualizar ni borrar un movimiento (ni el dueño, ni `service_role`); la existencia es la suma
   correcta con compras, ventas, ajustes y mermas mezclados; **un producto sin movimientos tiene
-  existencia 0, no `NULL`** (si no, la pantalla muestra "NaN"). _Verificar:_ verde.
-- [ ] **11.7** 📚🧪 `lib/inventory.ts` (puro): existencia a partir de movimientos, alerta de stock
+  existencia 0, no `NULL`** (si no, la pantalla muestra "NaN"). _Verificar:_ verde. **Hecho:** `stock-movements-rls.spec.ts` (25 tests); al abrir la política de lectura y quitar los triggers de inmutabilidad y de no-negativo fallan 6.
+- [x] **11.7** 📚🧪 `lib/inventory.ts` (puro): existencia a partir de movimientos, alerta de stock
   bajo (`<= min_stock`), validación de cantidades enteras y positivas, regla de stock (no se vende ni se consume
   sin existencia). Tests de bordes: existencia exactamente igual al mínimo, `min_stock = 0`, venta que
-  deja justo en 0, cantidad 0 o negativa en una compra. _Verificar:_ verde.
-- [ ] **11.8** 📚 `services/products.ts` y `services/inventory.ts` (lista, alta, edición, desactivar;
+  deja justo en 0, cantidad 0 o negativa en una compra. _Verificar:_ verde. **Hecho:** `lib/inventory.ts` (16 tests).
+- [x] **11.8** 📚 `services/products.ts` y `services/inventory.ts` (lista, alta, edición, desactivar;
   registrar compra, ajuste y merma con motivo obligatorio en los dos últimos) + `useInventoryStore`.
-  _Verificar:_ tests de servicio/store; la capa de §4 se respeta (ningún componente toca `supabase.ts`).
+  _Verificar:_ tests de servicio/store; la capa de §4 se respeta (ningún componente toca `supabase.ts`). **Hecho:** `services/products.ts`, `services/inventory.ts` y `stores/inventory.ts` (con `inventory.spec.ts`, 8 tests con mocks). No hay test de servicio contra Supabase real: un movimiento no se puede borrar, así que dejaría basura permanente en la base local; la lógica de la base ya la cubre `stock-movements-rls.spec.ts`.
 - [ ] **11.9** Pantalla de **Inventario** (menú lateral, bajo el permiso `inventory`): lista con
   existencia y alerta de stock bajo por sucursal, alta/edición de producto, diálogo de entrada de
   compra y de ajuste. Móvil usable. _Verificar:_ en navegador, con el dueño y con un groomer que no
