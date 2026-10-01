@@ -8,6 +8,7 @@ import {
   isValidRFC,
   MIN_PASSWORD_LENGTH,
   passwordChangeProblems,
+  passwordResetProblems,
 } from './validation'
 
 describe('isValidEmail', () => {
@@ -212,5 +213,30 @@ describe('passwordChangeProblems', () => {
     expect(problems.current).toBe('Escribe tu contraseña actual.')
     expect(problems.next).toContain('al menos')
     expect(problems.confirm).toBeUndefined()
+  })
+})
+
+describe('passwordResetProblems', () => {
+  it('no reporta problemas cuando la contraseña es válida y coincide', () => {
+    // Camino feliz: si fallara, nadie podría terminar la recuperación
+    // aunque escribiera todo bien y se quedaría fuera de su cuenta.
+    expect(passwordResetProblems({ next: 'MiNuevaClave9', confirm: 'MiNuevaClave9' })).toEqual({})
+  })
+
+  it('rechaza una contraseña más corta que el mínimo (borde MIN-1 / MIN)', () => {
+    // Si se aceptara una contraseña débil, la recuperación sería el
+    // camino fácil para dejar la cuenta con una clave trivial.
+    const short = 'a'.repeat(MIN_PASSWORD_LENGTH - 1)
+    const exact = 'a'.repeat(MIN_PASSWORD_LENGTH)
+    expect(passwordResetProblems({ next: short, confirm: short }).next).toBeDefined()
+    expect(passwordResetProblems({ next: exact, confirm: exact }).next).toBeUndefined()
+  })
+
+  it('rechaza una confirmación que no coincide', () => {
+    // Un error de dedo guardaría una contraseña que la persona no conoce,
+    // y tendría que repetir todo el correo de recuperación.
+    expect(
+      passwordResetProblems({ next: 'MiNuevaClave9', confirm: 'MiNuevaClave8' }).confirm,
+    ).toBeDefined()
   })
 })
