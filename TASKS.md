@@ -693,7 +693,7 @@ terceros y evita rehacer los conceptos de la factura), CFDI después.
 
 **Estado: planeada, sin construir.** Las decisiones se resolvieron con el usuario el
 2026-10-01 (tabla de abajo). Seguimiento en
-HMH Four: tareas #2045 a #2057.
+HMH Four: tareas #2036 a #2048.
 
 ### Decisiones (2026-10-01)
 
@@ -749,7 +749,7 @@ HMH Four: tareas #2045 a #2057.
 - [ ] **11.1** 📚 Registrar las decisiones de arriba en `PLAN.md`
   (D15 inventario, D16 facturación y PAC). Confirmar con el contador del negocio demo: claves SAT por
   defecto de los servicios (estética y veterinaria), tratamiento de IVA tasa 0 vs. exento en productos y
-  plazos del SAT para facturar. **Avance 2026-10-01:** las seis decisiones están cerradas. Sin contador: los códigos del SAT por servicio y producto son **editables por cada negocio** (el sistema propone un valor por defecto, que el negocio puede cambiar con su propio contador) y el sistema no impone plazos fiscales de la factura global, solo avisa. Pendiente: dar de alta Facturapi (#2045) y, antes de producción, una consulta puntual con un contador. _Verificar:_ `PLAN.md` tiene D15 y D16 sin "pendiente"; el usuario aprobó
+  plazos del SAT para facturar. **Avance 2026-10-01:** las seis decisiones están cerradas. Sin contador: los códigos del SAT por servicio y producto son **editables por cada negocio** (el sistema propone un valor por defecto, que el negocio puede cambiar con su propio contador) y el sistema no impone plazos fiscales de la factura global, solo avisa. Pendiente: dar de alta Facturapi (#2036) y, antes de producción, una consulta puntual con un contador. _Verificar:_ `PLAN.md` tiene D15 y D16 sin "pendiente"; el usuario aprobó
   por escrito la lista de dependencias nuevas (si el PAC trae SDK; si no, es `fetch` y no hay dependencia).
 - [ ] **11.2** 📚🧪 Claves SAT en `services`: `sat_product_code` y `sat_unit_code` (migración aditiva,
   `E48` unidad de servicio por defecto en la unidad; el código de producto, el que confirme el
