@@ -751,11 +751,13 @@ HMH Four: tareas #2036 a #2048.
   defecto de los servicios (estética y veterinaria), tratamiento de IVA tasa 0 vs. exento en productos y
   plazos del SAT para facturar. **Avance 2026-10-01:** las seis decisiones están cerradas. Sin contador: los códigos del SAT por servicio y producto son **editables por cada negocio** (el sistema propone un valor por defecto, que el negocio puede cambiar con su propio contador) y el sistema no impone plazos fiscales de la factura global, solo avisa. Pendiente: dar de alta Facturapi (#2036) y, antes de producción, una consulta puntual con un contador. _Verificar:_ `PLAN.md` tiene D15 y D16 sin "pendiente"; el usuario aprobó
   por escrito la lista de dependencias nuevas (si el PAC trae SDK; si no, es `fetch` y no hay dependencia).
-- [ ] **11.2** 📚🧪 Claves SAT en `services`: `sat_product_code` y `sat_unit_code` (migración aditiva,
+- [x] **11.2** 📚🧪 Claves SAT en `services`: `sat_product_code` y `sat_unit_code` (migración aditiva,
   `E48` unidad de servicio por defecto en la unidad; el código de producto, el que confirme el
   contador). Campos en el formulario de servicio, validación en `lib/validation.ts` (8 dígitos
-  / 3 caracteres). Los servicios existentes se rellenan con el valor por defecto en la misma
-  migración. _Verificar:_ test de validación en `lib/`; `db:reset` limpio; un servicio sin clave no
+  / 2 o 3 caracteres: el catálogo del SAT tiene unidades de 2, como `EA`). Los servicios existentes se rellenan con el valor por defecto en la misma
+  migración. **Hecho 2026-10-01 (#2037):** columnas `not null` con `default` (`70122000` "Salud animal", `E48`)
+  y `check` de formato en la base. **Pendiente antes de producción:** un contador debe revisar la clave de
+  producto por defecto, sobre todo para estética (no se encontró una clave específica en el catálogo; se usó la de salud animal). _Verificar:_ test de validación en `lib/`; `db:reset` limpio; un servicio sin clave no
   se puede guardar de nuevo.
 
 ### 11B. Productos e inventario

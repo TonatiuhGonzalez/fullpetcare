@@ -156,3 +156,28 @@ export function passwordResetProblems(
 
   return problems
 }
+
+// ---------------------------------------------------------------------------
+// Claves del SAT por servicio (CFDI 4.0, fase 11 tarea 11.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * ClaveProdServ (c_ClaveProdServ): identifica QUÉ se factura. Son 8 dígitos
+ * (segmento, familia, clase, producto). Ejemplo: `70122000` = "Salud animal".
+ *
+ * Igual que RFC y CURP: valida la FORMA, no que la clave exista en el
+ * catálogo del SAT (son más de 50 mil y cambian; que sea la correcta para el
+ * negocio lo decide su contador).
+ */
+export function isValidSatProductCode(value: string): boolean {
+  return /^\d{8}$/.test(value.trim())
+}
+
+/**
+ * ClaveUnidad (c_ClaveUnidad): en qué se mide el concepto. Son 2 o 3
+ * caracteres alfanuméricos en mayúsculas: `E48` (unidad de servicio), `H87`
+ * (pieza), `KGM` (kilogramo), `XBX` (caja), `EA` (elemento, 2 caracteres).
+ */
+export function isValidSatUnitCode(value: string): boolean {
+  return /^[A-Z0-9]{2,3}$/.test(value.trim().toUpperCase())
+}

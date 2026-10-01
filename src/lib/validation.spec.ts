@@ -6,6 +6,8 @@ import {
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
+  isValidSatProductCode,
+  isValidSatUnitCode,
   MIN_PASSWORD_LENGTH,
   passwordChangeProblems,
   passwordResetProblems,
@@ -238,5 +240,52 @@ describe('passwordResetProblems', () => {
     expect(
       passwordResetProblems({ next: 'MiNuevaClave9', confirm: 'MiNuevaClave8' }).confirm,
     ).toBeDefined()
+  })
+})
+
+describe('isValidSatProductCode', () => {
+  it('acepta exactamente 8 dígitos', () => {
+    // Caso base: la clave que usamos por defecto ("Salud animal"). Si esto
+    // fallara, ningún servicio podría guardarse con su clave de producto.
+    expect(isValidSatProductCode('70122000')).toBe(true)
+  })
+
+  it('rechaza 7 o 9 dígitos', () => {
+    // El error de captura típico: comerse o duplicar un dígito. El timbrado
+    // del PAC rechazaría la factura completa por una clave de longitud mala.
+    expect(isValidSatProductCode('7012200')).toBe(false)
+    expect(isValidSatProductCode('701220000')).toBe(false)
+  })
+
+  it('rechaza letras, espacios internos y cadena vacía', () => {
+    expect(isValidSatProductCode('7012200A')).toBe(false)
+    expect(isValidSatProductCode('7012 2000')).toBe(false)
+    expect(isValidSatProductCode('')).toBe(false)
+  })
+
+  it('ignora espacios al inicio o al final', () => {
+    // Pegar la clave desde un Excel o un correo suele arrastrar un espacio.
+    expect(isValidSatProductCode(' 70122000 ')).toBe(true)
+  })
+})
+
+describe('isValidSatUnitCode', () => {
+  it('acepta claves reales de 3 y de 2 caracteres', () => {
+    // E48 (servicio) es la nuestra; EA (elemento) existe en el catálogo con
+    // 2 caracteres, y exigir 3 siempre dejaría fuera unidades legítimas.
+    expect(isValidSatUnitCode('E48')).toBe(true)
+    expect(isValidSatUnitCode('H87')).toBe(true)
+    expect(isValidSatUnitCode('EA')).toBe(true)
+  })
+
+  it('acepta minúsculas (se normalizan a mayúsculas al guardar)', () => {
+    expect(isValidSatUnitCode('e48')).toBe(true)
+  })
+
+  it('rechaza 1 o 4 caracteres, símbolos y cadena vacía', () => {
+    expect(isValidSatUnitCode('E')).toBe(false)
+    expect(isValidSatUnitCode('E48X')).toBe(false)
+    expect(isValidSatUnitCode('E-8')).toBe(false)
+    expect(isValidSatUnitCode('')).toBe(false)
   })
 })
