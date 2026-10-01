@@ -86,6 +86,14 @@ export const router = createRouter({
           props: true,
         },
         {
+          // Venta de mostrador (tarea 11.11): cobrar productos sin cita. Misma
+          // página que el cobro de una cita, sin `id`. Cobrar es de recepción/dueño.
+          path: 'venta-mostrador',
+          name: 'venta-mostrador',
+          component: () => import('@/pages/agenda/CheckoutPage.vue'),
+          meta: { requiresFrontDesk: true },
+        },
+        {
           path: 'clientes',
           name: 'clientes',
           component: () => import('@/pages/clientes/CustomersPage.vue'),

@@ -859,6 +859,7 @@ export type Database = {
           id: string
           method: Database["public"]["Enums"]["payment_method"]
           paid_at: string
+          payment_form_code: string | null
           reference: string | null
           sale_id: string
           status: Database["public"]["Enums"]["payment_status"]
@@ -872,6 +873,7 @@ export type Database = {
           id?: string
           method: Database["public"]["Enums"]["payment_method"]
           paid_at?: string
+          payment_form_code?: string | null
           reference?: string | null
           sale_id: string
           status: Database["public"]["Enums"]["payment_status"]
@@ -885,6 +887,7 @@ export type Database = {
           id?: string
           method?: Database["public"]["Enums"]["payment_method"]
           paid_at?: string
+          payment_form_code?: string | null
           reference?: string | null
           sale_id?: string
           status?: Database["public"]["Enums"]["payment_status"]
@@ -1275,6 +1278,7 @@ export type Database = {
           id: string
           item_type: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents: number
+          product_id: string | null
           quantity: number
           sale_id: string
           service_id: string | null
@@ -1292,6 +1296,7 @@ export type Database = {
           id?: string
           item_type?: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents: number
+          product_id?: string | null
           quantity?: number
           sale_id: string
           service_id?: string | null
@@ -1309,6 +1314,7 @@ export type Database = {
           id?: string
           item_type?: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents?: number
+          product_id?: string | null
           quantity?: number
           sale_id?: string
           service_id?: string | null
@@ -1324,6 +1330,20 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
@@ -1909,6 +1929,17 @@ export type Database = {
           p_appointment_id: string
           p_discount_cents?: number
           p_payments: Json
+          p_products?: Json
+        }
+        Returns: string
+      }
+      checkout_counter_sale: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string
+          p_discount_cents?: number
+          p_payments: Json
+          p_products: Json
         }
         Returns: string
       }
@@ -2366,7 +2397,7 @@ export type Database = {
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
-      sale_item_type: "service"
+      sale_item_type: "service" | "product"
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
       share_link_scope: "pet" | "customer"
@@ -2530,7 +2561,7 @@ export const Constants = {
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       plan_billing_period: ["monthly", "yearly", "indefinite"],
-      sale_item_type: ["service"],
+      sale_item_type: ["service", "product"],
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
       share_link_scope: ["pet", "customer"],
