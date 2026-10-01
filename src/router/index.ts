@@ -106,6 +106,14 @@ export const router = createRouter({
           meta: { requiresPermission: 'employees' },
         },
         {
+          // Inventario (tarea 11.9): gateado por PERMISO, igual que empleados.
+          // Cambiar quién entra es una fila de role_permissions, no código.
+          path: 'inventario',
+          name: 'inventario',
+          component: () => import('@/pages/inventario/InventoryPage.vue'),
+          meta: { requiresPermission: 'inventory' },
+        },
+        {
           // Configuración (tarea #1959): la ven todos los roles, pero cada
           // sección se gatea aparte. "Empresa y sucursales" es solo del dueño
           // (política RLS de branches); "Cuenta" es de cualquiera.
@@ -289,7 +297,10 @@ router.beforeEach(async (to) => {
   // Secciones solo del dueño (configuración de sucursales): quien no lo es
   // cae en "Cuenta", que sí puede ver. La política RLS de branches ya le
   // negaría escribir; esto solo evita una pantalla que no podría usar.
-  if (to.matched.some((record) => record.meta.requiresOwner) && session.role !== 'owner') {
+  if (
+    to.matched.some((record) => record.meta.requiresOwner) &&
+    session.role !== 'owner'
+  ) {
     return { path: '/app/configuracion/cuenta' }
   }
 

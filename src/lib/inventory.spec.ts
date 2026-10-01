@@ -7,6 +7,8 @@ import {
   signedQuantity,
   stockStatus,
   validateMovement,
+  validateProduct,
+  type ProductInput,
 } from './inventory'
 
 describe('computeStock', () => {
@@ -19,7 +21,14 @@ describe('computeStock', () => {
   it('suma compras, ventas, ajustes y mermas con su signo', () => {
     // La existencia es la suma de la bitácora: +10 compra, -2 venta, -1 merma,
     // +3 ajuste = 10. Si el signo se perdiera, el conteo se descuadraría.
-    expect(computeStock([{ quantity: 10 }, { quantity: -2 }, { quantity: -1 }, { quantity: 3 }])).toBe(10)
+    expect(
+      computeStock([
+        { quantity: 10 },
+        { quantity: -2 },
+        { quantity: -1 },
+        { quantity: 3 },
+      ]),
+    ).toBe(10)
   })
 })
 
@@ -96,21 +105,35 @@ describe('validateMovement', () => {
   it('una compra válida no necesita motivo', () => {
     // El motivo solo es obligatorio en ajustes y mermas; pedirlo en cada
     // compra haría tedioso el caso más común.
-    expect(validateMovement({ type: 'purchase', quantity: 10, currentStock: 0 })).toBeNull()
+    expect(
+      validateMovement({ type: 'purchase', quantity: 10, currentStock: 0 }),
+    ).toBeNull()
   })
 
   it('ajustes y mermas exigen motivo, aunque sea solo espacios', () => {
     // El motivo es lo que permite explicar después por qué cambió la existencia.
-    expect(validateMovement({ type: 'loss', quantity: 1, currentStock: 5 })).toBe('Escribe el motivo.')
+    expect(validateMovement({ type: 'loss', quantity: 1, currentStock: 5 })).toBe(
+      'Escribe el motivo.',
+    )
     expect(
-      validateMovement({ type: 'adjustment', quantity: 1, reason: '   ', currentStock: 5 }),
+      validateMovement({
+        type: 'adjustment',
+        quantity: 1,
+        reason: '   ',
+        currentStock: 5,
+      }),
     ).toBe('Escribe el motivo.')
   })
 
   it('una merma mayor a la existencia se rechaza con el número real', () => {
     // La base también lo rechaza; aquí se avisa antes de enviar, con un mensaje claro.
     expect(
-      validateMovement({ type: 'loss', quantity: 6, reason: 'Caducado', currentStock: 5 }),
+      validateMovement({
+        type: 'loss',
+        quantity: 6,
+        reason: 'Caducado',
+        currentStock: 5,
+      }),
     ).toBe('No hay existencia suficiente: hay 5.')
   })
 
@@ -133,6 +156,58 @@ describe('validateMovement', () => {
     )
     expect(validateMovement({ type: 'purchase', quantity: 2.5, currentStock: 0 })).toBe(
       'La cantidad debe ser un número entero mayor a 0.',
+    )
+  })
+})
+
+describe('validateProduct', () => {
+  const valid: ProductInput = {
+    name: 'Shampoo hipoalergénico',
+    priceCents: 18900,
+    costCents: null,
+    minStock: 0,
+    satProductCode: '01010101',
+    satUnitCode: 'H87',
+  }
+
+  it('acepta precio 0, costo vacío y mínimo 0', () => {
+    // Son bordes válidos: un regalo sin precio, un negocio que no captura costo
+    // y otro que no quiere aviso de stock bajo. Rechazarlos bloquearía altas legítimas.
+    expect(validateProduct(valid)).toBeNull()
+    expect(validateProduct({ ...valid, priceCents: 0 })).toBeNull()
+  })
+
+  it('rechaza un nombre vacío o de solo espacios', () => {
+    // Un producto sin nombre sería una fila en blanco en la lista y en el ticket.
+    expect(validateProduct({ ...valid, name: '   ' })).toBe(
+      'Escribe el nombre del producto.',
+    )
+  })
+
+  it('rechaza precio o costo negativo y mínimo decimal o negativo', () => {
+    // Todo es entero (§8.2): 12.5 piezas o -1 centavos romperían el cálculo de
+    // alertas y el IVA por partida.
+    expect(validateProduct({ ...valid, priceCents: -1 })).toBe(
+      'El precio debe ser 0 o mayor.',
+    )
+    expect(validateProduct({ ...valid, costCents: -5 })).toBe(
+      'El costo debe ser 0 o mayor.',
+    )
+    expect(validateProduct({ ...valid, minStock: 2.5 })).toBe(
+      'El mínimo debe ser un número entero, 0 o mayor.',
+    )
+    expect(validateProduct({ ...valid, minStock: -1 })).toBe(
+      'El mínimo debe ser un número entero, 0 o mayor.',
+    )
+  })
+
+  it('rechaza claves del SAT con formato inválido', () => {
+    // La base las rechazaría con un error críptico; aquí se avisa claro y antes.
+    expect(validateProduct({ ...valid, satProductCode: '1234' })).toBe(
+      'La clave de producto del SAT debe tener 8 dígitos.',
+    )
+    expect(validateProduct({ ...valid, satUnitCode: 'X' })).toBe(
+      'La clave de unidad del SAT debe tener 2 o 3 caracteres.',
     )
   })
 })

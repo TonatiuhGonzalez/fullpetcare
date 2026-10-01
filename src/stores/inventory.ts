@@ -8,7 +8,14 @@ import { defineStore } from 'pinia'
 import * as inventoryService from '@/services/inventory'
 import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
-import { stockStatus, validateMovement, type ManualMovementType, type StockStatus } from '@/lib/inventory'
+import {
+  stockStatus,
+  validateMovement,
+  validateProduct,
+  type ManualMovementType,
+  type ProductInput,
+  type StockStatus,
+} from '@/lib/inventory'
 import { useSessionStore } from './session'
 
 export interface InventoryRow {
@@ -31,7 +38,9 @@ export const useInventoryStore = defineStore('inventory', () => {
   const errorMessage = ref<string | null>(null)
 
   /** Productos que piden atención: sin inventario o con stock bajo. */
-  const alertRows = computed(() => rows.value.filter((r) => r.product.is_active && r.status !== 'ok'))
+  const alertRows = computed(() =>
+    rows.value.filter((r) => r.product.is_active && r.status !== 'ok'),
+  )
 
   async function load(): Promise<void> {
     const session = useSessionStore()
@@ -68,7 +77,10 @@ export const useInventoryStore = defineStore('inventory', () => {
       return 'No se pudo registrar el movimiento. Inicia sesión de nuevo.'
     }
     const current = rows.value.find((r) => r.product.id === request.productId)
-    const validationError = validateMovement({ ...request, currentStock: current?.stock ?? 0 })
+    const validationError = validateMovement({
+      ...request,
+      currentStock: current?.stock ?? 0,
+    })
     if (validationError) return validationError
 
     try {
@@ -85,11 +97,69 @@ export const useInventoryStore = defineStore('inventory', () => {
     return null
   }
 
+  /**
+   * Alta (`productId` ausente) o edición de un producto, y recarga. Devuelve el
+   * mensaje de error listo para mostrar o `null` si salió bien. El IVA no se
+   * captura: el alta usa el 16 % de la base y la edición no lo toca.
+   */
+  async function saveProduct(
+    input: ProductInput,
+    productId?: string,
+  ): Promise<string | null> {
+    const session = useSessionStore()
+    if (!session.activeTenantId)
+      return 'No se pudo guardar el producto. Inicia sesión de nuevo.'
+    const validationError = validateProduct(input)
+    if (validationError) return validationError
+
+    const fields = {
+      name: input.name.trim(),
+      price_cents: input.priceCents,
+      cost_cents: input.costCents,
+      min_stock: input.minStock,
+      sat_product_code: input.satProductCode.trim(),
+      sat_unit_code: input.satUnitCode.trim().toUpperCase(),
+    }
+    try {
+      if (productId) await productsService.update(productId, fields)
+      else await productsService.create({ ...fields, tenant_id: session.activeTenantId })
+    } catch {
+      return 'No se pudo guardar el producto. Revisa tu conexión.'
+    }
+    await load()
+    return null
+  }
+
+  /** Desactiva o reactiva un producto (no se borra: conserva su historial). */
+  async function setProductActive(
+    productId: string,
+    isActive: boolean,
+  ): Promise<string | null> {
+    try {
+      await productsService.setActive(productId, isActive)
+    } catch {
+      return `No se pudo ${isActive ? 'activar' : 'desactivar'} el producto. Revisa tu conexión.`
+    }
+    const row = rows.value.find((r) => r.product.id === productId)
+    if (row) row.product.is_active = isActive
+    return null
+  }
+
   function reset(): void {
     rows.value = []
     status.value = 'idle'
     errorMessage.value = null
   }
 
-  return { rows, status, errorMessage, alertRows, load, registerMovement, reset }
+  return {
+    rows,
+    status,
+    errorMessage,
+    alertRows,
+    load,
+    registerMovement,
+    saveProduct,
+    setProductActive,
+    reset,
+  }
 })

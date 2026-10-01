@@ -18,7 +18,9 @@ const businessName = computed(() => session.activeMembership?.tenantName ?? '')
 // sucursal elegida (p. ej. el instante entre login y que
 // resolveActiveBranch() corra) se muestra solo el nombre del negocio.
 const titleLabel = computed(() =>
-  session.activeBranch ? `${businessName.value} - ${session.activeBranch.name}` : businessName.value,
+  session.activeBranch
+    ? `${businessName.value} - ${session.activeBranch.name}`
+    : businessName.value,
 )
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
@@ -54,6 +56,9 @@ const menuItems = computed<SideMenuItem[]>(() => [
     ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
     : []),
   { title: 'Catálogo', icon: 'mdi-clipboard-list-outline', to: '/app/catalogo' },
+  ...(session.canView('inventory')
+    ? [{ title: 'Inventario', icon: 'mdi-package-variant-closed', to: '/app/inventario' }]
+    : []),
   ...(session.canView('employees')
     ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
     : []),
