@@ -512,6 +512,14 @@ certificado. El certificado (CSD) pasa directo al PAC y **no se guarda** en nues
 IVA incluido, sin paquetes prepagados. Se descartó Factura.com (plan anual con tope de 2 a 15 RFC, que
 limita a un SaaS que crece), Facturama (también multi-emisor, pero con API anual más paquetes de
 timbres) y SW Sapien (sin precios públicos).
+**Reconfirmada el 2026-10-02 (#2036):** los precios de Facturapi se volvieron a leer en su página y
+coinciden ($299 MXN/mes + $0.60 por timbre, IVA incluido, cobro a mes vencido, multi-RFC sin costo extra,
+modo de prueba de 14 días sin tarjeta). Facturama (API multi-emisor $1,650 MXN/año + $0.50 por timbre,
+prepago con vigencia anual) sale unas ~$1,900 MXN/año más barato más $0.10 por timbre, pero exige prepago,
+los timbres vencen al año y no se pudo confirmar su sandbox en la página; la diferencia es chica frente a
+la facilidad de integración. El usuario confirmó Facturapi. **Sin dependencia nueva:** la Edge Function
+habla con la API por `fetch` (Deno), no con su SDK de npm. Los precios se verifican otra vez antes de
+contratar el plan de pago (el modo de prueba basta para desarrollar).
 **Costo aceptado:** dependencia de un tercero y costo por timbre. **Lo absorbe la plataforma dentro del plan**, con un tope de facturas por negocio
 (decisión del usuario, 2026-10-01). La forma de pago (crédito/débito) se elige a mano al cobrar con tarjeta. El armado del comprobante vive en `lib/cfdi.ts` (puro y probado) y el PAC queda detrás
 de un adaptador delgado, de modo que cambiar de proveedor no toca la lógica ni la base.
