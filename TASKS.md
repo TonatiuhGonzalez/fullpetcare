@@ -788,10 +788,10 @@ HMH Four: tareas #2036 a #2048.
 - [x] **11.8** 📚 `services/products.ts` y `services/inventory.ts` (lista, alta, edición, desactivar;
   registrar compra, ajuste y merma con motivo obligatorio en los dos últimos) + `useInventoryStore`.
   _Verificar:_ tests de servicio/store; la capa de §4 se respeta (ningún componente toca `supabase.ts`). **Hecho:** `services/products.ts`, `services/inventory.ts` y `stores/inventory.ts` (con `inventory.spec.ts`, 8 tests con mocks). No hay test de servicio contra Supabase real: un movimiento no se puede borrar, así que dejaría basura permanente en la base local; la lógica de la base ya la cubre `stock-movements-rls.spec.ts`.
-- [ ] **11.9** Pantalla de **Inventario** (menú lateral, bajo el permiso `inventory`): lista con
+- [x] **11.9** Pantalla de **Inventario** (menú lateral, bajo el permiso `inventory`): lista con
   existencia y alerta de stock bajo por sucursal, alta/edición de producto, diálogo de entrada de
   compra y de ajuste. Móvil usable. _Verificar:_ en navegador, con el dueño y con un groomer que no
-  la ve ni entra por URL directa.
+  la ve ni entra por URL directa. **Hecho 2026-10-02 (#2040):** ruta `/app/inventario` (`requiresPermission: 'inventory'`) y entrada de menú gateadas por `canView('inventory')`; botones de alta, edición, compra, ajuste y activar/desactivar solo con `canEdit('inventory')`. Verificado con Playwright a 390 px: el dueño ve la lista, registra una compra y un ajuste que excede la existencia muestra "No hay existencia suficiente"; el groomer no ve el menú y la URL directa lo manda a la agenda. Se agregó `validateProduct` (lib) y `saveProduct`/`setProductActive` (store) con sus tests. El IVA no se captura en el formulario: el alta usa 16 % (decisión pendiente si hace falta tasa 0). Las mermas existen en el store pero la pantalla solo ofrece compra y ajuste (lo que pide la tarea).
 
 ### 11C. Vender productos en el cobro
 

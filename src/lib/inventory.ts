@@ -4,6 +4,7 @@
 // stock_movements.sql); aquí viven para que la pantalla avise ANTES de enviar.
 //
 // Todo es entero (decisión #6 de la fase): lo suelto se maneja como presentación.
+import { isValidSatProductCode, isValidSatUnitCode } from './validation'
 
 /** Tipos de movimiento que una persona puede registrar a mano. */
 export type ManualMovementType = 'purchase' | 'adjustment' | 'loss'
@@ -86,6 +87,44 @@ export function validateMovement(input: MovementInput): string | null {
   const delta = signedQuantity(input.type, input.quantity, input.direction)
   if (delta < 0 && !canRemove(input.currentStock, -delta)) {
     return `No hay existencia suficiente: hay ${input.currentStock}.`
+  }
+  return null
+}
+
+export interface ProductInput {
+  name: string
+  priceCents: number
+  /** Opcional: no todos los negocios llevan el costo. */
+  costCents: number | null
+  minStock: number
+  satProductCode: string
+  satUnitCode: string
+}
+
+/**
+ * Valida el formulario de producto. Regresa el primer mensaje (en español) o
+ * `null`. Dinero y mínimo son enteros (CLAUDE.md §8.2): el precio ya viene en
+ * centavos, convertido con `pesosToCents()` antes de llegar aquí.
+ */
+export function validateProduct(input: ProductInput): string | null {
+  if (!input.name.trim()) return 'Escribe el nombre del producto.'
+  if (!Number.isInteger(input.priceCents) || input.priceCents < 0) {
+    return 'El precio debe ser 0 o mayor.'
+  }
+  if (
+    input.costCents !== null &&
+    (!Number.isInteger(input.costCents) || input.costCents < 0)
+  ) {
+    return 'El costo debe ser 0 o mayor.'
+  }
+  if (!Number.isInteger(input.minStock) || input.minStock < 0) {
+    return 'El mínimo debe ser un número entero, 0 o mayor.'
+  }
+  if (!isValidSatProductCode(input.satProductCode)) {
+    return 'La clave de producto del SAT debe tener 8 dígitos.'
+  }
+  if (!isValidSatUnitCode(input.satUnitCode)) {
+    return 'La clave de unidad del SAT debe tener 2 o 3 caracteres.'
   }
   return null
 }
