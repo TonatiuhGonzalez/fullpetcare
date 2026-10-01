@@ -1119,6 +1119,65 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          cost_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          min_stock: number
+          name: string
+          price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
+          sku: string | null
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          min_stock?: number
+          name: string
+          price_cents: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sku?: string | null
+          tax_rate_bp?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          min_stock?: number
+          name?: string
+          price_cents?: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sku?: string | null
+          tax_rate_bp?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -2184,7 +2243,7 @@ export type Database = {
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
-      permission_module: "employees"
+      permission_module: "employees" | "inventory"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
@@ -2340,7 +2399,7 @@ export const Constants = {
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
-      permission_module: ["employees"],
+      permission_module: ["employees", "inventory"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       plan_billing_period: ["monthly", "yearly", "indefinite"],

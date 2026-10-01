@@ -762,16 +762,16 @@ HMH Four: tareas #2036 a #2048.
 
 ### 11B. Productos e inventario
 
-- [ ] **11.3** 📚 Migración `products`: tabla con las columnas de §6 (`tenant_id`, `deleted_at`,
+- [x] **11.3** 📚 Migración `products`: tabla con las columnas de §6 (`tenant_id`, `deleted_at`,
   trigger de `updated_at`, índice que empieza por `tenant_id`), RLS activa y forzada en la misma
   migración, política de lectura para miembros, escritura para quien tenga `inventory`/`edit`
   (`app.has_permission`). Se agrega `inventory` a `permission_module` y sus filas en
   `role_permissions` (explicar el cuidado de `alter type ... add value` dentro de una transacción).
-  _Verificar:_ `db:reset` limpio.
-- [ ] **11.4** 🧪 Tests de aislamiento de `products`: otro tenant no los ve ni los edita; groomer sin
+  _Verificar:_ `db:reset` limpio. **Hecho 2026-10-02 (#2038):** dos migraciones (`inventory_permission_module`, que solo agrega el valor al enum, y `products`, que lo usa: Postgres no deja usar un valor de enum en la misma transacción donde se agregó). Lectura con `inventory`/`view`, escritura con `inventory`/`edit`; filas por defecto (dueño y recepción ver+editar, vet solo ver, groomer nada) para los negocios existentes y en `seed.sql`. Claves SAT por defecto `01010101` (genérica del SAT) y `H87` (pieza), pendientes de revisión por un contador. **Los negocios que se den de alta después de la migración no reciben filas de `inventory` solos** (igual que `employees` hoy): solo el dueño tendría acceso hasta sembrarlas; decidir si un trigger sobre `tenants` las crea.
+- [x] **11.4** 🧪 Tests de aislamiento de `products`: otro tenant no los ve ni los edita; groomer sin
   permiso no escribe; borrado suave funciona (cuidado con la trampa de §7.2: SELECT sin filtrar
   `deleted_at` si hay UPDATE para un rol normal); no hay política de DELETE. _Verificar:_ verde, y
-  se rompe a propósito una política para ver que el test falla (mutación, como en 10.4).
+  se rompe a propósito una política para ver que el test falla (mutación, como en 10.4). **Hecho:** `products-rls.spec.ts` (25 tests); con `products_select using (true)` fallan 3.
 - [ ] **11.5** 📚 Migración `stock_movements`: bitácora inmutable (sin UPDATE/DELETE, trigger
   `prevent_hard_delete()` + trigger que rechaza UPDATE), `branch_id` + `product_id`, tipo enum,
   cantidad entera con signo (`check <> 0`), referencia opcional a `sale_id`. Vista `product_stock`
