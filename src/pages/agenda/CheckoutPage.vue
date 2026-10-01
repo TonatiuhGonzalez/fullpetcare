@@ -314,6 +314,19 @@ function checkoutErrorMessage(err: unknown): string {
                 formatMXN(item.unitPriceCents * item.quantity)
               }}</template>
             </v-list-item>
+            <!-- Insumos cobrables de la consulta (11.14): solo lectura; se editan en la atención. -->
+            <v-list-item
+              v-for="item in cart.supplyItems"
+              :key="item.appointmentProductId"
+            >
+              <template #title>
+                {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
+              </template>
+              <template #subtitle>Usado en la consulta</template>
+              <template #append>{{
+                formatMXN(item.unitPriceCents * item.quantity)
+              }}</template>
+            </v-list-item>
             <v-list-item v-for="item in cart.productItems" :key="item.productId">
               <template #title>{{ item.description }}</template>
               <template #subtitle

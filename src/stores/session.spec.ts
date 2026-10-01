@@ -643,7 +643,10 @@ describe('avisos de acceso (#1905)', () => {
     graceEndsAt: null,
   }
 
-  async function loginWith(memberships: MembershipSummary[], notices: TenantNotice[] = [BLOCKED]) {
+  async function loginWith(
+    memberships: MembershipSummary[],
+    notices: TenantNotice[] = [BLOCKED],
+  ) {
     vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'x@y.mx' })
     vi.mocked(getProfile).mockResolvedValue({
       fullName: 'Ana',

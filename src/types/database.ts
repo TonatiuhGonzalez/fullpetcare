@@ -1349,6 +1349,7 @@ export type Database = {
       sale_items: {
         Row: {
           appointment_id: string | null
+          appointment_product_id: string | null
           created_at: string
           deleted_at: string | null
           description: string
@@ -1367,6 +1368,7 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description: string
@@ -1385,6 +1387,7 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string
@@ -1407,6 +1410,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
             referencedColumns: ["id"]
           },
           {

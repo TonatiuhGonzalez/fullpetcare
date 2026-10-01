@@ -21,6 +21,15 @@ export interface CheckoutLineItem extends LineItem {
   description: string
 }
 
+/**
+ * Un insumo cobrable registrado en la consulta (tarea 11.14). Ya salió del
+ * inventario al registrarse: el cobro solo lo pasa al ticket, sin tocar existencias.
+ */
+export interface CheckoutSupplyItem extends LineItem {
+  appointmentProductId: string
+  description: string
+}
+
 /** Un producto en el resumen de cobro, con la existencia que había al agregarlo. */
 export interface CheckoutProductItem extends LineItem {
   productId: string
@@ -51,6 +60,8 @@ export type CardFormCode = '04' | '28'
  */
 export interface CheckoutSummary {
   lineItems: CheckoutLineItem[]
+  /** Insumos cobrables de la consulta (los de uso interno no entran). */
+  supplyItems: CheckoutSupplyItem[]
   subtotalCents: number
   taxCents: number
   discountCents: number
@@ -126,10 +137,34 @@ export async function buildSummary(
     taxRateBp: row.services?.tax_rate_bp ?? 0,
   }))
 
-  const { subtotalCents, taxCents, totalCents: grossTotalCents } = sumLineItems(lineItems)
+  // Insumos cobrables de la consulta, con el precio e IVA que se guardaron al
+  // registrarlos (snapshot), igual que los copia checkout_appointment().
+  const { data: supplies, error: suppliesError } = await supabase
+    .from('appointment_products')
+    .select('id, name_snapshot, unit_price_cents, tax_rate_bp, quantity')
+    .eq('appointment_id', appointmentId)
+    .eq('is_billable', true)
+    .is('deleted_at', null)
+    .order('created_at')
+
+  if (suppliesError) throw suppliesError
+
+  const supplyItems: CheckoutSupplyItem[] = (supplies ?? []).map((row) => ({
+    appointmentProductId: row.id,
+    description: row.name_snapshot,
+    quantity: row.quantity,
+    unitPriceCents: row.unit_price_cents,
+    taxRateBp: row.tax_rate_bp,
+  }))
+
+  const {
+    subtotalCents,
+    taxCents,
+    totalCents: grossTotalCents,
+  } = sumLineItems([...lineItems, ...supplyItems])
   const totalCents = applyDiscount(grossTotalCents, discountCents)
 
-  return { lineItems, subtotalCents, taxCents, discountCents, totalCents }
+  return { lineItems, supplyItems, subtotalCents, taxCents, discountCents, totalCents }
 }
 
 function paymentsPayload(payments: NewPayment[]) {
