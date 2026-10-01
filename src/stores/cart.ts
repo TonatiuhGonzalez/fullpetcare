@@ -17,6 +17,7 @@ import * as checkoutService from '@/services/checkout'
 import type {
   CheckoutLineItem,
   CheckoutProductItem,
+  CheckoutSupplyItem,
   NewPayment,
   SellableProduct,
 } from '@/services/checkout'
@@ -26,6 +27,8 @@ import { canRemove } from '@/lib/inventory'
 export const useCartStore = defineStore('cart', () => {
   const appointmentId = ref<string | null>(null)
   const lineItems = ref<CheckoutLineItem[]>([])
+  /** Insumos cobrables de la consulta: ya salieron del inventario, solo se cobran. */
+  const supplyItems = ref<CheckoutSupplyItem[]>([])
   /** Productos agregados al ticket (de la cita o de una venta de mostrador). */
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
@@ -40,7 +43,11 @@ export const useCartStore = defineStore('cart', () => {
 
   // Servicios y productos se desglosan por partida con la misma función
   // (lib/money.ts), igual que la base: el IVA nunca se calcula sobre el total.
-  const allItems = computed(() => [...lineItems.value, ...productItems.value])
+  const allItems = computed(() => [
+    ...lineItems.value,
+    ...supplyItems.value,
+    ...productItems.value,
+  ])
   const subtotalCents = computed(() => sumLineItems(allItems.value).subtotalCents)
   const taxCents = computed(() => sumLineItems(allItems.value).taxCents)
   /** Lo que hay que cobrar: subtotal + IVA, menos el descuento (nunca negativo). */
@@ -71,6 +78,7 @@ export const useCartStore = defineStore('cart', () => {
     try {
       const summary = await checkoutService.buildSummary(id)
       lineItems.value = summary.lineItems
+      supplyItems.value = summary.supplyItems
       status.value = 'ready'
     } catch {
       status.value = 'error'
@@ -188,6 +196,7 @@ export const useCartStore = defineStore('cart', () => {
     productItems.value = []
     catalog.value = []
     lineItems.value = []
+    supplyItems.value = []
     discountCents.value = 0
     payments.value = []
     status.value = 'idle'
@@ -197,6 +206,7 @@ export const useCartStore = defineStore('cart', () => {
   return {
     appointmentId,
     lineItems,
+    supplyItems,
     productItems,
     catalog,
     counterBranchId,

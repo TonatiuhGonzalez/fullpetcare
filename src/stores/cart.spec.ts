@@ -41,7 +41,14 @@ const BANO: CheckoutLineItem = {
 // (lib/money.ts), así que los demás campos de CheckoutSummary no importan
 // aquí — solo lineItems es lo que loadAppointment() realmente usa.
 function summaryWith(lineItems: CheckoutLineItem[]): CheckoutSummary {
-  return { lineItems, subtotalCents: 0, taxCents: 0, discountCents: 0, totalCents: 0 }
+  return {
+    lineItems,
+    supplyItems: [],
+    subtotalCents: 0,
+    taxCents: 0,
+    discountCents: 0,
+    totalCents: 0,
+  }
 }
 
 beforeEach(() => {
@@ -316,5 +323,44 @@ describe('productos en el ticket (tarea 11.11)', () => {
         payments: [{ method: 'card', amountCents: 35000, paymentFormCode: '28' }],
       }),
     )
+  })
+})
+
+describe('insumos cobrables de la consulta (tarea 11.14)', () => {
+  // Alimento de $100.00 (IVA 16 % incluido) usado en la consulta.
+  const INSUMO = {
+    appointmentProductId: 'ap-1',
+    description: 'Vacuna triple',
+    quantity: 2,
+    unitPriceCents: 10000,
+    taxRateBp: 1600,
+  }
+
+  it('suman al total junto con el servicio, para que lo mostrado alcance lo que cobra la base', async () => {
+    // Qué se rompería: la pantalla pediría $250 y la base $450: el pago "alcanza"
+    // en pantalla pero el RPC lo rechazaría por no cubrir el total.
+    vi.mocked(buildSummary).mockResolvedValue({
+      ...summaryWith([BANO]),
+      supplyItems: [INSUMO],
+    })
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+
+    expect(cart.totalCents).toBe(25000 + 20000)
+    expect(cart.remainingCents).toBe(45000)
+  })
+
+  it('cargar otra cita no arrastra los insumos de la anterior', async () => {
+    vi.mocked(buildSummary).mockResolvedValueOnce({
+      ...summaryWith([BANO]),
+      supplyItems: [INSUMO],
+    })
+    vi.mocked(buildSummary).mockResolvedValueOnce(summaryWith([BANO]))
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+    await cart.loadAppointment('appt-2')
+
+    expect(cart.supplyItems).toEqual([])
+    expect(cart.totalCents).toBe(25000)
   })
 })

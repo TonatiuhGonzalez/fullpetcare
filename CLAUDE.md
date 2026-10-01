@@ -69,7 +69,7 @@ no se construye por iniciativa propia: necesita su fase y su aprobación.
 
 - **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
   `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
-  mostrador (§6.5). Falta el consumo de insumos en la consulta (11.12 a 11.14).
+  mostrador (§6.5). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
 - **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
   mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
   `services` y los futuros productos deberán llevarlas.

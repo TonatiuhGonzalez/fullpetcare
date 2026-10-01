@@ -811,21 +811,21 @@ HMH Four: tareas #2036 a #2048.
 
 ### 11C-bis. Insumos usados en la atención veterinaria
 
-- [ ] **11.12** 📚🧪 Migración `appointment_products` (snapshot de nombre, precio e IVA; `is_billable`;
+- [x] **11.12** 📚🧪 Migración `appointment_products` (snapshot de nombre, precio e IVA; `is_billable`;
   RLS que solo deja escribir a `owner` y `vet`, lectura según el rol que ya ve la cita) y RPCs para
   agregar y quitar una línea: revalidan membresía y rol (§7.3.4), rechazan existencia 0, y generan o
   revierten el movimiento de consumo en la misma transacción. Tests: groomer y recepción no escriben;
   otro tenant no ve nada; quitar una línea devuelve la existencia exacta; producto sin existencia se
-  rechaza; cita ya cobrada no admite cambios. _Verificar:_ verde.
-- [ ] **11.13** Apartado **"Productos y medicamentos usados"** en la pantalla de atención veterinaria:
+  rechaza; cita ya cobrada no admite cambios. _Verificar:_ verde. **Hecho 2026-10-03 (#2042, parte de base de datos; la pantalla es 11.13):** migración `appointment_products` con RPC `add_appointment_product` / `remove_appointment_product`. **Se escribe solo por RPC**, sin política de INSERT/UPDATE para usuarios (más estricto que "RLS que deja escribir a owner y vet"): una línea sin su movimiento de stock descuadraría el inventario; solo dueño y vet pasan la RPC. Solo citas veterinarias y no canceladas. Quitar la línea la oculta (`deleted_at`) y devuelve el neto exacto con `consumption_reversal`. `stock_movements` gana `appointment_product_id` (nullable). Lectura: sigue a la cita (por sucursal). Tests en `appointment-products-rpc.spec.ts`.
+- [x] **11.13** Apartado **"Productos y medicamentos usados"** en la pantalla de atención veterinaria:
   agregar producto y cantidad, interruptor "Cobrar al cliente", quitar línea. La vacuna se liga a su
   producto (columna nueva y opcional en `vaccinations`): descuenta una pieza; el lote se sigue
-  capturando a mano. _Verificar:_ en navegador, con un vet; el groomer no ve el apartado.
-- [ ] **11.14** 📚🧪 Las líneas cobrables pasan al cobro: la RPC de cobro las convierte en `sale_items`
+  capturando a mano. _Verificar:_ en navegador, con un vet; el groomer no ve el apartado. **Hecho 2026-10-03 (#2042):** `AppointmentProductsPanel` en la atención veterinaria (solo dueño y vet, `canRegisterSupplies`); `services/appointmentProducts.ts`. La vacuna se liga a la **línea de insumo** (`vaccinations.appointment_product_id`, no al producto suelto: la línea ya es el vínculo con el movimiento de stock), con un trigger que exige que sea de la misma cita y negocio. Orden al aplicar: primero la pieza, luego la vacuna (la vacunación es expediente y no se borra; la línea sí se puede quitar, y si la vacuna falla se quita para devolver la existencia). Una pieza ligada a una vacuna ya registrada no se puede quitar. Verificado en navegador con el vet de la semilla (agregar, quitar, vacuna con pieza, existencias correctas) con un script temporal que no se subió.
+- [x] **11.14** 📚🧪 Las líneas cobrables pasan al cobro: la RPC de cobro las convierte en `sale_items`
   **sin** crear otro movimiento de stock; garantía en la base de que una línea se cobra una sola vez.
   Tests: ticket con servicios, productos de mostrador y productos de consulta cuadra al centavo; las
   líneas de uso interno no aparecen; cancelar la venta no devuelve el consumo. _Verificar:_ verde; el E2E
-  sigue verde.
+  sigue verde. **Hecho 2026-10-03 (#2043):** migración `checkout_billable_supplies`: `sale_items.appointment_product_id` y `checkout_appointment()` (mismo cuerpo, un paso más) que copia los insumos cobrables con su snapshot de precio e IVA, **sin** movimiento de stock. Que cancelar no devuelva el consumo sale solo del diseño: la devolución revierte los movimientos `sale` de la venta y el consumo se ligó a la línea, no a la venta. «Se cobra una sola vez» = trigger (no índice único, porque tras cancelar la venta la cita se puede volver a cobrar) con candado por línea; también exige que la línea sea de la misma cita. La pantalla de cobro suma y lista los insumos (`supplyItems`), si no, el total en pantalla quedaría corto frente al de la base. Verificado en navegador (insumo cobrable aparece, el de uso interno no, cobro exitoso).
 
 ### 11D. Facturación (CFDI 4.0)
 

@@ -59,7 +59,9 @@ export const useAgendaStore = defineStore('agenda', () => {
 
   function activeBranchTimezone(): string | null {
     const session = useSessionStore()
-    return session.activeBranches.find((b) => b.id === activeBranchId.value)?.timezone ?? null
+    return (
+      session.activeBranches.find((b) => b.id === activeBranchId.value)?.timezone ?? null
+    )
   }
 
   const visibleDates = computed<string[]>(() => {
@@ -77,7 +79,9 @@ export const useAgendaStore = defineStore('agenda', () => {
 
   const hourRange = computed<HourRange>(() =>
     visibleHourRange(
-      visibleDates.value.map((dateStr) => hoursForDate(branchOpeningHours.value, dateStr)),
+      visibleDates.value.map((dateStr) =>
+        hoursForDate(branchOpeningHours.value, dateStr),
+      ),
     ),
   )
 
@@ -85,7 +89,13 @@ export const useAgendaStore = defineStore('agenda', () => {
     const session = useSessionStore()
     const timezone = activeBranchTimezone()
     const dates = visibleDates.value
-    if (!session.activeTenantId || !activeBranchId.value || dates.length === 0 || !timezone) return
+    if (
+      !session.activeTenantId ||
+      !activeBranchId.value ||
+      dates.length === 0 ||
+      !timezone
+    )
+      return
 
     status.value = 'loading'
     errorMessage.value = null

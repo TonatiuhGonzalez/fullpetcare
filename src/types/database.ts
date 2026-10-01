@@ -34,6 +34,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_products: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          id: string
+          is_billable: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot?: string
+          product_id?: string
+          quantity?: number
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_products_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "appointment_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_services: {
         Row: {
           appointment_id: string
@@ -1272,6 +1349,7 @@ export type Database = {
       sale_items: {
         Row: {
           appointment_id: string | null
+          appointment_product_id: string | null
           created_at: string
           deleted_at: string | null
           description: string
@@ -1290,6 +1368,7 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description: string
@@ -1308,6 +1387,7 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string
@@ -1330,6 +1410,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
             referencedColumns: ["id"]
           },
           {
@@ -1586,6 +1673,7 @@ export type Database = {
       }
       stock_movements: {
         Row: {
+          appointment_product_id: string | null
           branch_id: string
           created_at: string
           created_by: string
@@ -1598,6 +1686,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          appointment_product_id?: string | null
           branch_id: string
           created_at?: string
           created_by: string
@@ -1610,6 +1699,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          appointment_product_id?: string | null
           branch_id?: string
           created_at?: string
           created_by?: string
@@ -1622,6 +1712,13 @@ export type Database = {
           tenant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_movements_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_movements_branch_id_fkey"
             columns: ["branch_id"]
@@ -1789,6 +1886,7 @@ export type Database = {
           applied_at: string
           applied_by_user_id: string | null
           appointment_id: string | null
+          appointment_product_id: string | null
           batch_number: string | null
           created_at: string
           id: string
@@ -1803,6 +1901,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1817,6 +1916,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1833,6 +1933,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
             referencedColumns: ["id"]
           },
           {
@@ -1920,6 +2027,15 @@ export type Database = {
       }
     }
     Functions: {
+      add_appointment_product: {
+        Args: {
+          p_appointment_id: string
+          p_is_billable?: boolean
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: string
+      }
       cancel_my_tenant: {
         Args: { p_comment?: string; p_tenant_id: string }
         Returns: undefined
@@ -2342,6 +2458,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      remove_appointment_product: {
+        Args: { p_line_id: string }
+        Returns: undefined
       }
       reschedule_appointment: {
         Args: {
