@@ -7,6 +7,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useInventoryStore } from './inventory'
 import { useSessionStore } from './session'
 
+// useSessionStore importa estos services, y todos terminan en
+// services/supabase.ts, que lanza error si no hay VITE_SUPABASE_URL. En tu Mac
+// existe .env.local y pasa; en el CI no, y el archivo entero fallaba al
+// importar. Se mockean igual que en session.spec.ts para no tocar Supabase.
+vi.mock('@/services/auth', () => ({
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  getCurrentUser: vi.fn(),
+  onSessionLost: vi.fn(),
+}))
+vi.mock('@/services/profiles', () => ({ getProfile: vi.fn() }))
+vi.mock('@/services/memberships', () => ({ listMyMemberships: vi.fn() }))
+vi.mock('@/services/tenantAccess', () => ({
+  listMyTenantNotices: vi.fn(),
+  cancelMyTenant: vi.fn(),
+}))
+vi.mock('@/services/permissions', () => ({ listForTenant: vi.fn() }))
+vi.mock('@/services/platform', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@/services/products', () => ({ list: vi.fn() }))
 vi.mock('@/services/inventory', () => ({ listStock: vi.fn(), registerMovement: vi.fn() }))
 
