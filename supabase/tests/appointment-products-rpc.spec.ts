@@ -24,6 +24,7 @@ import {
   USER_GROOMER,
   USER_RECEPCION,
   USER_VET,
+  VACCINE_RABIA,
 } from './fixtures'
 
 afterAll(closePool)
@@ -364,6 +365,67 @@ describe('appointment_products: lectura y escritura directa (RLS)', () => {
       await expect(addLine(client, appointmentId, PRODUCT_SHAMPOO, 1)).rejects.toThrow(
         /no perteneces/i,
       )
+    })
+  })
+})
+
+describe('vacuna ligada a su pieza (tarea 11.13)', () => {
+  const insertVaccination = (
+    client: PoolClient,
+    appointmentId: string,
+    lineId: string | null,
+  ) =>
+    client.query(
+      `insert into vaccinations (tenant_id, pet_id, vaccine_id, applied_by_user_id, appointment_id, appointment_product_id)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [TENANT_PATITAS, PET_ROCKY, VACCINE_RABIA, USER_VET, appointmentId, lineId],
+    )
+
+  it('la vacunación puede apuntar a la pieza descontada de SU cita', async () => {
+    await withTransaction(async (client) => {
+      await seedStock(client, PRODUCT_SHAMPOO, 5)
+      const appointmentId = await seedAppointment(client)
+      await setRole(client, 'authenticated', USER_VET)
+      const lineId = await addLine(client, appointmentId, PRODUCT_SHAMPOO, 1)
+      await insertVaccination(client, appointmentId, lineId)
+      const { rows } = await client.query(
+        'select appointment_product_id from vaccinations where appointment_id = $1',
+        [appointmentId],
+      )
+      expect(rows[0].appointment_product_id).toBe(lineId)
+    })
+  })
+
+  it('no se puede colgar una vacuna de una pieza de OTRA cita', async () => {
+    // Qué se rompería: una vacuna "justificada" con una pieza descontada en
+    // otra consulta; el inventario y el expediente dirían cosas distintas.
+    await withTransaction(async (client) => {
+      await seedStock(client, PRODUCT_SHAMPOO, 5)
+      const mine = await seedAppointment(client)
+      const other = await seedAppointment(client)
+      await setRole(client, 'authenticated', USER_VET)
+      const otherLine = await addLine(client, other, PRODUCT_SHAMPOO, 1)
+      await expect(insertVaccination(client, mine, otherLine)).rejects.toThrow(
+        /no corresponde a esta cita/i,
+      )
+    })
+  })
+
+  it('una pieza ligada a una vacuna ya registrada no se puede quitar', async () => {
+    // Qué se rompería: quitar la pieza devolvería stock de una vacuna que SÍ se
+    // aplicó, y el expediente (que no se borra) apuntaría a una línea oculta.
+    await withTransaction(async (client) => {
+      await seedStock(client, PRODUCT_SHAMPOO, 5)
+      const appointmentId = await seedAppointment(client)
+      await setRole(client, 'authenticated', USER_VET)
+      const lineId = await addLine(client, appointmentId, PRODUCT_SHAMPOO, 1)
+      await insertVaccination(client, appointmentId, lineId)
+      await client.query('savepoint s')
+      await expect(
+        client.query('select remove_appointment_product($1)', [lineId]),
+      ).rejects.toThrow(/vacuna ya registrada/i)
+      await client.query('rollback to savepoint s')
+      expect(await stockOf(client, PRODUCT_SHAMPOO)).toBe(4)
     })
   })
 })

@@ -108,6 +108,8 @@ export interface NewVaccination {
   batchNumber?: string | null
   nextDueDate?: string | null
   appointmentId?: string | null
+  /** Línea de insumo (appointment_products) que descontó la pieza de esta vacuna. */
+  appointmentProductId?: string | null
   notes?: string | null
 }
 
@@ -130,6 +132,7 @@ export async function addVaccination(input: NewVaccination): Promise<Vaccination
       batch_number: input.batchNumber ?? null,
       next_due_date: input.nextDueDate ?? null,
       appointment_id: input.appointmentId ?? null,
+      appointment_product_id: input.appointmentProductId ?? null,
       notes: input.notes ?? null,
     })
     .select()
