@@ -398,7 +398,7 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 | Tabla               | Campos clave                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy solo `'employees'`), `can_view`, `can_edit`               |
+| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy `'employees'` e `'inventory'`), `can_view`, `can_edit`               |
 | `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`                            |
 | `employee_documents`| `tenant_id`, `membership_id`, `document_type` (enum: `voter_id`\|`address_proof`\|`employment_contract`), `storage_path`, `uploaded_by`, `uploaded_at` |
 

@@ -1,0 +1,14 @@
+-- Nuevo módulo de permisos: 'inventory' (fase 11, tarea 11.3 / HMH Four #2038).
+--
+-- Esta migración hace UNA sola cosa a propósito: agregar el valor al enum.
+-- La migración siguiente (products) ya lo USA en políticas y filas.
+--
+-- Por qué van en archivos separados: Postgres NO deja usar un valor de enum
+-- recién agregado dentro de la MISMA transacción donde se agregó ("unsafe use
+-- of new value of enum type"). El CLI de Supabase corre cada archivo de
+-- migración en su propia transacción, así que al separarlos, cuando corre
+-- products.sql el valor 'inventory' ya está confirmado (commit).
+--
+-- Es aditivo (CLAUDE.md §8.1): ningún permiso ni política existente cambia.
+-- (La migración role_permissions.sql ya anticipaba este `add value`.)
+alter type permission_module add value 'inventory';
