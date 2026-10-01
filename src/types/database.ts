@@ -1876,6 +1876,7 @@ export type Database = {
           applied_at: string
           applied_by_user_id: string | null
           appointment_id: string | null
+          appointment_product_id: string | null
           batch_number: string | null
           created_at: string
           id: string
@@ -1890,6 +1891,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1904,6 +1906,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1920,6 +1923,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
             referencedColumns: ["id"]
           },
           {
