@@ -811,12 +811,12 @@ HMH Four: tareas #2036 a #2048.
 
 ### 11C-bis. Insumos usados en la atención veterinaria
 
-- [ ] **11.12** 📚🧪 Migración `appointment_products` (snapshot de nombre, precio e IVA; `is_billable`;
+- [x] **11.12** 📚🧪 Migración `appointment_products` (snapshot de nombre, precio e IVA; `is_billable`;
   RLS que solo deja escribir a `owner` y `vet`, lectura según el rol que ya ve la cita) y RPCs para
   agregar y quitar una línea: revalidan membresía y rol (§7.3.4), rechazan existencia 0, y generan o
   revierten el movimiento de consumo en la misma transacción. Tests: groomer y recepción no escriben;
   otro tenant no ve nada; quitar una línea devuelve la existencia exacta; producto sin existencia se
-  rechaza; cita ya cobrada no admite cambios. _Verificar:_ verde.
+  rechaza; cita ya cobrada no admite cambios. _Verificar:_ verde. **Hecho 2026-10-03 (#2042, parte de base de datos; la pantalla es 11.13):** migración `appointment_products` con RPC `add_appointment_product` / `remove_appointment_product`. **Se escribe solo por RPC**, sin política de INSERT/UPDATE para usuarios (más estricto que "RLS que deja escribir a owner y vet"): una línea sin su movimiento de stock descuadraría el inventario; solo dueño y vet pasan la RPC. Solo citas veterinarias y no canceladas. Quitar la línea la oculta (`deleted_at`) y devuelve el neto exacto con `consumption_reversal`. `stock_movements` gana `appointment_product_id` (nullable). Lectura: sigue a la cita (por sucursal). Tests en `appointment-products-rpc.spec.ts`.
 - [ ] **11.13** Apartado **"Productos y medicamentos usados"** en la pantalla de atención veterinaria:
   agregar producto y cantidad, interruptor "Cobrar al cliente", quitar línea. La vacuna se liga a su
   producto (columna nueva y opcional en `vaccinations`): descuenta una pieza; el lote se sigue
