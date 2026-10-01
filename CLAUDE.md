@@ -67,10 +67,9 @@ El flujo completo de principio a fin, ya construido:
 Esto estaba "fuera de alcance en v1". Ya no está prohibido, pero **sigue sin existir** y
 no se construye por iniciativa propia: necesita su fase y su aprobación.
 
-- **Venta de productos e inventario.** Hoy solo hay servicios. El modelo de venta
-  (`sales` / `sale_items`) está diseñado para aceptar productos sin migración
-  destructiva (§6.5), pero todavía no hay tabla `products` ni UI de venta. **Candidato
-  de la etapa de mejoras.**
+- **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
+  `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
+  mostrador (§6.5). Falta el consumo de insumos en la consulta (11.12 a 11.14).
 - **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
   mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
   `services` y los futuros productos deberán llevarlas.
@@ -380,9 +379,15 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   columna. La vista `product_stock` (`security_invoker`) la calcula, con 0 si no hay movimientos.
   Un trigger impide dejarla en negativo. Los usuarios solo insertan `purchase`, `adjustment` y
   `loss`; `sale`/`consumption` los generarán las RPC (tareas 11.10 y 11.12).
-- `item_type` es enum con un solo valor hoy (`service`). Cuando entren productos se
-  agrega `product` y una columna `product_id` nullable: migración aditiva, sin tocar
-  ventas existentes.
+- `item_type` es enum (`service` | `product`, desde la fase 11 / #2041) con `product_id`
+  nullable; un `check` exige que una partida sea de producto (con `product_id`) o de
+  servicio (sin él). `checkout_appointment()` acepta productos extra y
+  `checkout_counter_sale()` cobra una venta de mostrador sin cita (pide cliente
+  registrado). Al pagar baja la existencia (`stock_movements` tipo `sale`); un trigger
+  sobre `sales` la devuelve (`sale_reversal`) al pasar de `paid` a `cancelled`.
+- `payments.payment_form_code` (c_FormaPago): con `method = 'card'` es obligatorio y lo
+  elige quien cobra (`04` crédito / `28` débito); efectivo (`01`) y transferencia (`03`)
+  se derivan solos. La factura lo precarga.
 - `payments.method`: `cash` | `card` | `transfer_spei` | `openpay`. Los tres últimos se
   **simulan** en v1: se registra el pago con `status = 'simulated_approved'` y una
   referencia falsa. La tabla ya es la que se usará de verdad.
