@@ -269,10 +269,37 @@ quita otros superadmins. Un dueño normal no entra a `/superadmin` ni por URL di
 **Trabajo futuro:** forzar el cambio de contraseña en el primer ingreso del dueño, gestión
 real de planes y vigencia, y bloqueo de acceso por vencimiento o suspensión.
 
-### Después de v1 (no ahora)
+### Fase 11 — Inventario, venta de productos y facturación (CFDI)
 
-Productos e inventario, CFDI real con un PAC, OpenPay real, WhatsApp Business API,
-reportes, recordatorios automáticos.
+Primera fase de la **etapa de mejoras** (`CLAUDE.md` §1). Dos bloques, en este orden:
+
+1. **Inventario y venta de productos.** `products` y `stock_movements` (bitácora inmutable; la
+   existencia es la suma de los movimientos, D15). `sale_items` acepta `item_type = 'product'`
+   con migración aditiva, como se dejó previsto en §6.5. El cobro sigue usando el mismo desglose
+   de IVA por partida.
+2. **Facturación CFDI 4.0** con un PAC externo (D16): `invoice_requests` pasa de "guardar lo que
+   pediría el SAT" a timbrar, cancelar y descargar, mediante una cuarta Edge Function
+   (`invoicing`). Factura individual primero; factura global al público en general al final.
+3. **Insumos en la atención veterinaria:** el veterinario registra los productos usados al
+   atender (`appointment_products`); cada línea se cobra al cliente o es de uso interno.
+
+Se hace en ese orden porque el inventario no depende de terceros y el CFDI pide claves SAT por
+concepto: si los productos nacen con ellas, no hay que rehacer nada. Detalle de tareas y de las
+decisiones (todas resueltas): `TASKS.md` Fase 11.
+
+**Demostrable (cuando termine):** el dueño da de alta productos con existencias por sucursal, registra
+una compra, vende un producto junto con un servicio en el mismo ticket (la existencia baja), recibe
+aviso de stock bajo, cancela la venta (la existencia regresa), configura los datos fiscales del
+negocio, factura la venta en el sandbox del PAC, descarga el PDF y XML y la cancela con motivo.
+
+**Fuera de esta fase:** lotes y caducidades (el lote de una vacuna se sigue capturando a mano),
+transferencias entre sucursales, cantidades fraccionarias, envío automático de la factura, y
+proveedores/órdenes de compra.
+
+### Después de la Fase 11 (no ahora)
+
+OpenPay real, WhatsApp Business API, reportes y corte de caja, recordatorios automáticos, reserva en
+línea, paquetes y membresías, comisiones por empleado, importador de clientes.
 
 ---
 
@@ -445,6 +472,51 @@ bloquear acceso implicaría tocar `app.is_member_of()`, que usa toda la base, y 
 decidirá cuando se diseñe la gestión real de planes.
 **Riesgo resuelto:** `demo:reset` ocultaba toda empresa fuera de la semilla. Ahora solo oculta
 las marcadas `is_demo` (default `false`, casilla en el alta) — CLAUDE.md §10.
+
+---
+
+### D15 — Existencias como suma de movimientos inmutables, no una columna `stock`
+
+**Estado:** aprobada (2026-10-01).
+**Alternativa descartada:** `products.stock int` que se actualiza en cada venta o compra.
+**Por qué se descartó:** una columna se descuadra en cuanto dos cobros coinciden o un proceso falla a
+medias, y cuando se descuadra no hay forma de saber por qué. Es el mismo problema que el dinero en
+flotantes: el error vive en el dato y no se ve.
+**Por qué los movimientos:** `stock_movements` solo se inserta (sin UPDATE ni DELETE, ni para el
+dueño; corregir es otro movimiento). La existencia es una suma que siempre se puede auditar y
+reconstruir, y el historial por producto sale gratis. Mismo criterio que el expediente (§8.5) y
+`audit_log` (§8.6).
+**Costo aceptado:** calcular la suma en cada consulta. Con el volumen de un negocio de mascotas es
+irrelevante; si algún día duele, se agrega una tabla de saldos derivada, sin tocar los movimientos.
+**Decisiones relacionadas:** cantidades enteras (§8.2); **no se vende ni se consume con existencia 0**
+(validado en la base, no solo en la pantalla); aviso de stock bajo y leyenda "Sin inventario".
+El consumo en la consulta es un movimiento propio (`consumption`) que nace al registrar la línea;
+cancelar el cobro no lo revierte porque el medicamento ya se aplicó.
+
+---
+
+### D16 — Facturar mediante un PAC (con Edge Function), no timbrar por cuenta propia
+
+**Estado:** aprobada (2026-10-01). PAC elegido: **Facturapi**.
+**Alternativa descartada:** generar y sellar el XML nosotros mismos y hablar directo con el SAT.
+**Por qué se descartó:** timbrar exige ser PAC autorizado o contratar uno de todos modos; lo
+demás (validaciones, catálogos del SAT que cambian, cancelación con aceptación del receptor)
+es mantenimiento fiscal permanente que no es el negocio de este producto.
+**Por qué un PAC detrás de una Edge Function:** la llave del PAC es un secreto, igual que la
+`service_role`, y no puede vivir en el frontend. La función revalida permiso con el JWT de quien
+llama antes de usarla (patrón de `platform-admin`, D14).
+**Requisito duro:** el PAC debe ser **multi-emisor**: cada negocio factura con su propio RFC y
+certificado. El certificado (CSD) pasa directo al PAC y **no se guarda** en nuestra base.
+**PAC elegido: Facturapi.** Multi-emisor incluido, sandbox y prueba de 14 días. Precios consultados el
+2026-10-01 en su página (verificar antes de contratar): $299 MXN/mes por la API + $0.60 por timbre,
+IVA incluido, sin paquetes prepagados. Se descartó Factura.com (plan anual con tope de 2 a 15 RFC, que
+limita a un SaaS que crece), Facturama (también multi-emisor, pero con API anual más paquetes de
+timbres) y SW Sapien (sin precios públicos).
+**Costo aceptado:** dependencia de un tercero y costo por timbre. **Lo absorbe la plataforma dentro del plan**, con un tope de facturas por negocio
+(decisión del usuario, 2026-10-01). La forma de pago (crédito/débito) se elige a mano al cobrar con tarjeta. El armado del comprobante vive en `lib/cfdi.ts` (puro y probado) y el PAC queda detrás
+de un adaptador delgado, de modo que cambiar de proveedor no toca la lógica ni la base.
+**Riesgo conocido:** el desglose de IVA hacia atrás (D5) debe coincidir al centavo con lo que
+valida el PAC; por eso la suma de los conceptos se prueba contra el total de la venta.
 
 ---
 

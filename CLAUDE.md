@@ -18,13 +18,35 @@ El diferenciador es cubrir **los dos lados del negocio en una sola plataforma**:
 - **Común**: agenda por sucursal y por empleado, catálogo de servicios, cobro y ticket,
   cliente con sus mascotas.
 
-Estado actual: **demo funcional** para validar el concepto con dueños de negocio reales.
-No es un producto maduro. Pero las decisiones estructurales (§6, §7, §8) van bien desde
-el día uno porque retrofitearlas cuesta carísimo.
+Estado actual: **demo funcional** que ya recorre el flujo completo (v1, abajo) y que
+ahora entra en una **etapa de mejoras**: enriquecer lo existente con funciones nuevas.
+Sigue sin ser un producto maduro, pero las decisiones estructurales (§6, §7, §8) van
+bien desde el día uno porque retrofitearlas cuesta carísimo, y eso no cambia.
 
-### Alcance de v1
+### Etapa de mejoras (desde 2026-10-01)
 
-Debe recorrerse un flujo completo de principio a fin:
+v1 ya está terminada; lo que se agrega ahora **no es "v2" ni un rediseño**, son mejoras
+sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de productos**,
+**facturación (CFDI con un PAC)**, y, por evaluar, recordatorios por WhatsApp, reserva en
+línea, paquetes/membresías, pagos reales, corte de caja y reportes, comisiones por
+empleado, importador de clientes.
+
+Reglas de esta etapa:
+
+- Cada mejora se define como una **fase nueva en `TASKS.md`** (con su decisión en
+  `PLAN.md` si tiene alternativas) **antes** de construirse. Lo que no esté ahí, se
+  propone, no se construye (§11).
+- Las reglas de §8 y §7 **no se relajan** por ser "una mejora": RLS, dinero entero,
+  fechas UTC, borrado suave, migraciones aditivas.
+- Una mejora que necesite un servicio externo o dependencia nueva (PAC, WhatsApp
+  Business API, pasarela de pago) se justifica con el usuario primero: costo, alternativas
+  y contras (§3).
+- Los apartados de este archivo que digan "en v1" describen el estado **de hoy**; cuando
+  una mejora cambie ese estado, se actualiza el apartado en el mismo PR.
+
+### Alcance de v1 (terminado)
+
+El flujo completo de principio a fin, ya construido:
 
 1. Login y selección de tenant/sucursal
 2. Dashboard con la agenda del día
@@ -40,17 +62,23 @@ Debe recorrerse un flujo completo de principio a fin:
 > con datos de la empresa únicamente. Ver `TASKS.md` Fase 10, `PLAN.md` D14, y §6.8 y
 > §7.5 de este archivo.
 
-### Fuera de alcance en v1 (no lo construyas aunque parezca obvio)
+### Aún no construido (no lo construyas sin una fase en `TASKS.md`)
 
-- **Venta de productos e inventario.** Decidido explícitamente: v1 es solo servicios.
-  El modelo de venta (`sales` / `sale_items`) está diseñado para aceptar productos
-  después sin migración destructiva, pero no hay tabla `products` ni UI de venta.
-- App móvil nativa (la vista cliente cubre esa necesidad)
-- CFDI real (solo campos y `invoice_requests` listos)
+Esto estaba "fuera de alcance en v1". Ya no está prohibido, pero **sigue sin existir** y
+no se construye por iniciativa propia: necesita su fase y su aprobación.
+
+- **Venta de productos e inventario.** Hoy solo hay servicios. El modelo de venta
+  (`sales` / `sale_items`) está diseñado para aceptar productos sin migración
+  destructiva (§6.5), pero todavía no hay tabla `products` ni UI de venta. **Candidato
+  de la etapa de mejoras.**
+- **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
+  mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
+  `services` y los futuros productos deberán llevarlas.
 - Pasarela de pago real (SPEI/OpenPay simulados)
 - Lotes y caducidades de medicamento
 - Reportes financieros avanzados
 - Envío automático de notificaciones por WhatsApp (el link se copia y se pega a mano)
+- App móvil nativa (la vista cliente cubre esa necesidad)
 - Docker de la app, Kubernetes, infraestructura como código
 
 ---
@@ -917,7 +945,8 @@ Ejemplo:
 - **No tomar una decisión que tenga más de una opción razonable.** Presentar las
   alternativas con sus contras y dejar que el usuario elija.
 - **No ampliar el alcance.** Si algo parece necesario pero no está en `TASKS.md`,
-  proponerlo, no construirlo. Especialmente: no reintroducir productos/inventario.
+  proponerlo, no construirlo. Productos/inventario y CFDI son candidatos de la etapa
+  de mejoras (§1), pero hasta que tengan su fase aprobada en `TASKS.md`, no se tocan.
 - **No relajar las reglas de §8** (dinero, fechas, CFDI, borrado suave, migraciones)
   aunque compliquen una tarea concreta.
 - **No crear tablas sin RLS**, ni funciones `SECURITY DEFINER` sin revalidar membresía.
