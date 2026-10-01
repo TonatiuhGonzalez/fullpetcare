@@ -680,3 +680,210 @@ de horario); un cliente ya registrado sin teléfono no se obliga a completarlo. 
 pantalla en navegador; fuera de esta tarea, fila de espera con turnos y aviso por mensaje.
 
 **Trabajo futuro (fuera de esta fase):** cuotas de uso por plan (sucursales, empleados…).
+
+---
+
+## Fase 11 — Inventario, venta de productos y facturación (CFDI)
+
+**Meta: poder vender productos (alimento, accesorios, medicamento de mostrador) con control
+de existencias por sucursal, y poder facturar una venta (CFDI 4.0) a través de un PAC.**
+Es la primera fase de la **etapa de mejoras** (`CLAUDE.md` §1): no es v2, es enriquecer lo
+que ya existe. Prioridad alta. Orden recomendado: inventario primero (no depende de
+terceros y evita rehacer los conceptos de la factura), CFDI después.
+
+**Estado: planeada, sin construir.** Las decisiones se resolvieron con el usuario el
+2026-10-01 (tabla de abajo). Seguimiento en
+HMH Four: tareas #2045 a #2057.
+
+### Decisiones (2026-10-01)
+
+| #   | Decisión                                         | Resolución                                                                                                                                                                                                                                  |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Qué PAC** (proveedor de timbrado)              | **Facturapi.** Multi-emisor incluido, sandbox y prueba de 14 días. Precios consultados el 2026-10-01 en su página: $299 MXN/mes por la API + $0.60 por timbre, IVA incluido, sin paquetes prepagados (verificar antes de contratar). **Los timbres los absorbe la plataforma dentro del plan**, con un tope razonable de facturas por negocio (el tope se define al armar los planes). |
+| 2   | Stock bajo y en cero                             | Aviso cuando queda poco (`<= min_stock`) y leyenda **"Sin inventario"** en 0. **Con existencia 0 no se puede vender**: no se agrega al ticket ni se toma en cuenta. Se valida **en la base**, no solo en la pantalla.                         |
+| 3   | Factura global al público en general             | **Sí entra** en la fase (tarea 11.20), aislada al final para poder soltar la factura individual antes.                                                                                                                                      |
+| 4   | Consumo de insumos desde la consulta             | **Sí entra** (tareas 11.12 a 11.14): el veterinario registra lo usado al atender; cada línea se cobra al cliente o es de uso interno; la existencia baja al registrarlo.                                                                    |
+| 5   | Forma de pago (crédito/débito y demás)           | **Selección manual al cobrar con tarjeta** (crédito `04` o débito `28`). El dato queda guardado con el pago (`payments.payment_form_code`; efectivo `01` y transferencia `03` se derivan solos), la factura lo precarga y se puede cambiar al facturar. Razón: al cobrar se sabe cómo pagó el cliente; días después, no, y corregir una factura timbrada cuesta cancelar y reemplazar. |
+| 6   | Cantidades fraccionarias                         | **No**: solo enteros (§8.2). Lo suelto se maneja como presentación.                                                                                                                                                                         |
+
+### Diseño acordado (resumen; el detalle y las alternativas descartadas irán en `PLAN.md` D15 y D16)
+
+- **Productos:** tabla `products` por tenant (nombre, SKU, precio con IVA incluido, `tax_rate_bp`,
+  `cost_cents` opcional, `min_stock`, `is_active`, y las claves SAT). El **precio con IVA incluido y
+  el desglose por partida** son los de siempre (§8.2); no cambia la matemática del cobro.
+- **Existencias = suma de movimientos, no una columna.** Tabla `stock_movements` (por sucursal y
+  producto; tipo: `purchase` | `sale` | `sale_reversal` | `consumption` | `consumption_reversal` | `adjustment` | `loss`; cantidad con signo;
+  referencia a la venta si aplica). Es una **bitácora inmutable** (sin UPDATE ni DELETE, ni siquiera
+  para el dueño): corregir un error es otro movimiento. Así el stock nunca se desfasa de su
+  historia. Una vista/RPC calcula la existencia actual.
+- **Cobro:** `sale_items.item_type` gana el valor `product` y una columna `product_id` nullable
+  (migración aditiva, §6.5), con un `check` que exige exactamente uno de `service_id` / `product_id`.
+  Al **pagar** se generan los movimientos de venta; al **cancelar** una venta pagada, los movimientos
+  inversos. Todo dentro de la RPC de cobro (`SECURITY DEFINER`, revalida membresía, §7.3).
+- **Consumo en la atención:** tabla `appointment_products` (como `appointment_services`, con snapshot
+  de nombre, precio e IVA) y un interruptor `is_billable`. El movimiento de stock (`consumption`) se
+  genera **al registrar** la línea y se revierte (`consumption_reversal`) si el veterinario la quita;
+  cancelar el cobro **no** devuelve stock (el medicamento ya se aplicó). Las líneas cobrables pasan al
+  ticket **sin crear un segundo movimiento**. Una vacuna se liga a su producto; el **lote sigue siendo
+  texto capturado a mano** (lotes y caducidades siguen fuera de alcance, §1).
+- **Permisos:** nuevo valor `inventory` en el enum `permission_module` (la migración de
+  `role_permissions` ya lo anticipa) y `invoicing` para facturación. Dueño todo; recepción
+  ver/editar; groomer sin acceso; vet ver. Se ajusta con filas, no con migraciones (D13).
+- **Facturación:** se reutiliza `invoice_requests` (ya existe, con RLS y bitácora) y se le agregan
+  estado, UUID fiscal, rutas de XML/PDF, cancelación y mensaje de error. **Nunca se borra** una
+  factura: se cancela (es un documento fiscal, igual que el expediente, §8.5).
+- **Edge Function `invoicing`** (la cuarta): timbra, cancela y descarga. Es la única que habla con
+  el PAC; la llave del PAC vive solo como secreto de la función, nunca en el frontend. Revalida
+  permiso con el JWT de quien llama **antes** de tocar nada (mismo patrón que `platform-admin`).
+- **Certificado de sello digital (CSD) del negocio:** el dueño sube su `.cer`, `.key` y contraseña.
+  Pasan **directo al PAC** desde la Edge Function y **no se guardan** en nuestra base ni en Storage.
+  Solo guardamos el identificador de la organización en el PAC y si el CSD está vigente.
+- **Lo difícil se prueba en puro:** armar el comprobante (conceptos, impuestos, forma de pago,
+  RFC genérico, uso de CFDI) vive en `lib/cfdi.ts`: entra una venta, sale el cuerpo de la factura.
+  El PAC queda detrás de un adaptador delgado; no hay mocks elaborados (§9).
+- **Ambientes:** local y staging usan el **sandbox** del PAC; solo producción timbra de verdad. Si
+  alguien apunta a producción por error, el CI y `.env.example` lo hacen difícil (llaves distintas).
+
+### 11A. Preparación
+
+- [ ] **11.1** 📚 Registrar las decisiones de arriba en `PLAN.md`
+  (D15 inventario, D16 facturación y PAC). Confirmar con el contador del negocio demo: claves SAT por
+  defecto de los servicios (estética y veterinaria), tratamiento de IVA tasa 0 vs. exento en productos y
+  plazos del SAT para facturar. **Avance 2026-10-01:** las seis decisiones están cerradas. Sin contador: los códigos del SAT por servicio y producto son **editables por cada negocio** (el sistema propone un valor por defecto, que el negocio puede cambiar con su propio contador) y el sistema no impone plazos fiscales de la factura global, solo avisa. Pendiente: dar de alta Facturapi (#2045) y, antes de producción, una consulta puntual con un contador. _Verificar:_ `PLAN.md` tiene D15 y D16 sin "pendiente"; el usuario aprobó
+  por escrito la lista de dependencias nuevas (si el PAC trae SDK; si no, es `fetch` y no hay dependencia).
+- [ ] **11.2** 📚🧪 Claves SAT en `services`: `sat_product_code` y `sat_unit_code` (migración aditiva,
+  `E48` unidad de servicio por defecto en la unidad; el código de producto, el que confirme el
+  contador). Campos en el formulario de servicio, validación en `lib/validation.ts` (8 dígitos
+  / 3 caracteres). Los servicios existentes se rellenan con el valor por defecto en la misma
+  migración. _Verificar:_ test de validación en `lib/`; `db:reset` limpio; un servicio sin clave no
+  se puede guardar de nuevo.
+
+### 11B. Productos e inventario
+
+- [ ] **11.3** 📚 Migración `products`: tabla con las columnas de §6 (`tenant_id`, `deleted_at`,
+  trigger de `updated_at`, índice que empieza por `tenant_id`), RLS activa y forzada en la misma
+  migración, política de lectura para miembros, escritura para quien tenga `inventory`/`edit`
+  (`app.has_permission`). Se agrega `inventory` a `permission_module` y sus filas en
+  `role_permissions` (explicar el cuidado de `alter type ... add value` dentro de una transacción).
+  _Verificar:_ `db:reset` limpio.
+- [ ] **11.4** 🧪 Tests de aislamiento de `products`: otro tenant no los ve ni los edita; groomer sin
+  permiso no escribe; borrado suave funciona (cuidado con la trampa de §7.2: SELECT sin filtrar
+  `deleted_at` si hay UPDATE para un rol normal); no hay política de DELETE. _Verificar:_ verde, y
+  se rompe a propósito una política para ver que el test falla (mutación, como en 10.4).
+- [ ] **11.5** 📚 Migración `stock_movements`: bitácora inmutable (sin UPDATE/DELETE, trigger
+  `prevent_hard_delete()` + trigger que rechaza UPDATE), `branch_id` + `product_id`, tipo enum,
+  cantidad entera con signo (`check <> 0`), referencia opcional a `sale_id`. Vista `product_stock`
+  (`security_invoker`, explicar por qué: que RLS del que consulta aplique, no la del dueño de la
+  vista). Con `app.log_change()` y `enforce_tenant_writable`. _Verificar:_ `db:reset` limpio.
+- [ ] **11.6** 🧪 Tests de `stock_movements`: aislamiento por tenant y por sucursal; no se puede
+  actualizar ni borrar un movimiento (ni el dueño, ni `service_role`); la existencia es la suma
+  correcta con compras, ventas, ajustes y mermas mezclados; **un producto sin movimientos tiene
+  existencia 0, no `NULL`** (si no, la pantalla muestra "NaN"). _Verificar:_ verde.
+- [ ] **11.7** 📚🧪 `lib/inventory.ts` (puro): existencia a partir de movimientos, alerta de stock
+  bajo (`<= min_stock`), validación de cantidades enteras y positivas, regla de stock (no se vende ni se consume
+  sin existencia). Tests de bordes: existencia exactamente igual al mínimo, `min_stock = 0`, venta que
+  deja justo en 0, cantidad 0 o negativa en una compra. _Verificar:_ verde.
+- [ ] **11.8** 📚 `services/products.ts` y `services/inventory.ts` (lista, alta, edición, desactivar;
+  registrar compra, ajuste y merma con motivo obligatorio en los dos últimos) + `useInventoryStore`.
+  _Verificar:_ tests de servicio/store; la capa de §4 se respeta (ningún componente toca `supabase.ts`).
+- [ ] **11.9** Pantalla de **Inventario** (menú lateral, bajo el permiso `inventory`): lista con
+  existencia y alerta de stock bajo por sucursal, alta/edición de producto, diálogo de entrada de
+  compra y de ajuste. Móvil usable. _Verificar:_ en navegador, con el dueño y con un groomer que no
+  la ve ni entra por URL directa.
+
+### 11C. Vender productos en el cobro
+
+- [ ] **11.10** 📚🧪 Migración de `sale_items` (`item_type = 'product'`, `product_id` nullable,
+  `check` de exactamente uno) y RPC de cobro extendida: calcula IVA por partida con la misma función
+  de §8.2, crea los movimientos de venta al pagar y los inversos al cancelar. **Todo o nada.** Tests:
+  venta mixta servicio + producto cuadra al centavo; cancelar devuelve la existencia exacta; un producto con existencia 0 se rechaza
+  (en la base, no solo en la pantalla) y una cantidad mayor a la existencia también; producto de otro tenant o sucursal rechazado; dos cobros
+  simultáneos del mismo producto no pierden un movimiento. _Verificar:_ verde; los tests de cobro de
+  la fase 5 siguen verdes **sin modificarlos** (prueba de que la migración fue aditiva).
+- [ ] **11.11** Carrito y cobro con productos: agregar producto al resumen de cobro, cantidad, aviso de
+  stock; el ticket los desglosa. `lib/money.ts` no cambia (es la prueba de que el diseño aguantó). **Al cobrar con tarjeta se elige
+  crédito o débito** (decisión #5): columna nueva `payment_form_code` en `payments`, obligatoria cuando
+  `method = 'card'`; test de que no se puede registrar un pago con tarjeta sin ella.
+  _Verificar:_ el E2E existente (agendar → atender → cobrar) sigue verde, y una venta de solo mostrador
+  (sin cita) se cobra y descuenta stock.
+
+### 11C-bis. Insumos usados en la atención veterinaria
+
+- [ ] **11.12** 📚🧪 Migración `appointment_products` (snapshot de nombre, precio e IVA; `is_billable`;
+  RLS que solo deja escribir a `owner` y `vet`, lectura según el rol que ya ve la cita) y RPCs para
+  agregar y quitar una línea: revalidan membresía y rol (§7.3.4), rechazan existencia 0, y generan o
+  revierten el movimiento de consumo en la misma transacción. Tests: groomer y recepción no escriben;
+  otro tenant no ve nada; quitar una línea devuelve la existencia exacta; producto sin existencia se
+  rechaza; cita ya cobrada no admite cambios. _Verificar:_ verde.
+- [ ] **11.13** Apartado **"Productos y medicamentos usados"** en la pantalla de atención veterinaria:
+  agregar producto y cantidad, interruptor "Cobrar al cliente", quitar línea. La vacuna se liga a su
+  producto (columna nueva y opcional en `vaccinations`): descuenta una pieza; el lote se sigue
+  capturando a mano. _Verificar:_ en navegador, con un vet; el groomer no ve el apartado.
+- [ ] **11.14** 📚🧪 Las líneas cobrables pasan al cobro: la RPC de cobro las convierte en `sale_items`
+  **sin** crear otro movimiento de stock; garantía en la base de que una línea se cobra una sola vez.
+  Tests: ticket con servicios, productos de mostrador y productos de consulta cuadra al centavo; las
+  líneas de uso interno no aparecen; cancelar la venta no devuelve el consumo. _Verificar:_ verde; el E2E
+  sigue verde.
+
+### 11D. Facturación (CFDI 4.0)
+
+- [ ] **11.15** 📚 Configuración fiscal del negocio (solo dueño): pantalla que valida RFC, razón
+  social, régimen y código postal de `tenants` (ya existen, §8.4) y sube el CSD al PAC mediante la Edge
+  Function. Migración con lo mínimo (id de organización en el PAC, serie, CSD vigente hasta).
+  Explicar qué es un CSD, un PAC y por qué el certificado no se guarda. _Verificar:_ en sandbox, un
+  negocio de prueba queda "listo para facturar"; con datos fiscales incompletos, la pantalla dice cuál
+  falta, en español y sin jerga.
+- [ ] **11.16** 📚🧪 `lib/cfdi.ts` (puro): de venta + cliente + pagos a cuerpo de comprobante. Cubre
+  desglose de IVA hacia atrás por concepto, **la suma de los conceptos debe dar exactamente el total
+  de la venta** (el riesgo del redondeo, abajo), forma de pago desde `payments.payment_form_code` (con pagos mezclados, la de mayor monto; a confirmar con un contador),
+  tasa 0 vs. exento, uso de CFDI por defecto, y rechazo de datos del cliente incompletos. Tests de
+  bordes: precio 0, cantidad > 1 con centavos que no dividen exacto, un solo concepto de $1, venta con
+  descuento, pago mixto efectivo + tarjeta. _Verificar:_ verde; cobertura de `lib/` ≥ 80 %.
+- [ ] **11.17** 📚🧪 Migración de `invoice_requests` (estado, `fiscal_uuid`, rutas de XML y PDF,
+  fecha de timbrado, cancelación y motivo SAT, `error_message`) + bucket privado `invoices` con la
+  convención `{tenant_id}/{invoice_request_id}.{ext}` + `invoicing` en `permission_module`. RLS y tests:
+  otro tenant no ve facturas ni sus archivos; una factura timbrada no se puede editar ni borrar (solo
+  cambia de estado vía la Edge Function). _Verificar:_ verde.
+- [ ] **11.18** 📚🧪 Edge Function `invoicing` (acciones `stamp`, `cancel`, `download`): revalida
+  permiso y membresía con el JWT **antes** de usar el PAC; un solo timbrado por venta (idempotente: si
+  se reintenta tras una falla de red, no timbra dos veces); guarda XML y PDF; en error del PAC guarda el
+  mensaje y deja la solicitud reintentable. Tests de la función (necesitan `supabase functions serve`,
+  como los de `platform-admin`): sin sesión, otro tenant, venta no pagada, venta ya facturada, PAC
+  caído. _Verificar:_ timbrado exitoso en sandbox con XML descargable; cancelación con motivo.
+- [ ] **11.19** Interfaz de facturación: botón "Facturar" en el detalle de la venta, formulario con los
+  datos fiscales del cliente (precargados de `customers`), estado de la factura, descarga de PDF/XML y
+  cancelación con motivo. El link/archivo se comparte a mano (WhatsApp sigue fuera de alcance).
+  _Verificar:_ en navegador, flujo completo en sandbox: cobrar → facturar → descargar → cancelar.
+- [ ] **11.20** Factura global al público en general: agrupa las
+  ventas del periodo sin factura individual en un solo CFDI (RFC genérico, información global con
+  periodicidad, mes y año). Tabla puente venta ↔ factura para que ninguna venta quede en dos
+  facturas. Tests de bordes: venta ya facturada no entra, periodo sin ventas, cambio de mes, venta
+  cancelada. _Verificar:_ en sandbox, una global del mes con ventas mixtas; las ventas incluidas ya no
+  ofrecen "Facturar".
+
+### 11E. Cierre
+
+- [ ] **11.21** 📚🧪 Extender el E2E: agendar → atender → cobrar **con un producto** → facturar en
+  sandbox. Sigue siendo **un solo** test (D12). _Verificar:_ verde en local y en CI (el CI usa el
+  sandbox; la llave va en GitHub Secrets, nunca en el repo).
+- [ ] **11.22** Semilla y reset: productos ficticios y existencias para Patitas Felices en `seed.sql`
+  y `demo-reset.sh`; el reset **no** toca nada fiscal real ni llama al PAC. _Verificar:_ `db:reset` y
+  `demo:reset` dejan el inventario limpio.
+- [ ] **11.23** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6, módulos nuevos de permisos
+  en §6.7/§7.2, la Edge Function `invoicing` en §3/§4/§10 y la dependencia (si el PAC trae SDK); quitar
+  "Venta de productos e inventario" y "CFDI real" de la lista de "Aún no construido" (§1); `.env.example`
+  con las llaves del PAC (vacías). _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+**Riesgos de la fase:**
+
+| Riesgo                                                        | Cómo se atiende                                                                                                   |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Los conceptos del CFDI no suman el total de la venta          | Desglose por partida (§8.2) + test en `lib/cfdi.ts` que compara la suma con el total; casos de centavos que no dividen |
+| Timbrar dos veces la misma venta                              | Un solo timbrado por venta, idempotente, garantizado por la base (índice único parcial) y no por la interfaz      |
+| Timbrar en producción desde local o staging                   | Llaves del PAC distintas por ambiente; solo producción tiene la de timbrado real                                  |
+| Fuga del certificado (CSD) de un negocio                      | No se guarda en nuestra base ni en Storage; pasa directo al PAC desde la Edge Function                            |
+| El stock se desfasa                                           | Existencia = suma de movimientos inmutables; no hay columna que se pueda descuadrar                                |
+| Claves SAT o tratamiento de IVA mal asignados                 | Se confirman con un contador en 11.1; el sistema valida formato, no contenido fiscal                              |
+| Costo por timbre sin dueño                                    | Decisión #1: se define quién lo paga antes de abrir la función a negocios reales                                   |
+| Descontar dos veces un insumo (al usarlo y al cobrarlo)       | El movimiento nace al registrar la línea; el cobro solo crea la partida del ticket. Test que cuenta los movimientos |
+| Vender con existencia 0 saltándose la pantalla                | La validación vive en la RPC de cobro, no en el frontend; test que lo intenta directo                              |
