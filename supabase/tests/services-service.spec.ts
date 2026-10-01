@@ -153,4 +153,62 @@ describe('services/services.ts contra Supabase local', () => {
     const list = await servicesService.listByKind(TENANT_PATITAS, 'veterinary')
     expect(list.find((s) => s.id === created.id)?.is_active).toBe(true)
   })
+
+  it('un servicio sin claves del SAT recibe las sugeridas por defecto', async () => {
+    // Las claves son NOT NULL con default: el servicio nuevo (o el que ya
+    // existía antes de la migración) nunca queda sin clave. Si faltara el
+    // default, el alta de servicios fallaría en toda la app.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const created = await servicesService.create({
+      tenant_id: TENANT_PATITAS,
+      kind: 'grooming',
+      name: 'Servicio con claves por defecto',
+      duration_minutes: 30,
+      price_cents: 10000,
+      tax_rate_bp: 1600,
+    })
+    createdIds.push(created.id)
+
+    expect(created.sat_product_code).toBe('70122000')
+    expect(created.sat_unit_code).toBe('E48')
+  })
+
+  it('la base rechaza una clave del SAT con formato imposible', async () => {
+    // El check de la tabla es la defensa final: aunque la UI se salte la
+    // validación, una clave de 7 dígitos no puede llegar a una factura.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    await expect(
+      servicesService.create({
+        tenant_id: TENANT_PATITAS,
+        kind: 'grooming',
+        name: 'Servicio con clave mala',
+        duration_minutes: 30,
+        price_cents: 10000,
+        tax_rate_bp: 1600,
+        sat_product_code: '1234567',
+      }),
+    ).rejects.toMatchObject({ code: '23514' })
+
+    await expect(
+      servicesService.create({
+        tenant_id: TENANT_PATITAS,
+        kind: 'grooming',
+        name: 'Servicio con unidad mala',
+        duration_minutes: 30,
+        price_cents: 10000,
+        tax_rate_bp: 1600,
+        sat_unit_code: 'e48',
+      }),
+    ).rejects.toMatchObject({ code: '23514' })
+  })
 })

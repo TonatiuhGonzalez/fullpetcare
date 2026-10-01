@@ -1362,6 +1362,8 @@ export type Database = {
           kind: Database["public"]["Enums"]["service_kind"]
           name: string
           price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
           tax_rate_bp: number
           tenant_id: string
           updated_at: string
@@ -1375,6 +1377,8 @@ export type Database = {
           kind: Database["public"]["Enums"]["service_kind"]
           name: string
           price_cents: number
+          sat_product_code?: string
+          sat_unit_code?: string
           tax_rate_bp: number
           tenant_id: string
           updated_at?: string
@@ -1388,6 +1392,8 @@ export type Database = {
           kind?: Database["public"]["Enums"]["service_kind"]
           name?: string
           price_cents?: number
+          sat_product_code?: string
+          sat_unit_code?: string
           tax_rate_bp?: number
           tenant_id?: string
           updated_at?: string
