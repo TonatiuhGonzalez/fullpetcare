@@ -964,10 +964,10 @@ vea cuánto se vendió, por qué método de pago, por sucursal y por empleado.**
 Segunda fase de la **etapa de mejoras** (`CLAUDE.md` §1). Todo sale de datos que ya existen: sin servicio
 externo ni dependencia nueva.
 
-**Estado: propuesta, sin construir y pendiente de aprobación.** Las decisiones y sus alternativas están en
+**Estado: aprobada (2026-10-06), sin construir.** Las decisiones y sus alternativas están en
 `PLAN.md` D17. Seguimiento en HMH Four: tareas #2071 a #2079 (12.1 → #2071, 12.2 → #2072, 12.3 a 12.6 → #2073 y #2074, 12.7 → #2075, 12.8 y 12.9 → #2076, 12.10 y 12.11 → #2077, 12.12 y 12.13 → #2078, 12.14 y 12.15 → #2079).
 
-### Decisiones propuestas (a aprobar antes de la 12.3)
+### Decisiones (aprobadas el 2026-10-06)
 
 | #   | Decisión                                | Propuesta                                                                                                                                                                                                  |
 | --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -984,8 +984,9 @@ externo ni dependencia nueva.
 
 ### 12A. Preparación
 
-- [ ] **12.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D17 (cambiar lo que no convenza
-  ahora es barato). _Verificar:_ el usuario aprobó por escrito; D17 sin "pendiente de aprobación".
+- [x] **12.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D17 (cambiar lo que no convenza
+  ahora es barato). _Verificar:_ el usuario aprobó por escrito; D17 sin "pendiente de aprobación". **Hecho
+  2026-10-06 (#2071):** el usuario aprobó las diez decisiones sin cambios.
 - [ ] **12.2** 📚🧪 `lib/cashCount.ts` (puro): efectivo esperado de un turno a partir de fondo, ventas con sus
   pagos y movimientos de caja; cambio de una venta; diferencia (sobrante/faltante). Explicar por qué el cambio
   se deriva y no se guarda. Tests de bordes: pago exacto, cambio con efectivo, **pago mixto efectivo + tarjeta

@@ -307,7 +307,7 @@ partidas, citas): no hay servicio externo ni dependencia nueva. Dos bloques:
 2. **Reportes de ventas** hechos en la base (funciones SQL que agregan, no el navegador): ventas por día,
    por método de pago, por servicio o producto, por empleado y por sucursal, con exportación a CSV.
 
-**Estado: propuesta, pendiente de aprobación** (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
+**Estado: aprobada (2026-10-06)** (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
 **Demostrable (cuando termine):** recepción abre la caja con $500 de fondo, cobra tres ventas (una en efectivo
 con cambio, una con tarjeta y una por transferencia), registra un retiro de $200, cierra contando el efectivo y
 ve el sobrante o faltante; el dueño ve las ventas del mes por método de pago, por sucursal y por empleado y
@@ -554,7 +554,7 @@ valida el PAC; por eso la suma de los conceptos se prueba contra el total de la 
 
 ### D17 — Corte de caja por turno de sucursal, sin bloquear el cobro; reportes calculados en la base
 
-**Estado:** propuesta, pendiente de aprobación (2026-10-06).
+**Estado:** aprobada (2026-10-06).
 
 **1. Qué es un corte: un turno de caja por sucursal, con apertura y cierre explícitos.**
 Se abre con un fondo inicial y se cierra con el conteo; puede haber varios por día (turno de mañana y de
