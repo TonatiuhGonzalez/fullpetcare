@@ -86,6 +86,15 @@ export const router = createRouter({
           props: true,
         },
         {
+          // Detalle de una venta cobrada y su factura (tarea 11.19): gateado por
+          // el permiso 'invoicing', igual que inventario.
+          path: 'ventas/:id',
+          name: 'venta-detalle',
+          component: () => import('@/pages/ventas/SaleDetailPage.vue'),
+          props: true,
+          meta: { requiresPermission: 'invoicing' },
+        },
+        {
           // Venta de mostrador (tarea 11.11): cobrar productos sin cita. Misma
           // página que el cobro de una cita, sin `id`. Cobrar es de recepción/dueño.
           path: 'venta-mostrador',

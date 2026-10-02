@@ -279,6 +279,16 @@ function checkoutErrorMessage(err: unknown): string {
           Cobro registrado.
         </v-alert>
         <TicketView :ticket="ticket" />
+        <v-btn
+          v-if="session.canView('invoicing')"
+          block
+          variant="tonal"
+          class="mt-4 no-print"
+          prepend-icon="mdi-file-document-outline"
+          :to="`/app/ventas/${ticket.sale.id}`"
+        >
+          Facturar esta venta
+        </v-btn>
         <v-btn block variant="tonal" class="mt-4 no-print" to="/app/agenda">
           Volver a la agenda
         </v-btn>

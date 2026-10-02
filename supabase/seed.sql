@@ -224,7 +224,15 @@ begin
     (v_tenant_huellitas, 'owner', 'inventory', true, true),
     (v_tenant_huellitas, 'receptionist', 'inventory', true, true),
     (v_tenant_huellitas, 'groomer', 'inventory', false, false),
-    (v_tenant_huellitas, 'vet', 'inventory', true, false);
+    (v_tenant_huellitas, 'vet', 'inventory', true, false),
+    (v_tenant_patitas, 'owner', 'invoicing', true, true),
+    (v_tenant_patitas, 'receptionist', 'invoicing', true, true),
+    (v_tenant_patitas, 'groomer', 'invoicing', false, false),
+    (v_tenant_patitas, 'vet', 'invoicing', false, false),
+    (v_tenant_huellitas, 'owner', 'invoicing', true, true),
+    (v_tenant_huellitas, 'receptionist', 'invoicing', true, true),
+    (v_tenant_huellitas, 'groomer', 'invoicing', false, false),
+    (v_tenant_huellitas, 'vet', 'invoicing', false, false);
 end $$;
 
 -- ===========================================================================
@@ -402,7 +410,11 @@ begin
     (v_tenant_mimos, 'owner', 'inventory', true, true),
     (v_tenant_mimos, 'receptionist', 'inventory', true, true),
     (v_tenant_mimos, 'groomer', 'inventory', false, false),
-    (v_tenant_mimos, 'vet', 'inventory', true, false);
+    (v_tenant_mimos, 'vet', 'inventory', true, false),
+    (v_tenant_mimos, 'owner', 'invoicing', true, true),
+    (v_tenant_mimos, 'receptionist', 'invoicing', true, true),
+    (v_tenant_mimos, 'groomer', 'invoicing', false, false),
+    (v_tenant_mimos, 'vet', 'invoicing', false, false);
 
   insert into platform_admins (user_id) values (v_user_superadmin);
 

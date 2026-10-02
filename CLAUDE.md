@@ -184,7 +184,7 @@ FullPetCare/
 │   │   ├── public-pet-view/     # Edge Function de la vista cliente
 │   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
 │   │   ├── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
-│   │   └── invoicing/           # único que habla con el PAC (Facturapi); hoy: configurar el negocio y su certificado (11.15)
+│   │   └── invoicing/           # único que habla con el PAC (Facturapi); configurar el negocio y su certificado (11.15), timbrar, cancelar y bajar facturas (11.18)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
 ├── scripts/
@@ -397,8 +397,11 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - `payments.method`: `cash` | `card` | `transfer_spei` | `openpay`. Los tres últimos se
   **simulan** en v1: se registra el pago con `status = 'simulated_approved'` y una
   referencia falsa. La tabla ya es la que se usará de verdad.
-- `invoice_requests` no factura nada. Guarda lo que el SAT pediría. Cuando se conecte un
-  PAC, se llena `fiscal_uuid` y ya.
+- `invoice_requests` (fase 11) es la factura: estados `pending` → `stamping` → `stamped` | `cancelled`,
+  con `fiscal_uuid`, `pac_invoice_id`, rutas de XML/PDF (bucket privado `invoices`) y `error_message`. Los
+  usuarios solo crean `pending`; el resto lo escribe la Edge Function `invoicing`. Una sola factura viva por
+  venta (índice único parcial); una timbrada no se edita ni se borra, solo se cancela. Los importes se arman
+  en `lib/cfdi.ts` (con copia para Deno en `functions/_shared/cfdi.ts`, vigilada por un test de paridad).
 
 ### 6.6 Vista pública y bitácora
 

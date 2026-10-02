@@ -520,6 +520,11 @@ los timbres vencen al año y no se pudo confirmar su sandbox en la página; la d
 la facilidad de integración. El usuario confirmó Facturapi. **Sin dependencia nueva:** la Edge Function
 habla con la API por `fetch` (Deno), no con su SDK de npm. Los precios se verifican otra vez antes de
 contratar el plan de pago (el modo de prueba basta para desarrollar).
+**Pendiente de decidir antes de producción (2026-10-04):** emitir facturas exige la llave de la
+*organización* de cada negocio (`sk_test_` en sandbox, `sk_live_` en producción). La de pruebas se puede consultar
+cuando haga falta; la *live* solo se muestra al crearla, así que hay que decidir dónde guardarla (cifrada en la
+base, o un secreto por negocio). Hasta entonces la función solo timbra en modo pruebas. Las rutas de la API
+quedan aisladas en `functions/_shared/facturapi.ts`.
 **Costo aceptado:** dependencia de un tercero y costo por timbre. **Lo absorbe la plataforma dentro del plan**, con un tope de facturas por negocio
 (decisión del usuario, 2026-10-01). La forma de pago (crédito/débito) se elige a mano al cobrar con tarjeta. El armado del comprobante vive en `lib/cfdi.ts` (puro y probado) y el PAC queda detrás
 de un adaptador delgado, de modo que cambiar de proveedor no toca la lógica ni la base.
