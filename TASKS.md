@@ -965,7 +965,7 @@ Segunda fase de la **etapa de mejoras** (`CLAUDE.md` §1). Todo sale de datos qu
 externo ni dependencia nueva.
 
 **Estado: propuesta, sin construir y pendiente de aprobación.** Las decisiones y sus alternativas están en
-`PLAN.md` D17. Seguimiento en HMH Four: tareas del apartado "Corte de caja y reportes".
+`PLAN.md` D17. Seguimiento en HMH Four: tareas #2071 a #2079 (12.1 → #2071, 12.2 → #2072, 12.3 a 12.6 → #2073 y #2074, 12.7 → #2075, 12.8 y 12.9 → #2076, 12.10 y 12.11 → #2077, 12.12 y 12.13 → #2078, 12.14 y 12.15 → #2079).
 
 ### Decisiones propuestas (a aprobar antes de la 12.3)
 
