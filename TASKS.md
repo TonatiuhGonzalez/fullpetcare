@@ -1039,12 +1039,22 @@ externo ni dependencia nueva.
 
 ### 12C. Reportes en la base de datos
 
-- [ ] **12.7** 📚🧪 RPC `report_sales_summary(desde, hasta, sucursal)`: por día, por método de pago y por
+- [x] **12.7** 📚🧪 RPC `report_sales_summary(desde, hasta, sucursal)`: por día, por método de pago y por
   sucursal (subtotal, IVA, descuento, total, número de ventas) más las canceladas aparte. El periodo se
   interpreta en la zona de la sucursal. Revalida permiso `reports` y sucursal. Tests de bordes: venta a las
   11 pm en Tijuana, cambio de mes, periodo sin ventas, venta cancelada, descuento, **pago mixto** (el monto va
   a cada método), aislamiento entre negocios y sucursales, usuario sin permiso. _Verificar:_ verde; los totales
   coinciden al centavo con la suma de los tickets.
+  **Hecho 2026-10-08 (#2075):** `report_sales_summary(negocio, desde, hasta, sucursal?)` devuelve un jsonb con
+  totales, por día (incluye los días sin ventas, para la gráfica), por sucursal, cobrado por método y canceladas
+  aparte. Las fechas son **locales de cada sucursal**, ambas incluidas; tope de un año. Exige permiso `reports`/ver
+  y acceso a la sucursal; cualquier otro caso (negocio ajeno, sucursal sin acceso) responde igual "sin permiso".
+  Índice nuevo en `sales (negocio, sucursal, paid_at)`. **Advertencias de lectura que la pantalla (12.12) debe
+  decir:** (1) subtotal e IVA son los guardados en la venta, **antes del descuento** (el cobro no recalcula el IVA al
+  descontar); el total es el exacto y `subtotal + IVA − descuento = total`. (2) Por método se reporta lo cobrado sin el
+  cambio; si alguien paga con tarjeta de más, ese sobrepago sí aparece y el total por métodos puede exceder al de
+  ventas. Tests en `report-sales-summary.spec.ts` (16): venta a las 11 pm, misma hora en CDMX y Tijuana, cambio de
+  mes, periodo sin ventas, descuento, canceladas, pago mixto, aislamiento y sucursal.
 - [ ] **12.8** 🧪 RPC `report_top_items`: servicios y productos más vendidos (cantidad e importe), con el IVA
   por partida. Tests: producto y servicio en el mismo ticket, cantidad > 1, partida de insumo de consulta,
   periodo vacío. _Verificar:_ verde.
