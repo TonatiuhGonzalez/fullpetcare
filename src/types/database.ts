@@ -2354,6 +2354,7 @@ export type Database = {
           billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           internal_notes: string
+          is_demo: boolean
           name: string
           owner_email: string
           owner_name: string

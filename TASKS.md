@@ -925,9 +925,17 @@ HMH Four: tareas #2036 a #2048.
 - [ ] **11.21** 📚🧪 Extender el E2E: agendar → atender → cobrar **con un producto** → facturar en
   sandbox. Sigue siendo **un solo** test (D12). _Verificar:_ verde en local y en CI (el CI usa el
   sandbox; la llave va en GitHub Secrets, nunca en el repo).
-- [ ] **11.22** Semilla y reset: productos ficticios y existencias para Patitas Felices en `seed.sql`
+- [x] **11.22** Semilla y reset: productos ficticios y existencias para Patitas Felices en `seed.sql`
   y `demo-reset.sh`; el reset **no** toca nada fiscal real ni llama al PAC. _Verificar:_ `db:reset` y
-  `demo:reset` dejan el inventario limpio.
+  `demo:reset` dejan el inventario limpio. **Hecho 2026-10-06 (#2048, parte de semilla; el E2E con sandbox y la
+  documentación de cierre, 11.21 y 11.23, siguen pendientes):** los productos ya estaban en `seed.sql` (11.3); el
+  reset ahora **restaura el catálogo base y las existencias** (oculta los productos creados en una demo y los insumos
+  de consultas anteriores). Como `stock_movements` es inmutable, las existencias se corrigen con un movimiento
+  `adjustment` por la diferencia, y repetir el reset no escribe nada de más. **Desviación:** las existencias viven
+  solo en `demo_reset.sql` y **no** en `seed.sql`, porque 21 tests de inventario (consumo de insumos, cobro con
+  productos y movimientos) asumen existencia 0 en la semilla; sembrarlas obligaba a reescribirlos. Para verlas en
+  local, se corre `demo_reset.sql` contra la base local. Deja visibles los tres estados de Inventario (normal, stock
+  bajo y "Sin inventario"). No toca `tenant_invoicing_settings`. Tests en `demo-reset.spec.ts`.
 - [ ] **11.23** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6, módulos nuevos de permisos
   en §6.7/§7.2, la Edge Function `invoicing` en §3/§4/§10 y la dependencia (si el PAC trae SDK); quitar
   "Venta de productos e inventario" y "CFDI real" de la lista de "Aún no construido" (§1); `.env.example`

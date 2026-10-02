@@ -162,6 +162,29 @@ describe('platform_list_tenants()', () => {
     })
   })
 
+  it('devuelve is_demo: true en un negocio de demostración y false en uno sin marcar', async () => {
+    // Es lo que permite a la lista mostrar cuáles oculta `demo:reset`. Si la
+    // columna faltara o saliera siempre en false, quien administra no sabría
+    // qué se ocultaría al restablecer. El negocio sin marcar es un cliente
+    // real: debe verse como tal.
+    await withTransaction(async (client) => {
+      // Los negocios se insertan antes de "ser" superadmin (un superadmin no
+      // escribe `tenants` directo: lo hace platform_create_tenant).
+      const real = await client.query("insert into tenants (name) values ('Cliente Real SA') returning id")
+      const demo = await client.query("insert into tenants (name) values ('Empresa de una demo') returning id")
+      await client.query('update tenant_platform_info set is_demo = true where tenant_id = $1', [demo.rows[0].id])
+      await asSuperadmin(client)
+
+      const { rows } = await client.query(
+        'select tenant_id, is_demo from platform_list_tenants() where tenant_id = any($1)',
+        [[real.rows[0].id, demo.rows[0].id]],
+      )
+      const byId = Object.fromEntries(rows.map((r) => [r.tenant_id, r.is_demo]))
+      expect(byId[real.rows[0].id]).toBe(false)
+      expect(byId[demo.rows[0].id]).toBe(true)
+    })
+  })
+
   it('un negocio SIN dueño aparece igual, con el dueño vacío', async () => {
     // Un alta a medias o un dato corrupto no debe hacer que la empresa
     // desaparezca de la lista: justo ese es el caso que el superadmin

@@ -11,9 +11,19 @@
 // lista del superadmin en plena operación.
 import { readFileSync } from 'node:fs'
 import { afterAll, describe, expect, it } from 'vitest'
+import type { PoolClient } from 'pg'
 
 import { closePool, withTransaction } from './helpers'
-import { TENANT_HUELLITAS, TENANT_MIMOS, TENANT_PATITAS } from './fixtures'
+import {
+  BRANCH_CENTRO,
+  BRANCH_DEL_VALLE,
+  PRODUCT_ALIMENTO,
+  PRODUCT_SHAMPOO,
+  TENANT_HUELLITAS,
+  TENANT_MIMOS,
+  TENANT_PATITAS,
+  USER_DUENO,
+} from './fixtures'
 
 afterAll(closePool)
 
@@ -68,6 +78,96 @@ describe('demo_reset.sql — empresas fuera de la semilla', () => {
 
       const rows = await client.query('select deleted_at from tenants where id = $1', [real.rows[0].id])
       expect(rows.rows[0].deleted_at).toBeNull()
+    })
+  })
+})
+
+describe('demo_reset.sql — inventario de demostración', () => {
+  const stockOf = async (client: PoolClient, branchId: string, productId: string) =>
+    (
+      await client.query(
+        'select coalesce(sum(quantity), 0)::int as n from stock_movements where tenant_id = $1 and branch_id = $2 and product_id = $3',
+        [TENANT_PATITAS, branchId, productId],
+      )
+    ).rows[0].n as number
+
+  it('crea las existencias base y las devuelve a su valor compensando lo vendido en una demo anterior', async () => {
+    // Una demo vende producto y deja el stock bajo. Como los movimientos no se
+    // pueden borrar, el reset debe COMPENSAR con un ajuste; si no, la siguiente
+    // presentación arrancaría con "Sin inventario" en un producto que debería
+    // tener piezas.
+    await withTransaction(async (client) => {
+      // La semilla no trae existencias: la primera corrida las crea.
+      expect(await stockOf(client, BRANCH_CENTRO, PRODUCT_ALIMENTO)).toBe(0)
+      await client.query(DEMO_RESET_SQL)
+      expect(await stockOf(client, BRANCH_CENTRO, PRODUCT_ALIMENTO)).toBe(12)
+      await client.query(
+        `insert into stock_movements (tenant_id, branch_id, product_id, movement_type, quantity, created_by)
+         values ($1, $2, $3, 'sale', -5, $4)`,
+        [TENANT_PATITAS, BRANCH_CENTRO, PRODUCT_ALIMENTO, USER_DUENO],
+      )
+      await client.query(
+        `insert into stock_movements (tenant_id, branch_id, product_id, movement_type, quantity, reason, created_by)
+         values ($1, $2, $3, 'adjustment', 40, 'Conteo de prueba', $4)`,
+        [TENANT_PATITAS, BRANCH_DEL_VALLE, PRODUCT_SHAMPOO, USER_DUENO],
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      expect(await stockOf(client, BRANCH_CENTRO, PRODUCT_ALIMENTO)).toBe(12)
+      expect(await stockOf(client, BRANCH_DEL_VALLE, PRODUCT_SHAMPOO)).toBe(2)
+    })
+  })
+
+  it('repetir el reset no escribe movimientos de más', async () => {
+    // El reset se corre antes de cada demo. Si cada corrida agregara ajustes
+    // aunque nada cambió, la bitácora de inventario se llenaría de ruido.
+    await withTransaction(async (client) => {
+      await client.query(DEMO_RESET_SQL)
+      const before = await client.query('select count(*)::int as n from stock_movements')
+      await client.query(DEMO_RESET_SQL)
+      const after = await client.query('select count(*)::int as n from stock_movements')
+      expect(after.rows[0].n).toBe(before.rows[0].n)
+    })
+  })
+
+  it('oculta los productos creados en la demo y restaura los editados', async () => {
+    // Un producto de prueba de una reunión anterior no debe aparecer en la
+    // siguiente; y un precio cambiado en vivo debe volver al del guion.
+    await withTransaction(async (client) => {
+      const extra = await client.query(
+        "insert into products (tenant_id, name, price_cents) values ($1, 'Producto de una demo', 5000) returning id",
+        [TENANT_PATITAS],
+      )
+      await client.query('update products set price_cents = 1, deleted_at = now() where id = $1', [PRODUCT_SHAMPOO])
+
+      await client.query(DEMO_RESET_SQL)
+
+      const hidden = await client.query('select deleted_at from products where id = $1', [extra.rows[0].id])
+      expect(hidden.rows[0].deleted_at).not.toBeNull()
+      const shampoo = await client.query('select price_cents, deleted_at from products where id = $1', [PRODUCT_SHAMPOO])
+      expect(shampoo.rows[0]).toEqual({ price_cents: 14500, deleted_at: null })
+    })
+  })
+
+  it('no toca la configuración fiscal del negocio', async () => {
+    // El demo desplegado conserva su organización y certificado de pruebas en
+    // el PAC. Si el reset los borrara, habría que volver a subir el certificado
+    // antes de cada presentación.
+    await withTransaction(async (client) => {
+      await client.query(
+        `insert into tenant_invoicing_settings (tenant_id, pac_organization_id, csd_valid_until)
+         values ($1, 'org_demo', '2030-01-01')`,
+        [TENANT_PATITAS],
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const { rows } = await client.query(
+        'select pac_organization_id, csd_valid_until is not null as has_csd, deleted_at from tenant_invoicing_settings where tenant_id = $1',
+        [TENANT_PATITAS],
+      )
+      expect(rows[0]).toEqual({ pac_organization_id: 'org_demo', has_csd: true, deleted_at: null })
     })
   })
 })
