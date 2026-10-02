@@ -601,3 +601,64 @@ describe('close_cash_session: paridad con lib/cashCount.ts', () => {
     })
   })
 })
+
+describe('cash_session_overview', () => {
+  const overview = async (client: PoolClient, user: string, id: string) => {
+    await setRole(client, 'authenticated', user)
+    const { rows } = await client.query('select * from cash_session_overview($1)', [id])
+    return rows[0]
+  }
+
+  it('muestra lo cobrado del turno por método mientras la caja sigue abierta', async () => {
+    // La pantalla de Caja lo necesita durante el día. Si no devolviera nada,
+    // recepción cerraría a ciegas sin ver ni lo que cobró.
+    await withTransaction(async (client) => {
+      const id = await openAs(client, USER_RECEPCION, BRANCH_CENTRO, 50000)
+      await setRole(client, 'service_role')
+      await client.query(`update cash_sessions set opened_at = now() - interval '2 hours' where id = $1`, [id])
+      const paidAt = new Date(Date.now() - 3600_000).toISOString()
+      await client.query(
+        `insert into sales (tenant_id, branch_id, customer_id, folio, status, total_cents, paid_at)
+         values ($1, $2, $3, 7300, 'paid', 35000, $4) returning id`,
+        [TENANT_PATITAS, BRANCH_CENTRO, CUSTOMER_SOFIA, paidAt],
+      )
+      const { rows: sale } = await client.query('select id from sales where folio = 7300 and branch_id = $1', [BRANCH_CENTRO])
+      await client.query(
+        `insert into payments (tenant_id, sale_id, method, amount_cents, status, paid_at, payment_form_code)
+         values ($1, $2, 'cash', 50000, 'approved', $3, '01')`,
+        [TENANT_PATITAS, sale[0].id, paidAt],
+      )
+      const row = await overview(client, USER_RECEPCION, id)
+      expect(Number(row.cash_cents)).toBe(35000) // $500 recibidos − $150 de cambio
+      expect(Number(row.change_given_cents)).toBe(15000)
+      expect(Number(row.expected_cents)).toBe(50000 + 35000)
+    })
+  })
+
+  it('el resumen de una caja cerrada coincide con el esperado que se congeló al cerrar', async () => {
+    // Un corte pasado no debe "moverse" si después entran ventas.
+    await withTransaction(async (client) => {
+      const id = await openAs(client, USER_DUENO, BRANCH_CENTRO, 10000)
+      const closed = await closeAs(client, USER_DUENO, id, 10000)
+      const row = await overview(client, USER_DUENO, id)
+      expect(Number(row.expected_cents)).toBe(closed.expected_cents)
+    })
+  })
+
+  it('niega a quien no tiene permiso, a otra sucursal y a un id inexistente con el mismo mensaje', async () => {
+    await withTransaction(async (client) => {
+      const id = await openAs(client, USER_DUENO, BRANCH_DEL_VALLE)
+      await expectFails(client, () => overview(client, USER_GROOMER, id), /no tienes permiso/i)
+      await expectFails(client, () => overview(client, USER_RECEPCION, id), /no tienes permiso/i)
+      await expectFails(client, () => overview(client, USER_DUENO, '00000000-0000-4000-8000-00000000dead'), /no tienes permiso/i)
+    })
+  })
+
+  it('anon no puede ejecutarla', async () => {
+    await withTransaction(async (client) => {
+      const id = await openAs(client, USER_DUENO)
+      await setRole(client, 'anon')
+      await expectFails(client, () => client.query('select * from cash_session_overview($1)', [id]), /permission denied/i)
+    })
+  })
+})

@@ -1078,14 +1078,28 @@ externo ni dependencia nueva.
 
 ### 12D. Interfaz
 
-- [ ] **12.10** Servicio `services/cashRegister.ts` y `services/reports.ts` y su store (estado de la caja
+- [x] **12.10** Servicio `services/cashRegister.ts` y `services/reports.ts` y su store (estado de la caja
   abierta, periodo y sucursal elegidos). _Verificar:_ tests de store de las transiciones (abrir, movimiento,
   cerrar); `npm run lint && npm run test:unit` en verde.
-- [ ] **12.11** Pantalla **Caja**: abrir con fondo, ver lo cobrado en el turno por método, registrar retiros
+  **Hecho 2026-10-10 (#2077, parte de la caja; los servicios y el store de Reportes llegan con 12.12):**
+  `services/cashRegister.ts`, `stores/cashRegister.ts` (11 tests de transiciones: abrir, movimiento, cerrar, y que un
+  dato inválido **no llegue al servidor**) y `lib/cashRegister.ts` (13 tests: de texto en pesos a centavos sin
+  flotantes, montos que se rechazan y mensajes en español). Migración nueva `cash_session_overview()`: la función
+  pública que envuelve el resumen interno del turno y revalida permiso y sucursal (4 tests).
+- [x] **12.11** Pantalla **Caja**: abrir con fondo, ver lo cobrado en el turno por método, registrar retiros
   y gastos, cerrar contando el efectivo (muestra esperado y diferencia **después** de capturar el conteo, no
   antes), historial de cortes y comprobante de corte imprimible (mismo estilo que el ticket). Explicar en
   pantalla qué es el fondo y la diferencia. _Verificar:_ en navegador con recepción: abrir → cobrar → retiro →
   cerrar; un groomer no ve la pantalla.
+  **Hecho 2026-10-10 (#2077):** `/app/caja` (`CashRegisterPage` + diálogos de movimiento y de cierre + comprobante
+  imprimible), con entrada "Caja" en el menú y la ruta gateada por `cash_register`. El cierre es en dos pasos: se
+  captura el conteo **sin ver el esperado** y se pide confirmar; el esperado y la diferencia salen al cerrar (el conteo
+  a ciegas es solo de la interfaz: la función del resumen sí devuelve el esperado, que quien tiene permiso puede
+  calcular con lo que ve). **Verificado en navegador** con Playwright contra la base local (script desechable, no se
+  sube): recepción ve la caja cerrada, un fondo inválido da error en español, abre con $500, registra un gasto de $30,
+  cierra contando $470 y el comprobante dice "La caja cuadra", el corte aparece en el historial, y un groomer que
+  escribe `/app/caja` en la barra termina en la agenda. **No cubierto:** el aviso de ventas en efectivo fuera de un
+  turno (queda como riesgo de la fase) y probar con ventas reales del día.
 - [ ] **12.12** Pantalla **Reportes** (solo con permiso): periodo (hoy, semana, mes, rango), sucursal (el
   dueño ve todas), tarjetas de totales, barras por día y por método dibujadas con CSS/SVG, tablas de más
   vendidos y de empleados, y **exportar a CSV** (con codificación para que Excel lea los acentos).
