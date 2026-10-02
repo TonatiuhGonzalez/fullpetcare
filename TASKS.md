@@ -1002,24 +1002,40 @@ externo ni dependencia nueva.
 
 ### 12B. Caja en la base de datos
 
-- [ ] **12.3** 📚 Migración (solo el enum): valores `cash_register` y `reports` en `permission_module`, en un
+- [x] **12.3** 📚 Migración (solo el enum): valores `cash_register` y `reports` en `permission_module`, en un
   archivo aparte (Postgres no deja usar un valor de enum nuevo en la misma transacción). _Verificar:_
   `db:reset` limpio; los tests de permisos existentes siguen verdes sin modificarlos.
-- [ ] **12.4** 📚🧪 Migración `cash_sessions`: sucursal, abierta por, fondo inicial, fecha de apertura y de
+  **Hecho 2026-10-07 (#2073):** migración `cash_permission_modules`.
+- [x] **12.4** 📚🧪 Migración `cash_sessions`: sucursal, abierta por, fondo inicial, fecha de apertura y de
   cierre, cerrada por, `expected_cents`, `counted_cents`, `difference_cents`, nota. RLS por sucursal y permiso
   `cash_register`; índice único parcial "una abierta por sucursal"; trigger que impide editar o borrar una
   cerrada (también `service_role`); bitácora; permisos por defecto en los negocios existentes y en la semilla.
   Tests: aislamiento entre negocios y entre sucursales, rol sin permiso, segunda caja abierta rechazada,
   cerrada inmutable. _Verificar:_ verde.
-- [ ] **12.5** 📚🧪 Migración `cash_movements` (retiro, gasto, ingreso; monto entero positivo; motivo
+  **Hecho 2026-10-07 (#2073):** `cash_sessions` + `open_cash_session()`. Los usuarios **no escriben la tabla**: abrir y
+  cerrar son RPC. Checks en la base: abierta = sin datos de cierre, cerrada = con todos, y `diferencia = contado −
+  esperado`. Una sucursal sin acceso, inexistente o ajena recibe el mismo mensaje de "sin permiso". Permisos por
+  defecto de `cash_register` (dueño y recepción) y `reports` (solo dueño) en negocios existentes y en la semilla.
+  Tests en `cash-register.spec.ts`.
+- [x] **12.5** 📚🧪 Migración `cash_movements` (retiro, gasto, ingreso; monto entero positivo; motivo
   obligatorio; ligado a la caja abierta): bitácora **inmutable** como `stock_movements`. Tests: no se
   modifica ni se borra, solo en caja abierta, motivo obligatorio, aislamiento. _Verificar:_ verde.
-- [ ] **12.6** 📚🧪 RPC `open_cash_session` y `close_cash_session` (`SECURITY DEFINER`, revalidan membresía,
+  **Hecho 2026-10-07 (#2074):** `cash_movements` (retiro, gasto, ingreso). Se insertan directo (política con permiso
+  `cash_register`/editar, sucursal propia y `created_by = auth.uid()`) y un trigger exige caja **abierta de la misma
+  sucursal y negocio**, también para `service_role`. Sin UPDATE ni DELETE (ni con `service_role`).
+- [x] **12.6** 📚🧪 RPC `open_cash_session` y `close_cash_session` (`SECURITY DEFINER`, revalidan membresía,
   permiso y sucursal en la primera línea, §7.3.4). El cierre **calcula el esperado en SQL con la misma regla**
   de `lib/cashCount.ts` y congela esperado, contado y diferencia. Tests: cierre cuadrado, con sobrante y con
   faltante; ventas de otra sucursal o fuera del rango no cuentan; cierre de una caja ya cerrada; **un test
   compara la RPC contra `lib/cashCount.ts` con las mismas entradas** (mismo patrón que `cfdi-parity`).
   _Verificar:_ verde.
+  **Hecho 2026-10-07 (#2073):** `close_cash_session()` con `for update` (dos cierres simultáneos no se pisan). El
+  esperado lo calcula `app.cash_session_summary()`, que repite la regla de `lib/cashCount.ts`; **el test de paridad
+  corre cuatro escenarios por las dos** (incluye pago mixto con sobrepago, tarjeta de más y venta cancelada) y también
+  prueba que una venta de otra sucursal o anterior a la apertura no cuenta. El turno es el rango `[apertura, cierre)`
+  de la sucursal; `closed_at` usa `clock_timestamp()` (no `now()`, que dentro de una transacción no avanza).
+  **Para 12.10/12.11:** `cash_session_summary` es interna (sin `EXECUTE` para usuarios); la pantalla de caja
+  necesitará una RPC pública que la envuelva y revalide permiso para mostrar "cobrado en el turno".
 
 ### 12C. Reportes en la base de datos
 

@@ -398,6 +398,150 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_movements: {
+        Row: {
+          amount_cents: number
+          branch_id: string
+          cash_session_id: string
+          created_at: string
+          created_by: string
+          id: string
+          movement_type: Database["public"]["Enums"]["cash_movement_type"]
+          reason: string
+          tenant_id: string
+        }
+        Insert: {
+          amount_cents: number
+          branch_id: string
+          cash_session_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["cash_movement_type"]
+          reason: string
+          tenant_id: string
+        }
+        Update: {
+          amount_cents?: number
+          branch_id?: string
+          cash_session_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["cash_movement_type"]
+          reason?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "cash_movements_cash_session_id_fkey"
+            columns: ["cash_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_sessions: {
+        Row: {
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closing_note: string | null
+          counted_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          difference_cents: number | null
+          expected_cents: number | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_note?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          difference_cents?: number | null
+          expected_cents?: number | null
+          id?: string
+          opened_at?: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_note?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          difference_cents?: number | null
+          expected_cents?: number | null
+          id?: string
+          opened_at?: string
+          opened_by?: string
+          opening_float_cents?: number
+          opening_note?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           cfdi_use: string | null
@@ -2126,6 +2270,33 @@ export type Database = {
         }
         Returns: string
       }
+      close_cash_session: {
+        Args: { p_counted_cents: number; p_note?: string; p_session_id: string }
+        Returns: {
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closing_note: string | null
+          counted_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          difference_cents: number | null
+          expected_cents: number | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cash_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_appointment: {
         Args: {
           p_branch_id: string
@@ -2244,6 +2415,14 @@ export type Database = {
           tenant_id: string
           tenant_name: string
         }[]
+      }
+      open_cash_session: {
+        Args: {
+          p_branch_id: string
+          p_note?: string
+          p_opening_float_cents: number
+        }
+        Returns: string
       }
       platform_add_admin: {
         Args: { p_user_id: string }
@@ -2584,6 +2763,7 @@ export type Database = {
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
       cancellation_reason_kind: "non_payment" | "customer_request" | "other"
+      cash_movement_type: "withdrawal" | "expense" | "income"
       employee_document_type:
         | "voter_id"
         | "address_proof"
@@ -2591,7 +2771,12 @@ export type Database = {
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
-      permission_module: "employees" | "inventory" | "invoicing"
+      permission_module:
+        | "employees"
+        | "inventory"
+        | "invoicing"
+        | "cash_register"
+        | "reports"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
@@ -2747,6 +2932,7 @@ export const Constants = {
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
       cancellation_reason_kind: ["non_payment", "customer_request", "other"],
+      cash_movement_type: ["withdrawal", "expense", "income"],
       employee_document_type: [
         "voter_id",
         "address_proof",
@@ -2755,7 +2941,13 @@ export const Constants = {
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
-      permission_module: ["employees", "inventory", "invoicing"],
+      permission_module: [
+        "employees",
+        "inventory",
+        "invoicing",
+        "cash_register",
+        "reports",
+      ],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       plan_billing_period: ["monthly", "yearly", "indefinite"],
