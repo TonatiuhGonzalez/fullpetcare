@@ -834,7 +834,21 @@ HMH Four: tareas #2036 a #2048.
   Function. Migración con lo mínimo (id de organización en el PAC, serie, CSD vigente hasta).
   Explicar qué es un CSD, un PAC y por qué el certificado no se guarda. _Verificar:_ en sandbox, un
   negocio de prueba queda "listo para facturar"; con datos fiscales incompletos, la pantalla dice cuál
-  falta, en español y sin jerga.
+  falta, en español y sin jerga. **Hecho 2026-10-04 (#2044), pendiente de verificar en sandbox:** migración
+  `tenant_invoicing_settings` (id de la organización en el PAC y vigencia del certificado; solo el dueño la lee y
+  **nadie la escribe desde el navegador**, solo la Edge Function). Los datos fiscales se escriben con la RPC
+  `update_tenant_fiscal_data` (solo dueño, valida RFC/régimen/CP; una política de UPDATE en `tenants` dejaría
+  tocar también otras columnas). Cambiar el RFC borra la vigencia del certificado (un CSD es de un solo RFC).
+  `can_manage_invoicing()` = dueño + negocio no en solo lectura: la usa la función, que escribe con `service_role`
+  y se saltaría ese bloqueo. Edge Function `invoicing`, acción `setup` (la `stamp`/`cancel`/`download` llegan en
+  11.18): crea la organización en Facturapi, le manda los datos fiscales y el certificado, y guarda solo la
+  vigencia. **"Listo para facturar" se calcula** (`lib/fiscalSetup.ts`), no se guarda: un booleano se
+  desactualizaría al vencer el certificado. Pantalla en Configuración → Facturación. Tests: `fiscalSetup.spec.ts`,
+  `invoicing-settings-rls.spec.ts`, `invoicing-function.spec.ts` (solo guardias previos al PAC).
+  **Pendiente:** (1) contratar Facturapi y poner `FACTURAPI_USER_KEY` (`supabase secrets set`); (2) confirmar en el
+  sandbox los endpoints (`/organizations`, `/legal`, `/certificate`) y el campo con la vigencia
+  (`certificate.expires_at`), que se escribieron de memoria de su documentación; (3) probar en navegador el
+  flujo completo y que un certificado equivocado muestre el mensaje.
 - [ ] **11.16** 📚🧪 `lib/cfdi.ts` (puro): de venta + cliente + pagos a cuerpo de comprobante. Cubre
   desglose de IVA hacia atrás por concepto, **la suma de los conceptos debe dar exactamente el total
   de la venta** (el riesgo del redondeo, abajo), forma de pago desde `payments.payment_form_code` (con pagos mezclados, la de mayor monto; a confirmar con un contador),
