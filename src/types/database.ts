@@ -2251,6 +2251,19 @@ export type Database = {
         Args: { p_comment?: string; p_tenant_id: string }
         Returns: undefined
       }
+      cash_session_overview: {
+        Args: { p_session_id: string }
+        Returns: {
+          card_cents: number
+          cash_cents: number
+          change_given_cents: number
+          expected_cents: number
+          income_cents: number
+          openpay_cents: number
+          outflow_cents: number
+          transfer_cents: number
+        }[]
+      }
       checkout_appointment: {
         Args: {
           p_appointment_id: string

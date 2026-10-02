@@ -131,6 +131,13 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Caja (tarea 12.11): gateada por PERMISO, igual que inventario.
+          path: 'caja',
+          name: 'caja',
+          component: () => import('@/pages/caja/CashRegisterPage.vue'),
+          meta: { requiresPermission: 'cash_register' },
+        },
+        {
           // Configuración (tarea #1959): la ven todos los roles, pero cada
           // sección se gatea aparte. "Empresa y sucursales" es solo del dueño
           // (política RLS de branches); "Cuenta" es de cualquiera.
