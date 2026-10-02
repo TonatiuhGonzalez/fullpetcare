@@ -954,3 +954,123 @@ HMH Four: tareas #2036 a #2048.
 | Costo por timbre sin dueño                                    | Decisión #1: se define quién lo paga antes de abrir la función a negocios reales                                   |
 | Descontar dos veces un insumo (al usarlo y al cobrarlo)       | El movimiento nace al registrar la línea; el cobro solo crea la partida del ticket. Test que cuenta los movimientos |
 | Vender con existencia 0 saltándose la pantalla                | La validación vive en la RPC de cobro, no en el frontend; test que lo intenta directo                              |
+
+---
+
+## Fase 12 — Corte de caja y reportes
+
+**Meta: que recepción cierre la caja contando el efectivo y vea si sobra o falta dinero, y que el dueño
+vea cuánto se vendió, por qué método de pago, por sucursal y por empleado.**
+Segunda fase de la **etapa de mejoras** (`CLAUDE.md` §1). Todo sale de datos que ya existen: sin servicio
+externo ni dependencia nueva.
+
+**Estado: aprobada (2026-10-06), sin construir.** Las decisiones y sus alternativas están en
+`PLAN.md` D17. Seguimiento en HMH Four: tareas #2071 a #2079 (12.1 → #2071, 12.2 → #2072, 12.3 a 12.6 → #2073 y #2074, 12.7 → #2075, 12.8 y 12.9 → #2076, 12.10 y 12.11 → #2077, 12.12 y 12.13 → #2078, 12.14 y 12.15 → #2079).
+
+### Decisiones (aprobadas el 2026-10-06)
+
+| #   | Decisión                                | Propuesta                                                                                                                                                                                                  |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Unidad del corte                        | **Turno de caja por sucursal**, con apertura (fondo inicial) y cierre (conteo). Varios por día; solo uno abierto a la vez por sucursal (lo garantiza la base).                                              |
+| 2   | ¿Cobrar exige caja abierta?             | **No.** La venta se asigna al corte por rango de tiempo (`paid_at` dentro del turno de su sucursal); no se toca la RPC de cobro ni sus tests.                                                              |
+| 3   | Efectivo esperado                       | `fondo + efectivo cobrado − cambio + ingresos − retiros/gastos`. **El cambio no está guardado**: se deriva de `pagado − total`, y solo sale de la caja si hubo efectivo. Tarjeta y transferencia no cuentan. |
+| 4   | Retiros, gastos e ingresos de caja      | **Sí**, como movimientos inmutables (`cash_movements`). Sin ellos, cualquier gasto chico con efectivo de la caja da un faltante falso.                                                                      |
+| 5   | Corte cerrado                           | **No se edita ni se borra** (ni con `service_role`). Se guardan esperado, contado y diferencia como instantánea. Un error se aclara con una nota.                                                           |
+| 6   | Dónde se calculan los reportes          | **En la base** (funciones SQL), no sumando en el navegador: el API corta a 1 000 filas y los totales saldrían mal sin avisar. El periodo se interpreta en la **zona de cada sucursal** (§8.3).              |
+| 7   | Ventas canceladas                       | Se **excluyen** de los totales y se muestran aparte. **No** se construye cancelar con reembolso (hoy no hay interfaz para cancelar una venta).                                                              |
+| 8   | Atribución a empleados                  | Servicios: el empleado de la cita. Productos de mostrador y ventas sin cita: quien cobró. Un producto vendido con un servicio va al empleado del servicio.                                                  |
+| 9   | Permisos                                | Módulos nuevos `cash_register` (dueño y recepción ver/editar) y `reports` (solo dueño por defecto). Se ajustan con filas (D13). Recepción solo ve sus sucursales.                                           |
+| 10  | Gráficas y exportación                  | **Sin librería** (D11): barras con CSS/SVG. Exportar a **CSV**; Excel queda fuera.                                                                                                                         |
+
+### 12A. Preparación
+
+- [x] **12.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D17 (cambiar lo que no convenza
+  ahora es barato). _Verificar:_ el usuario aprobó por escrito; D17 sin "pendiente de aprobación". **Hecho
+  2026-10-06 (#2071):** el usuario aprobó las diez decisiones sin cambios.
+- [x] **12.2** 📚🧪 `lib/cashCount.ts` (puro): efectivo esperado de un turno a partir de fondo, ventas con sus
+  pagos y movimientos de caja; cambio de una venta; diferencia (sobrante/faltante). Explicar por qué el cambio
+  se deriva y no se guarda. Tests de bordes: pago exacto, cambio con efectivo, **pago mixto efectivo + tarjeta
+  con sobrepago**, venta solo con tarjeta (cambio 0 aunque el monto exceda), turno sin ventas, retiro mayor al
+  efectivo, venta cancelada, descuento. _Verificar:_ verde; cobertura de `lib/` ≥ 80 %.
+  **Hecho 2026-10-06 (#2072):** `lib/cashCount.ts` (22 tests). Reglas que quedaron fijas y que la RPC de cierre
+  (12.6) debe repetir en SQL: el **cambio de una venta** es `pagado − total`, **limitado al efectivo recibido** en
+  esa venta (con tarjeta de más no hay cambio en efectivo); el efectivo que se queda en caja es lo recibido menos el
+  cambio; solo cuentan ventas `paid`. Un retiro mayor al efectivo deja el esperado **negativo** (se devuelve tal
+  cual para que la pantalla lo señale, no se recorta a 0). Un monto no entero o negativo **lanza error** en vez de
+  redondear en silencio. Supuesto a confirmar con un contador o con el negocio: si alguien paga con tarjeta de más y
+  se le devuelve efectivo, el sistema no lo ve (no hay forma de registrarlo todavía).
+
+### 12B. Caja en la base de datos
+
+- [ ] **12.3** 📚 Migración (solo el enum): valores `cash_register` y `reports` en `permission_module`, en un
+  archivo aparte (Postgres no deja usar un valor de enum nuevo en la misma transacción). _Verificar:_
+  `db:reset` limpio; los tests de permisos existentes siguen verdes sin modificarlos.
+- [ ] **12.4** 📚🧪 Migración `cash_sessions`: sucursal, abierta por, fondo inicial, fecha de apertura y de
+  cierre, cerrada por, `expected_cents`, `counted_cents`, `difference_cents`, nota. RLS por sucursal y permiso
+  `cash_register`; índice único parcial "una abierta por sucursal"; trigger que impide editar o borrar una
+  cerrada (también `service_role`); bitácora; permisos por defecto en los negocios existentes y en la semilla.
+  Tests: aislamiento entre negocios y entre sucursales, rol sin permiso, segunda caja abierta rechazada,
+  cerrada inmutable. _Verificar:_ verde.
+- [ ] **12.5** 📚🧪 Migración `cash_movements` (retiro, gasto, ingreso; monto entero positivo; motivo
+  obligatorio; ligado a la caja abierta): bitácora **inmutable** como `stock_movements`. Tests: no se
+  modifica ni se borra, solo en caja abierta, motivo obligatorio, aislamiento. _Verificar:_ verde.
+- [ ] **12.6** 📚🧪 RPC `open_cash_session` y `close_cash_session` (`SECURITY DEFINER`, revalidan membresía,
+  permiso y sucursal en la primera línea, §7.3.4). El cierre **calcula el esperado en SQL con la misma regla**
+  de `lib/cashCount.ts` y congela esperado, contado y diferencia. Tests: cierre cuadrado, con sobrante y con
+  faltante; ventas de otra sucursal o fuera del rango no cuentan; cierre de una caja ya cerrada; **un test
+  compara la RPC contra `lib/cashCount.ts` con las mismas entradas** (mismo patrón que `cfdi-parity`).
+  _Verificar:_ verde.
+
+### 12C. Reportes en la base de datos
+
+- [ ] **12.7** 📚🧪 RPC `report_sales_summary(desde, hasta, sucursal)`: por día, por método de pago y por
+  sucursal (subtotal, IVA, descuento, total, número de ventas) más las canceladas aparte. El periodo se
+  interpreta en la zona de la sucursal. Revalida permiso `reports` y sucursal. Tests de bordes: venta a las
+  11 pm en Tijuana, cambio de mes, periodo sin ventas, venta cancelada, descuento, **pago mixto** (el monto va
+  a cada método), aislamiento entre negocios y sucursales, usuario sin permiso. _Verificar:_ verde; los totales
+  coinciden al centavo con la suma de los tickets.
+- [ ] **12.8** 🧪 RPC `report_top_items`: servicios y productos más vendidos (cantidad e importe), con el IVA
+  por partida. Tests: producto y servicio en el mismo ticket, cantidad > 1, partida de insumo de consulta,
+  periodo vacío. _Verificar:_ verde.
+- [ ] **12.9** 🧪 RPC `report_staff_activity`: citas atendidas y monto de servicios por empleado, y ventas de
+  mostrador por quien cobró (regla 8 de las decisiones). Tests: cita sin empleado, empleado dado de baja,
+  producto vendido junto con un servicio. _Verificar:_ verde.
+
+### 12D. Interfaz
+
+- [ ] **12.10** Servicio `services/cashRegister.ts` y `services/reports.ts` y su store (estado de la caja
+  abierta, periodo y sucursal elegidos). _Verificar:_ tests de store de las transiciones (abrir, movimiento,
+  cerrar); `npm run lint && npm run test:unit` en verde.
+- [ ] **12.11** Pantalla **Caja**: abrir con fondo, ver lo cobrado en el turno por método, registrar retiros
+  y gastos, cerrar contando el efectivo (muestra esperado y diferencia **después** de capturar el conteo, no
+  antes), historial de cortes y comprobante de corte imprimible (mismo estilo que el ticket). Explicar en
+  pantalla qué es el fondo y la diferencia. _Verificar:_ en navegador con recepción: abrir → cobrar → retiro →
+  cerrar; un groomer no ve la pantalla.
+- [ ] **12.12** Pantalla **Reportes** (solo con permiso): periodo (hoy, semana, mes, rango), sucursal (el
+  dueño ve todas), tarjetas de totales, barras por día y por método dibujadas con CSS/SVG, tablas de más
+  vendidos y de empleados, y **exportar a CSV** (con codificación para que Excel lea los acentos).
+  _Verificar:_ en navegador; el CSV abre en Excel sin caracteres rotos y suma lo mismo que la pantalla.
+- [ ] **12.13** Menú y rutas: entradas "Caja" y "Reportes" gateadas por permiso (`requiresPermission`), igual
+  que Inventario. _Verificar:_ cada rol ve solo lo suyo, y la URL directa de una pantalla sin permiso redirige.
+
+### 12E. Cierre
+
+- [ ] **12.14** Semilla y reset: un corte cerrado de ejemplo y ventas variadas de los últimos días para que los
+  reportes no salgan vacíos en la demo; `demo_reset.sql` restaura los cortes sin borrarlos (son inmutables: se
+  ocultan o se compensan, como el inventario). **No** va en `seed.sql` si rompe tests existentes (como pasó
+  con las existencias en 11.22). _Verificar:_ `demo:reset` deja los reportes con datos y la caja cerrada.
+- [ ] **12.15** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6.5, módulos nuevos en §6.7/§7.2, quitar
+  "reportes y corte de caja" de los candidatos de §1, y la nota de que "Reportes financieros avanzados" sigue
+  fuera. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+**Riesgos de la fase:**
+
+| Riesgo                                                        | Cómo se atiende                                                                                                   |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| El efectivo esperado no cuadra por el cambio mal calculado    | El cambio se deriva (no se guarda) en una función pura con tests de bordes; la RPC de cierre repite la regla y un test compara ambas |
+| Totales de reporte incorrectos por pasar de 1 000 filas        | Se agrega en SQL, no en el navegador                                                                              |
+| Una venta nocturna cae en el día equivocado                   | El periodo se interpreta en la zona de la sucursal (§8.3) y hay test con Tijuana a las 11 pm                      |
+| Dos cajas abiertas a la vez en una sucursal                   | Índice único parcial en la base                                                                                   |
+| Reescribir un corte ya cerrado para "arreglar" un faltante    | Trigger que lo impide, también con `service_role`; el error se aclara con una nota                                |
+| Una venta sin caja abierta queda fuera de todo corte          | Los reportes no dependen de la caja; la pantalla avisa cuando hay ventas en efectivo fuera de un turno             |
+| Que recepción vea reportes de otras sucursales                | RPC con permiso `reports` y sucursal revalidados; test de aislamiento por sucursal                                 |

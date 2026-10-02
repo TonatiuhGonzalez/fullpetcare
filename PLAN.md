@@ -296,10 +296,31 @@ negocio, factura la venta en el sandbox del PAC, descarga el PDF y XML y la canc
 transferencias entre sucursales, cantidades fraccionarias, envío automático de la factura, y
 proveedores/órdenes de compra.
 
-### Después de la Fase 11 (no ahora)
+### Fase 12 — Corte de caja y reportes
 
-OpenPay real, WhatsApp Business API, reportes y corte de caja, recordatorios automáticos, reserva en
-línea, paquetes y membresías, comisiones por empleado, importador de clientes.
+Segunda fase de la **etapa de mejoras**. Todo se calcula con datos que **ya existen** (ventas, pagos,
+partidas, citas): no hay servicio externo ni dependencia nueva. Dos bloques:
+
+1. **Corte de caja** por sucursal: se abre con un fondo inicial, se registran retiros y gastos de
+   efectivo, y se cierra contando el dinero. El sistema calcula cuánto efectivo **debería** haber y
+   muestra el sobrante o faltante. Un corte cerrado no se edita (D17).
+2. **Reportes de ventas** hechos en la base (funciones SQL que agregan, no el navegador): ventas por día,
+   por método de pago, por servicio o producto, por empleado y por sucursal, con exportación a CSV.
+
+**Estado: aprobada (2026-10-06)** (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
+**Demostrable (cuando termine):** recepción abre la caja con $500 de fondo, cobra tres ventas (una en efectivo
+con cambio, una con tarjeta y una por transferencia), registra un retiro de $200, cierra contando el efectivo y
+ve el sobrante o faltante; el dueño ve las ventas del mes por método de pago, por sucursal y por empleado y
+descarga el CSV.
+
+**Fuera de esta fase:** cancelar una venta con reembolso (hoy no existe en la interfaz), comisiones por
+empleado, reportes de inventario o de utilidad, facturación en los reportes, gráficas con librería y
+exportación a Excel.
+
+### Después de la Fase 12 (no ahora)
+
+OpenPay real, WhatsApp Business API, recordatorios automáticos, reserva en línea, paquetes y membresías,
+comisiones por empleado, importador de clientes.
 
 ---
 
@@ -530,6 +551,67 @@ quedan aisladas en `functions/_shared/facturapi.ts`.
 de un adaptador delgado, de modo que cambiar de proveedor no toca la lógica ni la base.
 **Riesgo conocido:** el desglose de IVA hacia atrás (D5) debe coincidir al centavo con lo que
 valida el PAC; por eso la suma de los conceptos se prueba contra el total de la venta.
+
+### D17 — Corte de caja por turno de sucursal, sin bloquear el cobro; reportes calculados en la base
+
+**Estado:** aprobada (2026-10-06).
+
+**1. Qué es un corte: un turno de caja por sucursal, con apertura y cierre explícitos.**
+Se abre con un fondo inicial y se cierra con el conteo; puede haber varios por día (turno de mañana y de
+tarde) y solo **uno abierto a la vez por sucursal** (índice único parcial, garantizado por la base).
+**Alternativa descartada:** corte diario automático sin apertura. Es más simple, pero no sabe con cuánto
+efectivo empezó el día, que es justo lo que hace falta para detectar un faltante.
+**Costo aceptado:** alguien tiene que acordarse de abrir la caja. Se mitiga con el punto 2.
+
+**2. Cobrar NO exige caja abierta, y la venta no apunta a la caja: se asigna por rango de tiempo.**
+Una venta pertenece al corte de su sucursal cuya apertura y cierre contienen `paid_at`. **Alternativa
+descartada:** una columna `cash_session_id` en `sales` y obligar a abrir caja para cobrar. Bloquear el cobro
+porque se olvidó abrir la caja es peor que el problema que se quiere resolver, y exigiría modificar la RPC de
+cobro y sus tests (que hoy son estables). **Costo aceptado:** si dos turnos se solapan por un error de captura,
+una venta podría caer en dos; el índice único parcial lo impide para abiertos y la RPC de cierre lo valida.
+
+**3. El efectivo esperado se calcula en la base y se congela al cerrar.**
+`esperado = fondo + efectivo cobrado − cambio entregado + ingresos − retiros/gastos`. Dos detalles que no
+son obvios:
+- **El cambio no está guardado:** el cobro acepta pagos que suman **más** que el total (se paga con $500 una
+  venta de $350) y registra el monto entregado. El cambio es `pagado − total` de esa venta, y solo sale de la
+  caja si hubo efectivo (nunca más que el efectivo recibido). Se calcula en `lib/cashCount.ts` (puro, con
+  tests de bordes) y la RPC de cierre usa la misma regla.
+- **Tarjeta y transferencia no entran al efectivo esperado**, pero sí al reporte del turno.
+Al cerrar se guardan `esperado`, `contado` y `diferencia` como **instantánea**: si después cambia algo, el
+corte ya cerrado no se mueve.
+
+**4. Retiros, gastos e ingresos de caja son movimientos inmutables** (`cash_movements`: sin UPDATE ni DELETE;
+se corrige con otro movimiento), mismo criterio que `stock_movements` (D15). **Alternativa descartada:**
+no tenerlos. Sin ellos, pagar una propina o comprar hielo con efectivo de la caja produce un "faltante" falso
+en cada turno y el corte deja de ser creíble.
+
+**5. Un corte cerrado no se edita ni se borra** (trigger, también para `service_role`): es un documento
+contable, igual que el expediente (§8.5). Un error de captura se aclara con una nota, no reescribiéndolo.
+
+**6. Reportes: funciones SQL que agregan (`SECURITY DEFINER`, revalidan permiso y sucursal), no consultas
+que traen filas al navegador.** **Alternativa descartada:** pedir todas las ventas y sumar en el cliente: el
+API devuelve máximo 1 000 filas por consulta y un reporte del mes las pasaría sin avisar, dando totales
+**incorrectos** sin ningún error. **Fechas:** el periodo ("hoy", "este mes") se interpreta en la zona de cada
+sucursal (§8.3), no en UTC ni en la del navegador; una venta a las 11 pm en Tijuana no es del día siguiente.
+**Qué cuenta:** ventas `paid`; las canceladas se excluyen de los totales y se muestran aparte (conteo y
+monto). El IVA se desglosa por partida, como siempre (§8.2); no es un reporte fiscal oficial.
+
+**7. Atribución a empleados:** las partidas de servicio se atribuyen al empleado de la cita
+(`appointments.employee_user_id`); los productos de mostrador y las ventas sin cita, a quien cobró
+(`sales.closed_by`). **Costo aceptado:** un producto vendido junto con un servicio se atribuye al empleado
+del servicio. Es la regla más simple y se documenta en la pantalla.
+
+**8. Permisos por módulo (D13), no por rol fijo:** dos módulos nuevos en `permission_module`:
+`cash_register` (dueño y recepción ver/editar; el resto nada) y `reports` (solo el dueño por defecto,
+configurable con filas). Recepción solo ve las sucursales que tiene asignadas.
+
+**9. Sin librería de gráficas (D11) y sin Excel:** las barras se dibujan con CSS/SVG, y se exporta a **CSV**
+(sin dependencia). Si las barras no alcanzan, se propone una librería aparte, con su justificación.
+
+**Riesgo conocido:** que el corte no cuadre por una venta con cambio mal calculado. Por eso la regla vive en
+una función pura con tests y la RPC de cierre la repite en SQL; un test compara ambas con las mismas entradas
+(mismo patrón que `lib/cfdi.ts` y su copia).
 
 ---
 
