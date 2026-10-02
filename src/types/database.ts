@@ -2710,6 +2710,15 @@ export type Database = {
         Args: { p_line_id: string }
         Returns: undefined
       }
+      report_sales_summary: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       reschedule_appointment: {
         Args: {
           p_appointment_id: string
