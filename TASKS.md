@@ -1055,12 +1055,26 @@ externo ni dependencia nueva.
   cambio; si alguien paga con tarjeta de más, ese sobrepago sí aparece y el total por métodos puede exceder al de
   ventas. Tests en `report-sales-summary.spec.ts` (16): venta a las 11 pm, misma hora en CDMX y Tijuana, cambio de
   mes, periodo sin ventas, descuento, canceladas, pago mixto, aislamiento y sucursal.
-- [ ] **12.8** 🧪 RPC `report_top_items`: servicios y productos más vendidos (cantidad e importe), con el IVA
+- [x] **12.8** 🧪 RPC `report_top_items`: servicios y productos más vendidos (cantidad e importe), con el IVA
   por partida. Tests: producto y servicio en el mismo ticket, cantidad > 1, partida de insumo de consulta,
   periodo vacío. _Verificar:_ verde.
-- [ ] **12.9** 🧪 RPC `report_staff_activity`: citas atendidas y monto de servicios por empleado, y ventas de
+  **Hecho 2026-10-09 (#2076):** `report_top_items(negocio, desde, hasta, sucursal?, límite)` devuelve
+  `{ services, products }`, cada lista ordenada por cantidad y luego por importe (límite de 1 a 100). Un insumo de
+  consulta cobrado cuenta como **producto**. El importe es el de la partida **con IVA y antes del descuento de la
+  venta**, así que la suma de la lista puede exceder al total de ventas cuando hubo descuentos (la pantalla debe
+  decirlo). Nombre = el de la partida más reciente. Las dos funciones comparten la validación de permiso y periodo
+  (`app.assert_report_access`, interna). Tests en `report-top-items-staff.spec.ts`.
+- [x] **12.9** 🧪 RPC `report_staff_activity`: citas atendidas y monto de servicios por empleado, y ventas de
   mostrador por quien cobró (regla 8 de las decisiones). Tests: cita sin empleado, empleado dado de baja,
   producto vendido junto con un servicio. _Verificar:_ verde.
+  **Hecho 2026-10-09 (#2076):** `report_staff_activity(negocio, desde, hasta, sucursal?)`: una fila por empleado
+  con citas completadas, importe de servicios, de productos y total. Atribución por **partida**: ligada a una cita →
+  empleado de esa cita; producto sin cita en una venta que lleva citas → empleado de la **cita más temprana** del
+  ticket; venta sin citas → quien cobró (`closed_by`). Lo que no tenga empleado (p. ej. una venta antigua sin
+  `closed_by`) sale como **"Sin asignar"** en vez de perderse. Las citas se cuentan por su fecha local de inicio y no
+  dependen de que se hayan cobrado. Un empleado dado de baja aparece si tuvo actividad. **Corrección al plan:** "cita
+  sin empleado asignado" **no puede ocurrir** (`appointments.employee_user_id` es obligatorio); el caso real de
+  "Sin asignar" es la venta sin `closed_by`.
 
 ### 12D. Interfaz
 
