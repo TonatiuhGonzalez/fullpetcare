@@ -19,6 +19,12 @@ const session = useSessionStore()
             title="Empresa y sucursales"
           />
           <v-list-item
+            v-if="session.role === 'owner'"
+            to="/app/configuracion/facturacion"
+            prepend-icon="mdi-file-certificate-outline"
+            title="Facturación"
+          />
+          <v-list-item
             to="/app/configuracion/cuenta"
             prepend-icon="mdi-account-cog-outline"
             title="Cuenta"

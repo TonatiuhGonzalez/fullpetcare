@@ -458,3 +458,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/platform-admin/deno.json"
 entrypoint = "./functions/platform-admin/index.ts"
+
+[functions.invoicing]
+enabled = true
+# Hay sesión (el dueño ya inició sesión): la verificación de JWT de la
+# plataforma queda prendida. Que además sea el dueño de ESE negocio y que el
+# negocio no esté en solo lectura lo revalida la función (can_manage_invoicing).
+verify_jwt = true
+import_map = "./functions/invoicing/deno.json"
+entrypoint = "./functions/invoicing/index.ts"

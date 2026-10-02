@@ -183,7 +183,8 @@ FullPetCare/
 │   ├── functions/
 │   │   ├── public-pet-view/     # Edge Function de la vista cliente
 │   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
-│   │   └── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   ├── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   └── invoicing/           # único que habla con el PAC (Facturapi); hoy: configurar el negocio y su certificado (11.15)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
 ├── scripts/
@@ -385,6 +386,11 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   `checkout_counter_sale()` cobra una venta de mostrador sin cita (pide cliente
   registrado). Al pagar baja la existencia (`stock_movements` tipo `sale`); un trigger
   sobre `sales` la devuelve (`sale_reversal`) al pasar de `paid` a `cancelled`.
+- **Configuración fiscal (11.15, `tenant_invoicing_settings`):** 1 a 1 con `tenants`; guarda el id
+  de la organización del negocio en el PAC y `csd_valid_until`. Solo el dueño la lee y solo la Edge
+  Function `invoicing` la escribe. El certificado (CSD) **nunca se guarda**: pasa directo al PAC. "Listo
+  para facturar" se calcula (`lib/fiscalSetup.ts`), no es una columna. Los datos fiscales de `tenants` se
+  escriben con la RPC `update_tenant_fiscal_data` (solo dueño).
 - `payments.payment_form_code` (c_FormaPago): con `method = 'card'` es obligatorio y lo
   elige quien cobra (`04` crédito / `28` débito); efectivo (`01`) y transferencia (`03`)
   se derivan solos. La factura lo precarga.

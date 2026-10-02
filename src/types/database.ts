@@ -1763,6 +1763,47 @@ export type Database = {
           },
         ]
       }
+      tenant_invoicing_settings: {
+        Row: {
+          created_at: string
+          csd_valid_until: string | null
+          deleted_at: string | null
+          id: string
+          pac_organization_id: string | null
+          series: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csd_valid_until?: string | null
+          deleted_at?: string | null
+          id?: string
+          pac_organization_id?: string | null
+          series?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csd_valid_until?: string | null
+          deleted_at?: string | null
+          id?: string
+          pac_organization_id?: string | null
+          series?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_invoicing_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_platform_info: {
         Row: {
           billing_period: Database["public"]["Enums"]["plan_billing_period"]
@@ -2036,6 +2077,7 @@ export type Database = {
         }
         Returns: string
       }
+      can_manage_invoicing: { Args: { p_tenant_id: string }; Returns: boolean }
       cancel_my_tenant: {
         Args: { p_comment?: string; p_tenant_id: string }
         Returns: undefined
@@ -2496,6 +2538,16 @@ export type Database = {
         }
       }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      update_tenant_fiscal_data: {
+        Args: {
+          p_legal_name: string
+          p_postal_code: string
+          p_rfc: string
+          p_tax_regime_code: string
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       appointment_status:

@@ -143,6 +143,12 @@ export const router = createRouter({
               meta: { requiresOwner: true },
             },
             {
+              path: 'facturacion',
+              name: 'configuracion-facturacion',
+              component: () => import('@/pages/configuracion/FiscalSettingsPage.vue'),
+              meta: { requiresOwner: true },
+            },
+            {
               path: 'cuenta',
               name: 'configuracion-cuenta',
               component: () => import('@/pages/configuracion/AccountSettingsPage.vue'),
