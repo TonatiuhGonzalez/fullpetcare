@@ -62,6 +62,9 @@ const menuItems = computed<SideMenuItem[]>(() => [
   ...(session.canView('cash_register')
     ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja' }]
     : []),
+  ...(session.canView('reports')
+    ? [{ title: 'Reportes', icon: 'mdi-chart-bar', to: '/app/reportes' }]
+    : []),
   ...(isFrontDesk(session.role)
     ? [{ title: 'Venta de mostrador', icon: 'mdi-cash-register', to: '/app/venta-mostrador' }]
     : []),
