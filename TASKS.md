@@ -1100,12 +1100,28 @@ externo ni dependencia nueva.
   cierra contando $470 y el comprobante dice "La caja cuadra", el corte aparece en el historial, y un groomer que
   escribe `/app/caja` en la barra termina en la agenda. **No cubierto:** el aviso de ventas en efectivo fuera de un
   turno (queda como riesgo de la fase) y probar con ventas reales del día.
-- [ ] **12.12** Pantalla **Reportes** (solo con permiso): periodo (hoy, semana, mes, rango), sucursal (el
+- [x] **12.12** Pantalla **Reportes** (solo con permiso): periodo (hoy, semana, mes, rango), sucursal (el
   dueño ve todas), tarjetas de totales, barras por día y por método dibujadas con CSS/SVG, tablas de más
   vendidos y de empleados, y **exportar a CSV** (con codificación para que Excel lea los acentos).
   _Verificar:_ en navegador; el CSV abre en Excel sin caracteres rotos y suma lo mismo que la pantalla.
-- [ ] **12.13** Menú y rutas: entradas "Caja" y "Reportes" gateadas por permiso (`requiresPermission`), igual
+  **Hecho 2026-10-11 (#2078):** `/app/reportes` (`ReportsPage`): periodo (hoy, esta semana de lunes a hoy, este mes,
+  mes pasado, rango de fechas con tope de un año), sucursal (si hay más de una), tres pestañas (resumen, más vendido,
+  empleados), tarjetas de totales, barras por día y por método dibujadas con CSS (sin librería, D11) y descarga a
+  CSV por reporte. `lib/reports.ts` (20 tests: periodos con cruce de mes, año y bisiesto; escala de barras; CSV),
+  `services/reports.ts` y `stores/reports.ts` (6 tests). El CSV lleva **BOM** (Excel lee los acentos), importes en
+  pesos con punto y sin "$" (Excel los suma) y **neutraliza las fórmulas**: un nombre de producto que empiece con
+  `=`, `+`, `-` o `@` se prefija con una comilla, porque Excel lo ejecutaría. La pantalla **explica las dos
+  advertencias**: subtotal e IVA antes del descuento, y el sobrepago con tarjeta en el cobrado por método.
+  **Verificado en navegador** con Playwright contra la base local (script desechable): con 3 ventas pagadas y 1
+  cancelada, el total ($895.00), el ticket promedio, las canceladas y el desglose por método coinciden con los
+  tickets; el CSV de ventas por día suma lo mismo que la pantalla (con BOM); el nombre de producto `=CMD(...)` sale
+  neutralizado; un rango invertido da un error en español; y recepción, que no tiene `reports`, ni ve el menú ni
+  entra por URL (termina en la agenda). **No cubierto:** abrir el CSV en un Excel real (se comprobó el contenido y
+  el BOM, no la apertura) y la pantalla con miles de ventas.
+- [x] **12.13** Menú y rutas: entradas "Caja" y "Reportes" gateadas por permiso (`requiresPermission`), igual
   que Inventario. _Verificar:_ cada rol ve solo lo suyo, y la URL directa de una pantalla sin permiso redirige.
+  **Hecho 2026-10-11 (#2077 y #2078):** "Caja" y "Reportes" ya están en el menú y en el router con
+  `requiresPermission`; probado con dueño (ve ambos), recepción (ve Caja, no Reportes) y groomer (ninguno).
 
 ### 12E. Cierre
 

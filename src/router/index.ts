@@ -131,6 +131,13 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Reportes (tarea 12.12): gateado por PERMISO; por defecto solo el dueño.
+          path: 'reportes',
+          name: 'reportes',
+          component: () => import('@/pages/reportes/ReportsPage.vue'),
+          meta: { requiresPermission: 'reports' },
+        },
+        {
           // Caja (tarea 12.11): gateada por PERMISO, igual que inventario.
           path: 'caja',
           name: 'caja',
