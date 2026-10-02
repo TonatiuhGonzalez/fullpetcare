@@ -30,6 +30,17 @@ export async function getCurrentBySale(saleId: string): Promise<InvoiceRequest |
   return pickCurrentInvoice(data ?? [])
 }
 
+/** Nombre de quien canceló la factura (los miembros del negocio se ven entre sí). */
+export async function getCancelledByName(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data?.full_name ?? null
+}
+
 /** La venta pagada de una cita (null si aún no se cobra). */
 export async function findPaidSaleIdByAppointment(
   appointmentId: string,

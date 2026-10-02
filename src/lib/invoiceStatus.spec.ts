@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { pickCurrentInvoice } from './invoiceStatus'
+import { cancelMotiveLabel, pickCurrentInvoice } from './invoiceStatus'
 
 const row = (id: string, status: string, created_at: string) => ({
   id,
@@ -49,5 +49,19 @@ describe('pickCurrentInvoice', () => {
       row('b', 'cancelled', '2026-10-02T10:00:00Z'),
     ]
     expect(pickCurrentInvoice(rows)?.id).toBe('b')
+  })
+})
+
+describe('cancelMotiveLabel', () => {
+  it('traduce los cuatro motivos del SAT, también los que aún no se ofrecen', () => {
+    // Una factura cancelada por otra vía (01 o 04) debe leerse bien en pantalla.
+    expect(cancelMotiveLabel('02')).toMatch(/sin sustituirla/)
+    expect(cancelMotiveLabel('01')).toMatch(/sustituyó/)
+    expect(cancelMotiveLabel('04')).toMatch(/global/)
+  })
+
+  it('no truena con un código vacío o desconocido', () => {
+    expect(cancelMotiveLabel(null)).toBe('Motivo no registrado')
+    expect(cancelMotiveLabel('99')).toBe('Motivo no registrado')
   })
 })

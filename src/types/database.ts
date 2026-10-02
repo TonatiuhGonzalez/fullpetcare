@@ -683,6 +683,7 @@ export type Database = {
         Row: {
           cancellation_reason_code: string | null
           cancelled_at: string | null
+          cancelled_by: string | null
           cfdi_use: string
           created_at: string
           deleted_at: string | null
@@ -707,6 +708,7 @@ export type Database = {
         Insert: {
           cancellation_reason_code?: string | null
           cancelled_at?: string | null
+          cancelled_by?: string | null
           cfdi_use: string
           created_at?: string
           deleted_at?: string | null
@@ -731,6 +733,7 @@ export type Database = {
         Update: {
           cancellation_reason_code?: string | null
           cancelled_at?: string | null
+          cancelled_by?: string | null
           cfdi_use?: string
           created_at?: string
           deleted_at?: string | null

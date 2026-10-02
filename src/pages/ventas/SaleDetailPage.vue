@@ -27,6 +27,7 @@ const receiver = ref<InvoiceReceiver>({
 })
 const loading = ref(false)
 const loadError = ref<string | null>(null)
+const cancelledByName = ref<string | null>(null)
 const busy = ref(false)
 const actionError = ref<string | null>(null)
 const snackbar = ref({ show: false, text: '' })
@@ -48,6 +49,7 @@ async function load(): Promise<void> {
   try {
     ticket.value = await checkoutService.getTicket(props.id)
     invoice.value = await invoicingService.getCurrentBySale(props.id)
+    await loadCancelledBy()
     // Si ya hay una solicitud (p. ej. la que se pidió al cobrar) se precarga con
     // sus datos; si no, con los del cliente.
     if (invoice.value) {
@@ -80,6 +82,15 @@ async function load(): Promise<void> {
 
 onMounted(load)
 
+// Quién canceló la factura vigente (si está cancelada). Un fallo aquí no debe
+// romper la pantalla: solo se muestra sin el nombre.
+async function loadCancelledBy(): Promise<void> {
+  const userId = invoice.value?.status === 'cancelled' ? invoice.value.cancelled_by : null
+  cancelledByName.value = userId
+    ? await invoicingService.getCancelledByName(userId).catch(() => null)
+    : null
+}
+
 // Cada acción recarga la factura para mostrar el estado real que dejó la función.
 async function run(action: () => Promise<void>, success: string): Promise<void> {
   busy.value = true
@@ -94,6 +105,7 @@ async function run(action: () => Promise<void>, success: string): Promise<void> 
     invoice.value = await invoicingService
       .getCurrentBySale(props.id)
       .catch(() => invoice.value)
+    await loadCancelledBy()
     busy.value = false
   }
 }
@@ -164,6 +176,7 @@ async function handleOpen(kind: 'xml' | 'pdf'): Promise<void> {
         :receiver="receiver"
         :payment-form-code="paymentFormCode"
         :can-edit="canEdit"
+        :cancelled-by-name="cancelledByName"
         :busy="busy"
         :error="actionError"
         @stamp="handleStamp"

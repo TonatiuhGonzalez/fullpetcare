@@ -4,7 +4,12 @@
 // hacer quien factura; SaleDetailPage habla con el servicio.
 import { computed, ref, watch } from 'vue'
 
-import { CANCEL_MOTIVES, INVOICE_STATUS_LABELS, PAYMENT_FORMS } from '@/lib/invoiceStatus'
+import {
+  CANCEL_MOTIVES,
+  INVOICE_STATUS_LABELS,
+  PAYMENT_FORMS,
+  cancelMotiveLabel,
+} from '@/lib/invoiceStatus'
 import type { InvoiceStatus } from '@/lib/invoiceStatus'
 import type { InvoiceReceiver } from '@/services/invoicing'
 import type { InvoiceRequest } from '@/services/invoicing'
@@ -16,6 +21,8 @@ const props = defineProps<{
   /** Forma de pago con la que se cobró; se puede corregir antes de emitir. */
   paymentFormCode: string | null
   canEdit: boolean
+  /** Quién canceló la factura (si está cancelada y se pudo leer). */
+  cancelledByName: string | null
   busy: boolean
   error: string | null
 }>()
@@ -47,6 +54,14 @@ const statusLabel = computed(() =>
 )
 const canIssue = computed(
   () => !status.value || status.value === 'pending' || status.value === 'cancelled',
+)
+const cancelledAtLabel = computed(() =>
+  props.invoice?.cancelled_at
+    ? new Date(props.invoice.cancelled_at).toLocaleString('es-MX', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      })
+    : '',
 )
 const hasFiles = computed(() => !!props.invoice?.xml_path && !!props.invoice?.pdf_path)
 
@@ -100,6 +115,19 @@ function handleCancel(): void {
       <p class="text-body-2 mb-3">
         <strong>Receptor:</strong> {{ invoice?.legal_name }} ({{ invoice?.rfc }})
       </p>
+      <v-alert
+        v-if="status === 'cancelled'"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        title="Factura cancelada"
+      >
+        {{ cancelMotiveLabel(invoice?.cancellation_reason_code ?? null) }}. Cancelada el
+        {{ cancelledAtLabel
+        }}<template v-if="cancelledByName"> por {{ cancelledByName }}</template
+        >. Sus archivos siguen disponibles para consulta.
+      </v-alert>
       <div v-if="hasFiles" class="d-flex ga-2 flex-wrap mb-3">
         <v-btn
           size="small"
