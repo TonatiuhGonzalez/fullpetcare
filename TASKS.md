@@ -987,11 +987,18 @@ externo ni dependencia nueva.
 - [x] **12.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D17 (cambiar lo que no convenza
   ahora es barato). _Verificar:_ el usuario aprobó por escrito; D17 sin "pendiente de aprobación". **Hecho
   2026-10-06 (#2071):** el usuario aprobó las diez decisiones sin cambios.
-- [ ] **12.2** 📚🧪 `lib/cashCount.ts` (puro): efectivo esperado de un turno a partir de fondo, ventas con sus
+- [x] **12.2** 📚🧪 `lib/cashCount.ts` (puro): efectivo esperado de un turno a partir de fondo, ventas con sus
   pagos y movimientos de caja; cambio de una venta; diferencia (sobrante/faltante). Explicar por qué el cambio
   se deriva y no se guarda. Tests de bordes: pago exacto, cambio con efectivo, **pago mixto efectivo + tarjeta
   con sobrepago**, venta solo con tarjeta (cambio 0 aunque el monto exceda), turno sin ventas, retiro mayor al
   efectivo, venta cancelada, descuento. _Verificar:_ verde; cobertura de `lib/` ≥ 80 %.
+  **Hecho 2026-10-06 (#2072):** `lib/cashCount.ts` (22 tests). Reglas que quedaron fijas y que la RPC de cierre
+  (12.6) debe repetir en SQL: el **cambio de una venta** es `pagado − total`, **limitado al efectivo recibido** en
+  esa venta (con tarjeta de más no hay cambio en efectivo); el efectivo que se queda en caja es lo recibido menos el
+  cambio; solo cuentan ventas `paid`. Un retiro mayor al efectivo deja el esperado **negativo** (se devuelve tal
+  cual para que la pantalla lo señale, no se recorta a 0). Un monto no entero o negativo **lanza error** en vez de
+  redondear en silencio. Supuesto a confirmar con un contador o con el negocio: si alguien paga con tarjeta de más y
+  se le devuelve efectivo, el sistema no lo ve (no hay forma de registrarlo todavía).
 
 ### 12B. Caja en la base de datos
 
