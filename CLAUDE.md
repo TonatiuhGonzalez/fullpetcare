@@ -865,7 +865,9 @@ suave) solo las empresas marcadas `is_demo`** (columna de `tenant_platform_info`
 alta en una demo con la casilla "Empresa de demostración" del formulario. `is_demo` nace en
 `false`, así que una empresa sin marcar se trata como cliente real y el reset no la toca:
 olvidar la casilla en una empresa de demo solo deja una empresa de sobra (se oculta a mano
-desde el panel), nunca borra a un cliente. Aun así, ese paso sigue tocando producción:
+desde el panel), nunca borra a un cliente. Desde la fase 11 también restaura el catálogo base de productos y sus
+existencias de Patitas Felices (con un movimiento `adjustment` por la diferencia, porque la
+bitácora de inventario es inmutable) y no toca la configuración fiscal. Aun así, ese paso sigue tocando producción:
 no marques como demo una empresa real.
 
 ### Git

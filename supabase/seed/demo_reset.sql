@@ -248,6 +248,97 @@ begin
 end $$;
 
 -- =============================================================================
+-- Inventario de demostración (fase 11, tarea 11.22)
+-- =============================================================================
+-- Deja el catálogo de productos y las existencias de Patitas Felices como las
+-- trae seed.sql, para que la demo muestre siempre los tres estados de la
+-- pantalla de Inventario (normal, stock bajo y "Sin inventario").
+--
+-- Por qué las existencias se restauran con un AJUSTE y no borrando movimientos:
+-- `stock_movements` es una bitácora inmutable (sin UPDATE ni DELETE, ni siquiera
+-- con service_role; CLAUDE.md §6.5). Lo vendido o consumido en una demo anterior
+-- no se puede "deshacer": se compensa con un movimiento `adjustment` por la
+-- diferencia entre lo que hay y lo que debería haber. Si ya está en su valor,
+-- no se escribe nada (repetir el reset no ensucia la bitácora).
+--
+-- Lo que este bloque NO toca, a propósito: nada fiscal. `tenant_invoicing_settings`
+-- (la organización del negocio en el PAC y la vigencia de su certificado) queda
+-- como esté, para que la demo no pierda el certificado de pruebas cargado. Las
+-- facturas de demos anteriores se ocultan en el Paso 1 de arriba, como las ventas.
+-- Este script jamás llama al PAC.
+do $$
+declare
+  v_tenant_patitas uuid := 'b0000000-0000-4000-8000-000000000001';
+  v_user_dueno     uuid := 'a0000000-0000-4000-8000-000000000001';
+  v_target record;
+  v_current integer;
+begin
+  -- Los insumos usados en consultas de demos anteriores se ocultan, como las citas.
+  update appointment_products set deleted_at = now()
+    where tenant_id = v_tenant_patitas and deleted_at is null;
+
+  -- Catálogo base (mismos datos que seed.sql). Se revive lo que se hubiera
+  -- editado u ocultado, y se oculta (borrado suave) cualquier producto creado
+  -- durante la demo.
+  insert into products (id, tenant_id, name, sku, price_cents, tax_rate_bp, cost_cents, min_stock, is_active)
+  values
+    ('20000000-0000-4000-8000-000000000001', v_tenant_patitas, 'Alimento seco adulto 3 kg', 'ALI-3KG', 38900, 1600, 26000, 5, true),
+    ('20000000-0000-4000-8000-000000000002', v_tenant_patitas, 'Shampoo hipoalergénico 250 ml', 'SHA-250', 14500, 1600, 8000, 3, true),
+    ('20000000-0000-4000-8000-000000000003', v_tenant_patitas, 'Collar de nylon mediano', 'COL-M', 9900, 1600, null, 0, false)
+  on conflict (id) do update set
+    name = excluded.name, sku = excluded.sku, price_cents = excluded.price_cents,
+    tax_rate_bp = excluded.tax_rate_bp, cost_cents = excluded.cost_cents,
+    min_stock = excluded.min_stock, is_active = excluded.is_active, deleted_at = null;
+
+  update products set deleted_at = now()
+    where tenant_id = v_tenant_patitas
+      and deleted_at is null
+      and id <> all(array[
+        '20000000-0000-4000-8000-000000000001'::uuid,
+        '20000000-0000-4000-8000-000000000002'::uuid,
+        '20000000-0000-4000-8000-000000000003'::uuid
+      ]);
+
+  -- Existencia objetivo por sucursal. La primera vez (base sin movimientos) el
+  -- ajuste es toda la existencia; después solo corrige la diferencia.
+  --
+  -- Por qué las existencias NO están en seed.sql: ese archivo es la base
+  -- determinista de los tests de base de datos (checkout, consumo de insumos,
+  -- movimientos de inventario), que asumen existencia 0 de entrada. Sembrarlas
+  -- ahí rompería 21 tests de inventario. Para la demo sirve este script, que se
+  -- puede correr también contra la base local.
+  --
+  -- Estados que deja visibles en la pantalla de Inventario:
+  --   Alimento 3 kg: Centro 12 (normal) y Del Valle 0 ("Sin inventario").
+  --   Shampoo: Centro 6 (normal) y Del Valle 2 (stock bajo: mínimo 3).
+  --   Collar (inactivo): 10 en Centro, conserva existencia pero no se ofrece.
+  for v_target in
+    select * from (values
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000001'::uuid, 12),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000001'::uuid, 0),
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000002'::uuid, 6),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000002'::uuid, 2),
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000003'::uuid, 10),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000003'::uuid, 0)
+    ) as t(branch_id, product_id, quantity)
+  loop
+    select coalesce(sum(quantity), 0)::integer into v_current
+      from stock_movements
+      where tenant_id = v_tenant_patitas
+        and branch_id = v_target.branch_id
+        and product_id = v_target.product_id;
+
+    if v_current <> v_target.quantity then
+      insert into stock_movements (tenant_id, branch_id, product_id, movement_type, quantity, reason, created_by)
+      values (
+        v_tenant_patitas, v_target.branch_id, v_target.product_id, 'adjustment',
+        v_target.quantity - v_current, 'Restablecer inventario de demostración', v_user_dueno
+      );
+    end if;
+  end loop;
+end $$;
+
+-- =============================================================================
 -- Estado de PLATAFORMA (fase 10): lo que el superadmin toca en una demo
 -- =============================================================================
 -- El panel de superadmin permite suspender empresas, cambiar sus notas y dar
