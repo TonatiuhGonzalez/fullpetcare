@@ -2719,6 +2719,25 @@ export type Database = {
         }
         Returns: Json
       }
+      report_staff_activity: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      report_top_items: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_limit?: number
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       reschedule_appointment: {
         Args: {
           p_appointment_id: string
