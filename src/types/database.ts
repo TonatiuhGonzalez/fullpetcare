@@ -681,55 +681,76 @@ export type Database = {
       }
       invoice_requests: {
         Row: {
+          cancellation_reason_code: string | null
+          cancelled_at: string | null
           cfdi_use: string
           created_at: string
           deleted_at: string | null
+          error_message: string | null
           fiscal_uuid: string | null
           id: string
           legal_name: string
+          pac_invoice_id: string | null
           payment_form_code: string
           payment_method_code: string
+          pdf_path: string | null
           postal_code: string
           rfc: string
           sale_id: string
+          stamped_at: string | null
           status: string
           tax_regime_code: string
           tenant_id: string
           updated_at: string
+          xml_path: string | null
         }
         Insert: {
+          cancellation_reason_code?: string | null
+          cancelled_at?: string | null
           cfdi_use: string
           created_at?: string
           deleted_at?: string | null
+          error_message?: string | null
           fiscal_uuid?: string | null
           id?: string
           legal_name: string
+          pac_invoice_id?: string | null
           payment_form_code: string
           payment_method_code: string
+          pdf_path?: string | null
           postal_code: string
           rfc: string
           sale_id: string
+          stamped_at?: string | null
           status?: string
           tax_regime_code: string
           tenant_id: string
           updated_at?: string
+          xml_path?: string | null
         }
         Update: {
+          cancellation_reason_code?: string | null
+          cancelled_at?: string | null
           cfdi_use?: string
           created_at?: string
           deleted_at?: string | null
+          error_message?: string | null
           fiscal_uuid?: string | null
           id?: string
           legal_name?: string
+          pac_invoice_id?: string | null
           payment_form_code?: string
           payment_method_code?: string
+          pdf_path?: string | null
           postal_code?: string
           rfc?: string
           sale_id?: string
+          stamped_at?: string | null
           status?: string
           tax_regime_code?: string
           tenant_id?: string
           updated_at?: string
+          xml_path?: string | null
         }
         Relationships: [
           {
@@ -2077,6 +2098,7 @@ export type Database = {
         }
         Returns: string
       }
+      can_invoice: { Args: { p_tenant_id: string }; Returns: boolean }
       can_manage_invoicing: { Args: { p_tenant_id: string }; Returns: boolean }
       cancel_my_tenant: {
         Args: { p_comment?: string; p_tenant_id: string }
@@ -2565,7 +2587,7 @@ export type Database = {
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
-      permission_module: "employees" | "inventory"
+      permission_module: "employees" | "inventory" | "invoicing"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
@@ -2729,7 +2751,7 @@ export const Constants = {
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
-      permission_module: ["employees", "inventory"],
+      permission_module: ["employees", "inventory", "invoicing"],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       plan_billing_period: ["monthly", "yearly", "indefinite"],

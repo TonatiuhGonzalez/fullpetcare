@@ -849,27 +849,64 @@ HMH Four: tareas #2036 a #2048.
   sandbox los endpoints (`/organizations`, `/legal`, `/certificate`) y el campo con la vigencia
   (`certificate.expires_at`), que se escribieron de memoria de su documentación; (3) probar en navegador el
   flujo completo y que un certificado equivocado muestre el mensaje.
-- [ ] **11.16** 📚🧪 `lib/cfdi.ts` (puro): de venta + cliente + pagos a cuerpo de comprobante. Cubre
+- [x] **11.16** 📚🧪 `lib/cfdi.ts` (puro): de venta + cliente + pagos a cuerpo de comprobante. Cubre
   desglose de IVA hacia atrás por concepto, **la suma de los conceptos debe dar exactamente el total
   de la venta** (el riesgo del redondeo, abajo), forma de pago desde `payments.payment_form_code` (con pagos mezclados, la de mayor monto; a confirmar con un contador),
   tasa 0 vs. exento, uso de CFDI por defecto, y rechazo de datos del cliente incompletos. Tests de
   bordes: precio 0, cantidad > 1 con centavos que no dividen exacto, un solo concepto de $1, venta con
   descuento, pago mixto efectivo + tarjeta. _Verificar:_ verde; cobertura de `lib/` ≥ 80 %.
-- [ ] **11.17** 📚🧪 Migración de `invoice_requests` (estado, `fiscal_uuid`, rutas de XML y PDF,
+  **Hecho 2026-10-04 (#2045):** `lib/cfdi.ts` (97 % de cobertura). El **descuento de la venta se reparte entre los
+  conceptos** por el método del mayor residuo y el IVA se recalcula sobre lo que de verdad pagó el cliente por cada
+  uno; el total del comprobante es exactamente `sales.total_cents` (se prueba con 300 ventas generadas). Ojo: la
+  RPC de cobro **no ajusta `sales.tax_cents` por el descuento**, por eso la factura no usa esos totales sino que
+  recalcula desde las partidas. Tasa 0 se factura como tasa 0 %, no como exento (**a confirmar con un contador**,
+  igual que la forma de pago de pagos mixtos, que aquí es la del pago de mayor monto: el `invoiceRequests.create`
+  del cobro sigue guardando `06` en ese caso y la factura la corrige al emitir). La Edge Function usa una copia
+  (`functions/_shared/cfdi.ts`, las funciones solo importan de su carpeta) y `cfdi-parity.spec.ts` exige que ambas den
+  lo mismo.
+- [x] **11.17** 📚🧪 Migración de `invoice_requests` (estado, `fiscal_uuid`, rutas de XML y PDF,
   fecha de timbrado, cancelación y motivo SAT, `error_message`) + bucket privado `invoices` con la
   convención `{tenant_id}/{invoice_request_id}.{ext}` + `invoicing` en `permission_module`. RLS y tests:
   otro tenant no ve facturas ni sus archivos; una factura timbrada no se puede editar ni borrar (solo
   cambia de estado vía la Edge Function). _Verificar:_ verde.
+  **Hecho 2026-10-04 (#2045):** migraciones `invoicing_permission_module` y `invoice_requests_stamping`. Estados
+  `pending` → `stamping` → `stamped` → `cancelled`; el candado de "una sola factura viva por venta" es un índice
+  único parcial (`stamping` y `stamped` cuentan; una cancelada libera la venta). **La política de INSERT original
+  dejaba crear una solicitud con cualquier estado**: se endureció para que los usuarios solo creen `pending` limpias
+  (si no, se fabricaba una "timbrada" falsa). Un trigger impide editar los datos de una timbrada (solo cancelar) y
+  tocar una cancelada, incluso con `service_role`; el borrado físico se bloquea salvo en `pending` (no es aún un
+  documento fiscal, y las pruebas existentes la limpian así). `can_invoice()` para la Edge Function. Bucket privado
+  `invoices` con solo lectura para quien tenga `invoicing`/ver. Permisos por defecto: dueño y recepción, el resto
+  nada (también en `seed.sql`). Tests: `invoice-stamping-rls.spec.ts`.
 - [ ] **11.18** 📚🧪 Edge Function `invoicing` (acciones `stamp`, `cancel`, `download`): revalida
   permiso y membresía con el JWT **antes** de usar el PAC; un solo timbrado por venta (idempotente: si
   se reintenta tras una falla de red, no timbra dos veces); guarda XML y PDF; en error del PAC guarda el
   mensaje y deja la solicitud reintentable. Tests de la función (necesitan `supabase functions serve`,
   como los de `platform-admin`): sin sesión, otro tenant, venta no pagada, venta ya facturada, PAC
   caído. _Verificar:_ timbrado exitoso en sandbox con XML descargable; cancelación con motivo.
+  **Avance 2026-10-04 (#2045), código hecho y pendiente de sandbox (queda sin marcar):** acciones `stamp`, `cancel` y
+  `download` (esta última re-guarda los archivos si no se alcanzaron a guardar; abrirlos lo hace la pantalla con ligas
+  firmadas del bucket). Todo lo específico de Facturapi vive en `functions/_shared/facturapi.ts`. La función
+  **recalcula los importes ella misma** y exige que sumen el total del ticket; la solicitud pasa a `stamping` con una
+  toma atómica y, si el PAC falla, vuelve a `pending` con su mensaje. Solo se ofrecen los motivos de cancelación 02 y
+  03 (el 01 pide la factura sustituta y el 04 es de la global). Tests (`invoicing-function.spec.ts`): sin sesión,
+  sin permiso, otro negocio, venta inexistente, no pagada, sin certificado, y motivos inválidos. **Pendiente /
+  decisiones abiertas:** (1) verificar en sandbox; (2) **timbrar en producción** necesita la llave *live* de cada
+  organización, que el PAC solo muestra al crearla: hay que decidir dónde guardarla (hoy `FACTURAPI_MODE=live`
+  responde "no habilitado"; en `test` se pide la llave de pruebas de la organización); (3) si la función se cae
+  después de timbrar y antes de anotarlo, la solicitud queda en `stamping` (el UUID va al log para recuperarla a
+  mano); no hay recuperación automática; (4) las rutas de la API de organizaciones (`PUT /organizations/{id}` y
+  `/csd`) salieron de la documentación pública y las fuentes consultadas no coincidían del todo.
 - [ ] **11.19** Interfaz de facturación: botón "Facturar" en el detalle de la venta, formulario con los
   datos fiscales del cliente (precargados de `customers`), estado de la factura, descarga de PDF/XML y
   cancelación con motivo. El link/archivo se comparte a mano (WhatsApp sigue fuera de alcance).
   _Verificar:_ en navegador, flujo completo en sandbox: cobrar → facturar → descargar → cancelar.
+  **Avance 2026-10-04 (#2045), pantalla hecha y pendiente de verificar en navegador con el sandbox (queda sin marcar):**
+  no existía un "detalle de venta", así que se creó `/app/ventas/:id` (`SaleDetailPage` + `InvoicePanel`, gateada por el
+  permiso `invoicing`), con enlace desde la pantalla de cobro y desde el detalle de una cita ya cobrada. Precarga los
+  datos del cliente (o los de la solicitud pedida al cobrar) y la forma de pago del cobro, corregible; muestra estado,
+  último error con "Reintentar", descarga de PDF/XML y cancelación con motivo. `lib/invoiceStatus.ts` decide cuál
+  factura mostrar si una venta tiene varias.
 - [ ] **11.20** Factura global al público en general: agrupa las
   ventas del periodo sin factura individual en un solo CFDI (RFC genérico, información global con
   periodicidad, mes y año). Tabla puente venta ↔ factura para que ninguna venta quede en dos
