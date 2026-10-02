@@ -907,6 +907,12 @@ HMH Four: tareas #2036 a #2048.
   datos del cliente (o los de la solicitud pedida al cobrar) y la forma de pago del cobro, corregible; muestra estado,
   último error con "Reintentar", descarga de PDF/XML y cancelación con motivo. `lib/invoiceStatus.ts` decide cuál
   factura mostrar si una venta tiene varias.
+  **Cancelación (#2046, 2026-10-05):** la base guarda **quién** cancela (`cancelled_by`, columna nueva con un check:
+  una cancelada siempre trae motivo, fecha y persona). La bitácora no sirve para eso: la función escribe con
+  `service_role` y ahí `auth.uid()` es nulo. La función toma a la persona de su JWT, nunca del navegador, y **guarda el
+  XML y el PDF antes de cancelar** si faltaban (una cancelada ya no se puede tocar). La pantalla muestra motivo, fecha y
+  quién, y deja descargar los archivos. Siguen sin ofrecerse el motivo 01 (exige la factura sustituta, y el índice de
+  "una viva por venta" no deja emitir la nueva mientras la vieja sigue timbrada) y el 04 (solo de la global, 11.20).
 - [ ] **11.20** Factura global al público en general: agrupa las
   ventas del periodo sin factura individual en un solo CFDI (RFC genérico, información global con
   periodicidad, mes y año). Tabla puente venta ↔ factura para que ninguna venta quede en dos

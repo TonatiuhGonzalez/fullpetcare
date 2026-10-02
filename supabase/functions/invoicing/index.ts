@@ -442,7 +442,7 @@ async function loadStampedRequest({ caller, tenantId }: Ctx, form: FormData) {
   if (typeof id !== "string" || !id) return null;
   const { data } = await caller
     .from("invoice_requests")
-    .select("id, status, pac_invoice_id")
+    .select("id, status, pac_invoice_id, xml_path, pdf_path")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -474,11 +474,31 @@ async function cancel(ctx: Ctx, form: FormData): Promise<Response> {
   if (!organizationId) return json("El negocio no tiene facturación configurada.", 422);
   if (!pac.isConfigured()) return NOT_CONFIGURED();
 
+  // Quién cancela: se toma del JWT de quien llama (ya validado arriba), no de
+  // nada que mande el navegador. La bitácora no sirve para esto: con
+  // service_role `auth.uid()` es nulo.
+  const { data: caller } = await ctx.caller.auth.getUser();
+  if (!caller.user) return FORBIDDEN();
+
+  // El XML y el PDF deben seguir disponibles tras cancelar. Una cancelada ya no
+  // se puede tocar (la base lo impide), así que si faltan se guardan AHORA.
+  if (!request.xml_path || !request.pdf_path) {
+    const files = await storeFiles(ctx.admin, ctx.tenantId, request.id, organizationId, request.pac_invoice_id);
+    if (!files.xmlPath || !files.pdfPath) {
+      return json("No se pudieron guardar los archivos de la factura antes de cancelarla. Intenta de nuevo.", 502);
+    }
+  }
+
   await pac.cancelInvoice(organizationId, request.pac_invoice_id, motive);
-  // La base exige motivo y fecha al pasar a 'cancelled' (check + trigger).
+  // La base exige motivo, fecha y quién al pasar a 'cancelled' (checks + trigger).
   const { error } = await ctx.admin
     .from("invoice_requests")
-    .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancellation_reason_code: motive })
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason_code: motive,
+      cancelled_by: caller.user.id,
+    })
     .eq("id", request.id)
     .eq("status", "stamped");
   if (error) {

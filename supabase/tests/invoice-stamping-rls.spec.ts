@@ -41,9 +41,9 @@ async function seedRequest(
   const { rows } = await client.query(
     `insert into invoice_requests (tenant_id, sale_id, rfc, legal_name, tax_regime_code, cfdi_use,
        postal_code, payment_form_code, payment_method_code, status, fiscal_uuid, stamped_at,
-       cancelled_at, cancellation_reason_code)
+       cancelled_at, cancellation_reason_code, cancelled_by)
      values ($1, $2, 'RUCS850312AB1', 'Sofía Ruiz', '612', 'G03', '97000', '01', 'PUE', $3,
-       $4, $5, $6, $7)
+       $4, $5, $6, $7, $8)
      returning id`,
     [
       TENANT_PATITAS,
@@ -53,6 +53,7 @@ async function seedRequest(
       stamped ? new Date() : null,
       status === 'cancelled' ? new Date() : null,
       status === 'cancelled' ? '02' : null,
+      status === 'cancelled' ? USER_DUENO : null,
     ],
   )
   return rows[0].id
@@ -163,10 +164,46 @@ describe('invoice_requests: una timbrada no se edita ni se borra', () => {
       const id = await seedRequest(client, await seedSale(client), 'stamped')
       const { rowCount } = await client.query(
         `update invoice_requests set status = 'cancelled', cancelled_at = now(),
-           cancellation_reason_code = '02' where id = $1`,
-        [id],
+           cancellation_reason_code = '02', cancelled_by = $2 where id = $1`,
+        [id, USER_DUENO],
       )
       expect(rowCount).toBe(1)
+    })
+  })
+
+  it('no se puede cancelar sin decir quién cancela', async () => {
+    // La tarea pide que quede registrado con quién la canceló y cuándo: lo
+    // garantiza un check de la base, no solo la Edge Function.
+    await withTransaction(async (client) => {
+      const id = await seedRequest(client, await seedSale(client), 'stamped')
+      await expect(
+        client.query(
+          `update invoice_requests set status = 'cancelled', cancelled_at = now(),
+             cancellation_reason_code = '02' where id = $1`,
+          [id],
+        ),
+      ).rejects.toThrow(/cancelled_has_actor/)
+    })
+  })
+
+  it('una factura cancelada conserva sus rutas de XML y PDF', async () => {
+    // Siguen disponibles para consulta: cancelar no borra ni cambia los archivos.
+    await withTransaction(async (client) => {
+      const id = await seedRequest(client, await seedSale(client), 'stamped')
+      await client.query(
+        `update invoice_requests set xml_path = 't/x.xml', pdf_path = 't/x.pdf' where id = $1`,
+        [id],
+      )
+      await client.query(
+        `update invoice_requests set status = 'cancelled', cancelled_at = now(),
+           cancellation_reason_code = '03', cancelled_by = $2 where id = $1`,
+        [id, USER_DUENO],
+      )
+      const { rows } = await client.query(
+        'select xml_path, pdf_path from invoice_requests where id = $1',
+        [id],
+      )
+      expect(rows[0]).toEqual({ xml_path: 't/x.xml', pdf_path: 't/x.pdf' })
     })
   })
 

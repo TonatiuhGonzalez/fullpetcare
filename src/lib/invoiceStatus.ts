@@ -54,3 +54,14 @@ export const PAYMENT_FORMS = [
   { code: '04', title: 'Tarjeta de crédito' },
   { code: '28', title: 'Tarjeta de débito' },
 ] as const
+
+/** Texto del motivo de cancelación del SAT a partir de su código (catálogo completo). */
+export function cancelMotiveLabel(code: string | null): string {
+  const labels: Record<string, string> = {
+    '01': 'Se emitió con errores y se sustituyó con otra factura',
+    '02': 'Se emitió con errores, sin sustituirla',
+    '03': 'La operación no se llevó a cabo',
+    '04': 'Operación nominativa en una factura global',
+  }
+  return (code && labels[code]) || 'Motivo no registrado'
+}
