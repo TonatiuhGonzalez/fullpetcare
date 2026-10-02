@@ -232,7 +232,23 @@ begin
     (v_tenant_huellitas, 'owner', 'invoicing', true, true),
     (v_tenant_huellitas, 'receptionist', 'invoicing', true, true),
     (v_tenant_huellitas, 'groomer', 'invoicing', false, false),
-    (v_tenant_huellitas, 'vet', 'invoicing', false, false);
+    (v_tenant_huellitas, 'vet', 'invoicing', false, false),
+    (v_tenant_patitas, 'owner', 'cash_register', true, true),
+    (v_tenant_patitas, 'receptionist', 'cash_register', true, true),
+    (v_tenant_patitas, 'groomer', 'cash_register', false, false),
+    (v_tenant_patitas, 'vet', 'cash_register', false, false),
+    (v_tenant_patitas, 'owner', 'reports', true, true),
+    (v_tenant_patitas, 'receptionist', 'reports', false, false),
+    (v_tenant_patitas, 'groomer', 'reports', false, false),
+    (v_tenant_patitas, 'vet', 'reports', false, false),
+    (v_tenant_huellitas, 'owner', 'cash_register', true, true),
+    (v_tenant_huellitas, 'receptionist', 'cash_register', true, true),
+    (v_tenant_huellitas, 'groomer', 'cash_register', false, false),
+    (v_tenant_huellitas, 'vet', 'cash_register', false, false),
+    (v_tenant_huellitas, 'owner', 'reports', true, true),
+    (v_tenant_huellitas, 'receptionist', 'reports', false, false),
+    (v_tenant_huellitas, 'groomer', 'reports', false, false),
+    (v_tenant_huellitas, 'vet', 'reports', false, false);
 end $$;
 
 -- ===========================================================================
@@ -414,7 +430,15 @@ begin
     (v_tenant_mimos, 'owner', 'invoicing', true, true),
     (v_tenant_mimos, 'receptionist', 'invoicing', true, true),
     (v_tenant_mimos, 'groomer', 'invoicing', false, false),
-    (v_tenant_mimos, 'vet', 'invoicing', false, false);
+    (v_tenant_mimos, 'vet', 'invoicing', false, false),
+    (v_tenant_mimos, 'owner', 'cash_register', true, true),
+    (v_tenant_mimos, 'receptionist', 'cash_register', true, true),
+    (v_tenant_mimos, 'groomer', 'cash_register', false, false),
+    (v_tenant_mimos, 'vet', 'cash_register', false, false),
+    (v_tenant_mimos, 'owner', 'reports', true, true),
+    (v_tenant_mimos, 'receptionist', 'reports', false, false),
+    (v_tenant_mimos, 'groomer', 'reports', false, false),
+    (v_tenant_mimos, 'vet', 'reports', false, false);
 
   insert into platform_admins (user_id) values (v_user_superadmin);
 
