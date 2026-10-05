@@ -55,7 +55,7 @@ const menuItems = computed<SideMenuItem[]>(() => [
   ...(isFrontDesk(session.role)
     ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
     : []),
-  { title: 'Catálogo', icon: 'mdi-clipboard-list-outline', to: '/app/catalogo' },
+  { title: 'Servicios', icon: 'mdi-clipboard-list-outline', to: '/app/servicios' },
   ...(session.canView('inventory')
     ? [{ title: 'Inventario', icon: 'mdi-package-variant-closed', to: '/app/inventario' }]
     : []),
