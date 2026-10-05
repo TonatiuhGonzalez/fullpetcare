@@ -1189,3 +1189,75 @@ externo ni dependencia nueva.
 | Reescribir un corte ya cerrado para "arreglar" un faltante    | Trigger que lo impide, también con `service_role`; el error se aclara con una nota                                |
 | Una venta sin caja abierta queda fuera de todo corte          | Los reportes no dependen de la caja; la pantalla avisa cuando hay ventas en efectivo fuera de un turno             |
 | Que recepción vea reportes de otras sucursales                | RPC con permiso `reports` y sucursal revalidados; test de aislamiento por sucursal                                 |
+
+---
+
+## Fase 13 — Venta de mostrador como punto de venta
+
+**Meta: que recepción cobre una venta de productos al paso, desde cualquier pantalla, con una interfaz de punto
+de venta y sin necesidad de registrar al cliente.**
+Tercera fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+
+**Estado: aprobada (2026-10-05), en construcción.** Decisiones y alternativas en `PLAN.md` D18.
+Seguimiento en HMH Four: proyecto FullPetCare.
+
+### Decisiones (aprobadas el 2026-10-05)
+
+| #   | Decisión                | Propuesta                                                                                                       |
+| --- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | Acceso                  | Botón circular flotante abajo a la derecha (escritorio), en todas las vistas de la app; se quita del menú.      |
+| 2   | Quién lo ve             | Solo dueño y recepción.                                                                                         |
+| 3   | Pantalla                | Completa, en `/app/venta-mostrador`, con aspecto de punto de venta.                                             |
+| 4   | Qué se vende            | Solo productos.                                                                                                 |
+| 5   | Cliente                 | No se requiere (`sales.customer_id` admite nulo).                                                               |
+| 6   | Factura sin cliente     | Se capturan los datos fiscales y se crea el cliente.                                                            |
+| 7   | Factura con cliente     | Selector de clientes registrados; si faltan datos fiscales, se piden en el momento.                             |
+| 8   | Móvil                   | El botón flotante se oculta.                                                                                    |
+| 9   | Elementos del POS       | Con búsqueda por código de barras, cantidades enteras y "Consultar precio" (diálogo). Sin atajos ni venta en espera. |
+| 10  | Venta y cliente nuevo   | Al facturar a alguien que no es cliente, la venta queda ligada al cliente que se crea.                          |
+
+### 13A. Preparación
+
+- [x] **13.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D18.
+  _Verificar:_ el usuario aprobó por escrito; D18 sin "pendiente de aprobación".
+  **Hecho 2026-10-05:** el usuario aprobó las diez decisiones tras fijar el comportamiento en móvil, la liga de la
+  venta con el cliente nuevo y los elementos del POS.
+
+### 13B. Base de datos
+
+- [x] **13.2** 🧪 Migración aditiva: `sales.customer_id` admite nulo y `checkout_counter_sale()` acepta cliente
+  nulo. Revisar que ticket, historial, reportes, caja y factura toleren una venta sin cliente. _Verificar:_ test
+  de base que cobra sin cliente y comprueba totales, existencias y reportes; los tests existentes siguen verdes.
+  **Hecho 2026-10-05:** migración `20261011120000_sales_customer_optional.sql` (`sales.customer_id` admite
+  nulo; `checkout_counter_sale()` valida el cliente solo si llega, y entonces exige que sea de ese negocio).
+  Revisado: reportes, caja, `finalize_sale`/`add_product_items` y la Edge Function de facturación **no** leen
+  `sales.customer_id`; lo que sí lo leía era la interfaz: el ticket (`TicketView`, ya no muestra "Cliente:" vacío) y
+  el detalle de venta (`SaleDetailPage`, sin cliente no precarga datos fiscales). `database.ts` regenerado. Test
+  nuevo en `checkout-products-rpc.spec.ts`: cobra sin cliente, la venta queda con `customer_id` nulo, baja la
+  existencia y entra en `report_sales_summary`. **Verificado:** 92 tests de ventas, caja y reportes en verde tras
+  `db:reset`; `vue-tsc -b`, `lint` y 400 tests unitarios en verde. En `test:db` fallan los mismos 55 tests de Edge
+  Functions y Storage de siempre (el runtime de funciones no está levantado, §12). **No cubierto:** el
+  `checkout-service.spec.ts` no ejercita `chargeCounterSale` sin cliente (el service solo pasa el valor); la pantalla
+  todavía pide cliente hasta la 13.4.
+
+### 13C. Interfaz
+
+- [ ] **13.3** Botón circular flotante en `AppLayout.vue` (abajo a la derecha, solo escritorio; oculto en
+  móvil), solo dueño y recepción; quitar la entrada del menú lateral. _Verificar:_ visible en todas las vistas para esos roles, ausente
+  para groomer y vet.
+- [ ] **13.4** Rehacer `/app/venta-mostrador` como punto de venta (búsqueda de producto, tabla de partidas,
+  total grande, Cobrar y Cancelar), sin pedir cliente. Búsqueda por código de barras
+  (`products.sku`), cantidades enteras y botón "Consultar precio" con su diálogo; sin atajos ni venta en espera. _Verificar:_ se cobra una venta sin cliente de principio
+  a fin y baja la existencia.
+
+### 13D. Factura
+
+- [ ] **13.5** 🧪 Factura sin cliente registrado: capturar datos fiscales (validados con `lib/validation.ts`),
+  crear el cliente, ligar la venta a él y crear la solicitud de factura. _Verificar:_ test del flujo y de datos fiscales inválidos.
+- [ ] **13.6** 🧪 Factura con cliente registrado: selector de clientes; pedir en el momento los datos fiscales
+  que falten. _Verificar:_ test con cliente completo y con cliente incompleto.
+
+### 13E. Cierre
+
+- [ ] **13.7** 📚 Actualizar `CLAUDE.md` (§6.5 venta de mostrador y `customer_id` nulo; §1) y marcar la fase
+  terminada. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.

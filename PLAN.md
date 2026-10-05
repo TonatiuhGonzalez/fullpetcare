@@ -615,6 +615,41 @@ una función pura con tests y la RPC de cierre la repite en SQL; un test compara
 
 ---
 
+### D18 — Venta de mostrador como punto de venta (pantalla completa), con venta libre y factura a pedido
+
+**Estado:** aprobada (2026-10-05).
+
+**1. Acceso: botón circular flotante, no una entrada del menú.** Se quita "Venta de mostrador" del menú
+lateral. Un botón circular fijo abajo a la derecha (escritorio) abre `/app/venta-mostrador`, que sigue siendo
+una pantalla completa. **En móvil el botón se oculta** (decidido por el usuario). Solo lo ven dueño y recepción (`requiresFrontDesk`, como hoy). Los permisos no cambian.
+
+**2. Interfaz de punto de venta.** La pantalla se rehace con la lógica de un POS (referencia: captura de un POS
+comercial): búsqueda de producto, tabla de partidas con precio, cantidad e importe, total grande y botones de
+Cobrar y Cancelar. **Solo productos** (decidido por el usuario). De la referencia **entran**: búsqueda por código de barras (se busca en `products.sku`, el código
+interno opcional del negocio), cantidades **enteras** y un botón "Consultar precio" que abre un diálogo para
+buscar un producto y ver su precio sin agregarlo al ticket. **No entran:** atajos de teclado, "Poner en
+espera" ni "Lista de espera", ni cantidades fraccionarias (decidido por el usuario).
+
+**3. La venta es libre: no exige cliente.** `sales.customer_id` pasa a admitir nulo (migración aditiva,
+§8.1) y `checkout_counter_sale()` acepta `p_customer_id` nulo. **Alternativa descartada:** un cliente
+"Público en general" falso por negocio; ensuciaría el listado de clientes y los reportes. **Costo aceptado:**
+todo lo que lea `sales.customer_id` (ticket, historial, reportes, factura) debe tolerar nulo; la tarea 13.2 lo
+revisa pieza por pieza.
+
+**4. Factura desde una venta libre.**
+- *No es cliente registrado:* se capturan sus datos fiscales en el momento y **se crea el cliente** (opción
+  "a" del usuario) con `requires_invoice`; la factura usa esos datos y **la venta queda ligada al cliente
+  nuevo** (decidido por el usuario).
+- *Sí es cliente registrado:* un selector con los clientes registrados. Si al elegido le faltan datos
+  fiscales, se le piden en el momento y se guardan.
+- Las reglas de §8 no cambian; los datos fiscales siguen validándose con `lib/validation.ts`.
+
+**5. Sin dependencias nuevas** (§3). Todo con Vue, Vuetify y lo que ya existe.
+
+**Pendientes:** ninguno.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
