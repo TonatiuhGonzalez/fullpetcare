@@ -317,7 +317,22 @@ descarga el CSV.
 empleado, reportes de inventario o de utilidad, facturación en los reportes, gráficas con librería y
 exportación a Excel.
 
-### Después de la Fase 12 (no ahora)
+### Fase 13 — Venta de mostrador como punto de venta
+
+Tercera fase de la **etapa de mejoras**. Sin servicio externo ni dependencia nueva. La venta de mostrador pasa
+de un formulario escondido en el menú a una pantalla de punto de venta, a la que se entra por un botón flotante
+desde cualquier vista, y deja de exigir un cliente registrado (D18). Si quien compra pide factura, se da de alta
+como cliente o se elige uno registrado, completando sus datos fiscales al momento.
+
+**Estado: terminada (2026-10-05)**; aprobada el 2026-10-05 (decisiones y alternativas en D18 y en `TASKS.md` Fase 13).
+**Demostrable:** recepción toca el botón flotante desde la agenda, escanea o busca dos productos, cobra en efectivo
+sin registrar al cliente; en otra venta pide factura a alguien nuevo (se captura y queda dado de alta) y en otra a un
+cliente registrado al que se le completan los datos fiscales que le faltaban.
+
+**Fuera de esta fase:** atajos de teclado, venta en espera, cantidades fraccionarias, vender servicios en el
+punto de venta, y el timbrado real con el PAC.
+
+### Después de la Fase 13 (no ahora)
 
 OpenPay real, WhatsApp Business API, recordatorios automáticos, reserva en línea, paquetes y membresías,
 comisiones por empleado, importador de clientes.

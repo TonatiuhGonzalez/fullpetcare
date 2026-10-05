@@ -29,7 +29,8 @@ v1 ya está terminada; lo que se agrega ahora **no es "v2" ni un rediseño**, so
 sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de productos**,
 **facturación (CFDI con un PAC)**, y, por evaluar, recordatorios por WhatsApp, reserva en
 línea, paquetes/membresías, pagos reales, comisiones por empleado, importador de
-clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5).
+clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5). **Ya construido
+(fase 13): la venta de mostrador como punto de venta** (§6.5).
 
 Reglas de esta etapa:
 
@@ -69,7 +70,7 @@ no se construye por iniciativa propia: necesita su fase y su aprobación.
 
 - **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
   `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
-  mostrador (§6.5). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
+  mostrador (§6.5; el mostrador es un punto de venta desde la fase 13). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
 - **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
   mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
   `services` y los futuros productos deberán llevarlas.
@@ -212,7 +213,7 @@ FullPetCare/
     ├── composables/
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
-    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, publico, superadmin
+    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, ventas, publico, superadmin
     └── styles/
 ```
 
@@ -370,7 +371,7 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 | Tabla              | Campos clave                                                                                                                                                                     |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sales`            | `tenant_id`, `branch_id`, `customer_id`, `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
+| `sales`            | `tenant_id`, `branch_id`, `customer_id` (nulo en venta libre), `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
 | `sale_items`       | `tenant_id`, `sale_id`, `item_type` (`service`), `service_id`, `appointment_id`, `description`, `quantity`, `unit_price_cents`, `tax_rate_bp`, `tax_cents`, `line_total_cents`   |
 | `payments`         | `tenant_id`, `sale_id`, `method`, `amount_cents`, `reference`, `status`, `paid_at`                                                                                               |
 | `invoice_requests` | `tenant_id`, `sale_id`, `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `payment_form_code`, `payment_method_code`, `status`, `fiscal_uuid`                   |
@@ -383,8 +384,8 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - `item_type` es enum (`service` | `product`, desde la fase 11 / #2041) con `product_id`
   nullable; un `check` exige que una partida sea de producto (con `product_id`) o de
   servicio (sin él). `checkout_appointment()` acepta productos extra y
-  `checkout_counter_sale()` cobra una venta de mostrador sin cita (pide cliente
-  registrado). Al pagar baja la existencia (`stock_movements` tipo `sale`); un trigger
+  `checkout_counter_sale()` cobra una venta de mostrador sin cita; desde la fase 13 el cliente
+  es **opcional** (`sales.customer_id` admite nulo). Al pagar baja la existencia (`stock_movements` tipo `sale`); un trigger
   sobre `sales` la devuelve (`sale_reversal`) al pasar de `paid` a `cancelled`.
 - **Configuración fiscal (11.15, `tenant_invoicing_settings`):** 1 a 1 con `tenants`; guarda el id
   de la organización del negocio en el PAC y `csd_valid_until`. Solo el dueño la lee y solo la Edge
@@ -402,6 +403,17 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   usuarios solo crean `pending`; el resto lo escribe la Edge Function `invoicing`. Una sola factura viva por
   venta (índice único parcial); una timbrada no se edita ni se borra, solo se cancela. Los importes se arman
   en `lib/cfdi.ts` (con copia para Deno en `functions/_shared/cfdi.ts`, vigilada por un test de paridad).
+
+- **Venta de mostrador como punto de venta (fase 13, PLAN.md D18):** pantalla completa
+  (`/app/venta-mostrador`, `pages/ventas/PointOfSalePage.vue`), solo para dueño y recepción, a la que se
+  entra por un **botón circular flotante** de `AppLayout` (abajo a la derecha; oculto en móvil y en la propia
+  pantalla), ya no por el menú. Solo vende productos, con captura por código de barras (coincidencia exacta en
+  `products.sku`, `lib/productSearch.ts`) o por nombre, cantidades enteras y un diálogo "Consultar precio" que
+  no toca el ticket. **La venta es libre:** no pide cliente. Si se pide factura, o la persona **no es cliente**
+  (se capturan sus datos fiscales, se le da de alta como cliente y la venta queda ligada a él) o **ya lo es**
+  (selector de clientes; si le faltan datos fiscales se le piden al momento). La forma de los datos fiscales
+  se valida en `lib/validation.ts` (`fiscalReceiverProblems`, `customerFiscalProblems`); que exista en el
+  catálogo del SAT lo decide el PAC. El cobro de una cita sigue en `pages/agenda/CheckoutPage.vue`.
 
 - **Caja (fase 12, `cash_sessions` y `cash_movements`):** un turno de caja por sucursal. `cash_sessions` se abre
   con un fondo inicial (`opening_float_cents`) y se cierra contando el efectivo; al cerrar se congelan

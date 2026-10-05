@@ -1198,7 +1198,7 @@ externo ni dependencia nueva.
 de venta y sin necesidad de registrar al cliente.**
 Tercera fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
 
-**Estado: aprobada (2026-10-05), en construcción.** Decisiones y alternativas en `PLAN.md` D18.
+**Estado: terminada (2026-10-05).** Aprobada el 2026-10-05. Decisiones y alternativas en `PLAN.md` D18.
 Seguimiento en HMH Four: proyecto FullPetCare.
 
 ### Decisiones (aprobadas el 2026-10-05)
@@ -1315,5 +1315,13 @@ Seguimiento en HMH Four: proyecto FullPetCare.
 
 ### 13E. Cierre
 
-- [ ] **13.7** 📚 Actualizar `CLAUDE.md` (§6.5 venta de mostrador y `customer_id` nulo; §1) y marcar la fase
+- [x] **13.7** 📚 Actualizar `CLAUDE.md` (§6.5 venta de mostrador y `customer_id` nulo; §1) y marcar la fase
   terminada. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-05:** `CLAUDE.md` §1 pasa la venta de mostrador como punto de venta a "ya construido"; §6.5 documenta
+  `sales.customer_id` nulo, el cliente opcional de `checkout_counter_sale()` y un apartado nuevo con la pantalla, el
+  botón flotante, la captura por código y por nombre, y los dos caminos de factura; §4 agrega la carpeta `pages/ventas`.
+  `PLAN.md` agrega la Fase 13 (terminada) y `TASKS.md` la marca terminada. **Verificado** releyendo cada afirmación
+  contra el código (la migración, la ruta, el botón de `AppLayout`, las funciones de `lib/` y los componentes).
+  **Revisado sin cambios:** la tarea 11.20 (factura global) agrupa ventas sin factura individual sin mirar el cliente, así
+  que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
+  solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.
