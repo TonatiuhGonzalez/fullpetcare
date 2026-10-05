@@ -181,3 +181,37 @@ export function isValidSatProductCode(value: string): boolean {
 export function isValidSatUnitCode(value: string): boolean {
   return /^[A-Z0-9]{2,3}$/.test(value.trim().toUpperCase())
 }
+
+// --- Datos fiscales de quien recibe la factura (fase 13, tarea 13.5) ---
+
+export interface FiscalReceiverInput {
+  rfc: string
+  legalName: string
+  taxRegimeCode: string
+  cfdiUse: string
+  postalCode: string
+}
+
+/**
+ * Lo que falta o está mal para poder facturar a alguien, en español y listo para
+ * mostrarse. Vacío = los datos alcanzan.
+ *
+ * Revisa la FORMA, no que el SAT los acepte: el régimen son 3 dígitos (601, 612…) y el
+ * uso de CFDI una o dos letras y dos dígitos (G03, D01, CP01…). Un dato con forma
+ * correcta pero inexistente lo rechaza el PAC al timbrar, no esta función.
+ */
+export function fiscalReceiverProblems(data: FiscalReceiverInput): string[] {
+  const problems: string[] = []
+  if (!isValidRFC(data.rfc)) problems.push('El RFC no es válido.')
+  if (!data.legalName.trim()) problems.push('Falta la razón social.')
+  if (!/^\d{3}$/.test(data.taxRegimeCode.trim())) {
+    problems.push('El régimen fiscal debe ser un código de 3 dígitos (por ejemplo 612).')
+  }
+  if (!/^[A-Z]{1,2}\d{2}$/.test(data.cfdiUse.trim().toUpperCase())) {
+    problems.push('El uso de CFDI debe ser un código como G03.')
+  }
+  if (!isValidPostalCode(data.postalCode)) {
+    problems.push('El código postal fiscal debe tener 5 dígitos.')
+  }
+  return problems
+}

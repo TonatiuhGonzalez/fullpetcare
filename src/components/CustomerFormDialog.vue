@@ -8,12 +8,22 @@ import { computed, ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
-import { isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
+import {
+  fiscalReceiverProblems,
+  isValidPhone,
+  isValidPostalCode,
+  isValidRFC,
+} from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
   tenantId: string
   customer?: Customer | null
+  /**
+   * Alta para facturar (punto de venta, fase 13): "Requiere factura" queda activado y no se
+   * puede guardar sin datos fiscales completos. Solo aplica al alta, no a editar.
+   */
+  invoiceRequired?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -52,7 +62,7 @@ watch(
     phone.value = c?.phone ?? ''
     email.value = c?.email ?? ''
     notes.value = c?.notes ?? ''
-    requiresInvoice.value = c?.requires_invoice ?? false
+    requiresInvoice.value = c?.requires_invoice ?? props.invoiceRequired ?? false
     rfc.value = c?.rfc ?? ''
     legalName.value = c?.legal_name ?? ''
     taxRegimeCode.value = c?.tax_regime_code ?? ''
@@ -73,8 +83,24 @@ function close(): void {
 }
 
 async function handleSubmit(): Promise<void> {
-  saving.value = true
   errorMessage.value = null
+  if (props.invoiceRequired && !isEditing.value) {
+    const problems = fiscalReceiverProblems({
+      rfc: rfc.value,
+      legalName: legalName.value,
+      taxRegimeCode: taxRegimeCode.value,
+      cfdiUse: cfdiUse.value,
+      postalCode: postalCode.value,
+    })
+    if (!firstName.value.trim() || !lastName.value.trim()) {
+      problems.unshift('Faltan el nombre y el apellido.')
+    }
+    if (problems.length > 0) {
+      errorMessage.value = problems.join(' ')
+      return
+    }
+  }
+  saving.value = true
   try {
     const payload = {
       first_name: firstName.value,
@@ -111,7 +137,13 @@ async function handleSubmit(): Promise<void> {
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-card>
-      <v-card-title>{{ isEditing ? 'Editar cliente' : 'Nuevo cliente' }}</v-card-title>
+      <v-card-title>{{
+        isEditing
+          ? 'Editar cliente'
+          : invoiceRequired
+            ? 'Datos para la factura'
+            : 'Nuevo cliente'
+      }}</v-card-title>
 
       <v-card-text>
         <v-form @submit.prevent="handleSubmit">
@@ -128,7 +160,12 @@ async function handleSubmit(): Promise<void> {
           <v-text-field v-model="email" label="Correo" type="email" />
           <v-textarea v-model="notes" label="Notas" rows="2" auto-grow />
 
-          <v-checkbox v-model="requiresInvoice" label="Requiere factura" density="compact" />
+          <v-checkbox
+            v-model="requiresInvoice"
+            label="Requiere factura"
+            density="compact"
+            :disabled="invoiceRequired && !isEditing"
+          />
 
           <!-- Sección fiscal colapsada: solo aparece si de verdad hace
                falta, para no pedirle RFC a un cliente que nunca va a
@@ -139,7 +176,10 @@ async function handleSubmit(): Promise<void> {
               <v-text-field v-model="legalName" label="Razón social" />
               <v-row dense>
                 <v-col cols="6">
-                  <v-text-field v-model="taxRegimeCode" label="Régimen fiscal (código SAT)" />
+                  <v-text-field
+                    v-model="taxRegimeCode"
+                    label="Régimen fiscal (código SAT)"
+                  />
                 </v-col>
                 <v-col cols="6">
                   <v-text-field v-model="cfdiUse" label="Uso de CFDI (código SAT)" />
@@ -153,7 +193,13 @@ async function handleSubmit(): Promise<void> {
             </div>
           </v-expand-transition>
 
-          <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-2">
+          <v-alert
+            v-if="errorMessage"
+            type="error"
+            density="compact"
+            variant="tonal"
+            class="mb-2"
+          >
             {{ errorMessage }}
           </v-alert>
         </v-form>

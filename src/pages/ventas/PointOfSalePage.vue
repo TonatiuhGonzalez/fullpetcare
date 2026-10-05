@@ -4,15 +4,20 @@
 //
 // Reutiliza useCartStore (el carrito de siempre, en modo "venta de mostrador") y el
 // cobro checkout_counter_sale() de la base: esta página solo arma el ticket y lo manda.
-// La factura (con cliente nuevo o registrado) llega en las tareas 13.5 y 13.6; mientras
-// tanto, tras cobrar se puede facturar desde el detalle de la venta, como siempre.
+// Factura (tarea 13.5): si quien compra pide factura y no es cliente, se capturan sus datos
+// fiscales, se le da de alta como cliente y la venta queda ligada a él. Elegir un cliente
+// ya registrado llega en la 13.6. Tras cobrar, siempre se puede facturar desde el detalle
+// de la venta.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
 import TicketView from '@/components/TicketView.vue'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { findBySku, searchProducts } from '@/lib/productSearch'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
+import type { Customer } from '@/services/customers'
+import * as invoiceRequestsService from '@/services/invoiceRequests'
 import { useCartStore } from '@/stores/cart'
 import { useSessionStore } from '@/stores/session'
 import type { Database } from '@/types/database'
@@ -124,6 +129,14 @@ const showPayment = ref(false)
 const charging = ref(false)
 const chargeError = ref<string | null>(null)
 const ticket = ref<Ticket | null>(null)
+/** Si la solicitud de factura falló DESPUÉS de cobrar: el cobro ya está hecho, solo se avisa. */
+const invoiceWarning = ref<string | null>(null)
+
+// Factura: el cliente que se da de alta con sus datos fiscales. Se conserva aunque el
+// cobro falle, para que reintentar no lo dé de alta dos veces.
+const requiresInvoice = ref(false)
+const invoiceCustomer = ref<Customer | null>(null)
+const showCustomerForm = ref(false)
 
 const discountInPesos = ref<number | null>(null)
 const newPaymentMethod = ref<PaymentMethod>('cash')
@@ -149,6 +162,9 @@ function resetPaymentForm(): void {
   newCardType.value = null
   chargeError.value = null
   ticket.value = null
+  invoiceWarning.value = null
+  requiresInvoice.value = false
+  invoiceCustomer.value = null
 }
 
 function openPayment(): void {
@@ -179,11 +195,50 @@ function fillRemaining(): void {
   newPaymentAmountInPesos.value = cart.remainingCents / 100
 }
 
+function handleCustomerSaved(customer: Customer): void {
+  invoiceCustomer.value = customer
+}
+
+/** Solicitud de factura de una venta ya cobrada, con los datos fiscales del cliente dado de alta. */
+async function createInvoiceRequest(sold: Ticket, customer: Customer): Promise<void> {
+  if (!session.activeTenantId) return
+  await invoiceRequestsService.create(
+    session.activeTenantId,
+    sold.sale.id,
+    {
+      rfc: customer.rfc ?? '',
+      legalName: customer.legal_name ?? '',
+      taxRegimeCode: customer.tax_regime_code ?? '',
+      cfdiUse: customer.cfdi_use ?? '',
+      postalCode: customer.postal_code ?? '',
+    },
+    sold.payments.map((p) => ({
+      method: p.method,
+      amountCents: p.amount_cents,
+      paymentFormCode: (p.payment_form_code ?? undefined) as CardFormCode | undefined,
+    })),
+  )
+}
+
 async function handleCharge(): Promise<void> {
+  const customer = requiresInvoice.value ? invoiceCustomer.value : null
+  if (requiresInvoice.value && !customer) return
   charging.value = true
   chargeError.value = null
   try {
-    ticket.value = await cart.checkout()
+    // La venta se liga al cliente recién dado de alta (o a ninguno: venta libre).
+    cart.setCounterCustomer(customer?.id ?? null)
+    const sold = await cart.checkout()
+    ticket.value = sold
+
+    if (customer) {
+      try {
+        await createInvoiceRequest(sold, customer)
+      } catch {
+        invoiceWarning.value =
+          'El cobro quedó registrado, pero no se pudo crear la solicitud de factura. Puedes facturarla desde el detalle de la venta.'
+      }
+    }
   } catch (err) {
     chargeError.value = checkoutErrorMessage(err)
   } finally {
@@ -429,6 +484,15 @@ function handleNewSale(): void {
         <v-alert type="success" density="compact" variant="tonal" class="mb-4">
           Cobro registrado.
         </v-alert>
+        <v-alert
+          v-if="invoiceWarning"
+          type="warning"
+          density="compact"
+          variant="tonal"
+          class="mb-4"
+        >
+          {{ invoiceWarning }}
+        </v-alert>
         <TicketView :ticket="ticket" />
         <v-btn
           v-if="session.canView('invoicing')"
@@ -547,6 +611,39 @@ function handleNewSale(): void {
             {{ formatMXN(cart.remainingCents) }}
           </p>
 
+          <v-checkbox
+            v-model="requiresInvoice"
+            label="Requiere factura"
+            density="compact"
+            hide-details
+          />
+          <div v-if="requiresInvoice" class="mb-3">
+            <v-alert
+              v-if="invoiceCustomer"
+              type="success"
+              density="compact"
+              variant="tonal"
+              class="mb-1"
+            >
+              Se facturará a {{ invoiceCustomer.legal_name }} ({{ invoiceCustomer.rfc }}).
+            </v-alert>
+            <v-btn
+              variant="tonal"
+              size="small"
+              prepend-icon="mdi-account-plus-outline"
+              :disabled="!!invoiceCustomer"
+              @click="showCustomerForm = true"
+            >
+              {{ invoiceCustomer ? 'Datos capturados' : 'Capturar datos del cliente' }}
+            </v-btn>
+            <p
+              v-if="!invoiceCustomer"
+              class="text-caption text-medium-emphasis mt-1 mb-0"
+            >
+              Se le dará de alta como cliente y la venta quedará ligada a él.
+            </p>
+          </div>
+
           <v-alert v-if="chargeError" type="error" density="compact" variant="tonal">
             {{ chargeError }}
           </v-alert>
@@ -560,7 +657,7 @@ function handleNewSale(): void {
             color="primary"
             variant="flat"
             :loading="charging"
-            :disabled="!cart.isFullyPaid"
+            :disabled="!cart.isFullyPaid || (requiresInvoice && !invoiceCustomer)"
             @click="handleCharge"
           >
             Cobrar {{ formatMXN(cart.totalCents) }}
@@ -568,6 +665,13 @@ function handleNewSale(): void {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <CustomerFormDialog
+      v-model="showCustomerForm"
+      :tenant-id="session.activeTenantId ?? ''"
+      invoice-required
+      @saved="handleCustomerSaved"
+    />
   </v-container>
 </template>
 

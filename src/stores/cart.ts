@@ -94,6 +94,11 @@ export const useCartStore = defineStore('cart', () => {
     status.value = 'ready'
   }
 
+  /** Liga (o quita) el cliente de una venta de mostrador ya abierta; p. ej. el que se da de alta para facturar. */
+  function setCounterCustomer(customerId: string | null): void {
+    counterCustomerId.value = customerId
+  }
+
   /** Carga los productos vendibles de la sucursal (activos y con existencia). */
   async function loadCatalog(tenantId: string, branchId: string): Promise<void> {
     try {
@@ -223,6 +228,7 @@ export const useCartStore = defineStore('cart', () => {
     isFullyPaid,
     loadAppointment,
     loadCounterSale,
+    setCounterCustomer,
     loadCatalog,
     addProduct,
     setProductQuantity,

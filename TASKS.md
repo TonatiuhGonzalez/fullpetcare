@@ -1278,8 +1278,25 @@ Seguimiento en HMH Four: proyecto FullPetCare.
 
 ### 13D. Factura
 
-- [ ] **13.5** 🧪 Factura sin cliente registrado: capturar datos fiscales (validados con `lib/validation.ts`),
+- [x] **13.5** 🧪 Factura sin cliente registrado: capturar datos fiscales (validados con `lib/validation.ts`),
   crear el cliente, ligar la venta a él y crear la solicitud de factura. _Verificar:_ test del flujo y de datos fiscales inválidos.
+  **Hecho 2026-10-05:** en el diálogo de cobro del punto de venta, la casilla "Requiere factura" pide "Capturar datos
+  del cliente", que abre `CustomerFormDialog` en un modo nuevo (`invoice-required`): "Requiere factura" queda
+  activado y no deja guardar sin nombre, apellido y datos fiscales completos. Esa validación es una función pura
+  nueva, `fiscalReceiverProblems()` en `lib/validation.ts` (5 tests: completos, cada faltante, régimen y uso de CFDI
+  con forma inválida, minúsculas, código postal). Al guardar se da de alta el cliente, y al cobrar la venta se liga a
+  él (`cart.setCounterCustomer`, 1 test) y se crea la solicitud de factura con los datos de ese cliente y la forma de
+  pago real. "Cobrar" queda deshabilitado mientras la casilla esté marcada y no haya datos. **Verificado** en el
+  navegador como recepción: guardar vacío lista los 6 problemas; con datos completos se cobra, y en la base la venta
+  quedó con el cliente nuevo, el cliente con `requires_invoice` y su RFC, y la solicitud `pending` con forma de pago
+  01. `vue-tsc -b`, `lint` y los tests unitarios en verde. **Decisiones mías:** (1) el cliente se da de alta al pulsar
+  Guardar en el formulario, antes de cobrar; si luego se cancela la venta, el cliente se queda (es una persona real
+  que dio sus datos); (2) si el cobro falla y se reintenta, no se vuelve a dar de alta (el cliente capturado se
+  conserva); (3) si el cobro sale bien pero la solicitud de factura falla, el ticket se muestra con un aviso y se puede
+  facturar desde el detalle de la venta; (4) la forma de los códigos del SAT (régimen de 3 dígitos, uso de CFDI como
+  G03) se valida, pero que exista en el catálogo del SAT lo decide el PAC al timbrar. **No cubierto:** un cliente ya
+  registrado (13.6) y el timbrado real con el PAC.
+
 - [ ] **13.6** 🧪 Factura con cliente registrado: selector de clientes; pedir en el momento los datos fiscales
   que falten. _Verificar:_ test con cliente completo y con cliente incompleto.
 
