@@ -1125,10 +1125,30 @@ externo ni dependencia nueva.
 
 ### 12E. Cierre
 
-- [ ] **12.14** Semilla y reset: un corte cerrado de ejemplo y ventas variadas de los últimos días para que los
+- [x] **12.14** Semilla y reset: un corte cerrado de ejemplo y ventas variadas de los últimos días para que los
   reportes no salgan vacíos en la demo; `demo_reset.sql` restaura los cortes sin borrarlos (son inmutables: se
   ocultan o se compensan, como el inventario). **No** va en `seed.sql` si rompe tests existentes (como pasó
   con las existencias en 11.22). _Verificar:_ `demo:reset` deja los reportes con datos y la caja cerrada.
+  **Hecho 2026-10-05 (#2079, parte 12.14):** nuevo bloque "Ventas y caja de demostración" en `demo_reset.sql` (no en
+  `seed.sql`). Siembra 13 ventas de los últimos 6 días en las dos sucursales (12 pagadas y 1 cancelada; una con
+  descuento; efectivo con cambio, tarjeta, transferencia y un pago dividido), con 8 citas atendidas por la groomer y el
+  vet para que el reporte de empleados tenga filas, y un corte cerrado en Centro (fondo $800, retiro $300, gasto $85,
+  esperado $1,054.00, contado $1,050.00: faltante de $4). "Hoy" queda vacío y la caja cerrada: el cobro y la apertura
+  se hacen en vivo. Las 7 citas del guion **no** se cobran. Ventas, partidas y pagos tienen ids fijos y se rehacen en
+  cada corrida (el folio se conserva, o toma el siguiente de la sucursal para no chocar con demos anteriores).
+  **Decisión sobre la inmutabilidad:** un corte cerrado no se puede ocultar (el trigger bloquea todo `UPDATE`, incluso
+  de `deleted_at`, y no se relajó), así que el corte de ejemplo se crea **una sola vez** y las ventas 1 a 5 se anclan
+  a **su día**, no a "ayer", para que su esperado congelado siga cuadrando con lo que Caja recalcula. Consecuencias:
+  el corte de ejemplo envejece (sale de "esta semana" en Reportes; las demás ventas no), y los cortes que alguien cierre
+  durante una demo se quedan en el historial para siempre. Lo que sí se oculta es una caja **abierta**. No se escriben
+  movimientos de inventario por estas ventas (la bitácora es inmutable y las existencias las fija el bloque de
+  Inventario), así que lo vendido aquí no baja el stock. 9 tests nuevos en `demo-reset.spec.ts` (16 en total: ventas
+  que cuadran, reportes con datos con las mismas RPC y rol que la pantalla, corte con esperado verificado a mano, caja
+  abierta oculta, repetir el reset no duplica nada, venta cancelada u oculta que se revive, folios que no chocan).
+  **Verificado** contra la base local (`demo_reset.sql` dentro de una transacción con rollback, y `test:db`).
+  **No cubierto:** correr `npm run demo:reset` contra el ambiente desplegado (apunta a producción; no se corrió sin
+  tu confirmación) ni ver las pantallas de Caja y Reportes sobre estos datos en el navegador. En `test:db` fallan 55
+  tests de Edge Functions y Storage porque el runtime de funciones no está levantado (ver §12); no tocan este cambio.
 - [x] **12.15** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6.5, módulos nuevos en §6.7/§7.2, quitar
   "reportes y corte de caja" de los candidatos de §1, y la nota de que "Reportes financieros avanzados" sigue
   fuera. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
