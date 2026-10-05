@@ -913,6 +913,21 @@ HMH Four: tareas #2036 a #2048.
   XML y el PDF antes de cancelar** si faltaban (una cancelada ya no se puede tocar). La pantalla muestra motivo, fecha y
   quién, y deja descargar los archivos. Siguen sin ofrecerse el motivo 01 (exige la factura sustituta, y el índice de
   "una viva por venta" no deja emitir la nueva mientras la vieja sigue timbrada) y el 04 (solo de la global, 11.20).
+  **Verificado en navegador SIN PAC (2026-10-05, #2069, parte sin proveedor; la casilla sigue sin marcar):** con
+  Playwright contra la base local y la función `invoicing` servida (script desechable, no se sube; la base trae las
+  ventas de demostración de 12.14). Pasó: la precarga de los datos fiscales del cliente (y el uso de CFDI `G03` y el
+  RFC vacío cuando no los tiene); la forma de pago del cobro llega preseleccionada; un doble clic en "Facturar" manda
+  **una sola** petición; los errores salen en español y sin jerga (negocio sin configurar, "Falta el RFC del
+  cliente…" con el negocio listo, y "La facturación todavía no está disponible" sin llave del PAC) y dejan reintentar;
+  una venta cancelada no ofrece facturar; una factura timbrada muestra UUID, PDF y XML, no ofrece facturar de nuevo y
+  su diálogo de cancelación solo trae los motivos 02 y 03; una cancelada muestra motivo, fecha y quién la canceló,
+  conserva las descargas y ofrece emitir una nueva; el dueño y la recepción de esa sucursal facturan; con permiso solo
+  de ver sale el aviso y no el botón; el groomer que escribe la URL termina en la agenda. Las facturas timbrada y
+  cancelada se **fabricaron** en la base local (no son de un PAC). **Hallazgo menor, sin corregir:** una recepción que
+  abre una venta de **otra sucursal** no la ve (bien), pero el mensaje es "No se pudo cargar la venta. Revisa tu
+  conexión.", que sugiere un fallo de red cuando es falta de acceso. **No cubierto (necesita la llave del sandbox):**
+  timbrar, descargar el XML real y cancelar en el PAC; que los importes cuadren al centavo con el ticket en una
+  factura real; ventas con descuento, varios productos o servicios a distinta tasa de IVA.
 - [ ] **11.20** Factura global al público en general: agrupa las
   ventas del periodo sin factura individual en un solo CFDI (RFC genérico, información global con
   periodicidad, mes y año). Tabla puente venta ↔ factura para que ninguna venta quede en dos
