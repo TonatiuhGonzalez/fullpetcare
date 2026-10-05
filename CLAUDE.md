@@ -28,8 +28,8 @@ bien desde el día uno porque retrofitearlas cuesta carísimo, y eso no cambia.
 v1 ya está terminada; lo que se agrega ahora **no es "v2" ni un rediseño**, son mejoras
 sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de productos**,
 **facturación (CFDI con un PAC)**, y, por evaluar, recordatorios por WhatsApp, reserva en
-línea, paquetes/membresías, pagos reales, corte de caja y reportes, comisiones por
-empleado, importador de clientes.
+línea, paquetes/membresías, pagos reales, comisiones por empleado, importador de
+clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5).
 
 Reglas de esta etapa:
 
@@ -75,7 +75,7 @@ no se construye por iniciativa propia: necesita su fase y su aprobación.
   `services` y los futuros productos deberán llevarlas.
 - Pasarela de pago real (SPEI/OpenPay simulados)
 - Lotes y caducidades de medicamento
-- Reportes financieros avanzados
+- Reportes financieros avanzados (la fase 12 trae reportes **de ventas** básicos; siguen fuera la utilidad, los reportes de inventario, la facturación en los reportes y la exportación a Excel nativo: solo hay CSV)
 - Envío automático de notificaciones por WhatsApp (el link se copia y se pega a mano)
 - App móvil nativa (la vista cliente cubre esa necesidad)
 - Docker de la app, Kubernetes, infraestructura como código
@@ -403,6 +403,26 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   venta (índice único parcial); una timbrada no se edita ni se borra, solo se cancela. Los importes se arman
   en `lib/cfdi.ts` (con copia para Deno en `functions/_shared/cfdi.ts`, vigilada por un test de paridad).
 
+- **Caja (fase 12, `cash_sessions` y `cash_movements`):** un turno de caja por sucursal. `cash_sessions` se abre
+  con un fondo inicial (`opening_float_cents`) y se cierra contando el efectivo; al cerrar se congelan
+  `expected_cents`, `counted_cents` y `difference_cents` (contado − esperado). **Solo una caja abierta por
+  sucursal** (índice único parcial). Los usuarios no escriben la tabla: abren y cierran con las RPC
+  `open_cash_session()` y `close_cash_session()` (revalidan permiso y sucursal), y la pantalla lee el turno con
+  `cash_session_overview()`. **Un corte cerrado es inmutable**: el trigger `protect_closed_cash_session` bloquea
+  todo `UPDATE` y no hay `DELETE`, ni siquiera con `service_role`; tampoco se puede ocultar con `deleted_at`.
+  `cash_movements` (retiros, gastos e ingresos) es bitácora inmutable, como `stock_movements`, y solo se escribe en
+  una caja abierta de la misma sucursal.
+- **Cobrar no exige caja abierta** y la venta no apunta al turno: pertenece al de su sucursal cuyo rango
+  [apertura, cierre) contiene `paid_at`. `esperado = fondo + efectivo que se queda + ingresos − retiros − gastos`,
+  donde el cambio (`pagado − total`, hasta el efectivo recibido) se deriva, no se guarda; la regla vive en
+  `lib/cashCount.ts` y la repite la base (PLAN.md D17).
+- **Reportes (fase 12, sin tablas nuevas):** funciones SQL que agregan en la base y revalidan el permiso
+  `reports` y la sucursal: `report_sales_summary()` (totales, por día, por método y canceladas aparte),
+  `report_top_items()` (servicios y productos más vendidos) y `report_staff_activity()` (por empleado; el
+  servicio va al de la cita y el producto de mostrador a quien cobró). Cuentan solo ventas `paid`, y el periodo son
+  fechas locales de cada sucursal (§8.3). La pantalla es `/app/reportes` y exporta a CSV (`lib/reports.ts`).
+  No son reportes fiscales ni financieros.
+
 ### 6.6 Vista pública y bitácora
 
 | Tabla         | Campos clave                                                                                                                                                                  |
@@ -417,9 +437,13 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 | Tabla               | Campos clave                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy `'employees'` e `'inventory'`), `can_view`, `can_edit`               |
+| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy `'employees'`, `'inventory'`, `'invoicing'`, `'cash_register'` y `'reports'`), `can_view`, `can_edit`               |
 | `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`                            |
 | `employee_documents`| `tenant_id`, `membership_id`, `document_type` (enum: `voter_id`\|`address_proof`\|`employment_contract`), `storage_path`, `uploaded_by`, `uploaded_at` |
+
+Permisos por defecto de los módulos de la fase 12 (se ajustan con filas, no con código): `cash_register` →
+dueño y recepción ver/editar, groomer y vet nada; `reports` → solo el dueño. Recepción solo ve las
+sucursales que tiene asignadas, también en Caja.
 
 Un "empleado" en la pantalla de gestión **es** la persona que ya tiene `membership` en
 el tenant — no un registro de RH aparte. `employee_details` solo extiende esa fila con
@@ -563,7 +587,10 @@ create function app.has_permission(p_tenant_id uuid, p_module permission_module,
 siempre regresa `true` sin mirar nada (§6.1, "Puede: Todo"). Es el único punto de este
 proyecto donde un permiso vive en una fila de datos en vez de en una comparación de
 rol fija; toda política o RPC que la usa queda lista para que, a futuro, cambiar quién
-puede hacer algo sea una fila distinta, no una migración.
+puede hacer algo sea una fila distinta, no una migración. La usan hoy los módulos `employees`,
+`inventory`, `invoicing` y, desde la fase 12, `cash_register` (políticas de `cash_sessions` y
+`cash_movements`, y las RPC de caja) y `reports` (las funciones `report_*`: `report_sales_summary()` valida por su cuenta;
+las otras dos usan `app.assert_report_access()`, que además valida periodo y sucursal).
 
 `memberships`, `membership_branches` y `profiles` nacieron en la fase 1 con **solo**
 política de SELECT (sin pantalla de administración todavía que las escribiera). La
@@ -867,8 +894,11 @@ alta en una demo con la casilla "Empresa de demostración" del formulario. `is_d
 olvidar la casilla en una empresa de demo solo deja una empresa de sobra (se oculta a mano
 desde el panel), nunca borra a un cliente. Desde la fase 11 también restaura el catálogo base de productos y sus
 existencias de Patitas Felices (con un movimiento `adjustment` por la diferencia, porque la
-bitácora de inventario es inmutable) y no toca la configuración fiscal. Aun así, ese paso sigue tocando producción:
-no marques como demo una empresa real.
+bitácora de inventario es inmutable) y no toca la configuración fiscal. Desde la fase 12 también deja **13 ventas
+de los últimos 6 días** (para que Reportes tenga datos; "hoy" queda vacío, lo llena el cobro en vivo), **un corte
+de caja cerrado de ejemplo** en Centro y **oculta cualquier caja abierta**. Los cortes **cerrados** no se pueden
+ocultar (§6.5): el de ejemplo se crea una sola vez (y envejece), y los que se cierren durante una demo se quedan en
+el historial de Caja. Aun así, ese paso sigue tocando producción: no marques como demo una empresa real.
 
 ### Git
 

@@ -964,7 +964,7 @@ vea cuánto se vendió, por qué método de pago, por sucursal y por empleado.**
 Segunda fase de la **etapa de mejoras** (`CLAUDE.md` §1). Todo sale de datos que ya existen: sin servicio
 externo ni dependencia nueva.
 
-**Estado: aprobada (2026-10-06), sin construir.** Las decisiones y sus alternativas están en
+**Estado: terminada (2026-10-05).** Aprobada el 2026-10-06. Las decisiones y sus alternativas están en
 `PLAN.md` D17. Seguimiento en HMH Four: tareas #2071 a #2079 (12.1 → #2071, 12.2 → #2072, 12.3 a 12.6 → #2073 y #2074, 12.7 → #2075, 12.8 y 12.9 → #2076, 12.10 y 12.11 → #2077, 12.12 y 12.13 → #2078, 12.14 y 12.15 → #2079).
 
 ### Decisiones (aprobadas el 2026-10-06)
@@ -1129,9 +1129,19 @@ externo ni dependencia nueva.
   reportes no salgan vacíos en la demo; `demo_reset.sql` restaura los cortes sin borrarlos (son inmutables: se
   ocultan o se compensan, como el inventario). **No** va en `seed.sql` si rompe tests existentes (como pasó
   con las existencias en 11.22). _Verificar:_ `demo:reset` deja los reportes con datos y la caja cerrada.
-- [ ] **12.15** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6.5, módulos nuevos en §6.7/§7.2, quitar
+- [x] **12.15** 📚 Documentar al cerrar: tablas nuevas en `CLAUDE.md` §6.5, módulos nuevos en §6.7/§7.2, quitar
   "reportes y corte de caja" de los candidatos de §1, y la nota de que "Reportes financieros avanzados" sigue
   fuera. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-05 (#2079, parte 12.15):** `CLAUDE.md` §6.5 documenta `cash_sessions` y `cash_movements` (turno,
+  RPC de apertura, cierre y resumen, inmutabilidad del corte cerrado, regla del efectivo esperado) y las tres funciones
+  de reportes; §6.7 y §7.2 listan los módulos `cash_register` y `reports` con sus permisos por defecto (y corrigen la
+  lista de módulos, que había quedado en `employees` e `inventory`); §1 quita "corte de caja y reportes" de los
+  candidatos y precisa qué "Reportes financieros avanzados" sigue fuera (utilidad, inventario, facturación y Excel
+  nativo); §10 describe lo que `demo:reset` deja ahora (esto último depende del PR de 12.14). `PLAN.md` y
+  `TASKS.md` marcan la fase 12 como terminada. **Verificado** releyendo cada afirmación contra las migraciones, las
+  rutas y los archivos de `src/` (nombres de funciones, tablas, permisos y rutas existen). **No cubierto:** el
+  ejemplo de demostración de `PLAN.md` ("tres ventas, retiro de $200") no se reprodujo de principio a fin en esta
+  tarea; lo verificado en navegador está en 12.11 y 12.12.
 
 **Riesgos de la fase:**
 

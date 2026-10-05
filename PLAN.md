@@ -307,8 +307,8 @@ partidas, citas): no hay servicio externo ni dependencia nueva. Dos bloques:
 2. **Reportes de ventas** hechos en la base (funciones SQL que agregan, no el navegador): ventas por día,
    por método de pago, por servicio o producto, por empleado y por sucursal, con exportación a CSV.
 
-**Estado: aprobada (2026-10-06)** (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
-**Demostrable (cuando termine):** recepción abre la caja con $500 de fondo, cobra tres ventas (una en efectivo
+**Estado: terminada (2026-10-05)**; aprobada el 2026-10-06 (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
+**Demostrable:** recepción abre la caja con $500 de fondo, cobra tres ventas (una en efectivo
 con cambio, una con tarjeta y una por transferencia), registra un retiro de $200, cierra contando el efectivo y
 ve el sobrante o faltante; el dueño ve las ventas del mes por método de pago, por sucursal y por empleado y
 descarga el CSV.
