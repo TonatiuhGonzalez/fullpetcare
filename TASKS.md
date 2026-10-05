@@ -1254,10 +1254,27 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   `isFrontDesk` que el groomer, no se probó aparte), `/superadmin` y el login (usan otro layout, así que no lo llevan);
   no hay test automático del botón (es un componente de layout, §9).
 
-- [ ] **13.4** Rehacer `/app/venta-mostrador` como punto de venta (búsqueda de producto, tabla de partidas,
+- [x] **13.4** Rehacer `/app/venta-mostrador` como punto de venta (búsqueda de producto, tabla de partidas,
   total grande, Cobrar y Cancelar), sin pedir cliente. Búsqueda por código de barras
   (`products.sku`), cantidades enteras y botón "Consultar precio" con su diálogo; sin atajos ni venta en espera. _Verificar:_ se cobra una venta sin cliente de principio
   a fin y baja la existencia.
+  **Hecho 2026-10-05:** pantalla nueva `pages/ventas/PointOfSalePage.vue` (la ruta `venta-mostrador` ya no usa
+  `CheckoutPage`, que quedó solo para cobrar citas). Barra de captura con código de barras (Enter lo agrega; busca
+  exacto en `products.sku`) y búsqueda por nombre, botón "Consultar precio" con su diálogo (no toca el ticket), tabla
+  de partidas con cantidad entera editable, total grande, Cancelar (con confirmación) y Cobrar (diálogo de descuento y
+  formas de pago, y luego el ticket con "Facturar esta venta" y "Nueva venta"). Sin cliente. Piezas puras nuevas:
+  `lib/productSearch.ts` (9 tests) y `lib/checkoutErrors.ts` (la traducción de errores del cobro, antes metida en
+  `CheckoutPage`; 4 tests); el store acepta cliente nulo (1 test). **Verificado** en el navegador como recepción
+  entrando por el botón flotante: código en minúsculas, mismo código dos veces (suma cantidad), código inexistente (avisa),
+  producto por nombre, Consultar precio, cobro en efectivo y Nueva venta; en la base la venta quedó con `customer_id`
+  nulo, total $679.00 y la existencia bajó 2 y 1. `vue-tsc -b`, `lint`, `build` y 415 tests unitarios en verde.
+  **Decisiones mías que conviene revisar:** (1) el campo "Buscar por nombre" junto al código: los productos sin código
+  (es opcional) no tendrían otra forma de venderse; (2) Consultar precio y el catálogo solo ven productos **con
+  existencia** en la sucursal (así lo entrega `listSellableProducts`), así que un producto agotado no aparece; (3) el
+  formulario de pago está duplicado de `CheckoutPage` (segunda vez; se extrae a un componente si hace falta una tercera).
+  **No cubierto:** la factura en esta pantalla (13.5 y 13.6), probar con un lector de código de barras real (se
+  simuló escribiendo y Enter), pantallas menores a 960 px (el botón flotante y el POS están pensados para escritorio),
+  y no hay test automático de la página (§9).
 
 ### 13D. Factura
 

@@ -306,6 +306,22 @@ describe('productos en el ticket (tarea 11.11)', () => {
     expect(cart.productItems).toEqual([]) // el carrito queda limpio
   })
 
+  it('una venta libre (sin cliente) se cobra mandando el cliente en null', async () => {
+    // Qué se rompería: la venta libre de la fase 13 lanzaría "no hay ninguna cita ni venta
+    // cargada" por no tener cliente, y recepción no podría vender un shampoo al paso.
+    vi.mocked(chargeCounterSale).mockResolvedValue({} as Ticket)
+    const cart = useCartStore()
+    cart.loadCounterSale('branch-1')
+    cart.addProduct(ALIMENTO, 1)
+    cart.addPayment({ method: 'cash', amountCents: 10000 })
+
+    await cart.checkout()
+
+    expect(chargeCounterSale).toHaveBeenCalledWith(
+      expect.objectContaining({ branchId: 'branch-1', customerId: null }),
+    )
+  })
+
   it('el cobro de una cita manda sus productos extra', async () => {
     vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
     vi.mocked(charge).mockResolvedValue({} as Ticket)
