@@ -247,7 +247,8 @@ function handleAppointmentCreated(appointment: Appointment): void {
 </script>
 
 <template>
-  <v-container class="py-6" :max-width="null">
+  <!-- null (no undefined) para ignorar el ancho global de VContainer: el calendario usa todo el ancho. El cast es solo para vue-tsc. -->
+  <v-container class="py-6" :max-width="null as unknown as undefined">
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <h1 class="text-h5 mr-4">Agenda</h1>
 
