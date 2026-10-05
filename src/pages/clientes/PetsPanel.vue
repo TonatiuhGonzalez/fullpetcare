@@ -63,6 +63,13 @@ async function load(): Promise<void> {
 
 onMounted(load)
 
+// El botón "Nueva mascota" vive en el encabezado de la página (junto al
+// de "Nuevo cliente"), así que la página lo dispara a través de este método.
+function openNewPet(): void {
+  showFormDialog.value = true
+}
+defineExpose({ openNewPet })
+
 function handleRowClick(_event: Event, { item }: { item: Pet }): void {
   selectedPetId.value = item.id
   showDetailDialog.value = true
@@ -71,22 +78,17 @@ function handleRowClick(_event: Event, { item }: { item: Pet }): void {
 
 <template>
   <div>
-    <div class="d-flex align-center mb-4">
-      <v-text-field
-        v-model="searchTerm"
-        label="Buscar por nombre, especie o dueño"
-        prepend-inner-icon="mdi-magnify"
-        density="compact"
-        variant="outlined"
-        hide-details
-        clearable
-        style="max-width: 420px"
-      />
-      <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="showFormDialog = true">
-        Nueva mascota
-      </v-btn>
-    </div>
+    <v-text-field
+      v-model="searchTerm"
+      label="Buscar por nombre, especie o dueño"
+      prepend-inner-icon="mdi-magnify"
+      density="compact"
+      variant="outlined"
+      hide-details
+      clearable
+      class="mb-4"
+      style="max-width: 420px"
+    />
 
     <v-alert
       v-if="errorMessage"
