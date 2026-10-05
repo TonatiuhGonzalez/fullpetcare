@@ -376,15 +376,17 @@ function handleNewSale(): void {
           <thead>
             <tr>
               <th>Descripción</th>
-              <th class="text-right">Precio unitario</th>
-              <th class="text-center">Cantidad</th>
-              <th class="text-right">Importe</th>
-              <th />
+              <th class="text-right col-price">Precio unitario</th>
+              <th class="text-center col-qty">Cantidad</th>
+              <th class="text-right col-amount">Importe</th>
+              <th class="col-actions" />
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in cart.productItems" :key="item.productId">
-              <td>{{ item.description }}</td>
+              <td class="pos-description" :title="item.description">
+                {{ item.description }}
+              </td>
               <td class="text-right">{{ formatMXN(item.unitPriceCents) }}</td>
               <td class="text-center">
                 <v-text-field
@@ -759,6 +761,32 @@ function handleNewSale(): void {
 </template>
 
 <style scoped lang="scss">
+// Columnas de la tabla del ticket con ancho fijo: solo "Descripción" ocupa el resto, y un
+// nombre largo se corta con "…" en vez de empujar las demás columnas.
+.pos-lines :deep(table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.col-price,
+.col-amount {
+  width: 160px;
+}
+
+.col-qty {
+  width: 140px;
+}
+
+.col-actions {
+  width: 64px;
+}
+
+.pos-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // La tarjeta ocupa el alto disponible para que la tabla de partidas crezca y el total
 // quede siempre abajo, como en una caja registradora.
 .pos-card {
