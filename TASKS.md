@@ -1242,9 +1242,18 @@ Seguimiento en HMH Four: proyecto FullPetCare.
 
 ### 13C. Interfaz
 
-- [ ] **13.3** Botón circular flotante en `AppLayout.vue` (abajo a la derecha, solo escritorio; oculto en
+- [x] **13.3** Botón circular flotante en `AppLayout.vue` (abajo a la derecha, solo escritorio; oculto en
   móvil), solo dueño y recepción; quitar la entrada del menú lateral. _Verificar:_ visible en todas las vistas para esos roles, ausente
   para groomer y vet.
+  **Hecho 2026-10-05:** en `AppLayout.vue` se quitó la entrada del menú y se agregó un `v-btn` circular fijo
+  (`position="fixed"`, abajo a la derecha) que navega a `/app/venta-mostrador`. Se oculta en móvil con
+  `d-none d-md-flex` (mismo corte `md` que el menú lateral), solo lo ven dueño y recepción (`isFrontDesk`) y se
+  oculta en la propia pantalla de venta (ahí taparía el botón de cobrar). **Verificado** en el navegador (Playwright
+  contra el servidor local, 1280 px): recepción y dueño lo ven en Agenda y Servicios, el groomer no, y en 500 px
+  desaparece; el menú ya no dice "Venta de mostrador". `vue-tsc -b` y `lint` en verde. **No cubierto:** el vet (mismo
+  `isFrontDesk` que el groomer, no se probó aparte), `/superadmin` y el login (usan otro layout, así que no lo llevan);
+  no hay test automático del botón (es un componente de layout, §9).
+
 - [ ] **13.4** Rehacer `/app/venta-mostrador` como punto de venta (búsqueda de producto, tabla de partidas,
   total grande, Cobrar y Cancelar), sin pedir cliente. Búsqueda por código de barras
   (`products.sku`), cantidades enteras y botón "Consultar precio" con su diálogo; sin atajos ni venta en espera. _Verificar:_ se cobra una venta sin cliente de principio

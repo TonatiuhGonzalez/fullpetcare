@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
@@ -65,13 +65,19 @@ const menuItems = computed<SideMenuItem[]>(() => [
   ...(session.canView('reports')
     ? [{ title: 'Reportes', icon: 'mdi-chart-bar', to: '/app/reportes' }]
     : []),
-  ...(isFrontDesk(session.role)
-    ? [{ title: 'Venta de mostrador', icon: 'mdi-cash-register', to: '/app/venta-mostrador' }]
-    : []),
   ...(session.canView('employees')
     ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
     : []),
 ])
+
+// Botón flotante de venta de mostrador (fase 13, tarea 13.3). Reemplaza la entrada
+// del menú: se ve desde cualquier pantalla de la app, pero solo dueño y recepción
+// cobran (misma regla que la ruta, `requiresFrontDesk`). En la propia pantalla de
+// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado.
+const route = useRoute()
+const showPosButton = computed(
+  () => isFrontDesk(session.role) && route.name !== 'venta-mostrador',
+)
 
 const showFeedback = ref(false)
 const feedbackSentNotice = ref(false)
@@ -181,4 +187,19 @@ function handleBranchChange(branchId: unknown): void {
     </v-alert>
     <router-view />
   </v-main>
+
+  <!-- d-none d-md-flex: solo escritorio; en móvil se oculta (mismo corte md que el menú lateral). -->
+  <v-btn
+    v-if="showPosButton"
+    class="d-none d-md-flex ma-6"
+    icon="mdi-cash-register"
+    color="primary"
+    size="large"
+    position="fixed"
+    location="bottom right"
+    elevation="6"
+    aria-label="Venta de mostrador"
+    title="Venta de mostrador"
+    to="/app/venta-mostrador"
+  />
 </template>
