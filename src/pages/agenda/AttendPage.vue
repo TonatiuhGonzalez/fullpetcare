@@ -146,7 +146,7 @@ async function handleVaccinationSaved(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6" style="max-width: 640px">
+  <v-container class="py-6">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"

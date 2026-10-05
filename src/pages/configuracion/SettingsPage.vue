@@ -8,7 +8,7 @@ const session = useSessionStore()
 </script>
 
 <template>
-  <v-container fluid class="pa-4">
+  <v-container class="pa-4">
     <v-row>
       <v-col cols="12" md="3" lg="2">
         <v-list nav density="comfortable" class="border rounded">

@@ -96,7 +96,7 @@ const methodRows = computed(() => {
 </script>
 
 <template>
-  <v-container class="py-4" style="max-width: 860px">
+  <v-container class="py-4">
     <div class="d-flex align-center mb-4">
       <div>
         <h1 class="text-h5">Caja</h1>

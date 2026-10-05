@@ -63,7 +63,7 @@ export const router = createRouter({
           component: () => import('@/pages/agenda/AgendaPage.vue'),
         },
         {
-          path: 'catalogo',
+          path: 'servicios',
           name: 'catalogo',
           component: () => import('@/pages/agenda/CatalogPage.vue'),
         },
