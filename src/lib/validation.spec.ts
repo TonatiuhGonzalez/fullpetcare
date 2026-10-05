@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  customerFiscalProblems,
   fiscalReceiverProblems,
   isValidCURP,
   isValidEmail,
@@ -342,5 +343,33 @@ describe('fiscalReceiverProblems', () => {
 
   it('rechaza un código postal que no tiene 5 dígitos', () => {
     expect(fiscalReceiverProblems({ ...COMPLETE, postalCode: '660' })).toHaveLength(1)
+  })
+})
+
+describe('customerFiscalProblems', () => {
+  it('un cliente con todos sus datos fiscales ya se puede facturar', () => {
+    expect(
+      customerFiscalProblems({
+        rfc: 'XAXX010101000',
+        legal_name: 'Cliente de Prueba',
+        tax_regime_code: '612',
+        cfdi_use: 'G03',
+        postal_code: '06600',
+      }),
+    ).toEqual([])
+  })
+
+  it('un cliente que nunca pidió factura (campos nulos) reporta todo lo que falta', () => {
+    // Qué se rompería: al elegirlo en el punto de venta se cobraría y la solicitud de factura
+    // saldría con datos vacíos (la base exige RFC y razón social), sin forma de corregirlo.
+    expect(
+      customerFiscalProblems({
+        rfc: null,
+        legal_name: null,
+        tax_regime_code: null,
+        cfdi_use: null,
+        postal_code: null,
+      }),
+    ).toHaveLength(5)
   })
 })

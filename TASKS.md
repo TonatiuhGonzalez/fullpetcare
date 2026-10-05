@@ -1297,8 +1297,21 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   G03) se valida, pero que exista en el catálogo del SAT lo decide el PAC al timbrar. **No cubierto:** un cliente ya
   registrado (13.6) y el timbrado real con el PAC.
 
-- [ ] **13.6** 🧪 Factura con cliente registrado: selector de clientes; pedir en el momento los datos fiscales
+- [x] **13.6** 🧪 Factura con cliente registrado: selector de clientes; pedir en el momento los datos fiscales
   que falten. _Verificar:_ test con cliente completo y con cliente incompleto.
+  **Hecho 2026-10-05:** al marcar "Requiere factura" aparece "¿Ya es cliente registrado?" (No, es nuevo / Sí; por
+  defecto "No", como en 13.5). Con "Sí" hay un selector con los clientes registrados (se carga la primera vez que se
+  elige "Sí"). Si el cliente elegido no tiene datos fiscales completos, un aviso lista lo que falta y "Completar datos"
+  abre el mismo formulario de cliente (`invoice-required`, ahora también al **editar**), que no deja guardar
+  incompleto; al guardar se actualiza el cliente y se puede cobrar. Función pura nueva `customerFiscalProblems()`
+  (`lib/validation.ts`, 2 tests: cliente completo y cliente con todo nulo). **Verificado** en el navegador como
+  recepción: Santiago (completo) queda listo y se cobra; Sofía (sin datos) bloquea "Cobrar", guardar vacío lista los 5
+  problemas, y tras completarlos se cobra. En la base, cada venta quedó ligada a su cliente y con su solicitud de factura
+  `pending`; Sofía quedó con `requires_invoice` y su RFC. Se repitió el flujo de cliente nuevo (13.5) y sigue
+  funcionando. `vue-tsc -b`, `lint`, `build` y 423 tests unitarios en verde. **Límite conocido:** el selector carga
+  la lista completa de clientes (`customersService.list`), y la API devuelve máximo 1 000 filas; con un negocio mayor
+  habría que buscar en el servidor (`customersService.search`). Es lo mismo que hacía la venta de mostrador anterior.
+  **No cubierto:** el timbrado real con el PAC.
 
 ### 13E. Cierre
 

@@ -20,8 +20,9 @@ const props = defineProps<{
   tenantId: string
   customer?: Customer | null
   /**
-   * Alta para facturar (punto de venta, fase 13): "Requiere factura" queda activado y no se
-   * puede guardar sin datos fiscales completos. Solo aplica al alta, no a editar.
+   * Para facturar (punto de venta, fase 13): "Requiere factura" queda activado y no se puede
+   * guardar sin datos fiscales completos. Sirve para dar de alta a quien pide factura y para
+   * completar los datos fiscales de un cliente ya registrado.
    */
   invoiceRequired?: boolean
 }>()
@@ -62,7 +63,7 @@ watch(
     phone.value = c?.phone ?? ''
     email.value = c?.email ?? ''
     notes.value = c?.notes ?? ''
-    requiresInvoice.value = c?.requires_invoice ?? props.invoiceRequired ?? false
+    requiresInvoice.value = props.invoiceRequired || (c?.requires_invoice ?? false)
     rfc.value = c?.rfc ?? ''
     legalName.value = c?.legal_name ?? ''
     taxRegimeCode.value = c?.tax_regime_code ?? ''
@@ -84,7 +85,7 @@ function close(): void {
 
 async function handleSubmit(): Promise<void> {
   errorMessage.value = null
-  if (props.invoiceRequired && !isEditing.value) {
+  if (props.invoiceRequired) {
     const problems = fiscalReceiverProblems({
       rfc: rfc.value,
       legalName: legalName.value,
@@ -138,10 +139,10 @@ async function handleSubmit(): Promise<void> {
   >
     <v-card>
       <v-card-title>{{
-        isEditing
-          ? 'Editar cliente'
-          : invoiceRequired
-            ? 'Datos para la factura'
+        invoiceRequired
+          ? 'Datos para la factura'
+          : isEditing
+            ? 'Editar cliente'
             : 'Nuevo cliente'
       }}</v-card-title>
 
@@ -164,7 +165,7 @@ async function handleSubmit(): Promise<void> {
             v-model="requiresInvoice"
             label="Requiere factura"
             density="compact"
-            :disabled="invoiceRequired && !isEditing"
+            :disabled="invoiceRequired"
           />
 
           <!-- Sección fiscal colapsada: solo aparece si de verdad hace

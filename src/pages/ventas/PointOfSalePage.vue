@@ -4,10 +4,10 @@
 //
 // Reutiliza useCartStore (el carrito de siempre, en modo "venta de mostrador") y el
 // cobro checkout_counter_sale() de la base: esta página solo arma el ticket y lo manda.
-// Factura (tarea 13.5): si quien compra pide factura y no es cliente, se capturan sus datos
-// fiscales, se le da de alta como cliente y la venta queda ligada a él. Elegir un cliente
-// ya registrado llega en la 13.6. Tras cobrar, siempre se puede facturar desde el detalle
-// de la venta.
+// Factura (tareas 13.5 y 13.6): si quien compra pide factura, o no es cliente (se capturan
+// sus datos fiscales y se le da de alta) o ya lo es (se elige de la lista y, si le faltan
+// datos fiscales, se le piden en el momento). En ambos casos la venta queda ligada al
+// cliente. Tras cobrar, siempre se puede facturar desde el detalle de la venta.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
@@ -15,7 +15,9 @@ import TicketView from '@/components/TicketView.vue'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { findBySku, searchProducts } from '@/lib/productSearch'
+import { customerFiscalProblems } from '@/lib/validation'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
+import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import * as invoiceRequestsService from '@/services/invoiceRequests'
 import { useCartStore } from '@/stores/cart'
@@ -137,6 +139,37 @@ const invoiceWarning = ref<string | null>(null)
 const requiresInvoice = ref(false)
 const invoiceCustomer = ref<Customer | null>(null)
 const showCustomerForm = ref(false)
+/** ¿Quien pide factura ya es cliente registrado (se elige) o no (se captura y se da de alta)? */
+const invoiceMode = ref<'new' | 'registered'>('new')
+const customers = ref<Customer[]>([])
+const customersLoaded = ref(false)
+const customersError = ref<string | null>(null)
+
+/** Lo que le falta al cliente elegido para facturarle; vacío si ya se puede (o si no hay cliente). */
+const invoiceProblems = computed(() =>
+  invoiceCustomer.value ? customerFiscalProblems(invoiceCustomer.value) : [],
+)
+/** Hay cliente y ya tiene todos sus datos fiscales: se puede cobrar con factura. */
+const invoiceReady = computed(
+  () => !!invoiceCustomer.value && invoiceProblems.value.length === 0,
+)
+
+async function loadCustomers(): Promise<void> {
+  if (customersLoaded.value || !session.activeTenantId) return
+  customersError.value = null
+  try {
+    customers.value = await customersService.list(session.activeTenantId)
+    customersLoaded.value = true
+  } catch {
+    customersError.value = 'No se pudo cargar la lista de clientes. Revisa tu conexión.'
+  }
+}
+
+// Cambiar entre "cliente nuevo" y "registrado" descarta lo elegido; la lista se carga la primera vez.
+watch([requiresInvoice, invoiceMode], ([invoice, mode], [, previousMode]) => {
+  if (mode !== previousMode) invoiceCustomer.value = null
+  if (invoice && mode === 'registered') void loadCustomers()
+})
 
 const discountInPesos = ref<number | null>(null)
 const newPaymentMethod = ref<PaymentMethod>('cash')
@@ -164,6 +197,7 @@ function resetPaymentForm(): void {
   ticket.value = null
   invoiceWarning.value = null
   requiresInvoice.value = false
+  invoiceMode.value = 'new'
   invoiceCustomer.value = null
 }
 
@@ -195,8 +229,11 @@ function fillRemaining(): void {
   newPaymentAmountInPesos.value = cart.remainingCents / 100
 }
 
+/** Cliente dado de alta, o cliente registrado al que se le completaron los datos fiscales. */
 function handleCustomerSaved(customer: Customer): void {
   invoiceCustomer.value = customer
+  const index = customers.value.findIndex((c) => c.id === customer.id)
+  if (index >= 0) customers.value[index] = customer
 }
 
 /** Solicitud de factura de una venta ya cobrada, con los datos fiscales del cliente dado de alta. */
@@ -222,7 +259,7 @@ async function createInvoiceRequest(sold: Ticket, customer: Customer): Promise<v
 
 async function handleCharge(): Promise<void> {
   const customer = requiresInvoice.value ? invoiceCustomer.value : null
-  if (requiresInvoice.value && !customer) return
+  if (requiresInvoice.value && !invoiceReady.value) return
   charging.value = true
   chargeError.value = null
   try {
@@ -618,30 +655,75 @@ function handleNewSale(): void {
             hide-details
           />
           <div v-if="requiresInvoice" class="mb-3">
+            <v-radio-group v-model="invoiceMode" inline density="compact" hide-details>
+              <template #label>¿Ya es cliente registrado?</template>
+              <v-radio label="No, es nuevo" value="new" />
+              <v-radio label="Sí" value="registered" />
+            </v-radio-group>
+
+            <!-- Cliente registrado: selector de la lista. -->
+            <template v-if="invoiceMode === 'registered'">
+              <v-autocomplete
+                v-model="invoiceCustomer"
+                :items="customers"
+                :item-title="(c: Customer) => `${c.first_name} ${c.last_name}`"
+                return-object
+                label="Cliente"
+                density="compact"
+                hide-details
+                class="mt-2"
+                no-data-text="Sin resultados"
+                :loading="!customersLoaded && !customersError"
+              />
+              <p v-if="customersError" class="text-caption text-error mt-1 mb-0">
+                {{ customersError }}
+              </p>
+              <v-alert
+                v-if="invoiceCustomer && invoiceProblems.length > 0"
+                type="warning"
+                density="compact"
+                variant="tonal"
+                class="mt-2"
+              >
+                A este cliente le faltan datos para facturarle.
+                {{ invoiceProblems.join(' ') }}
+                <template #append>
+                  <v-btn size="small" variant="flat" @click="showCustomerForm = true">
+                    Completar datos
+                  </v-btn>
+                </template>
+              </v-alert>
+            </template>
+
+            <!-- Cliente nuevo: se capturan sus datos y se le da de alta. -->
+            <template v-else>
+              <v-btn
+                variant="tonal"
+                size="small"
+                prepend-icon="mdi-account-plus-outline"
+                class="mt-2"
+                :disabled="!!invoiceCustomer"
+                @click="showCustomerForm = true"
+              >
+                {{ invoiceCustomer ? 'Datos capturados' : 'Capturar datos del cliente' }}
+              </v-btn>
+              <p
+                v-if="!invoiceCustomer"
+                class="text-caption text-medium-emphasis mt-1 mb-0"
+              >
+                Se le dará de alta como cliente y la venta quedará ligada a él.
+              </p>
+            </template>
+
             <v-alert
-              v-if="invoiceCustomer"
+              v-if="invoiceReady && invoiceCustomer"
               type="success"
               density="compact"
               variant="tonal"
-              class="mb-1"
+              class="mt-2"
             >
               Se facturará a {{ invoiceCustomer.legal_name }} ({{ invoiceCustomer.rfc }}).
             </v-alert>
-            <v-btn
-              variant="tonal"
-              size="small"
-              prepend-icon="mdi-account-plus-outline"
-              :disabled="!!invoiceCustomer"
-              @click="showCustomerForm = true"
-            >
-              {{ invoiceCustomer ? 'Datos capturados' : 'Capturar datos del cliente' }}
-            </v-btn>
-            <p
-              v-if="!invoiceCustomer"
-              class="text-caption text-medium-emphasis mt-1 mb-0"
-            >
-              Se le dará de alta como cliente y la venta quedará ligada a él.
-            </p>
           </div>
 
           <v-alert v-if="chargeError" type="error" density="compact" variant="tonal">
@@ -657,7 +739,7 @@ function handleNewSale(): void {
             color="primary"
             variant="flat"
             :loading="charging"
-            :disabled="!cart.isFullyPaid || (requiresInvoice && !invoiceCustomer)"
+            :disabled="!cart.isFullyPaid || (requiresInvoice && !invoiceReady)"
             @click="handleCharge"
           >
             Cobrar {{ formatMXN(cart.totalCents) }}
@@ -669,6 +751,7 @@ function handleNewSale(): void {
     <CustomerFormDialog
       v-model="showCustomerForm"
       :tenant-id="session.activeTenantId ?? ''"
+      :customer="invoiceMode === 'registered' ? invoiceCustomer : null"
       invoice-required
       @saved="handleCustomerSaved"
     />
