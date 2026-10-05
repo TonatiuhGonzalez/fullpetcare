@@ -48,7 +48,7 @@ async function openScreenshot(report: FeedbackReport): Promise<void> {
 </script>
 
 <template>
-  <v-container max-width="900">
+  <v-container>
     <h1 class="text-h5 mb-1">Reportes y sugerencias</h1>
     <p class="text-body-2 text-medium-emphasis mb-4">
       Comentarios que los usuarios envían desde el botón de la barra superior, del más

@@ -88,7 +88,7 @@ async function update(
 </script>
 
 <template>
-  <v-container max-width="800">
+  <v-container>
     <h1 class="text-h5 mb-1">Motivos de suspensión y baja</h1>
     <p class="text-body-2 text-medium-emphasis mb-4">
       Son los motivos que puedes elegir al suspender o dar de baja una empresa. El cliente

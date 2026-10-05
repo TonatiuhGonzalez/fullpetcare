@@ -131,7 +131,7 @@ async function handleReschedule(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6" style="max-width: 560px">
+  <v-container class="py-6">
     <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" to="/app/agenda">
       Volver a la agenda
     </v-btn>

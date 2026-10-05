@@ -143,7 +143,7 @@ async function handleOpen(kind: 'xml' | 'pdf'): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-4" style="max-width: 720px">
+  <v-container class="py-4">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"

@@ -247,7 +247,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container class="py-6" :max-width="null">
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <h1 class="text-h5 mr-4">Agenda</h1>
 

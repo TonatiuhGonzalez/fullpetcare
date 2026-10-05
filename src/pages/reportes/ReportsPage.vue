@@ -167,7 +167,7 @@ function exportStaff(): void {
 </script>
 
 <template>
-  <v-container class="py-4" style="max-width: 1000px">
+  <v-container class="py-4">
     <h1 class="text-h5 mb-1">Reportes</h1>
     <p class="text-body-2 text-medium-emphasis mb-4">
       Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal.
