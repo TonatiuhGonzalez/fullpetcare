@@ -1189,3 +1189,139 @@ externo ni dependencia nueva.
 | Reescribir un corte ya cerrado para "arreglar" un faltante    | Trigger que lo impide, también con `service_role`; el error se aclara con una nota                                |
 | Una venta sin caja abierta queda fuera de todo corte          | Los reportes no dependen de la caja; la pantalla avisa cuando hay ventas en efectivo fuera de un turno             |
 | Que recepción vea reportes de otras sucursales                | RPC con permiso `reports` y sucursal revalidados; test de aislamiento por sucursal                                 |
+
+---
+
+## Fase 13 — Venta de mostrador como punto de venta
+
+**Meta: que recepción cobre una venta de productos al paso, desde cualquier pantalla, con una interfaz de punto
+de venta y sin necesidad de registrar al cliente.**
+Tercera fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+
+**Estado: terminada (2026-10-05).** Aprobada el 2026-10-05. Decisiones y alternativas en `PLAN.md` D18.
+Seguimiento en HMH Four: proyecto FullPetCare.
+
+### Decisiones (aprobadas el 2026-10-05)
+
+| #   | Decisión                | Propuesta                                                                                                       |
+| --- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | Acceso                  | Botón circular flotante abajo a la derecha (escritorio), en todas las vistas de la app; se quita del menú.      |
+| 2   | Quién lo ve             | Solo dueño y recepción.                                                                                         |
+| 3   | Pantalla                | Completa, en `/app/venta-mostrador`, con aspecto de punto de venta.                                             |
+| 4   | Qué se vende            | Solo productos.                                                                                                 |
+| 5   | Cliente                 | No se requiere (`sales.customer_id` admite nulo).                                                               |
+| 6   | Factura sin cliente     | Se capturan los datos fiscales y se crea el cliente.                                                            |
+| 7   | Factura con cliente     | Selector de clientes registrados; si faltan datos fiscales, se piden en el momento.                             |
+| 8   | Móvil                   | El botón flotante se oculta.                                                                                    |
+| 9   | Elementos del POS       | Con búsqueda por código de barras, cantidades enteras y "Consultar precio" (diálogo). Sin atajos ni venta en espera. |
+| 10  | Venta y cliente nuevo   | Al facturar a alguien que no es cliente, la venta queda ligada al cliente que se crea.                          |
+
+### 13A. Preparación
+
+- [x] **13.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D18.
+  _Verificar:_ el usuario aprobó por escrito; D18 sin "pendiente de aprobación".
+  **Hecho 2026-10-05:** el usuario aprobó las diez decisiones tras fijar el comportamiento en móvil, la liga de la
+  venta con el cliente nuevo y los elementos del POS.
+
+### 13B. Base de datos
+
+- [x] **13.2** 🧪 Migración aditiva: `sales.customer_id` admite nulo y `checkout_counter_sale()` acepta cliente
+  nulo. Revisar que ticket, historial, reportes, caja y factura toleren una venta sin cliente. _Verificar:_ test
+  de base que cobra sin cliente y comprueba totales, existencias y reportes; los tests existentes siguen verdes.
+  **Hecho 2026-10-05:** migración `20261011120000_sales_customer_optional.sql` (`sales.customer_id` admite
+  nulo; `checkout_counter_sale()` valida el cliente solo si llega, y entonces exige que sea de ese negocio).
+  Revisado: reportes, caja, `finalize_sale`/`add_product_items` y la Edge Function de facturación **no** leen
+  `sales.customer_id`; lo que sí lo leía era la interfaz: el ticket (`TicketView`, ya no muestra "Cliente:" vacío) y
+  el detalle de venta (`SaleDetailPage`, sin cliente no precarga datos fiscales). `database.ts` regenerado. Test
+  nuevo en `checkout-products-rpc.spec.ts`: cobra sin cliente, la venta queda con `customer_id` nulo, baja la
+  existencia y entra en `report_sales_summary`. **Verificado:** 92 tests de ventas, caja y reportes en verde tras
+  `db:reset`; `vue-tsc -b`, `lint` y 400 tests unitarios en verde. En `test:db` fallan los mismos 55 tests de Edge
+  Functions y Storage de siempre (el runtime de funciones no está levantado, §12). **No cubierto:** el
+  `checkout-service.spec.ts` no ejercita `chargeCounterSale` sin cliente (el service solo pasa el valor); la pantalla
+  todavía pide cliente hasta la 13.4.
+
+### 13C. Interfaz
+
+- [x] **13.3** Botón circular flotante en `AppLayout.vue` (abajo a la derecha, solo escritorio; oculto en
+  móvil), solo dueño y recepción; quitar la entrada del menú lateral. _Verificar:_ visible en todas las vistas para esos roles, ausente
+  para groomer y vet.
+  **Hecho 2026-10-05:** en `AppLayout.vue` se quitó la entrada del menú y se agregó un `v-btn` circular fijo
+  (`position="fixed"`, abajo a la derecha) que navega a `/app/venta-mostrador`. Se oculta en móvil con
+  `d-none d-md-flex` (mismo corte `md` que el menú lateral), solo lo ven dueño y recepción (`isFrontDesk`) y se
+  oculta en la propia pantalla de venta (ahí taparía el botón de cobrar). **Verificado** en el navegador (Playwright
+  contra el servidor local, 1280 px): recepción y dueño lo ven en Agenda y Servicios, el groomer no, y en 500 px
+  desaparece; el menú ya no dice "Venta de mostrador". `vue-tsc -b` y `lint` en verde. **No cubierto:** el vet (mismo
+  `isFrontDesk` que el groomer, no se probó aparte), `/superadmin` y el login (usan otro layout, así que no lo llevan);
+  no hay test automático del botón (es un componente de layout, §9).
+
+- [x] **13.4** Rehacer `/app/venta-mostrador` como punto de venta (búsqueda de producto, tabla de partidas,
+  total grande, Cobrar y Cancelar), sin pedir cliente. Búsqueda por código de barras
+  (`products.sku`), cantidades enteras y botón "Consultar precio" con su diálogo; sin atajos ni venta en espera. _Verificar:_ se cobra una venta sin cliente de principio
+  a fin y baja la existencia.
+  **Hecho 2026-10-05:** pantalla nueva `pages/ventas/PointOfSalePage.vue` (la ruta `venta-mostrador` ya no usa
+  `CheckoutPage`, que quedó solo para cobrar citas). Barra de captura con código de barras (Enter lo agrega; busca
+  exacto en `products.sku`) y búsqueda por nombre, botón "Consultar precio" con su diálogo (no toca el ticket), tabla
+  de partidas con cantidad entera editable, total grande, Cancelar (con confirmación) y Cobrar (diálogo de descuento y
+  formas de pago, y luego el ticket con "Facturar esta venta" y "Nueva venta"). Sin cliente. Piezas puras nuevas:
+  `lib/productSearch.ts` (9 tests) y `lib/checkoutErrors.ts` (la traducción de errores del cobro, antes metida en
+  `CheckoutPage`; 4 tests); el store acepta cliente nulo (1 test). **Verificado** en el navegador como recepción
+  entrando por el botón flotante: código en minúsculas, mismo código dos veces (suma cantidad), código inexistente (avisa),
+  producto por nombre, Consultar precio, cobro en efectivo y Nueva venta; en la base la venta quedó con `customer_id`
+  nulo, total $679.00 y la existencia bajó 2 y 1. `vue-tsc -b`, `lint`, `build` y 415 tests unitarios en verde.
+  **Decisiones mías que conviene revisar:** (1) el campo "Buscar por nombre" junto al código: los productos sin código
+  (es opcional) no tendrían otra forma de venderse; (2) Consultar precio y el catálogo solo ven productos **con
+  existencia** en la sucursal (así lo entrega `listSellableProducts`), así que un producto agotado no aparece; (3) el
+  formulario de pago está duplicado de `CheckoutPage` (segunda vez; se extrae a un componente si hace falta una tercera).
+  **No cubierto:** la factura en esta pantalla (13.5 y 13.6), probar con un lector de código de barras real (se
+  simuló escribiendo y Enter), pantallas menores a 960 px (el botón flotante y el POS están pensados para escritorio),
+  y no hay test automático de la página (§9).
+
+### 13D. Factura
+
+- [x] **13.5** 🧪 Factura sin cliente registrado: capturar datos fiscales (validados con `lib/validation.ts`),
+  crear el cliente, ligar la venta a él y crear la solicitud de factura. _Verificar:_ test del flujo y de datos fiscales inválidos.
+  **Hecho 2026-10-05:** en el diálogo de cobro del punto de venta, la casilla "Requiere factura" pide "Capturar datos
+  del cliente", que abre `CustomerFormDialog` en un modo nuevo (`invoice-required`): "Requiere factura" queda
+  activado y no deja guardar sin nombre, apellido y datos fiscales completos. Esa validación es una función pura
+  nueva, `fiscalReceiverProblems()` en `lib/validation.ts` (5 tests: completos, cada faltante, régimen y uso de CFDI
+  con forma inválida, minúsculas, código postal). Al guardar se da de alta el cliente, y al cobrar la venta se liga a
+  él (`cart.setCounterCustomer`, 1 test) y se crea la solicitud de factura con los datos de ese cliente y la forma de
+  pago real. "Cobrar" queda deshabilitado mientras la casilla esté marcada y no haya datos. **Verificado** en el
+  navegador como recepción: guardar vacío lista los 6 problemas; con datos completos se cobra, y en la base la venta
+  quedó con el cliente nuevo, el cliente con `requires_invoice` y su RFC, y la solicitud `pending` con forma de pago
+  01. `vue-tsc -b`, `lint` y los tests unitarios en verde. **Decisiones mías:** (1) el cliente se da de alta al pulsar
+  Guardar en el formulario, antes de cobrar; si luego se cancela la venta, el cliente se queda (es una persona real
+  que dio sus datos); (2) si el cobro falla y se reintenta, no se vuelve a dar de alta (el cliente capturado se
+  conserva); (3) si el cobro sale bien pero la solicitud de factura falla, el ticket se muestra con un aviso y se puede
+  facturar desde el detalle de la venta; (4) la forma de los códigos del SAT (régimen de 3 dígitos, uso de CFDI como
+  G03) se valida, pero que exista en el catálogo del SAT lo decide el PAC al timbrar. **No cubierto:** un cliente ya
+  registrado (13.6) y el timbrado real con el PAC.
+
+- [x] **13.6** 🧪 Factura con cliente registrado: selector de clientes; pedir en el momento los datos fiscales
+  que falten. _Verificar:_ test con cliente completo y con cliente incompleto.
+  **Hecho 2026-10-05:** al marcar "Requiere factura" aparece "¿Ya es cliente registrado?" (No, es nuevo / Sí; por
+  defecto "No", como en 13.5). Con "Sí" hay un selector con los clientes registrados (se carga la primera vez que se
+  elige "Sí"). Si el cliente elegido no tiene datos fiscales completos, un aviso lista lo que falta y "Completar datos"
+  abre el mismo formulario de cliente (`invoice-required`, ahora también al **editar**), que no deja guardar
+  incompleto; al guardar se actualiza el cliente y se puede cobrar. Función pura nueva `customerFiscalProblems()`
+  (`lib/validation.ts`, 2 tests: cliente completo y cliente con todo nulo). **Verificado** en el navegador como
+  recepción: Santiago (completo) queda listo y se cobra; Sofía (sin datos) bloquea "Cobrar", guardar vacío lista los 5
+  problemas, y tras completarlos se cobra. En la base, cada venta quedó ligada a su cliente y con su solicitud de factura
+  `pending`; Sofía quedó con `requires_invoice` y su RFC. Se repitió el flujo de cliente nuevo (13.5) y sigue
+  funcionando. `vue-tsc -b`, `lint`, `build` y 423 tests unitarios en verde. **Límite conocido:** el selector carga
+  la lista completa de clientes (`customersService.list`), y la API devuelve máximo 1 000 filas; con un negocio mayor
+  habría que buscar en el servidor (`customersService.search`). Es lo mismo que hacía la venta de mostrador anterior.
+  **No cubierto:** el timbrado real con el PAC.
+
+### 13E. Cierre
+
+- [x] **13.7** 📚 Actualizar `CLAUDE.md` (§6.5 venta de mostrador y `customer_id` nulo; §1) y marcar la fase
+  terminada. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-05:** `CLAUDE.md` §1 pasa la venta de mostrador como punto de venta a "ya construido"; §6.5 documenta
+  `sales.customer_id` nulo, el cliente opcional de `checkout_counter_sale()` y un apartado nuevo con la pantalla, el
+  botón flotante, la captura por código y por nombre, y los dos caminos de factura; §4 agrega la carpeta `pages/ventas`.
+  `PLAN.md` agrega la Fase 13 (terminada) y `TASKS.md` la marca terminada. **Verificado** releyendo cada afirmación
+  contra el código (la migración, la ruta, el botón de `AppLayout`, las funciones de `lib/` y los componentes).
+  **Revisado sin cambios:** la tarea 11.20 (factura global) agrupa ventas sin factura individual sin mirar el cliente, así
+  que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
+  solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.

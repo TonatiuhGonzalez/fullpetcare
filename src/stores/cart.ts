@@ -33,7 +33,7 @@ export const useCartStore = defineStore('cart', () => {
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
   const catalog = ref<SellableProduct[]>([])
-  /** Solo en venta de mostrador (sin cita). */
+  /** Solo en venta de mostrador (sin cita). El cliente es opcional: venta libre = null. */
   const counterBranchId = ref<string | null>(null)
   const counterCustomerId = ref<string | null>(null)
   const discountCents = ref(0)
@@ -86,12 +86,17 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
-  /** Prepara una venta de mostrador: sin cita ni servicios, solo productos. */
-  function loadCounterSale(branchId: string, customerId: string): void {
+  /** Prepara una venta de mostrador: sin cita ni servicios, solo productos y, opcionalmente, cliente. */
+  function loadCounterSale(branchId: string, customerId: string | null = null): void {
     reset()
     counterBranchId.value = branchId
     counterCustomerId.value = customerId
     status.value = 'ready'
+  }
+
+  /** Liga (o quita) el cliente de una venta de mostrador ya abierta; p. ej. el que se da de alta para facturar. */
+  function setCounterCustomer(customerId: string | null): void {
+    counterCustomerId.value = customerId
   }
 
   /** Carga los productos vendibles de la sucursal (activos y con existencia). */
@@ -174,7 +179,7 @@ export const useCartStore = defineStore('cart', () => {
         discountCents: discountCents.value,
         products,
       })
-    } else if (counterBranchId.value && counterCustomerId.value) {
+    } else if (counterBranchId.value) {
       ticket = await checkoutService.chargeCounterSale({
         branchId: counterBranchId.value,
         customerId: counterCustomerId.value,
@@ -223,6 +228,7 @@ export const useCartStore = defineStore('cart', () => {
     isFullyPaid,
     loadAppointment,
     loadCounterSale,
+    setCounterCustomer,
     loadCatalog,
     addProduct,
     setProductQuantity,

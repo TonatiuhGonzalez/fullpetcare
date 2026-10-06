@@ -317,7 +317,22 @@ descarga el CSV.
 empleado, reportes de inventario o de utilidad, facturación en los reportes, gráficas con librería y
 exportación a Excel.
 
-### Después de la Fase 12 (no ahora)
+### Fase 13 — Venta de mostrador como punto de venta
+
+Tercera fase de la **etapa de mejoras**. Sin servicio externo ni dependencia nueva. La venta de mostrador pasa
+de un formulario escondido en el menú a una pantalla de punto de venta, a la que se entra por un botón flotante
+desde cualquier vista, y deja de exigir un cliente registrado (D18). Si quien compra pide factura, se da de alta
+como cliente o se elige uno registrado, completando sus datos fiscales al momento.
+
+**Estado: terminada (2026-10-05)**; aprobada el 2026-10-05 (decisiones y alternativas en D18 y en `TASKS.md` Fase 13).
+**Demostrable:** recepción toca el botón flotante desde la agenda, escanea o busca dos productos, cobra en efectivo
+sin registrar al cliente; en otra venta pide factura a alguien nuevo (se captura y queda dado de alta) y en otra a un
+cliente registrado al que se le completan los datos fiscales que le faltaban.
+
+**Fuera de esta fase:** atajos de teclado, venta en espera, cantidades fraccionarias, vender servicios en el
+punto de venta, y el timbrado real con el PAC.
+
+### Después de la Fase 13 (no ahora)
 
 OpenPay real, WhatsApp Business API, recordatorios automáticos, reserva en línea, paquetes y membresías,
 comisiones por empleado, importador de clientes.
@@ -612,6 +627,41 @@ configurable con filas). Recepción solo ve las sucursales que tiene asignadas.
 **Riesgo conocido:** que el corte no cuadre por una venta con cambio mal calculado. Por eso la regla vive en
 una función pura con tests y la RPC de cierre la repite en SQL; un test compara ambas con las mismas entradas
 (mismo patrón que `lib/cfdi.ts` y su copia).
+
+---
+
+### D18 — Venta de mostrador como punto de venta (pantalla completa), con venta libre y factura a pedido
+
+**Estado:** aprobada (2026-10-05).
+
+**1. Acceso: botón circular flotante, no una entrada del menú.** Se quita "Venta de mostrador" del menú
+lateral. Un botón circular fijo abajo a la derecha (escritorio) abre `/app/venta-mostrador`, que sigue siendo
+una pantalla completa. **En móvil el botón se oculta** (decidido por el usuario). Solo lo ven dueño y recepción (`requiresFrontDesk`, como hoy). Los permisos no cambian.
+
+**2. Interfaz de punto de venta.** La pantalla se rehace con la lógica de un POS (referencia: captura de un POS
+comercial): búsqueda de producto, tabla de partidas con precio, cantidad e importe, total grande y botones de
+Cobrar y Cancelar. **Solo productos** (decidido por el usuario). De la referencia **entran**: búsqueda por código de barras (se busca en `products.sku`, el código
+interno opcional del negocio), cantidades **enteras** y un botón "Consultar precio" que abre un diálogo para
+buscar un producto y ver su precio sin agregarlo al ticket. **No entran:** atajos de teclado, "Poner en
+espera" ni "Lista de espera", ni cantidades fraccionarias (decidido por el usuario).
+
+**3. La venta es libre: no exige cliente.** `sales.customer_id` pasa a admitir nulo (migración aditiva,
+§8.1) y `checkout_counter_sale()` acepta `p_customer_id` nulo. **Alternativa descartada:** un cliente
+"Público en general" falso por negocio; ensuciaría el listado de clientes y los reportes. **Costo aceptado:**
+todo lo que lea `sales.customer_id` (ticket, historial, reportes, factura) debe tolerar nulo; la tarea 13.2 lo
+revisa pieza por pieza.
+
+**4. Factura desde una venta libre.**
+- *No es cliente registrado:* se capturan sus datos fiscales en el momento y **se crea el cliente** (opción
+  "a" del usuario) con `requires_invoice`; la factura usa esos datos y **la venta queda ligada al cliente
+  nuevo** (decidido por el usuario).
+- *Sí es cliente registrado:* un selector con los clientes registrados. Si al elegido le faltan datos
+  fiscales, se le piden en el momento y se guardan.
+- Las reglas de §8 no cambian; los datos fiscales siguen validándose con `lib/validation.ts`.
+
+**5. Sin dependencias nuevas** (§3). Todo con Vue, Vuetify y lo que ya existe.
+
+**Pendientes:** ninguno.
 
 ---
 

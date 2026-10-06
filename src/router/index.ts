@@ -95,11 +95,12 @@ export const router = createRouter({
           meta: { requiresPermission: 'invoicing' },
         },
         {
-          // Venta de mostrador (tarea 11.11): cobrar productos sin cita. Misma
-          // página que el cobro de una cita, sin `id`. Cobrar es de recepción/dueño.
+          // Venta de mostrador (tareas 11.11 y 13.4): punto de venta de productos
+          // sin cita ni cliente. Se abre desde el botón flotante de AppLayout.
+          // Cobrar es de recepción/dueño.
           path: 'venta-mostrador',
           name: 'venta-mostrador',
-          component: () => import('@/pages/agenda/CheckoutPage.vue'),
+          component: () => import('@/pages/ventas/PointOfSalePage.vue'),
           meta: { requiresFrontDesk: true },
         },
         {

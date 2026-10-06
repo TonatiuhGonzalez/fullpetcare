@@ -1629,7 +1629,7 @@ export type Database = {
           branch_id: string
           closed_by: string | null
           created_at: string
-          customer_id: string
+          customer_id: string | null
           deleted_at: string | null
           discount_cents: number
           folio: number
@@ -1646,7 +1646,7 @@ export type Database = {
           branch_id: string
           closed_by?: string | null
           created_at?: string
-          customer_id: string
+          customer_id?: string | null
           deleted_at?: string | null
           discount_cents?: number
           folio: number
@@ -1663,7 +1663,7 @@ export type Database = {
           branch_id?: string
           closed_by?: string | null
           created_at?: string
-          customer_id?: string
+          customer_id?: string | null
           deleted_at?: string | null
           discount_cents?: number
           folio?: number

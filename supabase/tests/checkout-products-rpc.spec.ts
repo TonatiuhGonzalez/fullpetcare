@@ -93,7 +93,10 @@ async function counterSale(
   client: PoolClient,
   products: ProductLine[],
   payments: Payment[],
-  { branch = BRANCH_CENTRO, customer = CUSTOMER_SOFIA } = {},
+  {
+    branch = BRANCH_CENTRO,
+    customer = CUSTOMER_SOFIA,
+  }: { branch?: string; customer?: string | null } = {},
 ): Promise<string> {
   const { rows } = await client.query(
     'select checkout_counter_sale($1, $2, $3::jsonb, $4::jsonb) as sale_id',
@@ -176,6 +179,40 @@ describe('venta de mostrador (sin cita)', () => {
       )
       expect(rows[0]).toEqual({ n: 1, with_appointment: 0 })
       expect(await stockOf(client, PRODUCT_SHAMPOO)).toBe(3)
+    })
+  })
+
+  it('cobra sin cliente registrado: la venta queda sin cliente y cuenta en reportes y existencias', async () => {
+    // Qué se rompería: la venta libre (fase 13) fallaría con "customer_id nulo" y recepción
+    // tendría que inventar un cliente para vender un shampoo; o, peor, la venta se guardaría
+    // pero desaparecería de los totales de reportes por un join mal hecho.
+    await withTransaction(async (client) => {
+      await seedStock(client, PRODUCT_SHAMPOO, 5)
+      const shampoo = await productPrice(client, PRODUCT_SHAMPOO)
+      const total = sumLineItems([{ quantity: 1, ...shampoo }]).totalCents
+
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      const saleId = await counterSale(
+        client,
+        [{ product_id: PRODUCT_SHAMPOO, quantity: 1 }],
+        [{ method: 'cash', amount_cents: total }],
+        { customer: null },
+      )
+
+      const { rows } = await client.query(
+        'select customer_id, status, total_cents from sales where id = $1',
+        [saleId],
+      )
+      expect(rows[0]).toEqual({ customer_id: null, status: 'paid', total_cents: total })
+      expect(await stockOf(client, PRODUCT_SHAMPOO)).toBe(4)
+
+      // El reporte agrega en SQL y no debe perder la venta por no tener cliente.
+      await setRole(client, 'authenticated', USER_DUENO)
+      const { rows: report } = await client.query(
+        `select report_sales_summary($1, current_date - 1, current_date + 1, $2) as r`,
+        [TENANT_PATITAS, BRANCH_CENTRO],
+      )
+      expect(report[0].r.totals.total_cents).toBeGreaterThanOrEqual(total)
     })
   })
 

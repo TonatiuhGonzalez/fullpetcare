@@ -306,6 +306,39 @@ describe('productos en el ticket (tarea 11.11)', () => {
     expect(cart.productItems).toEqual([]) // el carrito queda limpio
   })
 
+  it('una venta libre (sin cliente) se cobra mandando el cliente en null', async () => {
+    // Qué se rompería: la venta libre de la fase 13 lanzaría "no hay ninguna cita ni venta
+    // cargada" por no tener cliente, y recepción no podría vender un shampoo al paso.
+    vi.mocked(chargeCounterSale).mockResolvedValue({} as Ticket)
+    const cart = useCartStore()
+    cart.loadCounterSale('branch-1')
+    cart.addProduct(ALIMENTO, 1)
+    cart.addPayment({ method: 'cash', amountCents: 10000 })
+
+    await cart.checkout()
+
+    expect(chargeCounterSale).toHaveBeenCalledWith(
+      expect.objectContaining({ branchId: 'branch-1', customerId: null }),
+    )
+  })
+
+  it('el cliente puesto con setCounterCustomer viaja en el cobro de la venta libre', async () => {
+    // Qué se rompería: al facturar a alguien que no era cliente, se le daría de alta pero la
+    // venta saldría sin ligarse a él (decisión 10 de la fase 13).
+    vi.mocked(chargeCounterSale).mockResolvedValue({} as Ticket)
+    const cart = useCartStore()
+    cart.loadCounterSale('branch-1')
+    cart.addProduct(ALIMENTO, 1)
+    cart.addPayment({ method: 'cash', amountCents: 10000 })
+    cart.setCounterCustomer('customer-nuevo')
+
+    await cart.checkout()
+
+    expect(chargeCounterSale).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'customer-nuevo' }),
+    )
+  })
+
   it('el cobro de una cita manda sus productos extra', async () => {
     vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
     vi.mocked(charge).mockResolvedValue({} as Ticket)

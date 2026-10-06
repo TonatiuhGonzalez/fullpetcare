@@ -92,7 +92,8 @@ export interface ChargeArgs {
 
 export interface CounterSaleArgs {
   branchId: string
-  customerId: string
+  /** Opcional: una venta libre no lleva cliente registrado (fase 13). */
+  customerId: string | null
   products: ProductSaleLine[]
   payments: NewPayment[]
   discountCents?: number
@@ -197,7 +198,9 @@ export async function charge(args: ChargeArgs): Promise<Ticket> {
 export async function chargeCounterSale(args: CounterSaleArgs): Promise<Ticket> {
   const { data: saleId, error } = await supabase.rpc('checkout_counter_sale', {
     p_branch_id: args.branchId,
-    p_customer_id: args.customerId,
+    // La base acepta NULL (venta libre), pero los tipos generados marcan todos los argumentos
+    // de una función como obligatorios y no nulos: de ahí el cast.
+    p_customer_id: args.customerId as string,
     p_products: productsPayload(args.products),
     p_payments: paymentsPayload(args.payments),
     p_discount_cents: args.discountCents ?? 0,

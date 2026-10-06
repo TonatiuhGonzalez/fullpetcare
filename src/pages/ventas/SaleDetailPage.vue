@@ -61,10 +61,11 @@ async function load(): Promise<void> {
         cfdiUse: invoice.value.cfdi_use,
       }
     } else {
-      const customer = await customersService.getById(
-        session.activeTenantId,
-        ticket.value.sale.customer_id,
-      )
+      // Una venta libre (fase 13) no tiene cliente: no hay datos que precargar.
+      const customerId = ticket.value.sale.customer_id
+      const customer = customerId
+        ? await customersService.getById(session.activeTenantId, customerId)
+        : null
       receiver.value = {
         rfc: customer?.rfc ?? '',
         legalName: customer?.legal_name ?? '',
