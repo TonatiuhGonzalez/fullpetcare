@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   canAttendKind,
+  canRegisterSupplies,
   isFrontDesk,
   roleForServiceKind,
   roleLabel,
@@ -101,5 +102,17 @@ describe('visibleTimelineTypes', () => {
     const all = ['grooming', 'veterinary', 'vaccination', 'weight']
     expect(visibleTimelineTypes('owner')).toEqual(all)
     expect(visibleTimelineTypes('receptionist')).toEqual(all)
+  })
+})
+
+describe('canRegisterSupplies', () => {
+  // Qué se rompería: un groomer o recepción verían el apartado de medicamentos
+  // y cada intento terminaría en un error de la base.
+  it('solo dueño y veterinario pueden registrar insumos', () => {
+    expect(canRegisterSupplies('owner')).toBe(true)
+    expect(canRegisterSupplies('vet')).toBe(true)
+    expect(canRegisterSupplies('receptionist')).toBe(false)
+    expect(canRegisterSupplies('groomer')).toBe(false)
+    expect(canRegisterSupplies(null)).toBe(false)
   })
 })

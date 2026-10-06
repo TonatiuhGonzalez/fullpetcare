@@ -113,6 +113,12 @@ async function handleSubmit(): Promise<void> {
         <v-btn type="submit" color="primary" block size="large" :loading="submitting">
           Entrar
         </v-btn>
+
+        <div class="text-center mt-4">
+          <router-link to="/recuperar-contrasena" class="text-body-2">
+            ¿Olvidaste tu contraseña?
+          </router-link>
+        </div>
       </v-form>
     </v-card>
 

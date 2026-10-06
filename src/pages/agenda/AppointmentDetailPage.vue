@@ -10,6 +10,7 @@ import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
 import * as branchesService from '@/services/branches'
 import type { Branch } from '@/services/branches'
+import { findPaidSaleIdByAppointment } from '@/services/invoicing'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { formatDate, formatTime, fromBranchTime } from '@/lib/datetime'
@@ -28,6 +29,8 @@ const pet = ref<Pet | null>(null)
 const lines = ref<AppointmentService[]>([])
 const employees = ref<EmployeeSummary[]>([])
 
+// Venta ya cobrada de esta cita (si la hay): desde ahí se factura (tarea 11.19).
+const paidSaleId = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -68,6 +71,9 @@ async function load(): Promise<void> {
     customer.value = foundCustomer
     pet.value = foundPet
     lines.value = foundLines
+    if (found.status === 'completed' && session.canView('invoicing')) {
+      paidSaleId.value = await findPaidSaleIdByAppointment(found.id)
+    }
     if (foundBranch) {
       employees.value = await listBranchEmployees(session.activeTenantId, found.branch_id)
     }
@@ -125,7 +131,7 @@ async function handleReschedule(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6" style="max-width: 560px">
+  <v-container class="py-6">
     <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" to="/app/agenda">
       Volver a la agenda
     </v-btn>
@@ -199,6 +205,15 @@ async function handleReschedule(): Promise<void> {
 
       <v-card-actions v-else-if="appointment.status === 'completed'">
         <v-btn
+          v-if="paidSaleId"
+          color="primary"
+          prepend-icon="mdi-file-document-outline"
+          :to="`/app/ventas/${paidSaleId}`"
+        >
+          Ver venta y facturar
+        </v-btn>
+        <v-btn
+          v-else
           color="primary"
           prepend-icon="mdi-cash-register"
           :to="`/app/citas/${appointment.id}/cobrar`"

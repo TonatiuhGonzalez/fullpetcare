@@ -159,7 +159,15 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# Incluye el dev server de Vite (5173 por defecto, 5174 en vite.config.ts): el enlace de
+# "Olvidé mi contraseña" (tarea #1907) solo puede regresar a una URL de esta lista.
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173/**",
+  "http://localhost:5174/**",
+  "http://127.0.0.1:5174/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -450,3 +458,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/platform-admin/deno.json"
 entrypoint = "./functions/platform-admin/index.ts"
+
+[functions.invoicing]
+enabled = true
+# Hay sesión (el dueño ya inició sesión): la verificación de JWT de la
+# plataforma queda prendida. Que además sea el dueño de ESE negocio y que el
+# negocio no esté en solo lectura lo revalida la función (can_manage_invoicing).
+verify_jwt = true
+import_map = "./functions/invoicing/deno.json"
+entrypoint = "./functions/invoicing/index.ts"

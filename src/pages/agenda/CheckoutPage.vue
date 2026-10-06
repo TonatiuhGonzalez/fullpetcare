@@ -4,6 +4,9 @@
 // opcional (tarea 5.16). El cobro en sí lo hace checkout_appointment() en
 // la base (services/checkout.ts#charge) — esta página solo arma lo que se
 // le manda y muestra el resultado.
+//
+// Tarea 11.11: el ticket de una cita también puede llevar productos extra. La venta de
+// mostrador (sin cita) tiene su propia pantalla desde la fase 13: pages/ventas/PointOfSalePage.vue.
 import { computed, onMounted, ref } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -11,8 +14,9 @@ import type { Appointment } from '@/services/appointments'
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import * as invoiceRequestsService from '@/services/invoiceRequests'
-import type { Ticket } from '@/services/checkout'
+import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import type { Database } from '@/types/database'
+import { checkoutErrorMessage } from '@/lib/checkoutErrors'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
@@ -33,6 +37,12 @@ const loadError = ref<string | null>(null)
 const discountInPesos = ref<number | null>(null)
 const newPaymentMethod = ref<PaymentMethod>('cash')
 const newPaymentAmountInPesos = ref<number | null>(null)
+// Con tarjeta hay que elegir crédito o débito: la base no deja cobrar sin eso.
+const newCardType = ref<CardFormCode | null>(null)
+
+const productToAdd = ref<SellableProduct | null>(null)
+const productQuantity = ref(1)
+const productError = ref<string | null>(null)
 
 const requiresInvoice = ref(false)
 const charging = ref(false)
@@ -65,11 +75,15 @@ async function load(): Promise<void> {
     appointment.value = found
     if (!found) return
 
-    customer.value = await customersService.getById(session.activeTenantId, found.customer_id)
+    customer.value = await customersService.getById(
+      session.activeTenantId,
+      found.customer_id,
+    )
     requiresInvoice.value = customer.value?.requires_invoice ?? false
 
     if (found.status === 'completed') {
       await cart.loadAppointment(found.id)
+      await loadProducts(found.branch_id)
     }
   } catch {
     loadError.value = 'No se pudo cargar la cita. Revisa tu conexión.'
@@ -80,17 +94,51 @@ async function load(): Promise<void> {
 
 onMounted(load)
 
-function applyDiscount(): void {
-  cart.setDiscount(discountInPesos.value != null ? pesosToCents(discountInPesos.value) : 0)
+/** Productos con existencia en la sucursal donde se cobra. */
+async function loadProducts(branchId: string): Promise<void> {
+  if (session.activeTenantId) await cart.loadCatalog(session.activeTenantId, branchId)
 }
+
+function handleAddProduct(): void {
+  productError.value = null
+  if (!productToAdd.value) return
+  if (!cart.addProduct(productToAdd.value, productQuantity.value)) {
+    productError.value = `Solo hay ${productToAdd.value.stock} pieza(s) de "${productToAdd.value.name}".`
+    return
+  }
+  productToAdd.value = null
+  productQuantity.value = 1
+}
+
+function handleProductQuantity(productId: string, value: string | number): void {
+  productError.value = null
+  if (!cart.setProductQuantity(productId, Number(value))) {
+    productError.value =
+      'La cantidad debe ser un entero y no puede pasar de la existencia.'
+  }
+}
+
+function applyDiscount(): void {
+  cart.setDiscount(
+    discountInPesos.value != null ? pesosToCents(discountInPesos.value) : 0,
+  )
+}
+
+/** Con tarjeta no se puede agregar el pago hasta elegir crédito o débito. */
+const cardTypeMissing = computed(
+  () => newPaymentMethod.value === 'card' && !newCardType.value,
+)
 
 function handleAddPayment(): void {
   if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) return
+  if (cardTypeMissing.value) return
   cart.addPayment({
     method: newPaymentMethod.value,
     amountCents: pesosToCents(newPaymentAmountInPesos.value),
+    ...(newPaymentMethod.value === 'card' ? { paymentFormCode: newCardType.value! } : {}),
   })
   newPaymentAmountInPesos.value = null
+  newCardType.value = null
 }
 
 /** Prellena el pago con exactamente lo que falta — el caso más común (un solo método). */
@@ -116,7 +164,11 @@ async function handleCharge(): Promise<void> {
           cfdiUse: customer.value.cfdi_use!,
           postalCode: customer.value.postal_code!,
         },
-        chargedTicket.payments.map((p) => ({ method: p.method, amountCents: p.amount_cents })),
+        chargedTicket.payments.map((p) => ({
+          method: p.method,
+          amountCents: p.amount_cents,
+          paymentFormCode: (p.payment_form_code ?? undefined) as CardFormCode | undefined,
+        })),
       )
     }
 
@@ -127,46 +179,16 @@ async function handleCharge(): Promise<void> {
     charging.value = false
   }
 }
-
-/**
- * checkout_appointment() (checkout_rpc.sql) rechaza casos de negocio con un
- * mensaje propio en español — se reconocen aquí por su texto para
- * mostrarlos tal cual (son los mismos que ya prueba checkout-rpc.spec.ts),
- * en vez de un genérico "revisa tu conexión" que sería falso y confundiría
- * más de lo que ayuda (CLAUDE.md §5.4: los mensajes de error no mienten
- * sobre la causa).
- */
-function checkoutErrorMessage(err: unknown): string {
-  // NO "err instanceof Error": un error de `.rpc()`/`.from()` de
-  // supabase-js NO es una instancia de Error salvo que se use
-  // `.throwOnError()` — sin eso, PostgREST devuelve un objeto plano
-  // `{ message, details, hint, code }` (comprobado contra la respuesta
-  // real de checkout_appointment()). Los errores de supabase.auth (que sí
-  // usa `instanceof Error` en session.ts) son distintos: esos SÍ son
-  // instancias reales de AuthError.
-  const message =
-    typeof err === 'object' && err !== null && 'message' in err
-      ? String((err as { message: unknown }).message)
-      : ''
-
-  if (/no cubre el total/i.test(message)) return 'El monto pagado no cubre el total de la venta.'
-  if (/ya fue cobrada/i.test(message)) return 'Esta cita ya fue cobrada.'
-  if (/debe estar atendida/i.test(message)) {
-    return 'Esta cita todavía no está atendida — no se puede cobrar.'
-  }
-  if (/no tienes permiso para cobrar/i.test(message)) {
-    return 'No tienes permiso para cobrar citas.'
-  }
-  if (/no perteneces|no tienes acceso/i.test(message)) {
-    return 'No tienes acceso para cobrar esta cita.'
-  }
-  return 'No se pudo cobrar la cita. Revisa tu conexión.'
-}
 </script>
 
 <template>
-  <v-container class="py-6" style="max-width: 560px">
-    <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" :to="`/app/citas/${props.id}`">
+  <v-container class="py-6">
+    <v-btn
+      variant="text"
+      prepend-icon="mdi-arrow-left"
+      class="mb-2"
+      :to="`/app/citas/${props.id}`"
+    >
       Volver al detalle de la cita
     </v-btn>
 
@@ -178,12 +200,13 @@ function checkoutErrorMessage(err: unknown): string {
 
     <template v-else-if="appointment">
       <v-alert
-        v-if="appointment.status !== 'completed'"
+        v-if="appointment && appointment.status !== 'completed'"
         type="warning"
         density="compact"
         variant="tonal"
       >
-        Esta cita todavía no está atendida — se cobra después de guardar su ficha de atención.
+        Esta cita todavía no está atendida — se cobra después de guardar su ficha de
+        atención.
       </v-alert>
 
       <v-card v-else-if="ticket" class="pa-4">
@@ -191,6 +214,16 @@ function checkoutErrorMessage(err: unknown): string {
           Cobro registrado.
         </v-alert>
         <TicketView :ticket="ticket" />
+        <v-btn
+          v-if="session.canView('invoicing')"
+          block
+          variant="tonal"
+          class="mt-4 no-print"
+          prepend-icon="mdi-file-document-outline"
+          :to="`/app/ventas/${ticket.sale.id}`"
+        >
+          Facturar esta venta
+        </v-btn>
         <v-btn block variant="tonal" class="mt-4 no-print" to="/app/agenda">
           Volver a la agenda
         </v-btn>
@@ -198,6 +231,7 @@ function checkoutErrorMessage(err: unknown): string {
 
       <v-card v-else class="pa-4">
         <h1 class="text-h5 mb-3">Cobrar</h1>
+
         <p class="text-body-2 text-medium-emphasis mb-4">
           {{ customer?.first_name }} {{ customer?.last_name }}
         </p>
@@ -207,9 +241,93 @@ function checkoutErrorMessage(err: unknown): string {
             <template #title>
               {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
             </template>
-            <template #append>{{ formatMXN(item.unitPriceCents * item.quantity) }}</template>
+            <template #append>{{
+              formatMXN(item.unitPriceCents * item.quantity)
+            }}</template>
+          </v-list-item>
+          <!-- Insumos cobrables de la consulta (11.14): solo lectura; se editan en la atención. -->
+          <v-list-item v-for="item in cart.supplyItems" :key="item.appointmentProductId">
+            <template #title>
+              {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
+            </template>
+            <template #subtitle>Usado en la consulta</template>
+            <template #append>{{
+              formatMXN(item.unitPriceCents * item.quantity)
+            }}</template>
+          </v-list-item>
+          <v-list-item v-for="item in cart.productItems" :key="item.productId">
+            <template #title>{{ item.description }}</template>
+            <template #subtitle
+              >{{ formatMXN(item.unitPriceCents) }} c/u · hay {{ item.stock }}</template
+            >
+            <template #append>
+              <v-text-field
+                :model-value="item.quantity"
+                type="number"
+                min="1"
+                step="1"
+                density="compact"
+                hide-details
+                style="width: 80px"
+                class="mr-2"
+                aria-label="Cantidad"
+                @update:model-value="handleProductQuantity(item.productId, $event)"
+              />
+              <span class="mr-2">{{
+                formatMXN(item.unitPriceCents * item.quantity)
+              }}</span>
+              <v-btn
+                icon="mdi-close"
+                size="x-small"
+                variant="text"
+                aria-label="Quitar producto"
+                @click="cart.removeProduct(item.productId)"
+              />
+            </template>
           </v-list-item>
         </v-list>
+
+        <p class="text-subtitle-2 mt-3 mb-2">Agregar producto</p>
+        <div class="d-flex align-end ga-2 mb-1">
+          <v-autocomplete
+            v-model="productToAdd"
+            :items="cart.catalog"
+            item-title="name"
+            return-object
+            label="Producto"
+            density="compact"
+            hide-details
+            no-data-text="No hay productos con existencia"
+          >
+            <template #item="{ props: itemProps, item }">
+              <v-list-item
+                v-bind="itemProps"
+                :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${item.raw.stock}`"
+              />
+            </template>
+          </v-autocomplete>
+          <v-text-field
+            v-model.number="productQuantity"
+            label="Cant."
+            type="number"
+            min="1"
+            step="1"
+            density="compact"
+            hide-details
+            style="max-width: 90px"
+          />
+          <v-btn
+            icon="mdi-plus"
+            color="primary"
+            variant="tonal"
+            :disabled="!productToAdd"
+            aria-label="Agregar producto"
+            @click="handleAddProduct"
+          />
+        </div>
+        <p v-if="productError" class="text-caption text-error mb-2">
+          {{ productError }}
+        </p>
 
         <v-divider class="my-3" />
 
@@ -243,10 +361,24 @@ function checkoutErrorMessage(err: unknown): string {
 
         <v-list v-if="cart.payments.length > 0" density="compact" class="mb-2">
           <v-list-item v-for="(payment, index) in cart.payments" :key="index">
-            <template #title>{{ methodLabels[payment.method] }}</template>
+            <template #title>
+              {{ methodLabels[payment.method] }}
+              {{
+                payment.paymentFormCode === '28'
+                  ? '(débito)'
+                  : payment.paymentFormCode === '04'
+                    ? '(crédito)'
+                    : ''
+              }}
+            </template>
             <template #append>
               <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-              <v-btn icon="mdi-close" size="x-small" variant="text" @click="cart.removePayment(index)" />
+              <v-btn
+                icon="mdi-close"
+                size="x-small"
+                variant="text"
+                @click="cart.removePayment(index)"
+              />
             </template>
           </v-list-item>
         </v-list>
@@ -274,11 +406,34 @@ function checkoutErrorMessage(err: unknown): string {
             hide-details
           />
           <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-          <v-btn icon="mdi-plus" color="primary" variant="tonal" @click="handleAddPayment" />
+          <v-btn
+            icon="mdi-plus"
+            color="primary"
+            variant="tonal"
+            :disabled="cardTypeMissing"
+            aria-label="Agregar pago"
+            @click="handleAddPayment"
+          />
         </div>
 
+        <v-select
+          v-if="newPaymentMethod === 'card'"
+          v-model="newCardType"
+          :items="[
+            { title: 'Tarjeta de crédito', value: '04' },
+            { title: 'Tarjeta de débito', value: '28' },
+          ]"
+          label="Tipo de tarjeta"
+          density="compact"
+          :error="cardTypeMissing && newPaymentAmountInPesos != null"
+          hint="Elige crédito o débito para poder registrar el pago."
+          persistent-hint
+          class="mb-2"
+        />
+
         <p class="text-body-2 mb-3">
-          Pagado: {{ formatMXN(cart.paidCents) }} · Falta: {{ formatMXN(cart.remainingCents) }}
+          Pagado: {{ formatMXN(cart.paidCents) }} · Falta:
+          {{ formatMXN(cart.remainingCents) }}
         </p>
 
         <v-checkbox
@@ -287,11 +442,21 @@ function checkoutErrorMessage(err: unknown): string {
           density="compact"
           :disabled="!customerHasFiscalData"
         />
-        <p v-if="requiresInvoice && !customerHasFiscalData" class="text-caption text-warning mb-2">
-          Este cliente no tiene datos fiscales completos — edítalos en su ficha antes de facturar.
+        <p
+          v-if="requiresInvoice && !customerHasFiscalData"
+          class="text-caption text-warning mb-2"
+        >
+          Este cliente no tiene datos fiscales completos — edítalos en su ficha antes de
+          facturar.
         </p>
 
-        <v-alert v-if="chargeError" type="error" density="compact" variant="tonal" class="mb-3">
+        <v-alert
+          v-if="chargeError"
+          type="error"
+          density="compact"
+          variant="tonal"
+          class="mb-3"
+        >
           {{ chargeError }}
         </v-alert>
 

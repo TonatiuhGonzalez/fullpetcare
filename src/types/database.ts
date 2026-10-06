@@ -34,6 +34,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_products: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          id: string
+          is_billable: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot?: string
+          product_id?: string
+          quantity?: number
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_products_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "appointment_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_services: {
         Row: {
           appointment_id: string
@@ -163,6 +240,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "appointments_customer_id_fkey"
@@ -313,6 +397,150 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      cash_movements: {
+        Row: {
+          amount_cents: number
+          branch_id: string
+          cash_session_id: string
+          created_at: string
+          created_by: string
+          id: string
+          movement_type: Database["public"]["Enums"]["cash_movement_type"]
+          reason: string
+          tenant_id: string
+        }
+        Insert: {
+          amount_cents: number
+          branch_id: string
+          cash_session_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["cash_movement_type"]
+          reason: string
+          tenant_id: string
+        }
+        Update: {
+          amount_cents?: number
+          branch_id?: string
+          cash_session_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["cash_movement_type"]
+          reason?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "cash_movements_cash_session_id_fkey"
+            columns: ["cash_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_sessions: {
+        Row: {
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closing_note: string | null
+          counted_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          difference_cents: number | null
+          expected_cents: number | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_note?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          difference_cents?: number | null
+          expected_cents?: number | null
+          id?: string
+          opened_at?: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_note?: string | null
+          counted_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          difference_cents?: number | null
+          expected_cents?: number | null
+          id?: string
+          opened_at?: string
+          opened_by?: string
+          opening_float_cents?: number
+          opening_note?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customers: {
         Row: {
@@ -597,55 +825,79 @@ export type Database = {
       }
       invoice_requests: {
         Row: {
+          cancellation_reason_code: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           cfdi_use: string
           created_at: string
           deleted_at: string | null
+          error_message: string | null
           fiscal_uuid: string | null
           id: string
           legal_name: string
+          pac_invoice_id: string | null
           payment_form_code: string
           payment_method_code: string
+          pdf_path: string | null
           postal_code: string
           rfc: string
           sale_id: string
+          stamped_at: string | null
           status: string
           tax_regime_code: string
           tenant_id: string
           updated_at: string
+          xml_path: string | null
         }
         Insert: {
+          cancellation_reason_code?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           cfdi_use: string
           created_at?: string
           deleted_at?: string | null
+          error_message?: string | null
           fiscal_uuid?: string | null
           id?: string
           legal_name: string
+          pac_invoice_id?: string | null
           payment_form_code: string
           payment_method_code: string
+          pdf_path?: string | null
           postal_code: string
           rfc: string
           sale_id: string
+          stamped_at?: string | null
           status?: string
           tax_regime_code: string
           tenant_id: string
           updated_at?: string
+          xml_path?: string | null
         }
         Update: {
+          cancellation_reason_code?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           cfdi_use?: string
           created_at?: string
           deleted_at?: string | null
+          error_message?: string | null
           fiscal_uuid?: string | null
           id?: string
           legal_name?: string
+          pac_invoice_id?: string | null
           payment_form_code?: string
           payment_method_code?: string
+          pdf_path?: string | null
           postal_code?: string
           rfc?: string
           sale_id?: string
+          stamped_at?: string | null
           status?: string
           tax_regime_code?: string
           tenant_id?: string
           updated_at?: string
+          xml_path?: string | null
         }
         Relationships: [
           {
@@ -774,6 +1026,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "membership_branches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "membership_branches_membership_id_fkey"
             columns: ["membership_id"]
             isOneToOne: false
@@ -845,6 +1104,7 @@ export type Database = {
           id: string
           method: Database["public"]["Enums"]["payment_method"]
           paid_at: string
+          payment_form_code: string | null
           reference: string | null
           sale_id: string
           status: Database["public"]["Enums"]["payment_status"]
@@ -858,6 +1118,7 @@ export type Database = {
           id?: string
           method: Database["public"]["Enums"]["payment_method"]
           paid_at?: string
+          payment_form_code?: string | null
           reference?: string | null
           sale_id: string
           status: Database["public"]["Enums"]["payment_status"]
@@ -871,6 +1132,7 @@ export type Database = {
           id?: string
           method?: Database["public"]["Enums"]["payment_method"]
           paid_at?: string
+          payment_form_code?: string | null
           reference?: string | null
           sale_id?: string
           status?: Database["public"]["Enums"]["payment_status"]
@@ -1119,6 +1381,65 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          cost_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          min_stock: number
+          name: string
+          price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
+          sku: string | null
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          min_stock?: number
+          name: string
+          price_cents: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sku?: string | null
+          tax_rate_bp?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost_cents?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          min_stock?: number
+          name?: string
+          price_cents?: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sku?: string | null
+          tax_rate_bp?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -1196,12 +1517,14 @@ export type Database = {
       sale_items: {
         Row: {
           appointment_id: string | null
+          appointment_product_id: string | null
           created_at: string
           deleted_at: string | null
           description: string
           id: string
           item_type: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents: number
+          product_id: string | null
           quantity: number
           sale_id: string
           service_id: string | null
@@ -1213,12 +1536,14 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description: string
           id?: string
           item_type?: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents: number
+          product_id?: string | null
           quantity?: number
           sale_id: string
           service_id?: string | null
@@ -1230,12 +1555,14 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          appointment_product_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string
           id?: string
           item_type?: Database["public"]["Enums"]["sale_item_type"]
           line_total_cents?: number
+          product_id?: string | null
           quantity?: number
           sale_id?: string
           service_id?: string | null
@@ -1251,6 +1578,27 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
@@ -1281,7 +1629,7 @@ export type Database = {
           branch_id: string
           closed_by: string | null
           created_at: string
-          customer_id: string
+          customer_id: string | null
           deleted_at: string | null
           discount_cents: number
           folio: number
@@ -1298,7 +1646,7 @@ export type Database = {
           branch_id: string
           closed_by?: string | null
           created_at?: string
-          customer_id: string
+          customer_id?: string | null
           deleted_at?: string | null
           discount_cents?: number
           folio: number
@@ -1315,7 +1663,7 @@ export type Database = {
           branch_id?: string
           closed_by?: string | null
           created_at?: string
-          customer_id?: string
+          customer_id?: string | null
           deleted_at?: string | null
           discount_cents?: number
           folio?: number
@@ -1335,6 +1683,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "sales_customer_id_fkey"
@@ -1362,6 +1717,8 @@ export type Database = {
           kind: Database["public"]["Enums"]["service_kind"]
           name: string
           price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
           tax_rate_bp: number
           tenant_id: string
           updated_at: string
@@ -1375,6 +1732,8 @@ export type Database = {
           kind: Database["public"]["Enums"]["service_kind"]
           name: string
           price_cents: number
+          sat_product_code?: string
+          sat_unit_code?: string
           tax_rate_bp: number
           tenant_id: string
           updated_at?: string
@@ -1388,6 +1747,8 @@ export type Database = {
           kind?: Database["public"]["Enums"]["service_kind"]
           name?: string
           price_cents?: number
+          sat_product_code?: string
+          sat_unit_code?: string
           tax_rate_bp?: number
           tenant_id?: string
           updated_at?: string
@@ -1471,6 +1832,139 @@ export type Database = {
           },
           {
             foreignKeyName: "share_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          appointment_product_id: string | null
+          branch_id: string
+          created_at: string
+          created_by: string
+          id: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          product_id: string
+          quantity: number
+          reason: string | null
+          sale_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          appointment_product_id?: string | null
+          branch_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          product_id: string
+          quantity: number
+          reason?: string | null
+          sale_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          appointment_product_id?: string | null
+          branch_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["stock_movement_type"]
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          sale_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_invoicing_settings: {
+        Row: {
+          created_at: string
+          csd_valid_until: string | null
+          deleted_at: string | null
+          id: string
+          pac_organization_id: string | null
+          series: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csd_valid_until?: string | null
+          deleted_at?: string | null
+          id?: string
+          pac_organization_id?: string | null
+          series?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csd_valid_until?: string | null
+          deleted_at?: string | null
+          id?: string
+          pac_organization_id?: string | null
+          series?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_invoicing_settings_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1601,6 +2095,7 @@ export type Database = {
           applied_at: string
           applied_by_user_id: string | null
           appointment_id: string | null
+          appointment_product_id: string | null
           batch_number: string | null
           created_at: string
           id: string
@@ -1615,6 +2110,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1629,6 +2125,7 @@ export type Database = {
           applied_at?: string
           applied_by_user_id?: string | null
           appointment_id?: string | null
+          appointment_product_id?: string | null
           batch_number?: string | null
           created_at?: string
           id?: string
@@ -1645,6 +2142,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vaccinations_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
             referencedColumns: ["id"]
           },
           {
@@ -1713,20 +2217,98 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      product_stock: {
+        Row: {
+          branch_id: string | null
+          product_id: string | null
+          stock: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_appointment_product: {
+        Args: {
+          p_appointment_id: string
+          p_is_billable?: boolean
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: string
+      }
+      can_invoice: { Args: { p_tenant_id: string }; Returns: boolean }
+      can_manage_invoicing: { Args: { p_tenant_id: string }; Returns: boolean }
       cancel_my_tenant: {
         Args: { p_comment?: string; p_tenant_id: string }
         Returns: undefined
+      }
+      cash_session_overview: {
+        Args: { p_session_id: string }
+        Returns: {
+          card_cents: number
+          cash_cents: number
+          change_given_cents: number
+          expected_cents: number
+          income_cents: number
+          openpay_cents: number
+          outflow_cents: number
+          transfer_cents: number
+        }[]
       }
       checkout_appointment: {
         Args: {
           p_appointment_id: string
           p_discount_cents?: number
           p_payments: Json
+          p_products?: Json
         }
         Returns: string
+      }
+      checkout_counter_sale: {
+        Args: {
+          p_branch_id: string
+          p_customer_id: string
+          p_discount_cents?: number
+          p_payments: Json
+          p_products: Json
+        }
+        Returns: string
+      }
+      close_cash_session: {
+        Args: { p_counted_cents: number; p_note?: string; p_session_id: string }
+        Returns: {
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closing_note: string | null
+          counted_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          difference_cents: number | null
+          expected_cents: number | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_float_cents: number
+          opening_note: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cash_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_appointment: {
         Args: {
@@ -1847,6 +2429,14 @@ export type Database = {
           tenant_name: string
         }[]
       }
+      open_cash_session: {
+        Args: {
+          p_branch_id: string
+          p_note?: string
+          p_opening_float_cents: number
+        }
+        Returns: string
+      }
       platform_add_admin: {
         Args: { p_user_id: string }
         Returns: {
@@ -1956,6 +2546,7 @@ export type Database = {
           billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
           internal_notes: string
+          is_demo: boolean
           name: string
           owner_email: string
           owner_name: string
@@ -2128,6 +2719,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      remove_appointment_product: {
+        Args: { p_line_id: string }
+        Returns: undefined
+      }
+      report_sales_summary: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      report_staff_activity: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      report_top_items: {
+        Args: {
+          p_branch_id?: string
+          p_from: string
+          p_limit?: number
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       reschedule_appointment: {
         Args: {
           p_appointment_id: string
@@ -2161,6 +2784,16 @@ export type Database = {
         }
       }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      update_tenant_fiscal_data: {
+        Args: {
+          p_legal_name: string
+          p_postal_code: string
+          p_rfc: string
+          p_tax_regime_code: string
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       appointment_status:
@@ -2171,6 +2804,7 @@ export type Database = {
         | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
       cancellation_reason_kind: "non_payment" | "customer_request" | "other"
+      cash_movement_type: "withdrawal" | "expense" | "income"
       employee_document_type:
         | "voter_id"
         | "address_proof"
@@ -2178,14 +2812,27 @@ export type Database = {
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
-      permission_module: "employees"
+      permission_module:
+        | "employees"
+        | "inventory"
+        | "invoicing"
+        | "cash_register"
+        | "reports"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
-      sale_item_type: "service"
+      sale_item_type: "service" | "product"
       sale_status: "open" | "paid" | "cancelled"
       service_kind: "grooming" | "veterinary"
       share_link_scope: "pet" | "customer"
+      stock_movement_type:
+        | "purchase"
+        | "sale"
+        | "sale_reversal"
+        | "consumption"
+        | "consumption_reversal"
+        | "adjustment"
+        | "loss"
       tenant_status: "active" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -2326,6 +2973,7 @@ export const Constants = {
       ],
       audit_action: ["INSERT", "UPDATE", "DELETE"],
       cancellation_reason_kind: ["non_payment", "customer_request", "other"],
+      cash_movement_type: ["withdrawal", "expense", "income"],
       employee_document_type: [
         "voter_id",
         "address_proof",
@@ -2334,14 +2982,29 @@ export const Constants = {
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
-      permission_module: ["employees"],
+      permission_module: [
+        "employees",
+        "inventory",
+        "invoicing",
+        "cash_register",
+        "reports",
+      ],
       pet_sex: ["male", "female"],
       pet_species: ["dog", "cat", "other"],
       plan_billing_period: ["monthly", "yearly", "indefinite"],
-      sale_item_type: ["service"],
+      sale_item_type: ["service", "product"],
       sale_status: ["open", "paid", "cancelled"],
       service_kind: ["grooming", "veterinary"],
       share_link_scope: ["pet", "customer"],
+      stock_movement_type: [
+        "purchase",
+        "sale",
+        "sale_reversal",
+        "consumption",
+        "consumption_reversal",
+        "adjustment",
+        "loss",
+      ],
       tenant_status: ["active", "suspended", "closed"],
     },
   },

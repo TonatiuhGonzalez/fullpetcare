@@ -15,11 +15,17 @@ import type { Pet } from '@/services/pets'
 import * as branchesService from '@/services/branches'
 import type { Branch } from '@/services/branches'
 import * as recordsService from '@/services/records'
-import type { GroomingRecord, MedicalRecord, VaccinationWithName } from '@/services/records'
+import type {
+  GroomingRecord,
+  MedicalRecord,
+  VaccinationWithName,
+} from '@/services/records'
 import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
+import AppointmentProductsPanel from '@/components/AppointmentProductsPanel.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import { formatDate } from '@/lib/datetime'
+import { canRegisterSupplies } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 const props = defineProps<{ id: string }>()
@@ -38,6 +44,7 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const justCompleted = ref(false)
 const showVaccinationDialog = ref(false)
+const productsPanel = ref<InstanceType<typeof AppointmentProductsPanel> | null>(null)
 
 async function load(): Promise<void> {
   const tenantId = session.activeTenantId
@@ -57,13 +64,20 @@ async function load(): Promise<void> {
     ])
     branch.value = foundBranch
     pet.value = foundPet
-    customerName.value = foundCustomer ? `${foundCustomer.first_name} ${foundCustomer.last_name}` : ''
+    customerName.value = foundCustomer
+      ? `${foundCustomer.first_name} ${foundCustomer.last_name}`
+      : ''
 
     if (found.kind === 'grooming') {
-      existingGrooming.value = await recordsService.getGroomingRecordByAppointment(found.id)
+      existingGrooming.value = await recordsService.getGroomingRecordByAppointment(
+        found.id,
+      )
     } else {
       existingMedical.value = await recordsService.getMedicalRecordByAppointment(found.id)
-      appliedVaccines.value = await recordsService.listVaccinationsByPet(tenantId, found.pet_id)
+      appliedVaccines.value = await recordsService.listVaccinationsByPet(
+        tenantId,
+        found.pet_id,
+      )
     }
 
     // Al abrir la cita para atenderla, pasa de "agendada" a "en curso" —
@@ -111,7 +125,8 @@ async function handleSaved(): Promise<void> {
     appointment.value = { ...appointment.value, status: 'completed' }
     justCompleted.value = true
   } catch {
-    errorMessage.value = 'La ficha se guardó, pero no se pudo marcar la cita como completada.'
+    errorMessage.value =
+      'La ficha se guardó, pero no se pudo marcar la cita como completada.'
   }
 }
 
@@ -121,21 +136,43 @@ async function handleSaved(): Promise<void> {
 async function handleVaccinationSaved(): Promise<void> {
   const tenantId = session.activeTenantId
   if (!tenantId || !pet.value) return
-  appliedVaccines.value = await recordsService.listVaccinationsByPet(tenantId, pet.value.id)
+  appliedVaccines.value = await recordsService.listVaccinationsByPet(
+    tenantId,
+    pet.value.id,
+  )
+  // La vacuna pudo descontar una pieza: se refresca el apartado de productos usados.
+  await productsPanel.value?.reload()
 }
 </script>
 
 <template>
-  <v-container class="py-6" style="max-width: 640px">
-    <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" :to="`/app/citas/${props.id}`">
+  <v-container class="py-6">
+    <v-btn
+      variant="text"
+      prepend-icon="mdi-arrow-left"
+      class="mb-2"
+      :to="`/app/citas/${props.id}`"
+    >
       Volver al detalle de la cita
     </v-btn>
 
-    <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
+    <v-alert
+      v-if="errorMessage"
+      type="error"
+      density="compact"
+      variant="tonal"
+      class="mb-4"
+    >
       {{ errorMessage }}
     </v-alert>
 
-    <v-alert v-if="justCompleted" type="success" density="compact" variant="tonal" class="mb-4">
+    <v-alert
+      v-if="justCompleted"
+      type="success"
+      density="compact"
+      variant="tonal"
+      class="mb-4"
+    >
       Cita completada.
       <router-link :to="`/app/citas/${props.id}/cobrar`">Ir a cobrar</router-link>
     </v-alert>
@@ -145,7 +182,8 @@ async function handleVaccinationSaved(): Promise<void> {
     <v-card v-else-if="appointment && pet" class="pa-4">
       <h1 class="text-h5 mb-1">{{ pet.name }}</h1>
       <p class="text-body-2 text-medium-emphasis mb-4">
-        {{ customerName }} · {{ appointment.kind === 'grooming' ? 'Estética' : 'Veterinaria' }}
+        {{ customerName }} ·
+        {{ appointment.kind === 'grooming' ? 'Estética' : 'Veterinaria' }}
       </p>
 
       <GroomingRecordForm
@@ -170,7 +208,12 @@ async function handleVaccinationSaved(): Promise<void> {
 
         <div class="d-flex align-center justify-space-between mb-2">
           <p class="text-subtitle-2">Vacunas aplicadas</p>
-          <v-btn size="small" variant="tonal" prepend-icon="mdi-needle" @click="showVaccinationDialog = true">
+          <v-btn
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-needle"
+            @click="showVaccinationDialog = true"
+          >
             Aplicar vacuna
           </v-btn>
         </div>
@@ -179,10 +222,25 @@ async function handleVaccinationSaved(): Promise<void> {
             v-for="v in appliedVaccines"
             :key="v.id"
             :title="v.vaccineName"
-            :subtitle="formatDate(v.applied_at, branch?.timezone ?? 'America/Mexico_City')"
+            :subtitle="
+              formatDate(v.applied_at, branch?.timezone ?? 'America/Mexico_City')
+            "
           />
         </v-list>
-        <p v-else class="text-body-2 text-medium-emphasis">Esta mascota no tiene vacunas registradas.</p>
+        <p v-else class="text-body-2 text-medium-emphasis">
+          Esta mascota no tiene vacunas registradas.
+        </p>
+
+        <!-- Solo dueño y veterinario: la base rechaza a los demás roles (11.12). -->
+        <template v-if="canRegisterSupplies(session.role)">
+          <v-divider class="my-4" />
+          <AppointmentProductsPanel
+            ref="productsPanel"
+            :tenant-id="session.activeTenantId!"
+            :appointment-id="appointment.id"
+            :branch-id="appointment.branch_id"
+          />
+        </template>
 
         <VaccinationDialog
           v-model="showVaccinationDialog"
@@ -192,6 +250,7 @@ async function handleVaccinationSaved(): Promise<void> {
           :applied-by-user-id="session.user!.id"
           :branch-timezone="branch?.timezone ?? 'America/Mexico_City'"
           :appointment-id="appointment.id"
+          :branch-id="appointment.branch_id"
           @saved="handleVaccinationSaved"
         />
       </template>

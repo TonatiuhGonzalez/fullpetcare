@@ -142,6 +142,8 @@ describe('listTenants', () => {
       ownerName: 'Fernanda Ruiz Gómez',
       ownerEmail: 'dueno@patitasfelices.mx',
       ownerPhone: null,
+      // Patitas es un negocio de demostración de la semilla (#1908).
+      isDemo: true,
     })
   })
 

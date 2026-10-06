@@ -18,13 +18,36 @@ El diferenciador es cubrir **los dos lados del negocio en una sola plataforma**:
 - **Común**: agenda por sucursal y por empleado, catálogo de servicios, cobro y ticket,
   cliente con sus mascotas.
 
-Estado actual: **demo funcional** para validar el concepto con dueños de negocio reales.
-No es un producto maduro. Pero las decisiones estructurales (§6, §7, §8) van bien desde
-el día uno porque retrofitearlas cuesta carísimo.
+Estado actual: **demo funcional** que ya recorre el flujo completo (v1, abajo) y que
+ahora entra en una **etapa de mejoras**: enriquecer lo existente con funciones nuevas.
+Sigue sin ser un producto maduro, pero las decisiones estructurales (§6, §7, §8) van
+bien desde el día uno porque retrofitearlas cuesta carísimo, y eso no cambia.
 
-### Alcance de v1
+### Etapa de mejoras (desde 2026-10-01)
 
-Debe recorrerse un flujo completo de principio a fin:
+v1 ya está terminada; lo que se agrega ahora **no es "v2" ni un rediseño**, son mejoras
+sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de productos**,
+**facturación (CFDI con un PAC)**, y, por evaluar, recordatorios por WhatsApp, reserva en
+línea, paquetes/membresías, pagos reales, comisiones por empleado, importador de
+clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5). **Ya construido
+(fase 13): la venta de mostrador como punto de venta** (§6.5).
+
+Reglas de esta etapa:
+
+- Cada mejora se define como una **fase nueva en `TASKS.md`** (con su decisión en
+  `PLAN.md` si tiene alternativas) **antes** de construirse. Lo que no esté ahí, se
+  propone, no se construye (§11).
+- Las reglas de §8 y §7 **no se relajan** por ser "una mejora": RLS, dinero entero,
+  fechas UTC, borrado suave, migraciones aditivas.
+- Una mejora que necesite un servicio externo o dependencia nueva (PAC, WhatsApp
+  Business API, pasarela de pago) se justifica con el usuario primero: costo, alternativas
+  y contras (§3).
+- Los apartados de este archivo que digan "en v1" describen el estado **de hoy**; cuando
+  una mejora cambie ese estado, se actualiza el apartado en el mismo PR.
+
+### Alcance de v1 (terminado)
+
+El flujo completo de principio a fin, ya construido:
 
 1. Login y selección de tenant/sucursal
 2. Dashboard con la agenda del día
@@ -40,17 +63,22 @@ Debe recorrerse un flujo completo de principio a fin:
 > con datos de la empresa únicamente. Ver `TASKS.md` Fase 10, `PLAN.md` D14, y §6.8 y
 > §7.5 de este archivo.
 
-### Fuera de alcance en v1 (no lo construyas aunque parezca obvio)
+### Aún no construido (no lo construyas sin una fase en `TASKS.md`)
 
-- **Venta de productos e inventario.** Decidido explícitamente: v1 es solo servicios.
-  El modelo de venta (`sales` / `sale_items`) está diseñado para aceptar productos
-  después sin migración destructiva, pero no hay tabla `products` ni UI de venta.
-- App móvil nativa (la vista cliente cubre esa necesidad)
-- CFDI real (solo campos y `invoice_requests` listos)
+Esto estaba "fuera de alcance en v1". Ya no está prohibido, pero **sigue sin existir** y
+no se construye por iniciativa propia: necesita su fase y su aprobación.
+
+- **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
+  `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
+  mostrador (§6.5; el mostrador es un punto de venta desde la fase 13). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
+- **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
+  mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
+  `services` y los futuros productos deberán llevarlas.
 - Pasarela de pago real (SPEI/OpenPay simulados)
 - Lotes y caducidades de medicamento
-- Reportes financieros avanzados
+- Reportes financieros avanzados (la fase 12 trae reportes **de ventas** básicos; siguen fuera la utilidad, los reportes de inventario, la facturación en los reportes y la exportación a Excel nativo: solo hay CSV)
 - Envío automático de notificaciones por WhatsApp (el link se copia y se pega a mano)
+- App móvil nativa (la vista cliente cubre esa necesidad)
 - Docker de la app, Kubernetes, infraestructura como código
 
 ---
@@ -156,7 +184,8 @@ FullPetCare/
 │   ├── functions/
 │   │   ├── public-pet-view/     # Edge Function de la vista cliente
 │   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
-│   │   └── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   ├── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   └── invoicing/           # único que habla con el PAC (Facturapi); configurar el negocio y su certificado (11.15), timbrar, cancelar y bajar facturas (11.18)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
 ├── scripts/
@@ -184,7 +213,7 @@ FullPetCare/
     ├── composables/
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
-    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, publico, superadmin
+    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, ventas, publico, superadmin
     └── styles/
 ```
 
@@ -342,19 +371,69 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 | Tabla              | Campos clave                                                                                                                                                                     |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sales`            | `tenant_id`, `branch_id`, `customer_id`, `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
+| `sales`            | `tenant_id`, `branch_id`, `customer_id` (nulo en venta libre), `folio`, `status` (`open`\|`paid`\|`cancelled`), `subtotal_cents`, `tax_cents`, `discount_cents`, `total_cents`, `paid_at`, `closed_by` |
 | `sale_items`       | `tenant_id`, `sale_id`, `item_type` (`service`), `service_id`, `appointment_id`, `description`, `quantity`, `unit_price_cents`, `tax_rate_bp`, `tax_cents`, `line_total_cents`   |
 | `payments`         | `tenant_id`, `sale_id`, `method`, `amount_cents`, `reference`, `status`, `paid_at`                                                                                               |
 | `invoice_requests` | `tenant_id`, `sale_id`, `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `payment_form_code`, `payment_method_code`, `status`, `fiscal_uuid`                   |
 
-- `item_type` es enum con un solo valor hoy (`service`). Cuando entren productos se
-  agrega `product` y una columna `product_id` nullable: migración aditiva, sin tocar
-  ventas existentes.
+- **Existencias (fase 11, `stock_movements`):** la existencia por sucursal es la suma de una
+  bitácora inmutable (`stock_movements`: sin UPDATE ni DELETE, ni para `service_role`), no una
+  columna. La vista `product_stock` (`security_invoker`) la calcula, con 0 si no hay movimientos.
+  Un trigger impide dejarla en negativo. Los usuarios solo insertan `purchase`, `adjustment` y
+  `loss`; `sale`/`consumption` los generarán las RPC (tareas 11.10 y 11.12).
+- `item_type` es enum (`service` | `product`, desde la fase 11 / #2041) con `product_id`
+  nullable; un `check` exige que una partida sea de producto (con `product_id`) o de
+  servicio (sin él). `checkout_appointment()` acepta productos extra y
+  `checkout_counter_sale()` cobra una venta de mostrador sin cita; desde la fase 13 el cliente
+  es **opcional** (`sales.customer_id` admite nulo). Al pagar baja la existencia (`stock_movements` tipo `sale`); un trigger
+  sobre `sales` la devuelve (`sale_reversal`) al pasar de `paid` a `cancelled`.
+- **Configuración fiscal (11.15, `tenant_invoicing_settings`):** 1 a 1 con `tenants`; guarda el id
+  de la organización del negocio en el PAC y `csd_valid_until`. Solo el dueño la lee y solo la Edge
+  Function `invoicing` la escribe. El certificado (CSD) **nunca se guarda**: pasa directo al PAC. "Listo
+  para facturar" se calcula (`lib/fiscalSetup.ts`), no es una columna. Los datos fiscales de `tenants` se
+  escriben con la RPC `update_tenant_fiscal_data` (solo dueño).
+- `payments.payment_form_code` (c_FormaPago): con `method = 'card'` es obligatorio y lo
+  elige quien cobra (`04` crédito / `28` débito); efectivo (`01`) y transferencia (`03`)
+  se derivan solos. La factura lo precarga.
 - `payments.method`: `cash` | `card` | `transfer_spei` | `openpay`. Los tres últimos se
   **simulan** en v1: se registra el pago con `status = 'simulated_approved'` y una
   referencia falsa. La tabla ya es la que se usará de verdad.
-- `invoice_requests` no factura nada. Guarda lo que el SAT pediría. Cuando se conecte un
-  PAC, se llena `fiscal_uuid` y ya.
+- `invoice_requests` (fase 11) es la factura: estados `pending` → `stamping` → `stamped` | `cancelled`,
+  con `fiscal_uuid`, `pac_invoice_id`, rutas de XML/PDF (bucket privado `invoices`) y `error_message`. Los
+  usuarios solo crean `pending`; el resto lo escribe la Edge Function `invoicing`. Una sola factura viva por
+  venta (índice único parcial); una timbrada no se edita ni se borra, solo se cancela. Los importes se arman
+  en `lib/cfdi.ts` (con copia para Deno en `functions/_shared/cfdi.ts`, vigilada por un test de paridad).
+
+- **Venta de mostrador como punto de venta (fase 13, PLAN.md D18):** pantalla completa
+  (`/app/venta-mostrador`, `pages/ventas/PointOfSalePage.vue`), solo para dueño y recepción, a la que se
+  entra por un **botón circular flotante** de `AppLayout` (abajo a la derecha; oculto en móvil y en la propia
+  pantalla), ya no por el menú. Solo vende productos, con captura por código de barras (coincidencia exacta en
+  `products.sku`, `lib/productSearch.ts`) o por nombre, cantidades enteras y un diálogo "Consultar precio" que
+  no toca el ticket. **La venta es libre:** no pide cliente. Si se pide factura, o la persona **no es cliente**
+  (se capturan sus datos fiscales, se le da de alta como cliente y la venta queda ligada a él) o **ya lo es**
+  (selector de clientes; si le faltan datos fiscales se le piden al momento). La forma de los datos fiscales
+  se valida en `lib/validation.ts` (`fiscalReceiverProblems`, `customerFiscalProblems`); que exista en el
+  catálogo del SAT lo decide el PAC. El cobro de una cita sigue en `pages/agenda/CheckoutPage.vue`.
+
+- **Caja (fase 12, `cash_sessions` y `cash_movements`):** un turno de caja por sucursal. `cash_sessions` se abre
+  con un fondo inicial (`opening_float_cents`) y se cierra contando el efectivo; al cerrar se congelan
+  `expected_cents`, `counted_cents` y `difference_cents` (contado − esperado). **Solo una caja abierta por
+  sucursal** (índice único parcial). Los usuarios no escriben la tabla: abren y cierran con las RPC
+  `open_cash_session()` y `close_cash_session()` (revalidan permiso y sucursal), y la pantalla lee el turno con
+  `cash_session_overview()`. **Un corte cerrado es inmutable**: el trigger `protect_closed_cash_session` bloquea
+  todo `UPDATE` y no hay `DELETE`, ni siquiera con `service_role`; tampoco se puede ocultar con `deleted_at`.
+  `cash_movements` (retiros, gastos e ingresos) es bitácora inmutable, como `stock_movements`, y solo se escribe en
+  una caja abierta de la misma sucursal.
+- **Cobrar no exige caja abierta** y la venta no apunta al turno: pertenece al de su sucursal cuyo rango
+  [apertura, cierre) contiene `paid_at`. `esperado = fondo + efectivo que se queda + ingresos − retiros − gastos`,
+  donde el cambio (`pagado − total`, hasta el efectivo recibido) se deriva, no se guarda; la regla vive en
+  `lib/cashCount.ts` y la repite la base (PLAN.md D17).
+- **Reportes (fase 12, sin tablas nuevas):** funciones SQL que agregan en la base y revalidan el permiso
+  `reports` y la sucursal: `report_sales_summary()` (totales, por día, por método y canceladas aparte),
+  `report_top_items()` (servicios y productos más vendidos) y `report_staff_activity()` (por empleado; el
+  servicio va al de la cita y el producto de mostrador a quien cobró). Cuentan solo ventas `paid`, y el periodo son
+  fechas locales de cada sucursal (§8.3). La pantalla es `/app/reportes` y exporta a CSV (`lib/reports.ts`).
+  No son reportes fiscales ni financieros.
 
 ### 6.6 Vista pública y bitácora
 
@@ -370,9 +449,13 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 | Tabla               | Campos clave                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy solo `'employees'`), `can_view`, `can_edit`               |
+| `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy `'employees'`, `'inventory'`, `'invoicing'`, `'cash_register'` y `'reports'`), `can_view`, `can_edit`               |
 | `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`                            |
 | `employee_documents`| `tenant_id`, `membership_id`, `document_type` (enum: `voter_id`\|`address_proof`\|`employment_contract`), `storage_path`, `uploaded_by`, `uploaded_at` |
+
+Permisos por defecto de los módulos de la fase 12 (se ajustan con filas, no con código): `cash_register` →
+dueño y recepción ver/editar, groomer y vet nada; `reports` → solo el dueño. Recepción solo ve las
+sucursales que tiene asignadas, también en Caja.
 
 Un "empleado" en la pantalla de gestión **es** la persona que ya tiene `membership` en
 el tenant — no un registro de RH aparte. `employee_details` solo extiende esa fila con
@@ -516,7 +599,10 @@ create function app.has_permission(p_tenant_id uuid, p_module permission_module,
 siempre regresa `true` sin mirar nada (§6.1, "Puede: Todo"). Es el único punto de este
 proyecto donde un permiso vive en una fila de datos en vez de en una comparación de
 rol fija; toda política o RPC que la usa queda lista para que, a futuro, cambiar quién
-puede hacer algo sea una fila distinta, no una migración.
+puede hacer algo sea una fila distinta, no una migración. La usan hoy los módulos `employees`,
+`inventory`, `invoicing` y, desde la fase 12, `cash_register` (políticas de `cash_sessions` y
+`cash_movements`, y las RPC de caja) y `reports` (las funciones `report_*`: `report_sales_summary()` valida por su cuenta;
+las otras dos usan `app.assert_report_access()`, que además valida periodo y sucursal).
 
 `memberships`, `membership_branches` y `profiles` nacieron en la fase 1 con **solo**
 política de SELECT (sin pantalla de administración todavía que las escribiera). La
@@ -818,8 +904,13 @@ suave) solo las empresas marcadas `is_demo`** (columna de `tenant_platform_info`
 alta en una demo con la casilla "Empresa de demostración" del formulario. `is_demo` nace en
 `false`, así que una empresa sin marcar se trata como cliente real y el reset no la toca:
 olvidar la casilla en una empresa de demo solo deja una empresa de sobra (se oculta a mano
-desde el panel), nunca borra a un cliente. Aun así, ese paso sigue tocando producción:
-no marques como demo una empresa real.
+desde el panel), nunca borra a un cliente. Desde la fase 11 también restaura el catálogo base de productos y sus
+existencias de Patitas Felices (con un movimiento `adjustment` por la diferencia, porque la
+bitácora de inventario es inmutable) y no toca la configuración fiscal. Desde la fase 12 también deja **13 ventas
+de los últimos 6 días** (para que Reportes tenga datos; "hoy" queda vacío, lo llena el cobro en vivo), **un corte
+de caja cerrado de ejemplo** en Centro y **oculta cualquier caja abierta**. Los cortes **cerrados** no se pueden
+ocultar (§6.5): el de ejemplo se crea una sola vez (y envejece), y los que se cierren durante una demo se quedan en
+el historial de Caja. Aun así, ese paso sigue tocando producción: no marques como demo una empresa real.
 
 ### Git
 
@@ -917,7 +1008,8 @@ Ejemplo:
 - **No tomar una decisión que tenga más de una opción razonable.** Presentar las
   alternativas con sus contras y dejar que el usuario elija.
 - **No ampliar el alcance.** Si algo parece necesario pero no está en `TASKS.md`,
-  proponerlo, no construirlo. Especialmente: no reintroducir productos/inventario.
+  proponerlo, no construirlo. Productos/inventario y CFDI son candidatos de la etapa
+  de mejoras (§1), pero hasta que tengan su fase aprobada en `TASKS.md`, no se tocan.
 - **No relajar las reglas de §8** (dinero, fechas, CFDI, borrado suave, migraciones)
   aunque compliquen una tarea concreta.
 - **No crear tablas sin RLS**, ni funciones `SECURITY DEFINER` sin revalidar membresía.

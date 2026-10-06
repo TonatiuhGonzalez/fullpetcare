@@ -216,7 +216,39 @@ begin
     (v_tenant_huellitas, 'owner', 'employees', true, true),
     (v_tenant_huellitas, 'receptionist', 'employees', false, false),
     (v_tenant_huellitas, 'groomer', 'employees', false, false),
-    (v_tenant_huellitas, 'vet', 'employees', false, false);
+    (v_tenant_huellitas, 'vet', 'employees', false, false),
+    (v_tenant_patitas, 'owner', 'inventory', true, true),
+    (v_tenant_patitas, 'receptionist', 'inventory', true, true),
+    (v_tenant_patitas, 'groomer', 'inventory', false, false),
+    (v_tenant_patitas, 'vet', 'inventory', true, false),
+    (v_tenant_huellitas, 'owner', 'inventory', true, true),
+    (v_tenant_huellitas, 'receptionist', 'inventory', true, true),
+    (v_tenant_huellitas, 'groomer', 'inventory', false, false),
+    (v_tenant_huellitas, 'vet', 'inventory', true, false),
+    (v_tenant_patitas, 'owner', 'invoicing', true, true),
+    (v_tenant_patitas, 'receptionist', 'invoicing', true, true),
+    (v_tenant_patitas, 'groomer', 'invoicing', false, false),
+    (v_tenant_patitas, 'vet', 'invoicing', false, false),
+    (v_tenant_huellitas, 'owner', 'invoicing', true, true),
+    (v_tenant_huellitas, 'receptionist', 'invoicing', true, true),
+    (v_tenant_huellitas, 'groomer', 'invoicing', false, false),
+    (v_tenant_huellitas, 'vet', 'invoicing', false, false),
+    (v_tenant_patitas, 'owner', 'cash_register', true, true),
+    (v_tenant_patitas, 'receptionist', 'cash_register', true, true),
+    (v_tenant_patitas, 'groomer', 'cash_register', false, false),
+    (v_tenant_patitas, 'vet', 'cash_register', false, false),
+    (v_tenant_patitas, 'owner', 'reports', true, true),
+    (v_tenant_patitas, 'receptionist', 'reports', false, false),
+    (v_tenant_patitas, 'groomer', 'reports', false, false),
+    (v_tenant_patitas, 'vet', 'reports', false, false),
+    (v_tenant_huellitas, 'owner', 'cash_register', true, true),
+    (v_tenant_huellitas, 'receptionist', 'cash_register', true, true),
+    (v_tenant_huellitas, 'groomer', 'cash_register', false, false),
+    (v_tenant_huellitas, 'vet', 'cash_register', false, false),
+    (v_tenant_huellitas, 'owner', 'reports', true, true),
+    (v_tenant_huellitas, 'receptionist', 'reports', false, false),
+    (v_tenant_huellitas, 'groomer', 'reports', false, false),
+    (v_tenant_huellitas, 'vet', 'reports', false, false);
 end $$;
 
 -- ===========================================================================
@@ -284,6 +316,20 @@ values
   ('f0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Consulta general', 30, 35000, 1600),
   ('f0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Vacunación', 20, 28000, 1600),
   ('f0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'veterinary', 'Desparasitación', 15, 18000, 1600);
+
+-- ===========================================================================
+-- Catálogo de productos (fase 11, tarea 11.3)
+-- ===========================================================================
+-- Productos de mostrador ficticios. Dos en Patitas Felices (uno inactivo, para
+-- probar que se conserva pero ya no se ofrece) y uno en Huellitas Spa, solo
+-- para que el aislamiento entre negocios sea verificable. Precios con IVA
+-- incluido, en centavos. Los códigos SAT son los de por defecto de la tabla.
+insert into products (id, tenant_id, name, sku, price_cents, tax_rate_bp, cost_cents, min_stock, is_active)
+values
+  ('20000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Alimento seco adulto 3 kg', 'ALI-3KG', 38900, 1600, 26000, 5, true),
+  ('20000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Shampoo hipoalergénico 250 ml', 'SHA-250', 14500, 1600, 8000, 3, true),
+  ('20000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Collar de nylon mediano', 'COL-M', 9900, 1600, null, 0, false),
+  ('20000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000002', 'Alimento seco cachorro 2 kg', 'ALI-2KG', 29900, 1600, null, 2, true);
 
 -- ===========================================================================
 -- Catálogo de vacunas (fase 4, tarea 4.5)
@@ -376,7 +422,23 @@ begin
     (v_tenant_mimos, 'owner', 'employees', true, true),
     (v_tenant_mimos, 'receptionist', 'employees', false, false),
     (v_tenant_mimos, 'groomer', 'employees', false, false),
-    (v_tenant_mimos, 'vet', 'employees', false, false);
+    (v_tenant_mimos, 'vet', 'employees', false, false),
+    (v_tenant_mimos, 'owner', 'inventory', true, true),
+    (v_tenant_mimos, 'receptionist', 'inventory', true, true),
+    (v_tenant_mimos, 'groomer', 'inventory', false, false),
+    (v_tenant_mimos, 'vet', 'inventory', true, false),
+    (v_tenant_mimos, 'owner', 'invoicing', true, true),
+    (v_tenant_mimos, 'receptionist', 'invoicing', true, true),
+    (v_tenant_mimos, 'groomer', 'invoicing', false, false),
+    (v_tenant_mimos, 'vet', 'invoicing', false, false),
+    (v_tenant_mimos, 'owner', 'cash_register', true, true),
+    (v_tenant_mimos, 'receptionist', 'cash_register', true, true),
+    (v_tenant_mimos, 'groomer', 'cash_register', false, false),
+    (v_tenant_mimos, 'vet', 'cash_register', false, false),
+    (v_tenant_mimos, 'owner', 'reports', true, true),
+    (v_tenant_mimos, 'receptionist', 'reports', false, false),
+    (v_tenant_mimos, 'groomer', 'reports', false, false),
+    (v_tenant_mimos, 'vet', 'reports', false, false);
 
   insert into platform_admins (user_id) values (v_user_superadmin);
 

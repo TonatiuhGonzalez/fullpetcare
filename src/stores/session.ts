@@ -21,7 +21,11 @@ import {
 import { noticeRestrictsAccess } from '@/lib/tenantNotices'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin as fetchIsPlatformAdmin } from '@/services/platform'
-import { hasPermission, type PermissionModule, type RolePermissionRow } from '@/lib/permissions'
+import {
+  hasPermission,
+  type PermissionModule,
+  type RolePermissionRow,
+} from '@/lib/permissions'
 
 const ACTIVE_TENANT_KEY = 'fpc.activeTenantId'
 const ACTIVE_BRANCH_KEY = 'fpc.activeBranchId'
@@ -142,7 +146,9 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function loadPermissionsForActiveTenant(): Promise<void> {
-    permissions.value = activeTenantId.value ? await listForTenant(activeTenantId.value) : []
+    permissions.value = activeTenantId.value
+      ? await listForTenant(activeTenantId.value)
+      : []
   }
 
   function reset(): void {

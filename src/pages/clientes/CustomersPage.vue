@@ -35,6 +35,7 @@ const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
+const petsPanel = ref<InstanceType<typeof PetsPanel> | null>(null)
 const selectedCustomerId = ref<string | null>(null)
 
 const headers = [
@@ -101,6 +102,14 @@ function handleSaved(): void {
       >
         Nuevo cliente
       </v-btn>
+      <v-btn
+        v-else
+        color="primary"
+        prepend-icon="mdi-plus"
+        @click="petsPanel?.openNewPet()"
+      >
+        Nueva mascota
+      </v-btn>
     </div>
 
     <v-tabs v-model="tab" class="mb-4">
@@ -108,7 +117,7 @@ function handleSaved(): void {
       <v-tab value="mascotas">Mascotas</v-tab>
     </v-tabs>
 
-    <PetsPanel v-if="tab === 'mascotas'" />
+    <PetsPanel v-if="tab === 'mascotas'" ref="petsPanel" />
 
     <template v-else>
       <v-text-field

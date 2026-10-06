@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import * as servicesService from '@/services/services'
 import type { Service, ServiceKind } from '@/services/services'
 import { pesosToCents } from '@/lib/money'
+import { isValidSatProductCode, isValidSatUnitCode } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -26,6 +27,17 @@ const isEditing = computed(() => props.service != null)
 const name = ref('')
 const durationMinutes = ref<number | null>(null)
 const priceInPesos = ref<number | null>(null)
+// Claves del SAT (CFDI). Se sugieren las de la base; el negocio las cambia
+// con su contador. Tarea 11.2.
+const satProductCode = ref('70122000')
+const satUnitCode = ref('E48')
+
+const satProductRules = [
+  (v: string) => isValidSatProductCode(v) || 'Deben ser 8 dígitos, por ejemplo 70122000.',
+]
+const satUnitRules = [
+  (v: string) => isValidSatUnitCode(v) || 'Deben ser 2 o 3 caracteres, por ejemplo E48.',
+]
 
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -38,6 +50,8 @@ watch(
     name.value = s?.name ?? ''
     durationMinutes.value = s?.duration_minutes ?? null
     priceInPesos.value = s ? s.price_cents / 100 : null
+    satProductCode.value = s?.sat_product_code ?? '70122000'
+    satUnitCode.value = s?.sat_unit_code ?? 'E48'
     errorMessage.value = null
   },
 )
@@ -48,6 +62,7 @@ function close(): void {
 
 async function handleSubmit(): Promise<void> {
   if (durationMinutes.value == null || priceInPesos.value == null) return
+  if (!isValidSatProductCode(satProductCode.value) || !isValidSatUnitCode(satUnitCode.value)) return
 
   saving.value = true
   errorMessage.value = null
@@ -56,6 +71,8 @@ async function handleSubmit(): Promise<void> {
       name: name.value,
       duration_minutes: durationMinutes.value,
       price_cents: pesosToCents(priceInPesos.value),
+      sat_product_code: satProductCode.value.trim(),
+      sat_unit_code: satUnitCode.value.trim().toUpperCase(),
     }
 
     const saved = props.service
@@ -111,6 +128,30 @@ async function handleSubmit(): Promise<void> {
                 min="0"
                 step="0.01"
                 required
+              />
+            </v-col>
+          </v-row>
+
+          <v-row dense>
+            <v-col cols="6">
+              <v-text-field
+                v-model="satProductCode"
+                label="Clave de producto (SAT)"
+                :rules="satProductRules"
+                maxlength="8"
+                inputmode="numeric"
+                hint="Para facturar. Confírmala con tu contador."
+                persistent-hint
+              />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field
+                v-model="satUnitCode"
+                label="Clave de unidad (SAT)"
+                :rules="satUnitRules"
+                maxlength="3"
+                hint="E48 = unidad de servicio."
+                persistent-hint
               />
             </v-col>
           </v-row>

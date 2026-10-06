@@ -99,7 +99,7 @@ onMounted(load)
 </script>
 
 <template>
-  <v-container class="py-4" style="max-width: 480px">
+  <v-container class="py-4" max-width="480">
     <v-progress-circular
       v-if="status === 'loading'"
       indeterminate

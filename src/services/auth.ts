@@ -94,3 +94,36 @@ export async function changePassword(
     console.error('changePassword: no se pudieron cerrar las otras sesiones', othersError)
   }
 }
+
+/**
+ * Pide a Supabase que mande el correo "Olvidé mi contraseña". El enlace del
+ * correo regresa a /restablecer-contrasena con una sesión temporal de
+ * recuperación. Supabase responde igual exista o no el correo (así nadie
+ * puede averiguar qué correos están registrados): la UI debe mostrar siempre
+ * el mismo mensaje de éxito. Solo lanza por fallas reales (sin red, límite de
+ * envíos por hora).
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/restablecer-contrasena`,
+  })
+  if (error) throw error
+}
+
+/**
+ * Guarda la contraseña nueva de quien llegó por el enlace de recuperación (la
+ * sesión de recuperación ya existe: supabase-js la crea al abrir el enlace).
+ * No pide la actual: justo eso es lo que se olvidó. Igual que
+ * `changePassword`, cierra las OTRAS sesiones de la cuenta, porque si alguien
+ * más tenía la contraseña vieja debe quedar fuera; si ese paso falla, la
+ * contraseña YA cambió y solo se registra.
+ */
+export async function setNewPassword(newPassword: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+
+  const { error: othersError } = await supabase.auth.signOut({ scope: 'others' })
+  if (othersError) {
+    console.error('setNewPassword: no se pudieron cerrar las otras sesiones', othersError)
+  }
+}

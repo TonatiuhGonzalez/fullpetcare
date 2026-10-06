@@ -30,6 +30,18 @@ export const router = createRouter({
       component: () => import('@/pages/auth/LoginPage.vue'),
     },
     {
+      // Recuperación por correo (tarea #1907): se pide el enlace…
+      path: '/recuperar-contrasena',
+      name: 'forgot-password',
+      component: () => import('@/pages/auth/ForgotPasswordPage.vue'),
+    },
+    {
+      // …y el enlace del correo regresa aquí, ya con sesión de recuperación.
+      path: '/restablecer-contrasena',
+      name: 'reset-password',
+      component: () => import('@/pages/auth/ResetPasswordPage.vue'),
+    },
+    {
       // Pantalla obligatoria tras el primer inicio de sesión con contraseña
       // temporal (ver el guard de abajo).
       path: '/cambiar-contrasena',
@@ -51,7 +63,7 @@ export const router = createRouter({
           component: () => import('@/pages/agenda/AgendaPage.vue'),
         },
         {
-          path: 'catalogo',
+          path: 'servicios',
           name: 'catalogo',
           component: () => import('@/pages/agenda/CatalogPage.vue'),
         },
@@ -74,6 +86,24 @@ export const router = createRouter({
           props: true,
         },
         {
+          // Detalle de una venta cobrada y su factura (tarea 11.19): gateado por
+          // el permiso 'invoicing', igual que inventario.
+          path: 'ventas/:id',
+          name: 'venta-detalle',
+          component: () => import('@/pages/ventas/SaleDetailPage.vue'),
+          props: true,
+          meta: { requiresPermission: 'invoicing' },
+        },
+        {
+          // Venta de mostrador (tareas 11.11 y 13.4): punto de venta de productos
+          // sin cita ni cliente. Se abre desde el botón flotante de AppLayout.
+          // Cobrar es de recepción/dueño.
+          path: 'venta-mostrador',
+          name: 'venta-mostrador',
+          component: () => import('@/pages/ventas/PointOfSalePage.vue'),
+          meta: { requiresFrontDesk: true },
+        },
+        {
           path: 'clientes',
           name: 'clientes',
           component: () => import('@/pages/clientes/CustomersPage.vue'),
@@ -94,6 +124,28 @@ export const router = createRouter({
           meta: { requiresPermission: 'employees' },
         },
         {
+          // Inventario (tarea 11.9): gateado por PERMISO, igual que empleados.
+          // Cambiar quién entra es una fila de role_permissions, no código.
+          path: 'inventario',
+          name: 'inventario',
+          component: () => import('@/pages/inventario/InventoryPage.vue'),
+          meta: { requiresPermission: 'inventory' },
+        },
+        {
+          // Reportes (tarea 12.12): gateado por PERMISO; por defecto solo el dueño.
+          path: 'reportes',
+          name: 'reportes',
+          component: () => import('@/pages/reportes/ReportsPage.vue'),
+          meta: { requiresPermission: 'reports' },
+        },
+        {
+          // Caja (tarea 12.11): gateada por PERMISO, igual que inventario.
+          path: 'caja',
+          name: 'caja',
+          component: () => import('@/pages/caja/CashRegisterPage.vue'),
+          meta: { requiresPermission: 'cash_register' },
+        },
+        {
           // Configuración (tarea #1959): la ven todos los roles, pero cada
           // sección se gatea aparte. "Empresa y sucursales" es solo del dueño
           // (política RLS de branches); "Cuenta" es de cualquiera.
@@ -112,6 +164,12 @@ export const router = createRouter({
               path: 'sucursales',
               name: 'configuracion-sucursales',
               component: () => import('@/pages/configuracion/BranchesSettingsPage.vue'),
+              meta: { requiresOwner: true },
+            },
+            {
+              path: 'facturacion',
+              name: 'configuracion-facturacion',
+              component: () => import('@/pages/configuracion/FiscalSettingsPage.vue'),
               meta: { requiresOwner: true },
             },
             {
@@ -277,7 +335,10 @@ router.beforeEach(async (to) => {
   // Secciones solo del dueño (configuración de sucursales): quien no lo es
   // cae en "Cuenta", que sí puede ver. La política RLS de branches ya le
   // negaría escribir; esto solo evita una pantalla que no podría usar.
-  if (to.matched.some((record) => record.meta.requiresOwner) && session.role !== 'owner') {
+  if (
+    to.matched.some((record) => record.meta.requiresOwner) &&
+    session.role !== 'owner'
+  ) {
     return { path: '/app/configuracion/cuenta' }
   }
 

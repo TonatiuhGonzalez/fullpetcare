@@ -74,7 +74,12 @@ async function seedCompletedAppointment(
 async function checkout(
   client: PoolClient,
   appointmentId: string,
-  payments: Array<{ method: string; amount_cents: number; reference?: string }>,
+  payments: Array<{
+    method: string
+    amount_cents: number
+    reference?: string
+    payment_form_code?: string
+  }>,
   discountCents = 0,
 ): Promise<string> {
   const { rows } = await client.query(
@@ -151,7 +156,9 @@ describe('checkout_appointment(): cobro exitoso (tarea 5.7)', () => {
 
       await setRole(client, 'authenticated', USER_RECEPCION)
       const saleId = await checkout(client, appointmentId, [
-        { method: 'card', amount_cents: 25000 },
+        // Desde la tarea 11.11 un pago con tarjeta debe decir si fue de crédito
+        // (04) o de débito (28): ver payment-form-code en checkout-products-rpc.spec.ts.
+        { method: 'card', amount_cents: 25000, payment_form_code: '04' },
       ])
 
       const { rows } = await client.query(

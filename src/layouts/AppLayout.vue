@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
+import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
@@ -17,7 +18,9 @@ const businessName = computed(() => session.activeMembership?.tenantName ?? '')
 // sucursal elegida (p. ej. el instante entre login y que
 // resolveActiveBranch() corra) se muestra solo el nombre del negocio.
 const titleLabel = computed(() =>
-  session.activeBranch ? `${businessName.value} - ${session.activeBranch.name}` : businessName.value,
+  session.activeBranch
+    ? `${businessName.value} - ${session.activeBranch.name}`
+    : businessName.value,
 )
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
@@ -37,6 +40,44 @@ const banner = computed(() => {
 })
 // MOCK: aún no hay pasarela de pago (CLAUDE.md §1).
 const showPayMock = ref(false)
+
+// Opciones del menú lateral. "Clientes" solo para owner/receptionist
+// (isFrontDesk) — groomer/vet no tienen el listado completo (router/index.ts
+// ya redirige si llegan por URL directa; esto es solo para no mostrar un
+// link a algo a lo que de todos modos no pueden entrar).
+// "Empleados" (fase 9): gateado por PERMISO, no por rol fijo — hoy solo el
+// dueño tiene "employees:view" (role_permissions, sembrado en seed.sql),
+// pero a futuro un negocio podría dárselo a otro rol sin tocar este archivo
+// (CLAUDE.md §6.7).
+const menuOpen = ref(false)
+const menuItems = computed<SideMenuItem[]>(() => [
+  { title: 'Agenda', icon: 'mdi-calendar-month-outline', to: '/app/agenda' },
+  ...(isFrontDesk(session.role)
+    ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
+    : []),
+  { title: 'Servicios', icon: 'mdi-clipboard-list-outline', to: '/app/servicios' },
+  ...(session.canView('inventory')
+    ? [{ title: 'Inventario', icon: 'mdi-package-variant-closed', to: '/app/inventario' }]
+    : []),
+  ...(session.canView('cash_register')
+    ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja' }]
+    : []),
+  ...(session.canView('reports')
+    ? [{ title: 'Reportes', icon: 'mdi-chart-bar', to: '/app/reportes' }]
+    : []),
+  ...(session.canView('employees')
+    ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
+    : []),
+])
+
+// Botón flotante de venta de mostrador (fase 13, tarea 13.3). Reemplaza la entrada
+// del menú: se ve desde cualquier pantalla de la app, pero solo dueño y recepción
+// cobran (misma regla que la ruta, `requiresFrontDesk`). En la propia pantalla de
+// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado.
+const route = useRoute()
+const showPosButton = computed(
+  () => isFrontDesk(session.role) && route.name !== 'venta-mostrador',
+)
 
 const showFeedback = ref(false)
 const feedbackSentNotice = ref(false)
@@ -58,9 +99,12 @@ function handleBranchChange(branchId: unknown): void {
 
 <template>
   <v-app-bar color="primary" density="comfortable">
+    <!-- Hamburguesa: solo en pantallas angostas, donde el menú lateral está
+         oculto y se abre como cajón. -->
+    <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
     <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
-         botón de reportes quedaría pegado a la navegación, lejos del nombre.
-         El v-spacer de abajo empuja la navegación a la derecha. -->
+         botón de reportes quedaría pegado a lo de la derecha, lejos del nombre.
+         El v-spacer de abajo empuja el resto a la derecha. -->
     <v-app-bar-title style="flex: 0 1 auto">
       <v-icon icon="mdi-paw" class="mr-2" />
       {{ titleLabel }}
@@ -75,27 +119,6 @@ function handleBranchChange(branchId: unknown): void {
       Reportar error o sugerencia
     </v-btn>
     <v-spacer />
-
-    <!-- Navegación mínima: solo hay dos áreas construidas hasta ahora
-         (agenda y clientes). Un v-navigation-drawer completo se agrega
-         cuando haya suficientes secciones para justificarlo.
-
-         "Clientes" solo para owner/receptionist (isFrontDesk) — groomer/
-         vet no tienen el listado completo (router/index.ts ya redirige
-         si llegan por URL directa; esto es solo para no mostrar un link
-         a algo a lo que de todos modos no pueden entrar). -->
-    <v-btn to="/app/agenda" variant="text" class="mr-1">Agenda</v-btn>
-    <v-btn v-if="isFrontDesk(session.role)" to="/app/clientes" variant="text" class="mr-1">
-      Clientes
-    </v-btn>
-    <v-btn to="/app/catalogo" variant="text" class="mr-1">Catálogo</v-btn>
-    <!-- "Empleados" (fase 9): gateado por PERMISO, no por rol fijo — hoy
-         solo el dueño tiene "employees:view" (role_permissions,
-         sembrado en seed.sql), pero a futuro un negocio podría dárselo a
-         otro rol sin tocar este archivo (CLAUDE.md §6.7). -->
-    <v-btn v-if="session.canView('employees')" to="/app/empleados" variant="text" class="mr-4">
-      Empleados
-    </v-btn>
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
          elegir — con una sola, el título de arriba ya la muestra
@@ -130,6 +153,8 @@ function handleBranchChange(branchId: unknown): void {
     <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
 
+  <SideMenu v-model:open="menuOpen" :items="menuItems" />
+
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
   </v-snackbar>
@@ -162,4 +187,19 @@ function handleBranchChange(branchId: unknown): void {
     </v-alert>
     <router-view />
   </v-main>
+
+  <!-- d-none d-md-flex: solo escritorio; en móvil se oculta (mismo corte md que el menú lateral). -->
+  <v-btn
+    v-if="showPosButton"
+    class="d-none d-md-flex ma-6"
+    icon="mdi-cash-register"
+    color="primary"
+    size="large"
+    position="fixed"
+    location="bottom right"
+    elevation="6"
+    aria-label="Venta de mostrador"
+    title="Venta de mostrador"
+    to="/app/venta-mostrador"
+  />
 </template>

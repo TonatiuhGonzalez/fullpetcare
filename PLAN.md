@@ -269,10 +269,73 @@ quita otros superadmins. Un dueño normal no entra a `/superadmin` ni por URL di
 **Trabajo futuro:** forzar el cambio de contraseña en el primer ingreso del dueño, gestión
 real de planes y vigencia, y bloqueo de acceso por vencimiento o suspensión.
 
-### Después de v1 (no ahora)
+### Fase 11 — Inventario, venta de productos y facturación (CFDI)
 
-Productos e inventario, CFDI real con un PAC, OpenPay real, WhatsApp Business API,
-reportes, recordatorios automáticos.
+Primera fase de la **etapa de mejoras** (`CLAUDE.md` §1). Dos bloques, en este orden:
+
+1. **Inventario y venta de productos.** `products` y `stock_movements` (bitácora inmutable; la
+   existencia es la suma de los movimientos, D15). `sale_items` acepta `item_type = 'product'`
+   con migración aditiva, como se dejó previsto en §6.5. El cobro sigue usando el mismo desglose
+   de IVA por partida.
+2. **Facturación CFDI 4.0** con un PAC externo (D16): `invoice_requests` pasa de "guardar lo que
+   pediría el SAT" a timbrar, cancelar y descargar, mediante una cuarta Edge Function
+   (`invoicing`). Factura individual primero; factura global al público en general al final.
+3. **Insumos en la atención veterinaria:** el veterinario registra los productos usados al
+   atender (`appointment_products`); cada línea se cobra al cliente o es de uso interno.
+
+Se hace en ese orden porque el inventario no depende de terceros y el CFDI pide claves SAT por
+concepto: si los productos nacen con ellas, no hay que rehacer nada. Detalle de tareas y de las
+decisiones (todas resueltas): `TASKS.md` Fase 11.
+
+**Demostrable (cuando termine):** el dueño da de alta productos con existencias por sucursal, registra
+una compra, vende un producto junto con un servicio en el mismo ticket (la existencia baja), recibe
+aviso de stock bajo, cancela la venta (la existencia regresa), configura los datos fiscales del
+negocio, factura la venta en el sandbox del PAC, descarga el PDF y XML y la cancela con motivo.
+
+**Fuera de esta fase:** lotes y caducidades (el lote de una vacuna se sigue capturando a mano),
+transferencias entre sucursales, cantidades fraccionarias, envío automático de la factura, y
+proveedores/órdenes de compra.
+
+### Fase 12 — Corte de caja y reportes
+
+Segunda fase de la **etapa de mejoras**. Todo se calcula con datos que **ya existen** (ventas, pagos,
+partidas, citas): no hay servicio externo ni dependencia nueva. Dos bloques:
+
+1. **Corte de caja** por sucursal: se abre con un fondo inicial, se registran retiros y gastos de
+   efectivo, y se cierra contando el dinero. El sistema calcula cuánto efectivo **debería** haber y
+   muestra el sobrante o faltante. Un corte cerrado no se edita (D17).
+2. **Reportes de ventas** hechos en la base (funciones SQL que agregan, no el navegador): ventas por día,
+   por método de pago, por servicio o producto, por empleado y por sucursal, con exportación a CSV.
+
+**Estado: terminada (2026-10-05)**; aprobada el 2026-10-06 (decisiones y alternativas en D17 y en `TASKS.md` Fase 12).
+**Demostrable:** recepción abre la caja con $500 de fondo, cobra tres ventas (una en efectivo
+con cambio, una con tarjeta y una por transferencia), registra un retiro de $200, cierra contando el efectivo y
+ve el sobrante o faltante; el dueño ve las ventas del mes por método de pago, por sucursal y por empleado y
+descarga el CSV.
+
+**Fuera de esta fase:** cancelar una venta con reembolso (hoy no existe en la interfaz), comisiones por
+empleado, reportes de inventario o de utilidad, facturación en los reportes, gráficas con librería y
+exportación a Excel.
+
+### Fase 13 — Venta de mostrador como punto de venta
+
+Tercera fase de la **etapa de mejoras**. Sin servicio externo ni dependencia nueva. La venta de mostrador pasa
+de un formulario escondido en el menú a una pantalla de punto de venta, a la que se entra por un botón flotante
+desde cualquier vista, y deja de exigir un cliente registrado (D18). Si quien compra pide factura, se da de alta
+como cliente o se elige uno registrado, completando sus datos fiscales al momento.
+
+**Estado: terminada (2026-10-05)**; aprobada el 2026-10-05 (decisiones y alternativas en D18 y en `TASKS.md` Fase 13).
+**Demostrable:** recepción toca el botón flotante desde la agenda, escanea o busca dos productos, cobra en efectivo
+sin registrar al cliente; en otra venta pide factura a alguien nuevo (se captura y queda dado de alta) y en otra a un
+cliente registrado al que se le completan los datos fiscales que le faltaban.
+
+**Fuera de esta fase:** atajos de teclado, venta en espera, cantidades fraccionarias, vender servicios en el
+punto de venta, y el timbrado real con el PAC.
+
+### Después de la Fase 13 (no ahora)
+
+OpenPay real, WhatsApp Business API, recordatorios automáticos, reserva en línea, paquetes y membresías,
+comisiones por empleado, importador de clientes.
 
 ---
 
@@ -445,6 +508,160 @@ bloquear acceso implicaría tocar `app.is_member_of()`, que usa toda la base, y 
 decidirá cuando se diseñe la gestión real de planes.
 **Riesgo resuelto:** `demo:reset` ocultaba toda empresa fuera de la semilla. Ahora solo oculta
 las marcadas `is_demo` (default `false`, casilla en el alta) — CLAUDE.md §10.
+
+---
+
+### D15 — Existencias como suma de movimientos inmutables, no una columna `stock`
+
+**Estado:** aprobada (2026-10-01).
+**Alternativa descartada:** `products.stock int` que se actualiza en cada venta o compra.
+**Por qué se descartó:** una columna se descuadra en cuanto dos cobros coinciden o un proceso falla a
+medias, y cuando se descuadra no hay forma de saber por qué. Es el mismo problema que el dinero en
+flotantes: el error vive en el dato y no se ve.
+**Por qué los movimientos:** `stock_movements` solo se inserta (sin UPDATE ni DELETE, ni para el
+dueño; corregir es otro movimiento). La existencia es una suma que siempre se puede auditar y
+reconstruir, y el historial por producto sale gratis. Mismo criterio que el expediente (§8.5) y
+`audit_log` (§8.6).
+**Costo aceptado:** calcular la suma en cada consulta. Con el volumen de un negocio de mascotas es
+irrelevante; si algún día duele, se agrega una tabla de saldos derivada, sin tocar los movimientos.
+**Decisiones relacionadas:** cantidades enteras (§8.2); **no se vende ni se consume con existencia 0**
+(validado en la base, no solo en la pantalla); aviso de stock bajo y leyenda "Sin inventario".
+El consumo en la consulta es un movimiento propio (`consumption`) que nace al registrar la línea;
+cancelar el cobro no lo revierte porque el medicamento ya se aplicó.
+
+---
+
+### D16 — Facturar mediante un PAC (con Edge Function), no timbrar por cuenta propia
+
+**Estado:** aprobada (2026-10-01). PAC elegido: **Facturapi**.
+**Alternativa descartada:** generar y sellar el XML nosotros mismos y hablar directo con el SAT.
+**Por qué se descartó:** timbrar exige ser PAC autorizado o contratar uno de todos modos; lo
+demás (validaciones, catálogos del SAT que cambian, cancelación con aceptación del receptor)
+es mantenimiento fiscal permanente que no es el negocio de este producto.
+**Por qué un PAC detrás de una Edge Function:** la llave del PAC es un secreto, igual que la
+`service_role`, y no puede vivir en el frontend. La función revalida permiso con el JWT de quien
+llama antes de usarla (patrón de `platform-admin`, D14).
+**Requisito duro:** el PAC debe ser **multi-emisor**: cada negocio factura con su propio RFC y
+certificado. El certificado (CSD) pasa directo al PAC y **no se guarda** en nuestra base.
+**PAC elegido: Facturapi.** Multi-emisor incluido, sandbox y prueba de 14 días. Precios consultados el
+2026-10-01 en su página (verificar antes de contratar): $299 MXN/mes por la API + $0.60 por timbre,
+IVA incluido, sin paquetes prepagados. Se descartó Factura.com (plan anual con tope de 2 a 15 RFC, que
+limita a un SaaS que crece), Facturama (también multi-emisor, pero con API anual más paquetes de
+timbres) y SW Sapien (sin precios públicos).
+**Reconfirmada el 2026-10-02 (#2036):** los precios de Facturapi se volvieron a leer en su página y
+coinciden ($299 MXN/mes + $0.60 por timbre, IVA incluido, cobro a mes vencido, multi-RFC sin costo extra,
+modo de prueba de 14 días sin tarjeta). Facturama (API multi-emisor $1,650 MXN/año + $0.50 por timbre,
+prepago con vigencia anual) sale unas ~$1,900 MXN/año más barato más $0.10 por timbre, pero exige prepago,
+los timbres vencen al año y no se pudo confirmar su sandbox en la página; la diferencia es chica frente a
+la facilidad de integración. El usuario confirmó Facturapi. **Sin dependencia nueva:** la Edge Function
+habla con la API por `fetch` (Deno), no con su SDK de npm. Los precios se verifican otra vez antes de
+contratar el plan de pago (el modo de prueba basta para desarrollar).
+**Pendiente de decidir antes de producción (2026-10-04):** emitir facturas exige la llave de la
+*organización* de cada negocio (`sk_test_` en sandbox, `sk_live_` en producción). La de pruebas se puede consultar
+cuando haga falta; la *live* solo se muestra al crearla, así que hay que decidir dónde guardarla (cifrada en la
+base, o un secreto por negocio). Hasta entonces la función solo timbra en modo pruebas. Las rutas de la API
+quedan aisladas en `functions/_shared/facturapi.ts`.
+**Costo aceptado:** dependencia de un tercero y costo por timbre. **Lo absorbe la plataforma dentro del plan**, con un tope de facturas por negocio
+(decisión del usuario, 2026-10-01). La forma de pago (crédito/débito) se elige a mano al cobrar con tarjeta. El armado del comprobante vive en `lib/cfdi.ts` (puro y probado) y el PAC queda detrás
+de un adaptador delgado, de modo que cambiar de proveedor no toca la lógica ni la base.
+**Riesgo conocido:** el desglose de IVA hacia atrás (D5) debe coincidir al centavo con lo que
+valida el PAC; por eso la suma de los conceptos se prueba contra el total de la venta.
+
+### D17 — Corte de caja por turno de sucursal, sin bloquear el cobro; reportes calculados en la base
+
+**Estado:** aprobada (2026-10-06).
+
+**1. Qué es un corte: un turno de caja por sucursal, con apertura y cierre explícitos.**
+Se abre con un fondo inicial y se cierra con el conteo; puede haber varios por día (turno de mañana y de
+tarde) y solo **uno abierto a la vez por sucursal** (índice único parcial, garantizado por la base).
+**Alternativa descartada:** corte diario automático sin apertura. Es más simple, pero no sabe con cuánto
+efectivo empezó el día, que es justo lo que hace falta para detectar un faltante.
+**Costo aceptado:** alguien tiene que acordarse de abrir la caja. Se mitiga con el punto 2.
+
+**2. Cobrar NO exige caja abierta, y la venta no apunta a la caja: se asigna por rango de tiempo.**
+Una venta pertenece al corte de su sucursal cuya apertura y cierre contienen `paid_at`. **Alternativa
+descartada:** una columna `cash_session_id` en `sales` y obligar a abrir caja para cobrar. Bloquear el cobro
+porque se olvidó abrir la caja es peor que el problema que se quiere resolver, y exigiría modificar la RPC de
+cobro y sus tests (que hoy son estables). **Costo aceptado:** si dos turnos se solapan por un error de captura,
+una venta podría caer en dos; el índice único parcial lo impide para abiertos y la RPC de cierre lo valida.
+
+**3. El efectivo esperado se calcula en la base y se congela al cerrar.**
+`esperado = fondo + efectivo cobrado − cambio entregado + ingresos − retiros/gastos`. Dos detalles que no
+son obvios:
+- **El cambio no está guardado:** el cobro acepta pagos que suman **más** que el total (se paga con $500 una
+  venta de $350) y registra el monto entregado. El cambio es `pagado − total` de esa venta, y solo sale de la
+  caja si hubo efectivo (nunca más que el efectivo recibido). Se calcula en `lib/cashCount.ts` (puro, con
+  tests de bordes) y la RPC de cierre usa la misma regla.
+- **Tarjeta y transferencia no entran al efectivo esperado**, pero sí al reporte del turno.
+Al cerrar se guardan `esperado`, `contado` y `diferencia` como **instantánea**: si después cambia algo, el
+corte ya cerrado no se mueve.
+
+**4. Retiros, gastos e ingresos de caja son movimientos inmutables** (`cash_movements`: sin UPDATE ni DELETE;
+se corrige con otro movimiento), mismo criterio que `stock_movements` (D15). **Alternativa descartada:**
+no tenerlos. Sin ellos, pagar una propina o comprar hielo con efectivo de la caja produce un "faltante" falso
+en cada turno y el corte deja de ser creíble.
+
+**5. Un corte cerrado no se edita ni se borra** (trigger, también para `service_role`): es un documento
+contable, igual que el expediente (§8.5). Un error de captura se aclara con una nota, no reescribiéndolo.
+
+**6. Reportes: funciones SQL que agregan (`SECURITY DEFINER`, revalidan permiso y sucursal), no consultas
+que traen filas al navegador.** **Alternativa descartada:** pedir todas las ventas y sumar en el cliente: el
+API devuelve máximo 1 000 filas por consulta y un reporte del mes las pasaría sin avisar, dando totales
+**incorrectos** sin ningún error. **Fechas:** el periodo ("hoy", "este mes") se interpreta en la zona de cada
+sucursal (§8.3), no en UTC ni en la del navegador; una venta a las 11 pm en Tijuana no es del día siguiente.
+**Qué cuenta:** ventas `paid`; las canceladas se excluyen de los totales y se muestran aparte (conteo y
+monto). El IVA se desglosa por partida, como siempre (§8.2); no es un reporte fiscal oficial.
+
+**7. Atribución a empleados:** las partidas de servicio se atribuyen al empleado de la cita
+(`appointments.employee_user_id`); los productos de mostrador y las ventas sin cita, a quien cobró
+(`sales.closed_by`). **Costo aceptado:** un producto vendido junto con un servicio se atribuye al empleado
+del servicio. Es la regla más simple y se documenta en la pantalla.
+
+**8. Permisos por módulo (D13), no por rol fijo:** dos módulos nuevos en `permission_module`:
+`cash_register` (dueño y recepción ver/editar; el resto nada) y `reports` (solo el dueño por defecto,
+configurable con filas). Recepción solo ve las sucursales que tiene asignadas.
+
+**9. Sin librería de gráficas (D11) y sin Excel:** las barras se dibujan con CSS/SVG, y se exporta a **CSV**
+(sin dependencia). Si las barras no alcanzan, se propone una librería aparte, con su justificación.
+
+**Riesgo conocido:** que el corte no cuadre por una venta con cambio mal calculado. Por eso la regla vive en
+una función pura con tests y la RPC de cierre la repite en SQL; un test compara ambas con las mismas entradas
+(mismo patrón que `lib/cfdi.ts` y su copia).
+
+---
+
+### D18 — Venta de mostrador como punto de venta (pantalla completa), con venta libre y factura a pedido
+
+**Estado:** aprobada (2026-10-05).
+
+**1. Acceso: botón circular flotante, no una entrada del menú.** Se quita "Venta de mostrador" del menú
+lateral. Un botón circular fijo abajo a la derecha (escritorio) abre `/app/venta-mostrador`, que sigue siendo
+una pantalla completa. **En móvil el botón se oculta** (decidido por el usuario). Solo lo ven dueño y recepción (`requiresFrontDesk`, como hoy). Los permisos no cambian.
+
+**2. Interfaz de punto de venta.** La pantalla se rehace con la lógica de un POS (referencia: captura de un POS
+comercial): búsqueda de producto, tabla de partidas con precio, cantidad e importe, total grande y botones de
+Cobrar y Cancelar. **Solo productos** (decidido por el usuario). De la referencia **entran**: búsqueda por código de barras (se busca en `products.sku`, el código
+interno opcional del negocio), cantidades **enteras** y un botón "Consultar precio" que abre un diálogo para
+buscar un producto y ver su precio sin agregarlo al ticket. **No entran:** atajos de teclado, "Poner en
+espera" ni "Lista de espera", ni cantidades fraccionarias (decidido por el usuario).
+
+**3. La venta es libre: no exige cliente.** `sales.customer_id` pasa a admitir nulo (migración aditiva,
+§8.1) y `checkout_counter_sale()` acepta `p_customer_id` nulo. **Alternativa descartada:** un cliente
+"Público en general" falso por negocio; ensuciaría el listado de clientes y los reportes. **Costo aceptado:**
+todo lo que lea `sales.customer_id` (ticket, historial, reportes, factura) debe tolerar nulo; la tarea 13.2 lo
+revisa pieza por pieza.
+
+**4. Factura desde una venta libre.**
+- *No es cliente registrado:* se capturan sus datos fiscales en el momento y **se crea el cliente** (opción
+  "a" del usuario) con `requires_invoice`; la factura usa esos datos y **la venta queda ligada al cliente
+  nuevo** (decidido por el usuario).
+- *Sí es cliente registrado:* un selector con los clientes registrados. Si al elegido le faltan datos
+  fiscales, se le piden en el momento y se guardan.
+- Las reglas de §8 no cambian; los datos fiscales siguen validándose con `lib/validation.ts`.
+
+**5. Sin dependencias nuevas** (§3). Todo con Vue, Vuetify y lo que ya existe.
+
+**Pendientes:** ninguno.
 
 ---
 

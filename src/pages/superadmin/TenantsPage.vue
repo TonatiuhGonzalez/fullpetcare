@@ -155,6 +155,19 @@ function handlePasswordDialogToggle(open: boolean): void {
       class="mt-2"
       @click:row="handleRowClick"
     >
+      <template #[`item.name`]="{ item }">
+        {{ item.name }}
+        <v-chip
+          v-if="item.isDemo"
+          size="x-small"
+          variant="tonal"
+          color="info"
+          class="ml-2"
+          title="Marcada como de demostración: restablecer la demo la oculta, salvo los 3 negocios base"
+        >
+          Demostración
+        </v-chip>
+      </template>
       <template #[`item.statusLabel`]="{ item }">
         <v-chip :color="tenantStatusColor(item.status)" size="small" variant="tonal">
           {{ item.statusLabel }}

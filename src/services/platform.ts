@@ -43,6 +43,8 @@ export interface PlatformTenant {
   ownerName: string | null
   ownerEmail: string | null
   ownerPhone: string | null
+  /** Marcada "de demostración": `demo:reset` la oculta (salvo los 3 negocios base de la semilla). */
+  isDemo: boolean
 }
 
 export interface CancellationReason {
@@ -248,6 +250,7 @@ export async function listTenants(): Promise<PlatformTenant[]> {
     ownerName: (row.owner_name as string | null) ?? null,
     ownerEmail: (row.owner_email as string | null) ?? null,
     ownerPhone: (row.owner_phone as string | null) ?? null,
+    isDemo: row.is_demo,
   }))
 }
 

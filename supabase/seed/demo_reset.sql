@@ -34,12 +34,13 @@
 --      `on conflict do update` sobre su propio id fijo — nunca un
 --      `insert` liso, para no duplicar cada vez que se corre.
 --
--- A propósito NO se pre-siembra ninguna venta (`sales`): cobrar una cita
--- en vivo es justo lo que el presentador hace como parte del demo
--- (README.md, "agendar → atender → cobrar") — pre-sembrar el ticket le
--- quitaría el propósito. Cualquier venta que exista en el tenant de demo
--- es, por definición, de una sesión de demo anterior, y se le pone
--- `deleted_at` en el paso 1 igual que las citas sueltas.
+-- Las 7 citas del guion fijo NO se cobran aquí: cobrar una cita en vivo es
+-- justo lo que el presentador hace como parte del demo (README.md, "agendar
+-- → atender → cobrar") — pre-sembrar su ticket le quitaría el propósito. Toda
+-- venta que exista en el tenant de demo es de una sesión anterior y se le
+-- pone `deleted_at` en el paso 1 igual que las citas sueltas. La única
+-- excepción son las ventas de historia de la fase 12 (bloque "Ventas y caja
+-- de demostración", más abajo), que cuelgan de citas propias y se revivan ahí.
 do $$
 declare
   v_tenant_patitas   uuid := 'b0000000-0000-4000-8000-000000000001';
@@ -245,6 +246,381 @@ begin
   delete from appointment_services where appointment_id = v_appt_max_proxima;
   insert into appointment_services (tenant_id, appointment_id, service_id, name_snapshot, unit_price_cents, quantity, duration_minutes_snapshot)
   select v_tenant_patitas, v_appt_max_proxima, id, name, price_cents, 1, duration_minutes from services where id = v_service_consulta;
+end $$;
+
+-- =============================================================================
+-- Inventario de demostración (fase 11, tarea 11.22)
+-- =============================================================================
+-- Deja el catálogo de productos y las existencias de Patitas Felices como las
+-- trae seed.sql, para que la demo muestre siempre los tres estados de la
+-- pantalla de Inventario (normal, stock bajo y "Sin inventario").
+--
+-- Por qué las existencias se restauran con un AJUSTE y no borrando movimientos:
+-- `stock_movements` es una bitácora inmutable (sin UPDATE ni DELETE, ni siquiera
+-- con service_role; CLAUDE.md §6.5). Lo vendido o consumido en una demo anterior
+-- no se puede "deshacer": se compensa con un movimiento `adjustment` por la
+-- diferencia entre lo que hay y lo que debería haber. Si ya está en su valor,
+-- no se escribe nada (repetir el reset no ensucia la bitácora).
+--
+-- Lo que este bloque NO toca, a propósito: nada fiscal. `tenant_invoicing_settings`
+-- (la organización del negocio en el PAC y la vigencia de su certificado) queda
+-- como esté, para que la demo no pierda el certificado de pruebas cargado. Las
+-- facturas de demos anteriores se ocultan en el Paso 1 de arriba, como las ventas.
+-- Este script jamás llama al PAC.
+do $$
+declare
+  v_tenant_patitas uuid := 'b0000000-0000-4000-8000-000000000001';
+  v_user_dueno     uuid := 'a0000000-0000-4000-8000-000000000001';
+  v_target record;
+  v_current integer;
+begin
+  -- Los insumos usados en consultas de demos anteriores se ocultan, como las citas.
+  update appointment_products set deleted_at = now()
+    where tenant_id = v_tenant_patitas and deleted_at is null;
+
+  -- Catálogo base (mismos datos que seed.sql). Se revive lo que se hubiera
+  -- editado u ocultado, y se oculta (borrado suave) cualquier producto creado
+  -- durante la demo.
+  insert into products (id, tenant_id, name, sku, price_cents, tax_rate_bp, cost_cents, min_stock, is_active)
+  values
+    ('20000000-0000-4000-8000-000000000001', v_tenant_patitas, 'Alimento seco adulto 3 kg', 'ALI-3KG', 38900, 1600, 26000, 5, true),
+    ('20000000-0000-4000-8000-000000000002', v_tenant_patitas, 'Shampoo hipoalergénico 250 ml', 'SHA-250', 14500, 1600, 8000, 3, true),
+    ('20000000-0000-4000-8000-000000000003', v_tenant_patitas, 'Collar de nylon mediano', 'COL-M', 9900, 1600, null, 0, false)
+  on conflict (id) do update set
+    name = excluded.name, sku = excluded.sku, price_cents = excluded.price_cents,
+    tax_rate_bp = excluded.tax_rate_bp, cost_cents = excluded.cost_cents,
+    min_stock = excluded.min_stock, is_active = excluded.is_active, deleted_at = null;
+
+  update products set deleted_at = now()
+    where tenant_id = v_tenant_patitas
+      and deleted_at is null
+      and id <> all(array[
+        '20000000-0000-4000-8000-000000000001'::uuid,
+        '20000000-0000-4000-8000-000000000002'::uuid,
+        '20000000-0000-4000-8000-000000000003'::uuid
+      ]);
+
+  -- Existencia objetivo por sucursal. La primera vez (base sin movimientos) el
+  -- ajuste es toda la existencia; después solo corrige la diferencia.
+  --
+  -- Por qué las existencias NO están en seed.sql: ese archivo es la base
+  -- determinista de los tests de base de datos (checkout, consumo de insumos,
+  -- movimientos de inventario), que asumen existencia 0 de entrada. Sembrarlas
+  -- ahí rompería 21 tests de inventario. Para la demo sirve este script, que se
+  -- puede correr también contra la base local.
+  --
+  -- Estados que deja visibles en la pantalla de Inventario:
+  --   Alimento 3 kg: Centro 12 (normal) y Del Valle 0 ("Sin inventario").
+  --   Shampoo: Centro 6 (normal) y Del Valle 2 (stock bajo: mínimo 3).
+  --   Collar (inactivo): 10 en Centro, conserva existencia pero no se ofrece.
+  for v_target in
+    select * from (values
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000001'::uuid, 12),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000001'::uuid, 0),
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000002'::uuid, 6),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000002'::uuid, 2),
+      ('c0000000-0000-4000-8000-000000000001'::uuid, '20000000-0000-4000-8000-000000000003'::uuid, 10),
+      ('c0000000-0000-4000-8000-000000000002'::uuid, '20000000-0000-4000-8000-000000000003'::uuid, 0)
+    ) as t(branch_id, product_id, quantity)
+  loop
+    select coalesce(sum(quantity), 0)::integer into v_current
+      from stock_movements
+      where tenant_id = v_tenant_patitas
+        and branch_id = v_target.branch_id
+        and product_id = v_target.product_id;
+
+    if v_current <> v_target.quantity then
+      insert into stock_movements (tenant_id, branch_id, product_id, movement_type, quantity, reason, created_by)
+      values (
+        v_tenant_patitas, v_target.branch_id, v_target.product_id, 'adjustment',
+        v_target.quantity - v_current, 'Restablecer inventario de demostración', v_user_dueno
+      );
+    end if;
+  end loop;
+end $$;
+
+-- =============================================================================
+-- Ventas y caja de demostración (fase 12, tarea 12.14)
+-- =============================================================================
+-- Deja la demo con historia para que Reportes y Caja no salgan vacíos:
+--   * 13 ventas de los últimos 6 días en las dos sucursales (una cancelada,
+--     una con descuento, pagos en efectivo con cambio, tarjeta, transferencia y
+--     un pago dividido), con 8 citas ya atendidas por la groomer y el vet para
+--     que el reporte de empleados tenga filas.
+--   * Un corte de caja CERRADO en Centro (fondo, un retiro, un gasto y un
+--     faltante de $4), de las ventas 1 a 5.
+--   * Ninguna caja abierta: el presentador la abre en vivo.
+--
+-- "Hoy" queda vacío a propósito: el cobro en vivo es lo que lo llena.
+--
+-- Ninguna cita del guion fijo (las 7 de arriba) se cobra aquí: el presentador
+-- las cobra en vivo ("agendar → atender → cobrar"). Estas ventas cuelgan de
+-- citas propias (ids 33...), que el Paso 1 oculta y este bloque revive.
+--
+-- Cómo se mantiene repetible (se corre antes de cada demo):
+--   * Ventas, partidas y pagos tienen ids fijos y se REHACEN cada vez (las
+--     partidas y los pagos se borran y se vuelven a insertar; no son expediente).
+--     La venta conserva su folio si ya existía; si es nueva toma el siguiente
+--     de su sucursal, así que no choca con los folios de demos anteriores.
+--   * Las fechas de las ventas son relativas a hoy en la zona de su sucursal
+--     (§8.3), salvo las del corte (ver abajo).
+--   * No se escriben movimientos de inventario por estas ventas: las existencias
+--     de la demo las fija el bloque de Inventario de arriba, y la bitácora es
+--     inmutable. Por eso lo vendido aquí no baja el stock.
+--
+-- Por qué el corte NO se restaura como lo demás: un corte cerrado es inmutable
+-- (trigger `protect_closed_cash_session`, ni siquiera con service_role). No se
+-- puede ocultar, ni corregir, ni borrar. Así que:
+--   * Se crea UNA sola vez, con id fijo, y las corridas siguientes no lo tocan.
+--   * Las ventas 1 a 5 se anclan al DÍA DEL CORTE (no a "ayer"): así su efectivo
+--     esperado congelado sigue cuadrando con lo que Caja recalcula. El corte
+--     "envejece" (y sale de "esta semana" en Reportes); las otras ventas no.
+--   * Los cortes que alguien cierre durante una demo se quedan en el historial
+--     de Caja para siempre. Lo que sí se puede ocultar es una caja ABIERTA:
+--     se le pone `deleted_at` para que la demo arranque con la caja cerrada.
+do $$
+declare
+  v_tenant uuid := 'b0000000-0000-4000-8000-000000000001';
+  v_branch_centro uuid := 'c0000000-0000-4000-8000-000000000001';
+  v_branch_delvalle uuid := 'c0000000-0000-4000-8000-000000000002';
+  v_user_dueno uuid := 'a0000000-0000-4000-8000-000000000001';
+  v_user_recepcion uuid := 'a0000000-0000-4000-8000-000000000002';
+  v_user_groomer uuid := 'a0000000-0000-4000-8000-000000000003';
+  v_user_vet uuid := 'a0000000-0000-4000-8000-000000000004';
+  v_cut_id uuid := '35000000-0000-4000-8000-000000000001';
+
+  -- Claves cortas: s = servicio (1 Baño, 2 Corte, 3 Deslanado, 4 Consulta,
+  -- 5 Vacunación, 6 Desparasitación), p = producto (1 Alimento, 2 Shampoo),
+  -- cust = cliente de la semilla. En un pago, `a` ausente = lo que falte para
+  -- el total y `f` = forma de pago de la tarjeta (04 crédito, 28 débito).
+  v_sales jsonb := $json$[
+    {"n":1,  "branch":"centro",   "cut":true, "time":"10:15", "cust":1, "by":"recepcion", "appt":"groomer",
+     "items":[{"s":1}], "pay":[{"m":"cash","a":25000}]},
+    {"n":2,  "branch":"centro",   "cut":true, "time":"12:30", "cust":2, "by":"recepcion", "appt":"groomer", "disc":3000,
+     "items":[{"s":2},{"p":2}], "pay":[{"m":"card","f":"04"}]},
+    {"n":3,  "branch":"centro",   "cut":true, "time":"14:05", "cust":4, "by":"recepcion",
+     "items":[{"p":1}], "pay":[{"m":"cash","a":40000}]},
+    {"n":4,  "branch":"centro",   "cut":true, "time":"16:20", "cust":3, "by":"dueno", "appt":"groomer",
+     "items":[{"s":3}], "pay":[{"m":"transfer_spei"}]},
+    {"n":5,  "branch":"centro",   "cut":true, "time":"17:45", "cust":5, "by":"recepcion",
+     "items":[{"p":2,"q":2}], "pay":[{"m":"card","f":"28"}]},
+    {"n":6,  "branch":"delvalle", "days":2, "time":"11:00", "cust":6, "by":"dueno", "appt":"vet",
+     "items":[{"s":4}], "pay":[{"m":"card","f":"04"}]},
+    {"n":7,  "branch":"delvalle", "days":2, "time":"13:30", "cust":1, "by":"recepcion", "appt":"vet",
+     "items":[{"s":5},{"s":6}], "pay":[{"m":"cash","a":50000}]},
+    {"n":8,  "branch":"centro",   "days":3, "time":"10:00", "cust":2, "by":"recepcion", "appt":"groomer",
+     "items":[{"s":1}], "pay":[{"m":"card","f":"28"}]},
+    {"n":9,  "branch":"centro",   "days":3, "time":"15:30", "cust":3, "by":"recepcion",
+     "items":[{"p":1,"q":2}], "pay":[{"m":"card","f":"04"}]},
+    {"n":10, "branch":"delvalle", "days":4, "time":"12:00", "cust":4, "by":"recepcion", "appt":"vet",
+     "items":[{"s":4},{"p":1}], "pay":[{"m":"cash","a":30000},{"m":"card","f":"04"}]},
+    {"n":11, "branch":"centro",   "days":5, "time":"11:20", "cust":5, "by":"recepcion", "appt":"groomer",
+     "items":[{"s":2}], "pay":[{"m":"cash","a":45000}]},
+    {"n":12, "branch":"centro",   "days":5, "time":"16:00", "cust":6, "by":"recepcion", "appt":"groomer", "status":"cancelled",
+     "items":[{"s":1}], "pay":[{"m":"cash","a":25000}]},
+    {"n":13, "branch":"delvalle", "days":6, "time":"10:30", "cust":1, "by":"dueno", "appt":"vet",
+     "items":[{"s":4}], "pay":[{"m":"transfer_spei"}]}
+  ]$json$;
+
+  v_sale jsonb;
+  v_pay jsonb;
+  v_n integer;
+  v_sale_id uuid;
+  v_appt_id uuid;
+  v_branch uuid;
+  v_tz text;
+  v_cut_day date;
+  v_paid_at timestamptz;
+  v_customer uuid;
+  v_closed_by uuid;
+  v_employee uuid;
+  v_pet uuid;
+  v_first_service uuid;
+  v_minutes integer;
+  v_status sale_status;
+  v_discount integer;
+  v_folio integer;
+  v_subtotal integer;
+  v_tax integer;
+  v_total integer;
+  v_explicit integer;
+  v_paid_sum integer;
+  v_amount integer;
+  v_method text;
+  v_open_at timestamptz;
+  v_close_at timestamptz;
+  v_expected integer;
+begin
+  -- Una caja abierta de una demo anterior se oculta (ver arriba): la demo
+  -- arranca con la caja cerrada. Se hace antes de crear nada, porque la base
+  -- permite una sola caja abierta por sucursal.
+  update cash_sessions set deleted_at = now()
+    where tenant_id = v_tenant and closed_at is null and deleted_at is null;
+
+  -- Día del corte: el que ya tiene si existe; si no, ayer en Centro.
+  select timezone into v_tz from branches where id = v_branch_centro;
+  v_cut_day := coalesce(
+    (select (opened_at at time zone v_tz)::date from cash_sessions where id = v_cut_id),
+    (now() at time zone v_tz)::date - 1
+  );
+
+  for v_sale in select * from jsonb_array_elements(v_sales) loop
+    v_n := (v_sale->>'n')::integer;
+    v_sale_id := ('34000000-0000-4000-8000-' || lpad(v_n::text, 12, '0'))::uuid;
+    v_branch := case v_sale->>'branch' when 'centro' then v_branch_centro else v_branch_delvalle end;
+    select timezone into v_tz from branches where id = v_branch;
+
+    -- Instante del cobro: día local + hora local, convertido a UTC con la zona
+    -- IANA de la sucursal (§8.3), nunca con un offset fijo.
+    v_paid_at := (
+      case when (v_sale->>'cut')::boolean is true
+           then v_cut_day
+           else (now() at time zone v_tz)::date - (v_sale->>'days')::integer
+      end + (v_sale->>'time')::time
+    ) at time zone v_tz;
+
+    v_customer := ('d0000000-0000-4000-8000-' || lpad(v_sale->>'cust', 12, '0'))::uuid;
+    v_closed_by := case v_sale->>'by' when 'dueno' then v_user_dueno else v_user_recepcion end;
+    v_status := coalesce(v_sale->>'status', 'paid')::sale_status;
+    v_discount := coalesce((v_sale->>'disc')::integer, 0);
+
+    -- Cita atendida de la que cuelgan los servicios (solo si la venta la lleva).
+    v_appt_id := null;
+    if v_sale ? 'appt' then
+      select id into v_pet from pets
+        where customer_id = v_customer and tenant_id = v_tenant and deleted_at is null
+        order by created_at, id limit 1;
+      -- Duración total de los servicios, y uno de ellos para tomar el tipo de cita
+      -- (en esta lista todos los servicios de una cita son del mismo tipo).
+      select (array_agg(s.id order by s.id))[1],
+             sum(s.duration_minutes * coalesce((i->>'q')::integer, 1))::integer
+        into v_first_service, v_minutes
+        from jsonb_array_elements(v_sale->'items') i
+        join services s on s.id = ('f0000000-0000-4000-8000-' || lpad(i->>'s', 12, '0'))::uuid
+        where i ? 's';
+
+      if v_pet is not null and v_first_service is not null then
+        v_appt_id := ('33000000-0000-4000-8000-' || lpad(v_n::text, 12, '0'))::uuid;
+        v_employee := case v_sale->>'appt' when 'groomer' then v_user_groomer else v_user_vet end;
+
+        insert into appointments (id, tenant_id, branch_id, customer_id, pet_id, kind, employee_user_id, starts_at, ends_at, status, created_by)
+        values (
+          v_appt_id, v_tenant, v_branch, v_customer, v_pet,
+          (select kind from services where id = v_first_service),
+          v_employee,
+          v_paid_at - make_interval(mins => v_minutes + 10),
+          v_paid_at - interval '10 minutes',
+          'completed', v_user_dueno
+        )
+        on conflict (id) do update set
+          branch_id = excluded.branch_id, customer_id = excluded.customer_id, pet_id = excluded.pet_id,
+          kind = excluded.kind, employee_user_id = excluded.employee_user_id,
+          starts_at = excluded.starts_at, ends_at = excluded.ends_at, status = excluded.status,
+          deleted_at = null;
+
+        -- Sin restricción única: se limpia y se reinserta (como las citas del guion).
+        delete from appointment_services where appointment_id = v_appt_id;
+        insert into appointment_services (tenant_id, appointment_id, service_id, name_snapshot, unit_price_cents, quantity, duration_minutes_snapshot)
+        select v_tenant, v_appt_id, s.id, s.name, s.price_cents, coalesce((i->>'q')::integer, 1), s.duration_minutes
+        from jsonb_array_elements(v_sale->'items') i
+        join services s on s.id = ('f0000000-0000-4000-8000-' || lpad(i->>'s', 12, '0'))::uuid
+        where i ? 's';
+      end if;
+    end if;
+
+    -- Folio: el de siempre si la venta ya existía; si no, el siguiente de la
+    -- sucursal (el índice único cuenta también las ventas ocultas).
+    select coalesce(max(folio), 0) + 1 into v_folio
+      from sales where tenant_id = v_tenant and branch_id = v_branch;
+
+    insert into sales (id, tenant_id, branch_id, customer_id, folio, status, discount_cents, paid_at, closed_by)
+    values (v_sale_id, v_tenant, v_branch, v_customer, v_folio, v_status, v_discount, v_paid_at, v_closed_by)
+    on conflict (id) do update set
+      customer_id = excluded.customer_id, status = excluded.status, discount_cents = excluded.discount_cents,
+      paid_at = excluded.paid_at, closed_by = excluded.closed_by, deleted_at = null;
+
+    -- Partidas: IVA incluido en el precio y desglosado por partida (§8.2),
+    -- la misma cuenta que hace el cobro.
+    delete from sale_items where sale_id = v_sale_id;
+    delete from payments where sale_id = v_sale_id;
+
+    insert into sale_items (tenant_id, sale_id, item_type, service_id, appointment_id, description, quantity, unit_price_cents, tax_rate_bp, tax_cents, line_total_cents)
+    select v_tenant, v_sale_id, 'service', s.id, v_appt_id, s.name, x.q, s.price_cents, s.tax_rate_bp,
+           s.price_cents * x.q - round((s.price_cents * x.q)::numeric * 10000 / (10000 + s.tax_rate_bp))::integer,
+           s.price_cents * x.q
+    from jsonb_array_elements(v_sale->'items') i
+    join services s on s.id = ('f0000000-0000-4000-8000-' || lpad(i->>'s', 12, '0'))::uuid
+    cross join lateral (select coalesce((i->>'q')::integer, 1) as q) x
+    where i ? 's';
+
+    insert into sale_items (tenant_id, sale_id, item_type, product_id, description, quantity, unit_price_cents, tax_rate_bp, tax_cents, line_total_cents)
+    select v_tenant, v_sale_id, 'product', p.id, p.name, x.q, p.price_cents, p.tax_rate_bp,
+           p.price_cents * x.q - round((p.price_cents * x.q)::numeric * 10000 / (10000 + p.tax_rate_bp))::integer,
+           p.price_cents * x.q
+    from jsonb_array_elements(v_sale->'items') i
+    join products p on p.id = ('20000000-0000-4000-8000-' || lpad(i->>'p', 12, '0'))::uuid
+    cross join lateral (select coalesce((i->>'q')::integer, 1) as q) x
+    where i ? 'p';
+
+    select coalesce(sum(line_total_cents - tax_cents), 0), coalesce(sum(tax_cents), 0)
+      into v_subtotal, v_tax
+      from sale_items where sale_id = v_sale_id;
+    v_total := greatest(0, v_subtotal + v_tax - v_discount);
+
+    update sales set subtotal_cents = v_subtotal, tax_cents = v_tax, total_cents = v_total
+      where id = v_sale_id;
+
+    -- Pagos. Un pago sin `a` toma lo que falta para el total.
+    select coalesce(sum((p->>'a')::integer), 0) into v_explicit
+      from jsonb_array_elements(v_sale->'pay') p;
+    v_paid_sum := 0;
+    for v_pay in select * from jsonb_array_elements(v_sale->'pay') loop
+      v_method := v_pay->>'m';
+      v_amount := coalesce((v_pay->>'a')::integer, v_total - v_explicit);
+      insert into payments (tenant_id, sale_id, method, amount_cents, reference, status, paid_at, payment_form_code)
+      values (
+        v_tenant, v_sale_id, v_method::payment_method, v_amount,
+        case when v_method = 'cash' then null else 'SIM-DEMO-' || lpad(v_n::text, 3, '0') end,
+        (case when v_method = 'cash' then 'approved' else 'simulated_approved' end)::payment_status,
+        v_paid_at,
+        case v_method when 'cash' then '01' when 'transfer_spei' then '03' else v_pay->>'f' end
+      );
+      v_paid_sum := v_paid_sum + v_amount;
+    end loop;
+
+    -- Cinturón: si alguien edita la lista de arriba y los pagos no alcanzan, el
+    -- reset falla ruidosamente (y deshace todo) en vez de sembrar un ticket roto.
+    if v_paid_sum < v_total then
+      raise exception 'Semilla de demo: la venta % no queda cubierta (pagos %, total %).', v_n, v_paid_sum, v_total;
+    end if;
+  end loop;
+
+  -- ===========================================================================
+  -- Corte de caja cerrado de ejemplo (solo la primera vez, ver arriba)
+  -- ===========================================================================
+  if not exists (select 1 from cash_sessions where id = v_cut_id) then
+    select timezone into v_tz from branches where id = v_branch_centro;
+    v_open_at := (v_cut_day + time '09:00') at time zone v_tz;
+    v_close_at := (v_cut_day + time '19:00') at time zone v_tz;
+
+    insert into cash_sessions (id, tenant_id, branch_id, opened_by, opened_at, opening_float_cents, opening_note)
+    values (v_cut_id, v_tenant, v_branch_centro, v_user_recepcion, v_open_at, 80000, 'Fondo para dar cambio');
+
+    insert into cash_movements (tenant_id, branch_id, cash_session_id, movement_type, amount_cents, reason, created_by, created_at)
+    values
+      (v_tenant, v_branch_centro, v_cut_id, 'withdrawal', 30000, 'Retiro a caja fuerte', v_user_dueno, (v_cut_day + time '13:00') at time zone v_tz),
+      (v_tenant, v_branch_centro, v_cut_id, 'expense', 8500, 'Papelería y bolsas', v_user_recepcion, (v_cut_day + time '15:00') at time zone v_tz);
+
+    -- El esperado lo calcula la misma función que usa close_cash_session(), con
+    -- las ventas 1 a 5 ya insertadas arriba; el conteo queda $4 por debajo.
+    select expected_cents::integer into v_expected from app.cash_session_summary(v_cut_id, v_close_at);
+
+    update cash_sessions
+       set closed_by = v_user_recepcion, closed_at = v_close_at,
+           expected_cents = v_expected, counted_cents = v_expected - 400, difference_cents = -400,
+           closing_note = 'Faltaron $4 de cambio'
+     where id = v_cut_id;
+  end if;
 end $$;
 
 -- =============================================================================

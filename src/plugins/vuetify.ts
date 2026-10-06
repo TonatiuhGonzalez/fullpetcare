@@ -45,5 +45,8 @@ export const vuetify = createVuetify({
     VTextField: { density: 'comfortable', variant: 'outlined' },
     VSelect: { density: 'comfortable', variant: 'outlined' },
     VBtn: { style: 'text-transform: none;' },
+    // Ancho máximo único del contenido de todas las pantallas (centrado por el
+    // propio v-container). Las páginas no ponen su propio max-width.
+    VContainer: { maxWidth: 860 },
   },
 })

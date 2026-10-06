@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  customerFiscalProblems,
+  fiscalReceiverProblems,
   isValidCURP,
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
+  isValidSatProductCode,
+  isValidSatUnitCode,
   MIN_PASSWORD_LENGTH,
   passwordChangeProblems,
+  passwordResetProblems,
 } from './validation'
 
 describe('isValidEmail', () => {
@@ -168,7 +173,11 @@ describe('isValidPostalCode', () => {
 })
 
 describe('passwordChangeProblems', () => {
-  const valid = { current: 'Temporal123', next: 'MiNuevaClave9', confirm: 'MiNuevaClave9' }
+  const valid = {
+    current: 'Temporal123',
+    next: 'MiNuevaClave9',
+    confirm: 'MiNuevaClave9',
+  }
 
   it('no reporta problemas cuando todo está bien', () => {
     // Camino feliz mínimo: si esto fallara, nadie podría cambiar su
@@ -187,8 +196,12 @@ describe('passwordChangeProblems', () => {
     // Borde: exactamente MIN-1 caracteres falla y exactamente MIN pasa.
     const short = 'a'.repeat(MIN_PASSWORD_LENGTH - 1)
     const exact = 'a'.repeat(MIN_PASSWORD_LENGTH)
-    expect(passwordChangeProblems({ ...valid, next: short, confirm: short }).next).toBeDefined()
-    expect(passwordChangeProblems({ ...valid, next: exact, confirm: exact }).next).toBeUndefined()
+    expect(
+      passwordChangeProblems({ ...valid, next: short, confirm: short }).next,
+    ).toBeDefined()
+    expect(
+      passwordChangeProblems({ ...valid, next: exact, confirm: exact }).next,
+    ).toBeUndefined()
   })
 
   it('rechaza una contraseña nueva igual a la actual', () => {
@@ -196,13 +209,17 @@ describe('passwordChangeProblems', () => {
     // creería que ya se renovó. Con una temporal, sería dejar la que
     // el superadmin ya vio.
     const same = 'Temporal123'
-    expect(passwordChangeProblems({ current: same, next: same, confirm: same }).next).toBeDefined()
+    expect(
+      passwordChangeProblems({ current: same, next: same, confirm: same }).next,
+    ).toBeDefined()
   })
 
   it('rechaza una confirmación que no coincide', () => {
     // El error de dedo clásico: si no se pide confirmar, una contraseña
     // mal escrita se guarda y la persona queda fuera de su cuenta.
-    expect(passwordChangeProblems({ ...valid, confirm: 'MiNuevaClave8' }).confirm).toBeDefined()
+    expect(
+      passwordChangeProblems({ ...valid, confirm: 'MiNuevaClave8' }).confirm,
+    ).toBeDefined()
   })
 
   it('con todo vacío marca la actual, la nueva y no confunde "igual" con "falta"', () => {
@@ -212,5 +229,147 @@ describe('passwordChangeProblems', () => {
     expect(problems.current).toBe('Escribe tu contraseña actual.')
     expect(problems.next).toContain('al menos')
     expect(problems.confirm).toBeUndefined()
+  })
+})
+
+describe('passwordResetProblems', () => {
+  it('no reporta problemas cuando la contraseña es válida y coincide', () => {
+    // Camino feliz: si fallara, nadie podría terminar la recuperación
+    // aunque escribiera todo bien y se quedaría fuera de su cuenta.
+    expect(
+      passwordResetProblems({ next: 'MiNuevaClave9', confirm: 'MiNuevaClave9' }),
+    ).toEqual({})
+  })
+
+  it('rechaza una contraseña más corta que el mínimo (borde MIN-1 / MIN)', () => {
+    // Si se aceptara una contraseña débil, la recuperación sería el
+    // camino fácil para dejar la cuenta con una clave trivial.
+    const short = 'a'.repeat(MIN_PASSWORD_LENGTH - 1)
+    const exact = 'a'.repeat(MIN_PASSWORD_LENGTH)
+    expect(passwordResetProblems({ next: short, confirm: short }).next).toBeDefined()
+    expect(passwordResetProblems({ next: exact, confirm: exact }).next).toBeUndefined()
+  })
+
+  it('rechaza una confirmación que no coincide', () => {
+    // Un error de dedo guardaría una contraseña que la persona no conoce,
+    // y tendría que repetir todo el correo de recuperación.
+    expect(
+      passwordResetProblems({ next: 'MiNuevaClave9', confirm: 'MiNuevaClave8' }).confirm,
+    ).toBeDefined()
+  })
+})
+
+describe('isValidSatProductCode', () => {
+  it('acepta exactamente 8 dígitos', () => {
+    // Caso base: la clave que usamos por defecto ("Salud animal"). Si esto
+    // fallara, ningún servicio podría guardarse con su clave de producto.
+    expect(isValidSatProductCode('70122000')).toBe(true)
+  })
+
+  it('rechaza 7 o 9 dígitos', () => {
+    // El error de captura típico: comerse o duplicar un dígito. El timbrado
+    // del PAC rechazaría la factura completa por una clave de longitud mala.
+    expect(isValidSatProductCode('7012200')).toBe(false)
+    expect(isValidSatProductCode('701220000')).toBe(false)
+  })
+
+  it('rechaza letras, espacios internos y cadena vacía', () => {
+    expect(isValidSatProductCode('7012200A')).toBe(false)
+    expect(isValidSatProductCode('7012 2000')).toBe(false)
+    expect(isValidSatProductCode('')).toBe(false)
+  })
+
+  it('ignora espacios al inicio o al final', () => {
+    // Pegar la clave desde un Excel o un correo suele arrastrar un espacio.
+    expect(isValidSatProductCode(' 70122000 ')).toBe(true)
+  })
+})
+
+describe('isValidSatUnitCode', () => {
+  it('acepta claves reales de 3 y de 2 caracteres', () => {
+    // E48 (servicio) es la nuestra; EA (elemento) existe en el catálogo con
+    // 2 caracteres, y exigir 3 siempre dejaría fuera unidades legítimas.
+    expect(isValidSatUnitCode('E48')).toBe(true)
+    expect(isValidSatUnitCode('H87')).toBe(true)
+    expect(isValidSatUnitCode('EA')).toBe(true)
+  })
+
+  it('acepta minúsculas (se normalizan a mayúsculas al guardar)', () => {
+    expect(isValidSatUnitCode('e48')).toBe(true)
+  })
+
+  it('rechaza 1 o 4 caracteres, símbolos y cadena vacía', () => {
+    expect(isValidSatUnitCode('E')).toBe(false)
+    expect(isValidSatUnitCode('E48X')).toBe(false)
+    expect(isValidSatUnitCode('E-8')).toBe(false)
+    expect(isValidSatUnitCode('')).toBe(false)
+  })
+})
+
+describe('fiscalReceiverProblems', () => {
+  const COMPLETE = {
+    rfc: 'XAXX010101000',
+    legalName: 'Cliente de Prueba SA de CV',
+    taxRegimeCode: '612',
+    cfdiUse: 'G03',
+    postalCode: '06600',
+  }
+
+  it('no reporta nada cuando los datos están completos', () => {
+    expect(fiscalReceiverProblems(COMPLETE)).toEqual([])
+  })
+
+  it('reporta cada dato faltante por separado', () => {
+    // Qué se rompería: se cobraría la venta, la solicitud de factura fallaría después por
+    // un dato vacío y el cliente ya se habría ido sin su factura.
+    const problems = fiscalReceiverProblems({
+      rfc: '',
+      legalName: '  ',
+      taxRegimeCode: '',
+      cfdiUse: '',
+      postalCode: '',
+    })
+    expect(problems).toHaveLength(5)
+  })
+
+  it('rechaza un régimen o un uso de CFDI con forma inválida', () => {
+    expect(fiscalReceiverProblems({ ...COMPLETE, taxRegimeCode: '61' })).toHaveLength(1)
+    expect(fiscalReceiverProblems({ ...COMPLETE, cfdiUse: '03G' })).toHaveLength(1)
+  })
+
+  it('acepta el uso de CFDI en minúsculas y con espacios (como lo escribe una persona)', () => {
+    expect(fiscalReceiverProblems({ ...COMPLETE, cfdiUse: ' g03 ' })).toEqual([])
+  })
+
+  it('rechaza un código postal que no tiene 5 dígitos', () => {
+    expect(fiscalReceiverProblems({ ...COMPLETE, postalCode: '660' })).toHaveLength(1)
+  })
+})
+
+describe('customerFiscalProblems', () => {
+  it('un cliente con todos sus datos fiscales ya se puede facturar', () => {
+    expect(
+      customerFiscalProblems({
+        rfc: 'XAXX010101000',
+        legal_name: 'Cliente de Prueba',
+        tax_regime_code: '612',
+        cfdi_use: 'G03',
+        postal_code: '06600',
+      }),
+    ).toEqual([])
+  })
+
+  it('un cliente que nunca pidió factura (campos nulos) reporta todo lo que falta', () => {
+    // Qué se rompería: al elegirlo en el punto de venta se cobraría y la solicitud de factura
+    // saldría con datos vacíos (la base exige RFC y razón social), sin forma de corregirlo.
+    expect(
+      customerFiscalProblems({
+        rfc: null,
+        legal_name: null,
+        tax_regime_code: null,
+        cfdi_use: null,
+        postal_code: null,
+      }),
+    ).toHaveLength(5)
   })
 })

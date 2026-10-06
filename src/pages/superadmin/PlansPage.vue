@@ -76,7 +76,7 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
 </script>
 
 <template>
-  <v-container max-width="800">
+  <v-container>
     <h1 class="text-h5 mb-1">Planes</h1>
     <p class="text-body-2 text-medium-emphasis mb-4">
       Son los planes que puedes asignar a una empresa. Es solo informativo: el plan por

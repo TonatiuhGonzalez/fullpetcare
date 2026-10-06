@@ -32,7 +32,9 @@ function print(): void {
         </p>
       </div>
 
-      <p class="mb-2"><strong>Cliente:</strong> {{ props.ticket.customerName }}</p>
+      <p v-if="props.ticket.customerName" class="mb-2">
+        <strong>Cliente:</strong> {{ props.ticket.customerName }}
+      </p>
 
       <v-divider class="mb-2" />
 
