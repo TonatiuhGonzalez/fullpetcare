@@ -2417,6 +2417,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
+      delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
       my_tenant_notices: {
         Args: never
         Returns: {

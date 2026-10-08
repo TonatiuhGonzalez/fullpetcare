@@ -1325,3 +1325,62 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   **Revisado sin cambios:** la tarea 11.20 (factura global) agrupa ventas sin factura individual sin mirar el cliente, así
   que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
   solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.
+
+## Fase 14 — Clientes y mascotas: acciones en la tabla y edición directa
+
+**Meta: que en Clientes se edite y se elimine desde la propia tabla, y que el modal de cliente y el de mascota
+sean directamente de edición (sin la vista previa de solo lectura).**
+Cuarta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+
+**Estado: en construcción.** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D19.
+
+### Decisiones (acordadas con el usuario el 2026-10-08)
+
+| #   | Decisión                  | Propuesta                                                                                                                   |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Tablas                    | Headers en negritas (clientes y mascotas), siguen ordenables. Nueva columna "Acciones" con editar y eliminar (`mdi-pencil`, `mdi-delete`, con tooltip). |
+| 2   | Fila                      | Ya no abre nada al presionarla; editar solo por el ícono.                                                                   |
+| 3   | Quién ve las acciones     | Solo dueño y recepción.                                                                                                     |
+| 4   | Eliminar cliente          | Borrado suave con diálogo de confirmación. Sus mascotas y sus citas **programadas** se eliminan (borrado suave) con él.        |
+| 5   | Eliminar mascota          | Borrado suave con confirmación. Sus citas **programadas** se eliminan. **El expediente (clínico, estética, vacunas) no se borra** (§8.5).  |
+| 6   | Modal de cliente          | Reemplaza `CustomerDetailDialog` y `CustomerFormDialog` (también para dar de alta). Título = nombre completo. Orden: Mascotas (tarjetas como hoy, con alta directa), Nombre, Apellido, Teléfono, Correo, Notas, Requiere factura (con sus datos fiscales). |
+| 7   | Modal de mascota          | Edición directa, sin vista previa. Foto centrada (al presionarla se cambia); línea Nombre · raza · género · ícono de esterilización (verde = sí, amarillo = no, **ícono provisional**); Nacimiento; Peso (último registrado, solo lectura); Preferencia de corte (`grooming_notes`); Cartilla de vacunación; Historial de peso (la gráfica actual); Compartir con el cliente (`ShareLinkManager`). Especie y dueño también se muestran. Lo que hoy hay en el modal (próximas citas, línea de tiempo, alertas médicas) se mantiene debajo. |
+| 8   | Cartilla                  | Tabla de las vacunas del catálogo `vaccines` (por especie) con vacuna, fecha de aplicación, próxima dosis y lote. Se registra con el `VaccinationDialog` actual. El groomer la sigue viendo como hoy. |
+| 9   | Componentes sin uso       | Se dejan (no se borran).                                                                                                    |
+
+**Citas en la cascada (decidido el 2026-10-08):** solo se eliminan las **programadas** (`scheduled`). Las que están
+en curso, completadas, canceladas o no asistidas se conservan como historia, igual que las ventas cobradas y el expediente.
+
+### 14A. Preparación
+
+- [ ] **14.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D19, 
+  _Verificar:_ el usuario aprobó por escrito; D19 sin "pendiente de aprobación".
+
+### 14B. Base de datos
+
+- [x] **14.2** 🧪 RPC `delete_customer()` y `delete_pet()` (`SECURITY DEFINER`, revalidan membresía y rol dueño o
+  recepción) que hacen el borrado suave en cascada en una sola transacción. _Verificar:_ test de base: cascada,
+  expediente intacto, groomer/vet y otro tenant rechazados, y una venta cobrada no cambia.
+  (Ojo con la trampa de §7.2: el SELECT de estas tablas no debe filtrar `deleted_at`, o el UPDATE falla.)
+  **Hecho 2026-10-08:** migración `20261012120000_delete_customer_pet.sql` con `delete_pet()` y `delete_customer()`
+  (`SECURITY DEFINER`, revalidan membresía y rol; `EXECUTE` solo para `authenticated`). La cascada oculta citas
+  `scheduled` del cliente (de cualquier sucursal) y de sus mascotas; no toca citas en otro estado, ventas ni expediente.
+  16 tests nuevos en `delete-customer-pet-rpc.spec.ts` (estados de cita, otra mascota del mismo cliente, expediente
+  intacto, groomer, vet, otro negocio, inexistente, ya eliminado, anónimo). `database.ts` regenerado; `lint` en
+  verde. No hay test de que una venta cobrada quede intacta: la cascada no la
+  toca ni la lee. **No cubierto:** el service y la interfaz que las llaman (14.3).
+
+### 14C. Interfaz
+
+- [ ] **14.3** Tablas de clientes y mascotas: headers en negritas, columna de acciones (solo dueño y recepción),
+  diálogo de confirmación al eliminar, fila sin clic. _Verificar:_ en navegador como dueño, recepción, groomer y vet.
+- [ ] **14.4** Modal de cliente de edición directa (reemplaza detalle y formulario; mascotas en tarjetas con alta
+  directa; datos fiscales). _Verificar:_ crear, editar, y la validación fiscal de `lib/validation.ts` sigue funcionando.
+- [ ] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,
+  último peso, cartilla en tabla, gráfica de peso, compartir). _Verificar:_ crear, editar, cambiar foto, registrar
+  vacuna; test unitario de la función pura que arme las filas de la cartilla.
+
+### 14D. Cierre
+
+- [ ] **14.6** 📚 Actualizar `CLAUDE.md` (§1 y lo que describa Clientes) y marcar la fase terminada.
+  _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
