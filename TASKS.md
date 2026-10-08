@@ -1332,7 +1332,7 @@ Seguimiento en HMH Four: proyecto FullPetCare.
 sean directamente de edición (sin la vista previa de solo lectura).**
 Cuarta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
 
-**Estado: en construcción.** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D19.
+**Estado: terminada (2026-10-08).** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D19.
 
 ### Decisiones (acordadas con el usuario el 2026-10-08)
 
@@ -1427,5 +1427,9 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
 
 ### 14D. Cierre
 
-- [ ] **14.6** 📚 Actualizar `CLAUDE.md` (§1 y lo que describa Clientes) y marcar la fase terminada.
+- [x] **14.6** 📚 Actualizar `CLAUDE.md` (§1 y lo que describa Clientes) y marcar la fase terminada.
   _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-08:** `CLAUDE.md` §1 marca la fase 14 como construida y §6.2 documenta la pantalla Clientes (acciones,
+  modales de edición directa, qué componentes viejos se conservan y por qué) y el borrado en cascada por RPC.
+  `PLAN.md` D19 pasa a aprobada. **Pendiente al cerrar:** probar la subida de foto de la mascota en staging (falla en el
+  Storage local, ver 14.5) y abrir el PR hacia `develop`.

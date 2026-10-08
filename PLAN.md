@@ -665,7 +665,7 @@ revisa pieza por pieza.
 
 ### D19 — Clientes y mascotas: acciones en la tabla y modales de edición directa
 
-**Estado:** propuesta, pendiente de aprobación (2026-10-08).
+**Estado:** aprobada (2026-10-08).
 
 **1. Acciones en la tabla.** Columna "Acciones" con editar y eliminar, solo para dueño y recepción. La fila deja de
 ser clicable. Headers en negritas.
