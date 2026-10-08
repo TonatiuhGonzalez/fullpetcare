@@ -199,8 +199,9 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // escribir — prueba que services/petHistory.ts (fase 6) refleja la cita
   // recién cobrada, no solo que "algo" se guardó.
   // La ficha de la mascota es un diálogo (tarea #1968): se abre desde la
-  // pestaña "Mascotas" de Clientes, ya no hay ruta propia.
+  // pestaña "Mascotas" de Clientes, ya no hay ruta propia. Desde la fase 14 la
+  // fila ya no abre nada: se entra con el lápiz de la columna "Acciones".
   await page.goto('/app/clientes?tab=mascotas')
-  await page.getByRole('row', { name: /Rocky/ }).click()
+  await page.getByRole('row', { name: /Rocky/ }).getByLabel('Editar mascota').click()
   await expect(page.getByText(groomerNotes)).toBeVisible()
 })

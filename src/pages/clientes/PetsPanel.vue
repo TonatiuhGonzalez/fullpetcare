@@ -11,7 +11,9 @@ import type { Pet } from '@/services/pets'
 import { matchesPetSearch } from '@/lib/petSearch'
 import { speciesLabel } from '@/lib/petLabels'
 import { useSessionStore } from '@/stores/session'
-import PetDetailDialog from '@/components/PetDetailDialog.vue'
+import PetEditDialog from '@/components/PetEditDialog.vue'
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
+import { isFrontDesk } from '@/lib/roles'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 
 const session = useSessionStore()
@@ -22,14 +24,31 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
-const showDetailDialog = ref(false)
-const selectedPetId = ref<string | null>(null)
+const editingPetId = ref<string | null>(null)
+const showEditDialog = ref(false)
+const petToDelete = ref<Pet | null>(null)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
-const headers = [
-  { title: 'Nombre', key: 'name' },
-  { title: 'Especie', key: 'speciesName' },
-  { title: 'Dueño', key: 'ownerName' },
-]
+// Headers en negritas; acciones solo para dueño y recepción.
+const headerProps = { class: 'font-weight-bold' }
+const headers = computed(() => [
+  { title: 'Nombre', key: 'name', headerProps },
+  { title: 'Especie', key: 'speciesName', headerProps },
+  { title: 'Dueño', key: 'ownerName', headerProps },
+  ...(isFrontDesk(session.role)
+    ? [
+        {
+          title: 'Acciones',
+          key: 'actions',
+          sortable: false,
+          align: 'center' as const,
+          width: 140,
+          headerProps,
+        },
+      ]
+    : []),
+])
 
 const rows = computed(() =>
   pets.value
@@ -70,9 +89,30 @@ function openNewPet(): void {
 }
 defineExpose({ openNewPet })
 
-function handleRowClick(_event: Event, { item }: { item: Pet }): void {
-  selectedPetId.value = item.id
-  showDetailDialog.value = true
+function openEditPet(pet: Pet): void {
+  editingPetId.value = pet.id
+  showEditDialog.value = true
+}
+
+function askDelete(pet: Pet): void {
+  petToDelete.value = pet
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!petToDelete.value) return
+  deleting.value = true
+  errorMessage.value = null
+  try {
+    await petsService.softDelete(petToDelete.value.id)
+    showDeleteConfirm.value = false
+    await load()
+  } catch {
+    showDeleteConfirm.value = false
+    errorMessage.value = 'No se pudo eliminar la mascota. Revisa tu conexión.'
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -106,18 +146,42 @@ function handleRowClick(_event: Event, { item }: { item: Pet }): void {
       :loading="loading"
       no-data-text="No hay mascotas que coincidan con la búsqueda."
       loading-text="Cargando mascotas…"
-      @click:row="handleRowClick"
     >
       <template #[`item.name`]="{ item }">
         <span class="font-weight-medium">{{ item.name }}</span>
       </template>
+      <template #[`item.actions`]="{ item }">
+        <v-btn
+          icon="mdi-pencil"
+          color="primary"
+          variant="text"
+          size="small"
+          aria-label="Editar mascota"
+          @click="openEditPet(item)"
+        />
+        <v-btn
+          icon="mdi-delete"
+          color="error"
+          variant="text"
+          size="small"
+          aria-label="Eliminar mascota"
+          @click="askDelete(item)"
+        />
+      </template>
     </v-data-table>
 
-    <PetDetailDialog v-model="showDetailDialog" :pet-id="selectedPetId" @changed="load" />
     <PetFormDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"
       @saved="load"
+    />
+    <PetEditDialog v-model="showEditDialog" :pet-id="editingPetId" @saved="load" />
+    <ConfirmDeleteDialog
+      v-model="showDeleteConfirm"
+      title="Eliminar mascota"
+      :message="`¿Seguro que quieres eliminar a ${petToDelete?.name ?? ''}? También se eliminarán sus citas programadas. Su expediente y su historial de atenciones se conservan.`"
+      :loading="deleting"
+      @confirm="confirmDelete"
     />
   </div>
 </template>

@@ -1325,3 +1325,111 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   **Revisado sin cambios:** la tarea 11.20 (factura global) agrupa ventas sin factura individual sin mirar el cliente, así
   que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
   solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.
+
+## Fase 14 — Clientes y mascotas: acciones en la tabla y edición directa
+
+**Meta: que en Clientes se edite y se elimine desde la propia tabla, y que el modal de cliente y el de mascota
+sean directamente de edición (sin la vista previa de solo lectura).**
+Cuarta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+
+**Estado: terminada (2026-10-08).** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D19.
+
+### Decisiones (acordadas con el usuario el 2026-10-08)
+
+| #   | Decisión                  | Propuesta                                                                                                                   |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Tablas                    | Headers en negritas (clientes y mascotas), siguen ordenables. Nueva columna "Acciones" con editar y eliminar (`mdi-pencil`, `mdi-delete`, con tooltip). |
+| 2   | Fila                      | Ya no abre nada al presionarla; editar solo por el ícono.                                                                   |
+| 3   | Quién ve las acciones     | Solo dueño y recepción.                                                                                                     |
+| 4   | Eliminar cliente          | Borrado suave con diálogo de confirmación. Sus mascotas y sus citas **programadas** se eliminan (borrado suave) con él.        |
+| 5   | Eliminar mascota          | Borrado suave con confirmación. Sus citas **programadas** se eliminan. **El expediente (clínico, estética, vacunas) no se borra** (§8.5).  |
+| 6   | Modal de cliente          | Reemplaza `CustomerDetailDialog` y `CustomerFormDialog` (también para dar de alta). Título = nombre completo. Orden: Mascotas (tarjetas como hoy, con alta directa), Nombre, Apellido, Teléfono, Correo, Notas, Requiere factura (con sus datos fiscales). |
+| 7   | Modal de mascota          | Edición directa, sin vista previa. Foto centrada (al presionarla se cambia); línea Nombre · raza · género · ícono de esterilización (verde = sí, amarillo = no, **ícono provisional**); Nacimiento; Peso (último registrado, solo lectura); Preferencia de corte (`grooming_notes`); Cartilla de vacunación; Historial de peso (la gráfica actual); Compartir con el cliente (`ShareLinkManager`). Especie y dueño también se muestran. Lo que hoy hay en el modal (próximas citas, línea de tiempo, alertas médicas) se mantiene debajo. |
+| 8   | Cartilla                  | Tabla de las vacunas del catálogo `vaccines` (por especie) con vacuna, fecha de aplicación, próxima dosis y lote. Se registra con el `VaccinationDialog` actual. El groomer la sigue viendo como hoy. |
+| 9   | Componentes sin uso       | Se dejan (no se borran).                                                                                                    |
+
+**Citas en la cascada (decidido el 2026-10-08):** solo se eliminan las **programadas** (`scheduled`). Las que están
+en curso, completadas, canceladas o no asistidas se conservan como historia, igual que las ventas cobradas y el expediente.
+
+### 14A. Preparación
+
+- [ ] **14.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D19, 
+  _Verificar:_ el usuario aprobó por escrito; D19 sin "pendiente de aprobación".
+
+### 14B. Base de datos
+
+- [x] **14.2** 🧪 RPC `delete_customer()` y `delete_pet()` (`SECURITY DEFINER`, revalidan membresía y rol dueño o
+  recepción) que hacen el borrado suave en cascada en una sola transacción. _Verificar:_ test de base: cascada,
+  expediente intacto, groomer/vet y otro tenant rechazados, y una venta cobrada no cambia.
+  (Ojo con la trampa de §7.2: el SELECT de estas tablas no debe filtrar `deleted_at`, o el UPDATE falla.)
+  **Hecho 2026-10-08:** migración `20261012120000_delete_customer_pet.sql` con `delete_pet()` y `delete_customer()`
+  (`SECURITY DEFINER`, revalidan membresía y rol; `EXECUTE` solo para `authenticated`). La cascada oculta citas
+  `scheduled` del cliente (de cualquier sucursal) y de sus mascotas; no toca citas en otro estado, ventas ni expediente.
+  16 tests nuevos en `delete-customer-pet-rpc.spec.ts` (estados de cita, otra mascota del mismo cliente, expediente
+  intacto, groomer, vet, otro negocio, inexistente, ya eliminado, anónimo). `database.ts` regenerado; `lint` en
+  verde. No hay test de que una venta cobrada quede intacta: la cascada no la
+  toca ni la lee. **No cubierto:** el service y la interfaz que las llaman (14.3).
+
+### 14C. Interfaz
+
+- [x] **14.3** Tablas de clientes y mascotas: headers en negritas, columna de acciones (solo dueño y recepción),
+  diálogo de confirmación al eliminar, fila sin clic. _Verificar:_ en navegador como dueño, recepción, groomer y vet.
+  **Hecho 2026-10-08:** headers en negritas (`headerProps`, siguen ordenables) y columna "Acciones" con
+  `mdi-pencil` y `mdi-delete`, solo si `isFrontDesk(session.role)`, en `CustomersPage.vue` y `PetsPanel.vue`. La fila
+  ya no abre nada. Componente nuevo `ConfirmDeleteDialog.vue` (un solo diálogo para las dos tablas). `softDelete` de
+  `customers.ts` y `pets.ts` ahora llama a las RPC `delete_customer` / `delete_pet` (misma firma, así que los tests de
+  servicio existentes la cubren: 9 en verde). **Provisional hasta la 14.4 y 14.5:** el lápiz abre los formularios de
+  edición que ya existían (`CustomerFormDialog`, `PetFormDialog`), no los modales nuevos. `vue-tsc -b`, `lint` y 423
+  tests unitarios en verde. **No cubierto:** no lo vi en navegador (ni como dueño, recepción, groomer o vet); no hay test
+  automático de las páginas (§9).
+- [x] **14.4** Modal de cliente de edición directa (reemplaza detalle y formulario; mascotas en tarjetas con alta
+  directa; datos fiscales). _Verificar:_ crear, editar, y la validación fiscal de `lib/validation.ts` sigue funcionando.
+  **Hecho 2026-10-08:** componente nuevo `CustomerEditDialog.vue`, directo a la edición: título con el nombre del
+  cliente, Mascotas (tarjetas como antes, "Nueva mascota" con `PetFormDialog`, y al presionar una abre el
+  `PetDetailDialog` actual), Nombre, Apellido, Teléfono, Correo, Notas y "Requiere factura" con RFC, razón social,
+  régimen, uso de CFDI y CP. Sirve para editar y para dar de alta; la tabla ya no usa `CustomerFormDialog` ni
+  `CustomerDetailDialog`. Lógica pura nueva `lib/customerForm.ts` (`buildCustomerPayload`, 3 tests: con factura, sin
+  factura descarta lo fiscal, textos vacíos a NULL). `vue-tsc -b`, `lint` y 426 tests unitarios en verde. **Verificado**
+  en el navegador (Playwright, como dueño, contra Supabase local): headers en 700, la fila no abre nada, editar abre el
+  modal con las 2 mascotas de Sofía, cambiar el teléfono y marcar factura guarda, alta sin nombre avisa, alta con nombre
+  y apellido aparece en la tabla, y eliminar con confirmación lo quita. **Decisiones mías que conviene revisar:**
+  (1) en **alta** no se muestra la sección Mascotas (cada mascota necesita el id del dueño, que aún no existe): se
+  agregan al volver a abrir al cliente; (2) `CustomerFormDialog` **no se reemplazó**: el punto de venta lo sigue usando
+  para pedir datos de factura (fase 13); (3) al marcar "Requiere factura" no se exigen los datos fiscales (igual que el
+  formulario anterior; solo se exigen en el punto de venta). **No cubierto:** probado solo como dueño (no como
+  recepción, groomer o vet); no hay test automático de la página (§9); la alta de mascota desde el modal no se
+  ejercitó en navegador.
+
+- [x] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,
+  último peso, cartilla en tabla, gráfica de peso, compartir). _Verificar:_ crear, editar, cambiar foto, registrar
+  vacuna; test unitario de la función pura que arme las filas de la cartilla.
+  **Hecho 2026-10-08:** componente nuevo `PetEditDialog.vue`, directo a la edición: foto centrada (al presionarla se
+  elige otra y se sube al guardar), línea Nombre · Raza · Sexo · ícono de esterilización (verde = sí, amarillo = no;
+  `mdi-medical-bag` **provisional**, `sterilizationIndicator` en `lib/petLabels.ts`), Especie y Dueño, Nacimiento,
+  Peso (el último, solo lectura), Preferencia de corte, Alertas médicas, cartilla en tabla (Vacuna, Fecha de
+  aplicación, Próxima dosis, Lote; una fila por vacuna del catálogo de su especie con su aplicación más reciente,
+  `buildVaccineTableRows` en `lib/vaccination.ts`), la gráfica de peso, Compartir con el cliente y, debajo, próximas
+  citas e historial. "Registrar vacuna" abre el `VaccinationDialog` de siempre. La tabla de mascotas (lápiz) y las
+  tarjetas del modal de cliente abren este modal; `PetDetailDialog` se deja porque la agenda lo sigue usando.
+  `vue-tsc -b`, `lint` y 432 tests unitarios en verde (9 nuevos). **Verificado** en el navegador (Playwright, contra
+  Supabase local): como dueño, el modal carga las 3 vacunas de Rocky, su dueño y 29.2 kg; cambiar raza, preferencia de
+  corte y esterilización guarda y persiste al reabrir; elegir una foto la previsualiza y cancelar la descarta; "Registrar
+  vacuna" abre el diálogo. Como recepción: ve Guardar, ve Compartir y no ve "Registrar vacuna". **Decisiones mías que
+  conviene revisar:** (1) un solo botón "Registrar vacuna" sobre la tabla (no uno por fila): el diálogo actual no
+  recibe una vacuna preelegida; (2) solo dueño y veterinario pueden registrar vacunas (así lo dice la base), así que
+  recepción no ve el botón; (3) se conservan "Alertas médicas" (campo del formulario anterior) debajo de Preferencia de
+  corte; (4) el alta de mascota sigue en `PetFormDialog`, no en este modal. **No cubierto:** **subir la foto no se pudo
+  probar**: en el Storage local el `upsert` falla con error 42P10 (`ON CONFLICT` sin índice único que coincida); es la
+  misma llamada que ya usaban `PetFormDialog` y los documentos de empleados, parece un desajuste de versiones del
+  ambiente local y no del código, pero queda por confirmar en staging. Groomer y vet no llegan a esta pantalla
+  (`/clientes` es solo de recepción y dueño), así que sus campos bloqueados no se ejercitan aquí; no hay test
+  automático del componente (§9); el registro de una vacuna hasta guardar no se probó en navegador.
+
+### 14D. Cierre
+
+- [x] **14.6** 📚 Actualizar `CLAUDE.md` (§1 y lo que describa Clientes) y marcar la fase terminada.
+  _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-08:** `CLAUDE.md` §1 marca la fase 14 como construida y §6.2 documenta la pantalla Clientes (acciones,
+  modales de edición directa, qué componentes viejos se conservan y por qué) y el borrado en cascada por RPC.
+  `PLAN.md` D19 pasa a aprobada. **Pendiente al cerrar:** probar la subida de foto de la mascota en staging (falla en el
+  Storage local, ver 14.5) y abrir el PR hacia `develop`.

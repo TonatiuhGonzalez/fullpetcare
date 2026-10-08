@@ -663,6 +663,31 @@ revisa pieza por pieza.
 
 **Pendientes:** ninguno.
 
+### D19 — Clientes y mascotas: acciones en la tabla y modales de edición directa
+
+**Estado:** aprobada (2026-10-08).
+
+**1. Acciones en la tabla.** Columna "Acciones" con editar y eliminar, solo para dueño y recepción. La fila deja de
+ser clicable. Headers en negritas.
+
+**2. Eliminar es borrado suave en cascada.** Cliente: sus mascotas y sus citas **programadas**. Mascota: sus citas **programadas** (las demás se conservan como historia; decidido el 2026-10-08). El expediente nunca se
+borra (§8.5) y las ventas cobradas no se tocan. La cascada vive en una RPC `SECURITY DEFINER` (una sola transacción,
+revalida membresía y rol, §7.3.4), no en varias llamadas desde el navegador: si una falla a la mitad, no queda un
+cliente borrado con sus mascotas vivas. **Alternativa descartada:** encadenar los `softDelete` de los services desde el
+frontend (no es atómico). **Costo aceptado:** una migración y una RPC nuevas.
+
+**3. Modales de edición directa.** El de cliente reemplaza al detalle y al formulario; el de mascota pierde la vista
+previa. Los componentes que queden sin uso no se borran (decisión del usuario).
+
+**4. Cartilla como tabla.** Se arma con el catálogo `vaccines` filtrado por especie; el registro sigue en
+`VaccinationDialog`. La tabla es una función pura en `lib/` (§4).
+
+**5. Sin dependencias nuevas** (§3).
+
+**Pendientes:** el ícono definitivo de esterilización (se usa uno provisional, verde/amarillo).
+
+---
+
 ---
 
 ## Parte 4 — Riesgos conocidos

@@ -30,7 +30,8 @@ sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de prod
 **facturación (CFDI con un PAC)**, y, por evaluar, recordatorios por WhatsApp, reserva en
 línea, paquetes/membresías, pagos reales, comisiones por empleado, importador de
 clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5). **Ya construido
-(fase 13): la venta de mostrador como punto de venta** (§6.5).
+(fase 13): la venta de mostrador como punto de venta** (§6.5). **Ya construido
+(fase 14): acciones y edición directa en Clientes** (§6.2).
 
 Reglas de esta etapa:
 
@@ -336,6 +337,17 @@ condición en un `v-if`.
 
 `weight_grams` es entero (12 400 = 12.4 kg). Misma razón que el dinero: nada de
 flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
+
+- **Pantalla Clientes (fase 14, PLAN.md D19):** las tablas de clientes y de mascotas (`/app/clientes`, solo
+  dueño y recepción) ya no abren nada al presionar la fila: la columna "Acciones" trae editar y eliminar. Editar abre
+  un modal **directo a la edición** (`CustomerEditDialog.vue`: mascotas en tarjetas, datos y datos fiscales;
+  `PetEditDialog.vue`: foto cambiable, datos, último peso, cartilla en tabla con las vacunas del catálogo de su
+  especie, gráfica de peso y link para compartir). `CustomerFormDialog` sigue existiendo para el punto de venta
+  (§6.5) y `PetDetailDialog` para la agenda.
+- **Eliminar es borrado suave en cascada, en la base:** las RPC `delete_customer()` y `delete_pet()` (`SECURITY
+  DEFINER`, revalidan membresía y rol dueño o recepción) ocultan al cliente, a sus mascotas y **solo sus citas
+  `scheduled`**. Las demás citas, las ventas y el expediente no se tocan (§8.5). Se llaman desde `softDelete()` de
+  `services/customers.ts` y `services/pets.ts`, no con un UPDATE suelto desde el navegador (no sería atómico).
 
 ### 6.3 Catálogo y agenda
 
