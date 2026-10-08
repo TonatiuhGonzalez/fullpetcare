@@ -12,7 +12,7 @@ import { useRoute, useRouter } from 'vue-router'
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
-import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetsPanel from './PetsPanel.vue'
@@ -36,7 +36,7 @@ const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
 const petsPanel = ref<InstanceType<typeof PetsPanel> | null>(null)
-const editingCustomer = ref<Customer | null>(null)
+const editingCustomerId = ref<string | null>(null)
 const customerToDelete = ref<Customer | null>(null)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
@@ -94,12 +94,12 @@ watch(searchTerm, load)
 onMounted(load)
 
 function openNewCustomer(): void {
-  editingCustomer.value = null
+  editingCustomerId.value = null
   showFormDialog.value = true
 }
 
 function openEditCustomer(customer: Customer): void {
-  editingCustomer.value = customer
+  editingCustomerId.value = customer.id
   showFormDialog.value = true
 }
 
@@ -216,10 +216,10 @@ function handleSaved(): void {
       </v-data-table>
     </template>
 
-    <CustomerFormDialog
+    <CustomerEditDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"
-      :customer="editingCustomer"
+      :customer-id="editingCustomerId"
       @saved="handleSaved"
     />
     <ConfirmDeleteDialog

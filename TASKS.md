@@ -1382,8 +1382,24 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
   edición que ya existían (`CustomerFormDialog`, `PetFormDialog`), no los modales nuevos. `vue-tsc -b`, `lint` y 423
   tests unitarios en verde. **No cubierto:** no lo vi en navegador (ni como dueño, recepción, groomer o vet); no hay test
   automático de las páginas (§9).
-- [ ] **14.4** Modal de cliente de edición directa (reemplaza detalle y formulario; mascotas en tarjetas con alta
+- [x] **14.4** Modal de cliente de edición directa (reemplaza detalle y formulario; mascotas en tarjetas con alta
   directa; datos fiscales). _Verificar:_ crear, editar, y la validación fiscal de `lib/validation.ts` sigue funcionando.
+  **Hecho 2026-10-08:** componente nuevo `CustomerEditDialog.vue`, directo a la edición: título con el nombre del
+  cliente, Mascotas (tarjetas como antes, "Nueva mascota" con `PetFormDialog`, y al presionar una abre el
+  `PetDetailDialog` actual), Nombre, Apellido, Teléfono, Correo, Notas y "Requiere factura" con RFC, razón social,
+  régimen, uso de CFDI y CP. Sirve para editar y para dar de alta; la tabla ya no usa `CustomerFormDialog` ni
+  `CustomerDetailDialog`. Lógica pura nueva `lib/customerForm.ts` (`buildCustomerPayload`, 3 tests: con factura, sin
+  factura descarta lo fiscal, textos vacíos a NULL). `vue-tsc -b`, `lint` y 426 tests unitarios en verde. **Verificado**
+  en el navegador (Playwright, como dueño, contra Supabase local): headers en 700, la fila no abre nada, editar abre el
+  modal con las 2 mascotas de Sofía, cambiar el teléfono y marcar factura guarda, alta sin nombre avisa, alta con nombre
+  y apellido aparece en la tabla, y eliminar con confirmación lo quita. **Decisiones mías que conviene revisar:**
+  (1) en **alta** no se muestra la sección Mascotas (cada mascota necesita el id del dueño, que aún no existe): se
+  agregan al volver a abrir al cliente; (2) `CustomerFormDialog` **no se reemplazó**: el punto de venta lo sigue usando
+  para pedir datos de factura (fase 13); (3) al marcar "Requiere factura" no se exigen los datos fiscales (igual que el
+  formulario anterior; solo se exigen en el punto de venta). **No cubierto:** probado solo como dueño (no como
+  recepción, groomer o vet); no hay test automático de la página (§9); la alta de mascota desde el modal no se
+  ejercitó en navegador.
+
 - [ ] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,
   último peso, cartilla en tabla, gráfica de peso, compartir). _Verificar:_ crear, editar, cambiar foto, registrar
   vacuna; test unitario de la función pura que arme las filas de la cartilla.
