@@ -1372,8 +1372,16 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
 
 ### 14C. Interfaz
 
-- [ ] **14.3** Tablas de clientes y mascotas: headers en negritas, columna de acciones (solo dueño y recepción),
+- [x] **14.3** Tablas de clientes y mascotas: headers en negritas, columna de acciones (solo dueño y recepción),
   diálogo de confirmación al eliminar, fila sin clic. _Verificar:_ en navegador como dueño, recepción, groomer y vet.
+  **Hecho 2026-10-08:** headers en negritas (`headerProps`, siguen ordenables) y columna "Acciones" con
+  `mdi-pencil` y `mdi-delete`, solo si `isFrontDesk(session.role)`, en `CustomersPage.vue` y `PetsPanel.vue`. La fila
+  ya no abre nada. Componente nuevo `ConfirmDeleteDialog.vue` (un solo diálogo para las dos tablas). `softDelete` de
+  `customers.ts` y `pets.ts` ahora llama a las RPC `delete_customer` / `delete_pet` (misma firma, así que los tests de
+  servicio existentes la cubren: 9 en verde). **Provisional hasta la 14.4 y 14.5:** el lápiz abre los formularios de
+  edición que ya existían (`CustomerFormDialog`, `PetFormDialog`), no los modales nuevos. `vue-tsc -b`, `lint` y 423
+  tests unitarios en verde. **No cubierto:** no lo vi en navegador (ni como dueño, recepción, groomer o vet); no hay test
+  automático de las páginas (§9).
 - [ ] **14.4** Modal de cliente de edición directa (reemplaza detalle y formulario; mascotas en tarjetas con alta
   directa; datos fiscales). _Verificar:_ crear, editar, y la validación fiscal de `lib/validation.ts` sigue funcionando.
 - [ ] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,

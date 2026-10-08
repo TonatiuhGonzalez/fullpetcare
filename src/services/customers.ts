@@ -95,14 +95,13 @@ export async function update(id: string, changes: CustomerUpdate): Promise<Custo
 }
 
 /**
- * Borrado suave (CLAUDE.md §8.5): un UPDATE de `deleted_at`, nunca un
- * DELETE — la tabla no tiene política de DELETE, Postgres lo rechazaría.
+ * Borrado suave en cascada (CLAUDE.md §8.5, fase 14): la RPC `delete_customer`
+ * oculta al cliente, a sus mascotas y a sus citas PROGRAMADAS en una sola
+ * transacción. Las demás citas, las ventas y el expediente no se tocan. La
+ * tabla no tiene política de DELETE, y un UPDATE suelto no cubriría la cascada.
  */
 export async function softDelete(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('customers')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id)
+  const { error } = await supabase.rpc('delete_customer', { p_customer_id: id })
 
   if (error) throw error
 }

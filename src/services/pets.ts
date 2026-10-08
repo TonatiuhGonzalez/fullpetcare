@@ -25,7 +25,10 @@ export async function list(tenantId: string): Promise<Pet[]> {
  * Las mascotas de un cliente en particular — lo que necesita la ficha
  * del cliente (tarea 2.18).
  */
-export async function listByCustomer(tenantId: string, customerId: string): Promise<Pet[]> {
+export async function listByCustomer(
+  tenantId: string,
+  customerId: string,
+): Promise<Pet[]> {
   const { data, error } = await supabase
     .from('pets')
     .select('*')
@@ -70,9 +73,12 @@ export async function update(id: string, changes: PetUpdate): Promise<Pet> {
   return data
 }
 
-/** Borrado suave (CLAUDE.md §8.5): un UPDATE de deleted_at, nunca un DELETE. */
+/**
+ * Borrado suave (CLAUDE.md §8.5, fase 14): la RPC `delete_pet` oculta la mascota
+ * y sus citas PROGRAMADAS en una sola transacción. El expediente no se toca.
+ */
 export async function softDelete(id: string): Promise<void> {
-  const { error } = await supabase.from('pets').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  const { error } = await supabase.rpc('delete_pet', { p_pet_id: id })
 
   if (error) throw error
 }
