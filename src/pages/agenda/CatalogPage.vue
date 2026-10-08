@@ -187,7 +187,7 @@ function handleSaved(): void {
         <tr>
           <th
             v-for="column in columns"
-            :key="column.key"
+            :key="column.key ?? column.title"
             class="font-weight-bold text-center"
           >
             {{ column.title }}
