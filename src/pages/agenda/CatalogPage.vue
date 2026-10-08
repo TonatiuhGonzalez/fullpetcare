@@ -51,7 +51,7 @@ const headers = computed(() => [
           key: 'actions',
           sortable: false,
           align: 'center' as const,
-          width: 140,
+          width: 180,
           cellProps: { class: 'service-actions' },
         },
       ]
@@ -127,6 +127,32 @@ async function handleToggleActive(
     errorMessage.value = `No se pudo ${isActive ? 'activar' : 'desactivar'} el servicio. Revisa tu conexión.`
   } finally {
     togglingIds.value.delete(service.id)
+  }
+}
+
+// Eliminación (borrado suave) con confirmación. Solo el dueño ve el botón.
+const serviceToDelete = ref<Service | null>(null)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+
+function askDelete(service: Service): void {
+  serviceToDelete.value = service
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!serviceToDelete.value) return
+  deleting.value = true
+  errorMessage.value = null
+  try {
+    await servicesService.remove(serviceToDelete.value.id)
+    showDeleteConfirm.value = false
+    await load()
+  } catch {
+    showDeleteConfirm.value = false
+    errorMessage.value = 'No se pudo eliminar el servicio. Revisa tu conexión.'
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -212,6 +238,14 @@ function handleSaved(): void {
             size="small"
             @click="openEditService(item)"
           />
+          <v-btn
+            icon="mdi-delete"
+            color="error"
+            variant="text"
+            size="small"
+            aria-label="Eliminar servicio"
+            @click="askDelete(item)"
+          />
           <v-switch
             class="service-switch"
             :model-value="item.is_active"
@@ -226,6 +260,25 @@ function handleSaved(): void {
         </div>
       </template>
     </v-data-table>
+
+    <v-dialog v-model="showDeleteConfirm" max-width="420">
+      <v-card>
+        <v-card-title>Eliminar servicio</v-card-title>
+        <v-card-text>
+          ¿Seguro que quieres eliminar «{{ serviceToDelete?.name }}»? Dejará de verse en
+          el catálogo. Las citas y ventas donde ya se usó conservan su historial.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="deleting" @click="showDeleteConfirm = false">
+            Cancelar
+          </v-btn>
+          <v-btn color="error" :loading="deleting" @click="confirmDelete"
+            >Confirmar</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <ServiceFormDialog
       v-model="showFormDialog"

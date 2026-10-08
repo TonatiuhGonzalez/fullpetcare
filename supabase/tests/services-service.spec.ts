@@ -211,4 +211,127 @@ describe('services/services.ts contra Supabase local', () => {
       }),
     ).rejects.toMatchObject({ code: '23514' })
   })
+
+  it('remove() oculta el servicio del catálogo pero la fila sigue existiendo', async () => {
+    // Borrado suave (CLAUDE.md §8.5): si remove() borrara la fila de verdad, las
+    // citas y ventas que usaron el servicio perderían su vínculo (o la base
+    // rechazaría el borrado). Aquí verificamos que solo se marca deleted_at.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const created = await servicesService.create({
+      tenant_id: TENANT_PATITAS,
+      kind: 'grooming',
+      name: 'Servicio a eliminar',
+      duration_minutes: 30,
+      price_cents: 12000,
+      tax_rate_bp: 1600,
+    })
+    createdIds.push(created.id)
+
+    await servicesService.remove(created.id)
+
+    const list = await servicesService.listByKind(TENANT_PATITAS, 'grooming')
+    expect(list.some((s) => s.id === created.id)).toBe(false)
+    const { data } = await supabase
+      .from('services')
+      .select('deleted_at')
+      .eq('id', created.id)
+    expect(data?.[0]?.deleted_at).not.toBeNull()
+  })
+
+  it('recepción NO puede eliminar un servicio', async () => {
+    // Eliminar es configuración del negocio, solo owner: sin esto, cualquier
+    // recepcionista podría vaciar el catálogo llamando a la API directo. RLS
+    // responde con 0 filas afectadas, así que el servicio debe seguir visible.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: RECEPCION_EMAIL,
+      password: RECEPCION_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const before = await servicesService.listByKind(TENANT_PATITAS, 'grooming')
+    const target = before.find((s) => s.name === 'Baño')
+    if (!target) throw new Error('falta el servicio Baño de la semilla')
+
+    await servicesService.remove(target.id)
+
+    const after = await servicesService.listByKind(TENANT_PATITAS, 'grooming')
+    expect(after.some((s) => s.id === target.id)).toBe(true)
+  })
+
+  it('findDeletedByName encuentra el eliminado sin importar mayúsculas, solo del mismo tipo', async () => {
+    // Es lo que dispara el aviso "ya existía". Si distinguiera mayúsculas, "baño"
+    // crearía un duplicado; si ignorara el tipo, reactivaría uno de otra categoría.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const created = await servicesService.create({
+      tenant_id: TENANT_PATITAS,
+      kind: 'grooming',
+      name: 'Spa de prueba',
+      duration_minutes: 30,
+      price_cents: 12000,
+      tax_rate_bp: 1600,
+    })
+    createdIds.push(created.id)
+    await servicesService.remove(created.id)
+
+    const found = await servicesService.findDeletedByName(
+      TENANT_PATITAS,
+      'grooming',
+      '  SPA DE PRUEBA ',
+    )
+    expect(found?.id).toBe(created.id)
+    expect(
+      await servicesService.findDeletedByName(
+        TENANT_PATITAS,
+        'veterinary',
+        'Spa de prueba',
+      ),
+    ).toBeNull()
+    // Los comodines de ilike no deben coincidir con cualquier cosa.
+    expect(
+      await servicesService.findDeletedByName(TENANT_PATITAS, 'grooming', '%'),
+    ).toBeNull()
+  })
+
+  it('restore() reactiva el eliminado con los datos nuevos y el mismo id', async () => {
+    // Reusar el mismo id mantiene ligado el historial. Si en vez de eso se creara
+    // una fila nueva, habría dos servicios con el mismo nombre.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const created = await servicesService.create({
+      tenant_id: TENANT_PATITAS,
+      kind: 'grooming',
+      name: 'Servicio a reactivar',
+      duration_minutes: 30,
+      price_cents: 12000,
+      tax_rate_bp: 1600,
+    })
+    createdIds.push(created.id)
+    await servicesService.remove(created.id)
+
+    const restored = await servicesService.restore(created.id, {
+      duration_minutes: 50,
+      price_cents: 20000,
+    })
+
+    expect(restored.id).toBe(created.id)
+    expect(restored.deleted_at).toBeNull()
+    expect(restored.is_active).toBe(true)
+    expect(restored.price_cents).toBe(20000)
+    const list = await servicesService.listByKind(TENANT_PATITAS, 'grooming')
+    expect(list.some((s) => s.id === created.id)).toBe(true)
+  })
 })
