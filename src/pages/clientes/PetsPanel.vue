@@ -11,6 +11,7 @@ import type { Pet } from '@/services/pets'
 import { matchesPetSearch } from '@/lib/petSearch'
 import { speciesLabel } from '@/lib/petLabels'
 import { useSessionStore } from '@/stores/session'
+import PetEditDialog from '@/components/PetEditDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetFormDialog from '@/components/PetFormDialog.vue'
@@ -23,7 +24,8 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
-const editingPet = ref<Pet | null>(null)
+const editingPetId = ref<string | null>(null)
+const showEditDialog = ref(false)
 const petToDelete = ref<Pet | null>(null)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
@@ -83,14 +85,13 @@ onMounted(load)
 // El botón "Nueva mascota" vive en el encabezado de la página (junto al
 // de "Nuevo cliente"), así que la página lo dispara a través de este método.
 function openNewPet(): void {
-  editingPet.value = null
   showFormDialog.value = true
 }
 defineExpose({ openNewPet })
 
 function openEditPet(pet: Pet): void {
-  editingPet.value = pet
-  showFormDialog.value = true
+  editingPetId.value = pet.id
+  showEditDialog.value = true
 }
 
 function askDelete(pet: Pet): void {
@@ -172,9 +173,9 @@ async function confirmDelete(): Promise<void> {
     <PetFormDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"
-      :pet="editingPet"
       @saved="load"
     />
+    <PetEditDialog v-model="showEditDialog" :pet-id="editingPetId" @saved="load" />
     <ConfirmDeleteDialog
       v-model="showDeleteConfirm"
       title="Eliminar mascota"

@@ -17,7 +17,7 @@ import { buildCustomerPayload } from '@/lib/customerForm'
 import { speciesLabel } from '@/lib/petLabels'
 import { isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
 import PetFormDialog from '@/components/PetFormDialog.vue'
-import PetDetailDialog from '@/components/PetDetailDialog.vue'
+import PetEditDialog from '@/components/PetEditDialog.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -300,10 +300,10 @@ async function handlePetSaved(): Promise<void> {
       :customer-id="customerId"
       @saved="handlePetSaved"
     />
-    <PetDetailDialog
+    <PetEditDialog
       v-model="showPetDialog"
       :pet-id="selectedPetId"
-      @changed="handlePetSaved"
+      @saved="handlePetSaved"
     />
   </v-dialog>
 </template>

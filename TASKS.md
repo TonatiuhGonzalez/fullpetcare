@@ -1400,9 +1400,30 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
   recepción, groomer o vet); no hay test automático de la página (§9); la alta de mascota desde el modal no se
   ejercitó en navegador.
 
-- [ ] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,
+- [x] **14.5** Modal de mascota de edición directa (foto cambiable, línea de datos con ícono de esterilización,
   último peso, cartilla en tabla, gráfica de peso, compartir). _Verificar:_ crear, editar, cambiar foto, registrar
   vacuna; test unitario de la función pura que arme las filas de la cartilla.
+  **Hecho 2026-10-08:** componente nuevo `PetEditDialog.vue`, directo a la edición: foto centrada (al presionarla se
+  elige otra y se sube al guardar), línea Nombre · Raza · Sexo · ícono de esterilización (verde = sí, amarillo = no;
+  `mdi-medical-bag` **provisional**, `sterilizationIndicator` en `lib/petLabels.ts`), Especie y Dueño, Nacimiento,
+  Peso (el último, solo lectura), Preferencia de corte, Alertas médicas, cartilla en tabla (Vacuna, Fecha de
+  aplicación, Próxima dosis, Lote; una fila por vacuna del catálogo de su especie con su aplicación más reciente,
+  `buildVaccineTableRows` en `lib/vaccination.ts`), la gráfica de peso, Compartir con el cliente y, debajo, próximas
+  citas e historial. "Registrar vacuna" abre el `VaccinationDialog` de siempre. La tabla de mascotas (lápiz) y las
+  tarjetas del modal de cliente abren este modal; `PetDetailDialog` se deja porque la agenda lo sigue usando.
+  `vue-tsc -b`, `lint` y 432 tests unitarios en verde (9 nuevos). **Verificado** en el navegador (Playwright, contra
+  Supabase local): como dueño, el modal carga las 3 vacunas de Rocky, su dueño y 29.2 kg; cambiar raza, preferencia de
+  corte y esterilización guarda y persiste al reabrir; elegir una foto la previsualiza y cancelar la descarta; "Registrar
+  vacuna" abre el diálogo. Como recepción: ve Guardar, ve Compartir y no ve "Registrar vacuna". **Decisiones mías que
+  conviene revisar:** (1) un solo botón "Registrar vacuna" sobre la tabla (no uno por fila): el diálogo actual no
+  recibe una vacuna preelegida; (2) solo dueño y veterinario pueden registrar vacunas (así lo dice la base), así que
+  recepción no ve el botón; (3) se conservan "Alertas médicas" (campo del formulario anterior) debajo de Preferencia de
+  corte; (4) el alta de mascota sigue en `PetFormDialog`, no en este modal. **No cubierto:** **subir la foto no se pudo
+  probar**: en el Storage local el `upsert` falla con error 42P10 (`ON CONFLICT` sin índice único que coincida); es la
+  misma llamada que ya usaban `PetFormDialog` y los documentos de empleados, parece un desajuste de versiones del
+  ambiente local y no del código, pero queda por confirmar en staging. Groomer y vet no llegan a esta pantalla
+  (`/clientes` es solo de recepción y dueño), así que sus campos bloqueados no se ejercitan aquí; no hay test
+  automático del componente (§9); el registro de una vacuna hasta guardar no se probó en navegador.
 
 ### 14D. Cierre
 
