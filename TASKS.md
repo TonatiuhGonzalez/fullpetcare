@@ -1742,3 +1742,28 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 6. **Vista pública del cliente** en un teléfono: foto grande, cartilla con "1 vacuna vencida / por vencer / al día".
 7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
 8. **Superadmin** con la misma identidad.
+
+## Fase 16 — Acceso del cliente: PWA y cuenta propia (propuesta)
+
+**Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta, trabajo a futuro; no se construye hasta
+que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
+
+### 16A. PWA sobre la vista actual
+
+- [ ] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
+  y aprobar `PLAN.md` D21. _Verificar:_ el usuario aprobó por escrito; D21 sin "propuesta".
+- [ ] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
+  nunca de datos de la mascota. _Verificar:_ Lighthouse "instalable"; en el teléfono se agrega a inicio y abre sin barra
+  del navegador; un token revocado sigue sin mostrar nada aun con caché.
+- [ ] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
+  modo avión se ve el aviso, no datos viejos de otra mascota.
+
+### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
+
+- [ ] **16.4** 📚 Elegir alternativa (Edge Function o Auth con RLS), canal del código y regla de vínculo persona↔cliente.
+- [ ] **16.5** 🧪 Backend del acceso con código de un solo uso (caducidad corta, intentos limitados). _Verificar:_ tests de
+  código caducado, reutilizado, de otro cliente y de otro negocio.
+- [ ] **16.6** Pantalla de entrada del cliente y lista de sus mascotas. _Verificar:_ solo ve las suyas; el DTO sigue en
+  lista blanca (§7.4).
+- [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.

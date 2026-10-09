@@ -733,6 +733,43 @@ cambiar la pantalla de entrada hay que actualizar varias redirecciones (router, 
 
 ---
 
+### D21 — Acceso del cliente: PWA instalable y cuenta propia (sin app nativa)
+
+**Estado:** propuesta, pendiente de aprobación (2026-10-08). Trabajo a futuro.
+
+**Problema.** Hoy el cliente consulta a su mascota solo con un link con token (§7.4) que la recepción copia y pega.
+Si lo pierde, hay que generar otro; no hay forma de "entrar" por su cuenta ni de ver todas sus mascotas juntas.
+
+**1. Formato: PWA, no app nativa.** La vista pública ya es web y está pensada para móvil. Una PWA (manifest, ícono y
+service worker) se instala en la pantalla de inicio sin tienda. **Alternativa descartada:** app nativa (cuenta de
+Apple ~99 USD/año y de Google, revisión por versión, dos plataformas o un framework nuevo, y en multi-tenant habría que
+decidir una app para todos o una por negocio). §1 ya deja la app nativa fuera de alcance. **Costo aceptado de la PWA:**
+las notificaciones push en iPhone solo funcionan con la PWA instalada (iOS 16.4 o posterior), y no hay presencia en
+las tiendas.
+
+**2. Fase 16A — PWA sobre la vista actual (bajo riesgo).** Manifest con la identidad de la fase 15, íconos, pantalla
+sin conexión mínima y aviso "Agregar a inicio". **No cambia el acceso:** sigue siendo el link con token. Sin servicio
+externo. Dependencia: ninguna si el service worker se escribe a mano (el caché solo del cascarón de la app, **nunca de
+datos de la mascota**); si se prefiere `vite-plugin-pwa`, es dependencia nueva y se justifica aparte (§3).
+
+**3. Fase 16B — Cuenta del cliente (la parte grande, decidir antes de construir).** Que el cliente entre con su
+teléfono o correo mediante un código de un solo uso y vea todas sus mascotas. Implica:
+- **Rol nuevo "cliente"** con RLS propio y tests de aislamiento (no ve a otros clientes ni notas internas ni montos
+  ajenos). Hoy `anon` no lee nada y todo pasa por la Edge Function (§7.4). **Alternativa A (recomendada):** el cliente
+  sigue sin tocar Postgres; una Edge Function nueva emite una sesión corta y devuelve el mismo DTO de lista blanca.
+  **Alternativa B:** cliente como usuario de Supabase Auth con políticas RLS propias (más superficie de ataque).
+- **Envío del código:** correo (barato, sin costo por mensaje) o SMS/WhatsApp (servicio externo, costo por mensaje).
+  Se justifica con el usuario antes (§3) y se elige canal; el correo es el punto de partida.
+- Vincular persona ↔ cliente: por teléfono o correo ya capturado en `customers`; qué hacer si hay duplicados o el dato
+  no coincide.
+
+**4. Fuera de esta decisión:** push y recordatorios de vacunas (candidato aparte: WhatsApp, §1), pagos en línea y
+reserva en línea.
+
+**Pendientes:** elegir A o B del punto 3, el canal del código, y si el service worker es a mano o con plugin.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
