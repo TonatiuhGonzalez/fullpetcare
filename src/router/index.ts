@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { finishNavigation, startNavigation } from '@/composables/useNavigationProgress'
 import { isFrontDesk } from '@/lib/roles'
 import type { PermissionModule } from '@/lib/permissions'
 import { useSessionStore } from '@/stores/session'
@@ -240,6 +241,20 @@ export const router = createRouter({
       ],
     },
   ],
+})
+
+// Barra de progreso de navegación (PLAN.md D22). Este guard se registra PRIMERO para
+// que la barra arranque antes de cualquier espera (la sesión, la descarga de la
+// pantalla). Se apaga en `afterEach`, que Vue Router llama también cuando la
+// navegación se cancela o se redirige, y en `onError` si falla la descarga.
+router.beforeEach(() => {
+  startNavigation()
+})
+router.afterEach(() => {
+  finishNavigation()
+})
+router.onError(() => {
+  finishNavigation()
 })
 
 // Guard de sesión: corre ANTES de cada navegación, para las tres rutas

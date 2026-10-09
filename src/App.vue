@@ -6,6 +6,7 @@
 import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import NavigationProgress from '@/components/NavigationProgress.vue'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
@@ -29,6 +30,7 @@ watch(
 
 <template>
   <v-app>
+    <NavigationProgress />
     <router-view />
   </v-app>
 </template>
