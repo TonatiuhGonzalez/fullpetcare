@@ -40,6 +40,10 @@ const satUnitRules = [
 ]
 
 const saving = ref(false)
+// Servicio eliminado con el mismo nombre y tipo: si existe, antes de guardar se
+// pide confirmar que se reactiva en lugar de crear uno nuevo.
+const deletedMatch = ref<Service | null>(null)
+const showRestoreConfirm = ref(false)
 const errorMessage = ref<string | null>(null)
 
 watch(
@@ -56,13 +60,44 @@ watch(
   },
 )
 
+// Confirmó la reactivación: se reutiliza el registro eliminado con lo capturado.
+async function confirmRestore(): Promise<void> {
+  if (!deletedMatch.value || durationMinutes.value == null || priceInPesos.value == null)
+    return
+
+  saving.value = true
+  errorMessage.value = null
+  try {
+    const restored = await servicesService.restore(deletedMatch.value.id, {
+      name: name.value.trim(),
+      duration_minutes: durationMinutes.value,
+      price_cents: pesosToCents(priceInPesos.value),
+      sat_product_code: satProductCode.value.trim(),
+      sat_unit_code: satUnitCode.value.trim().toUpperCase(),
+      tax_rate_bp: 1600,
+    })
+    showRestoreConfirm.value = false
+    emit('saved', restored)
+    close()
+  } catch {
+    showRestoreConfirm.value = false
+    errorMessage.value = 'No se pudo reactivar el servicio. Revisa tu conexión.'
+  } finally {
+    saving.value = false
+  }
+}
+
 function close(): void {
   emit('update:modelValue', false)
 }
 
 async function handleSubmit(): Promise<void> {
   if (durationMinutes.value == null || priceInPesos.value == null) return
-  if (!isValidSatProductCode(satProductCode.value) || !isValidSatUnitCode(satUnitCode.value)) return
+  if (
+    !isValidSatProductCode(satProductCode.value) ||
+    !isValidSatUnitCode(satUnitCode.value)
+  )
+    return
 
   saving.value = true
   errorMessage.value = null
@@ -73,6 +108,19 @@ async function handleSubmit(): Promise<void> {
       price_cents: pesosToCents(priceInPesos.value),
       sat_product_code: satProductCode.value.trim(),
       sat_unit_code: satUnitCode.value.trim().toUpperCase(),
+    }
+
+    if (!props.service) {
+      const existing = await servicesService.findDeletedByName(
+        props.tenantId,
+        props.kind,
+        name.value,
+      )
+      if (existing) {
+        deletedMatch.value = existing
+        showRestoreConfirm.value = true
+        return
+      }
     }
 
     const saved = props.service
@@ -156,7 +204,13 @@ async function handleSubmit(): Promise<void> {
             </v-col>
           </v-row>
 
-          <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-2">
+          <v-alert
+            v-if="errorMessage"
+            type="error"
+            density="compact"
+            variant="tonal"
+            class="mb-2"
+          >
             {{ errorMessage }}
           </v-alert>
         </v-form>
@@ -168,5 +222,24 @@ async function handleSubmit(): Promise<void> {
         <v-btn color="primary" :loading="saving" @click="handleSubmit">Guardar</v-btn>
       </v-card-actions>
     </v-card>
+
+    <v-dialog v-model="showRestoreConfirm" max-width="420">
+      <v-card>
+        <v-card-title>Este servicio ya existía</v-card-title>
+        <v-card-text>
+          Ya hubo un servicio llamado «{{ deletedMatch?.name }}» en esta categoría y fue
+          eliminado. Si continúas, se va a reactivar con los datos que acabas de capturar.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="saving" @click="showRestoreConfirm = false">
+            Cancelar
+          </v-btn>
+          <v-btn color="primary" :loading="saving" @click="confirmRestore"
+            >Reactivar</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>

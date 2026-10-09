@@ -59,6 +59,8 @@ import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import TicketView from '@/components/TicketView.vue'
+import VisitKindChip from '@/components/VisitKindChip.vue'
+import { visitKindInfo } from '@/lib/visitKind'
 
 const props = defineProps<{
   modelValue: boolean
@@ -143,7 +145,6 @@ const customerHasFiscalData = computed(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ver el comentario de arriba.
 const formRef = ref<any>(null)
 
-const kindLabels: Record<string, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 const statusLabels: Record<string, string> = {
   scheduled: 'Agendada',
   in_progress: 'En curso',
@@ -479,7 +480,9 @@ function checkoutErrorMessage(err: unknown): string {
                 <strong>Cliente:</strong> {{ customer?.first_name }} {{ customer?.last_name }}
               </p>
               <p class="mb-1"><strong>Mascota:</strong> {{ pet?.name }}</p>
-              <p class="mb-1"><strong>Tipo:</strong> {{ kindLabels[appointment.kind] }}</p>
+              <p class="mb-1 d-flex align-center ga-2">
+                <strong>Tipo:</strong> <VisitKindChip :kind="appointment.kind" />
+              </p>
               <p class="mb-1">
                 <strong>Empleado:</strong> {{ employeeName(appointment.employee_user_id) }}
               </p>
@@ -505,7 +508,7 @@ function checkoutErrorMessage(err: unknown): string {
               <h2 class="text-h6 mb-1">{{ pet.name }}</h2>
               <p class="text-body-2 text-medium-emphasis mb-4">
                 {{ customer?.first_name }} {{ customer?.last_name }} ·
-                {{ kindLabels[appointment.kind] }}
+                {{ visitKindInfo(appointment.kind).label }}
               </p>
 
               <GroomingRecordForm

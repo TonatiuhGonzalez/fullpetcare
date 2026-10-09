@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AuthPanelLayout from '@/components/AuthPanelLayout.vue'
 import BlockedTenantDialog from '@/components/BlockedTenantDialog.vue'
 import { useSessionStore } from '@/stores/session'
 
@@ -24,10 +25,10 @@ onMounted(() => {
 
 function goHome(): Promise<unknown> {
   // Si el guard del router mandó aquí por intentar entrar a una ruta
-  // privada (?redirect=/app/...), se vuelve a esa. Si no, a /app/agenda
+  // privada (?redirect=/app/...), se vuelve a esa. Si no, a /app/inicio
   // — el guard decide desde ahí si hace falta elegir negocio primero.
   const redirectTo =
-    typeof route.query.redirect === 'string' ? route.query.redirect : '/app/agenda'
+    typeof route.query.redirect === 'string' ? route.query.redirect : '/app/inicio'
   return router.push(redirectTo)
 }
 
@@ -61,13 +62,12 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <template>
-  <v-main class="d-flex align-center justify-center" style="min-height: 100vh">
-    <v-card max-width="420" width="100%" class="pa-6 mx-4" elevation="2">
-      <div class="text-center mb-6">
-        <v-icon icon="mdi-paw" size="40" color="primary" class="mb-2" />
-        <h1 class="text-h5">FullPetCare</h1>
-        <p class="text-body-2 text-medium-emphasis">Inicia sesión para continuar</p>
-      </div>
+  <v-main>
+    <AuthPanelLayout>
+      <h1 class="text-h5 font-weight-bold mb-1">Inicia sesión</h1>
+      <p class="text-body-2 text-medium-emphasis mb-8">
+        Ingresa con tu correo y contraseña.
+      </p>
 
       <v-form @submit.prevent="handleSubmit">
         <v-text-field
@@ -120,7 +120,7 @@ async function handleSubmit(): Promise<void> {
           </router-link>
         </div>
       </v-form>
-    </v-card>
+    </AuthPanelLayout>
 
     <BlockedTenantDialog
       v-model="showBlocked"

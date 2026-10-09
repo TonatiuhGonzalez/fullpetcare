@@ -6,14 +6,17 @@
 // clientes por tenant), traer todo de una vez y paginar en el navegador
 // es simple y suficientemente rápido (CLAUDE.md §11, "simple sobre
 // elegante").
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
-import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
-import CustomerDetailDialog from '@/components/CustomerDetailDialog.vue'
+import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import { isFrontDesk } from '@/lib/roles'
 import PetsPanel from './PetsPanel.vue'
 
 const session = useSessionStore()
@@ -34,15 +37,32 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
-const showDetailDialog = ref(false)
 const petsPanel = ref<InstanceType<typeof PetsPanel> | null>(null)
-const selectedCustomerId = ref<string | null>(null)
+const editingCustomerId = ref<string | null>(null)
+const customerToDelete = ref<Customer | null>(null)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
-const headers = [
-  { title: 'Nombre', key: 'fullName' },
-  { title: 'Teléfono', key: 'phone' },
-  { title: 'Correo', key: 'email' },
-]
+// Headers en negritas (`headerProps`). La columna de acciones solo existe para
+// dueño y recepción (el borrado también lo revalida la base).
+const headerProps = { class: 'font-weight-bold' }
+const headers = computed(() => [
+  { title: 'Nombre', key: 'fullName', headerProps },
+  { title: 'Teléfono', key: 'phone', headerProps },
+  { title: 'Correo', key: 'email', headerProps },
+  ...(isFrontDesk(session.role)
+    ? [
+        {
+          title: 'Acciones',
+          key: 'actions',
+          sortable: false,
+          align: 'center' as const,
+          width: 140,
+          headerProps,
+        },
+      ]
+    : []),
+])
 
 // La tabla necesita "fullName" como columna, pero el servicio devuelve
 // first_name/last_name por separado (así vive en la base) — se arma
@@ -76,12 +96,34 @@ watch(searchTerm, load)
 onMounted(load)
 
 function openNewCustomer(): void {
+  editingCustomerId.value = null
   showFormDialog.value = true
 }
 
-function handleRowClick(_event: Event, { item }: { item: Customer }): void {
-  selectedCustomerId.value = item.id
-  showDetailDialog.value = true
+function openEditCustomer(customer: Customer): void {
+  editingCustomerId.value = customer.id
+  showFormDialog.value = true
+}
+
+function askDelete(customer: Customer): void {
+  customerToDelete.value = customer
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!customerToDelete.value) return
+  deleting.value = true
+  errorMessage.value = null
+  try {
+    await customersService.softDelete(customerToDelete.value.id)
+    showDeleteConfirm.value = false
+    await load()
+  } catch {
+    showDeleteConfirm.value = false
+    errorMessage.value = 'No se pudo eliminar el cliente. Revisa tu conexión.'
+  } finally {
+    deleting.value = false
+  }
 }
 
 function handleSaved(): void {
@@ -91,26 +133,26 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Clientes</h1>
-      <v-spacer />
-      <v-btn
-        v-if="tab === 'clientes'"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewCustomer"
-      >
-        Nuevo cliente
-      </v-btn>
-      <v-btn
-        v-else
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="petsPanel?.openNewPet()"
-      >
-        Nueva mascota
-      </v-btn>
-    </div>
+    <PageHeader title="Clientes">
+      <template #actions>
+        <v-btn
+          v-if="tab === 'clientes'"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewCustomer"
+        >
+          Nuevo cliente
+        </v-btn>
+        <v-btn
+          v-else
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="petsPanel?.openNewPet()"
+        >
+          Nueva mascota
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-tabs v-model="tab" class="mb-4">
       <v-tab value="clientes">Clientes</v-tab>
@@ -145,10 +187,21 @@ function handleSaved(): void {
         :headers="headers"
         :items="rows"
         :loading="loading"
-        no-data-text="No hay clientes que coincidan con la búsqueda."
         loading-text="Cargando clientes…"
-        @click:row="handleRowClick"
       >
+        <template #no-data>
+          <EmptyState
+            compact
+            illustration="customers"
+            :title="searchTerm.trim() ? 'Sin resultados' : 'Aún no hay clientes'"
+            :message="
+              searchTerm.trim()
+                ? 'No hay clientes que coincidan con la búsqueda.'
+                : 'Los clientes que des de alta aparecerán aquí.'
+            "
+          />
+        </template>
+
         <!-- Sintaxis de corchetes en vez de "#item.fullName": el "." en un
            nombre de slot corto se interpreta como si fuera un modificador
            de directiva (que v-slot no soporta), así que hay que pasar el
@@ -156,18 +209,39 @@ function handleSaved(): void {
         <template #[`item.fullName`]="{ item }">
           <span class="font-weight-medium">{{ item.fullName }}</span>
         </template>
+        <template #[`item.actions`]="{ item }">
+          <v-btn
+            icon="mdi-pencil"
+            color="primary"
+            variant="text"
+            size="small"
+            aria-label="Editar cliente"
+            @click="openEditCustomer(item)"
+          />
+          <v-btn
+            icon="mdi-delete"
+            color="error"
+            variant="text"
+            size="small"
+            aria-label="Eliminar cliente"
+            @click="askDelete(item)"
+          />
+        </template>
       </v-data-table>
     </template>
 
-    <CustomerDetailDialog
-      v-model="showDetailDialog"
-      :customer-id="selectedCustomerId"
-      @changed="load"
-    />
-    <CustomerFormDialog
+    <CustomerEditDialog
       v-model="showFormDialog"
       :tenant-id="session.activeTenantId ?? ''"
+      :customer-id="editingCustomerId"
       @saved="handleSaved"
+    />
+    <ConfirmDeleteDialog
+      v-model="showDeleteConfirm"
+      title="Eliminar cliente"
+      :message="`¿Seguro que quieres eliminar a ${customerToDelete?.first_name ?? ''} ${customerToDelete?.last_name ?? ''}? También se eliminarán sus mascotas y sus citas programadas. Su historial de atenciones, sus ventas y su expediente se conservan.`"
+      :loading="deleting"
+      @confirm="confirmDelete"
     />
   </v-container>
 </template>

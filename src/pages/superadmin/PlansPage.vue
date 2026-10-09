@@ -7,6 +7,7 @@ import { onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
 import type { Plan } from '@/services/platform'
+import PageHeader from '@/components/PageHeader.vue'
 
 const plans = ref<Plan[]>([])
 const loading = ref(false)
@@ -76,14 +77,8 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
 </script>
 
 <template>
-  <v-container>
-    <h1 class="text-h5 mb-1">Planes</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      Son los planes que puedes asignar a una empresa. Es solo informativo: el plan por
-      sí solo no limita nada — lo que controla el acceso es el estado y, si la vigencia
-      vence, el modo solo lectura. Un plan ya asignado no se borra: se desactiva y deja
-      de ofrecerse para asignaciones nuevas.
-    </p>
+  <v-container class="py-6">
+    <PageHeader title="Planes" subtitle="Son los planes que puedes asignar a una empresa. Es solo informativo: el plan por sí solo no limita nada — lo que controla el acceso es el estado y, si la vigencia vence, el modo solo lectura. Un plan ya asignado no se borra: se desactiva y deja de ofrecerse para asignaciones nuevas." />
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ errorMessage }}

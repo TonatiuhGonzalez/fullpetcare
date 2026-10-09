@@ -27,3 +27,17 @@ export function sexLabel(sex: PetSex | null): string {
   if (!sex) return 'No especificado'
   return SEX_LABELS[sex]
 }
+
+/**
+ * Ícono y color con que se muestra si la mascota está esterilizada: verde si sí,
+ * amarillo si no (fase 14). El ícono es PROVISIONAL, pendiente de definir.
+ */
+export function sterilizationIndicator(isSterilized: boolean): {
+  icon: string
+  color: string
+  label: string
+} {
+  return isSterilized
+    ? { icon: 'mdi-medical-bag', color: 'success', label: 'Esterilizado(a)' }
+    : { icon: 'mdi-medical-bag', color: 'warning', label: 'No esterilizado(a)' }
+}

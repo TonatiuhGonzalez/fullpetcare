@@ -22,6 +22,7 @@ import '@event-calendar/core/index.css'
 
 import { minutesToSlotTime } from '@/lib/calendarGrid'
 import type { CalendarBlock, HourRange } from '@/lib/calendarGrid'
+import { renderEventContent, toCalendarEvents } from './calendarEvents'
 
 const props = defineProps<{
   /** 'YYYY-MM-DD', el primer día de la ventana. */
@@ -36,17 +37,6 @@ const emit = defineEmits<{ select: [id: string] }>()
 
 const host = ref<HTMLElement | null>(null)
 let calendar: ReturnType<typeof createCalendar> | null = null
-
-function toEvents(blocks: CalendarBlock[]) {
-  return blocks.map((block) => ({
-    id: block.id,
-    start: block.start,
-    end: block.end,
-    title: block.text,
-    backgroundColor: block.color,
-    textColor: '#ffffff',
-  }))
-}
 
 function mountCalendar() {
   if (!host.value) return
@@ -63,8 +53,9 @@ function mountCalendar() {
     slotMaxTime: minutesToSlotTime(props.hourRange.endMinutes),
     slotDuration: '00:30',
     height: '640px',
-    events: toEvents(props.blocks),
+    events: toCalendarEvents(props.blocks),
     editable: false,
+    eventContent: renderEventContent,
     eventClick: (info) => emit('select', String(info.event.id)),
     // Tooltip nativo con el texto completo: con citas simultáneas la
     // tarjeta queda angosta y recorta el texto.
@@ -102,7 +93,7 @@ watch(
 )
 watch(
   () => props.blocks,
-  (blocks) => calendar?.setOption('events', toEvents(blocks)),
+  (blocks) => calendar?.setOption('events', toCalendarEvents(blocks)),
 )
 </script>
 

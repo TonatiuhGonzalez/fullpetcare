@@ -79,3 +79,22 @@ jobs:
         run: |
           supabase functions deploy platform-admin \
             --project-ref boajojegcmpvzjsloosk
+
+      # invoicing (fase 11, facturación con el PAC) tampoco tenía paso aquí:
+      # el workflow se quedó en las tres funciones de las fases 7 a 10, así que
+      # Configuración > Facturación fallaba en producción con un 404 del
+      # gateway aunque la migración sí estuviera aplicada. Mismo patrón.
+      #
+      # Exige sesión (`verify_jwt = true` en supabase/config.toml); que quien
+      # llama sea el dueño de ESE negocio lo revalida la propia función.
+      #
+      # OJO: esta función además lee secretos propios del PAC (Facturapi) que
+      # NO inyecta la plataforma. Se configuran una sola vez en el proyecto con
+      # `supabase secrets set` (FACTURAPI_USER_KEY y, para timbrar de verdad,
+      # FACTURAPI_MODE); este workflow solo sube el código.
+      - name: Desplegar invoicing a fullpetcare-prod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy invoicing \
+            --project-ref boajojegcmpvzjsloosk

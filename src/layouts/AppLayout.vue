@@ -1,27 +1,23 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 
+import BrandLogo from '@/components/BrandLogo.vue'
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
+import UserMenu from '@/components/UserMenu.vue'
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const router = useRouter()
+// En teléfono la barra no alcanza para el nombre junto al logo: solo el isotipo.
+const { xs } = useDisplay()
 
 const businessName = computed(() => session.activeMembership?.tenantName ?? '')
-// "Patitas Felices - Sucursal Centro" — la sucursal activa va pegada al
-// nombre del negocio en el título (pedido explícito, antes solo se veía
-// más a la derecha de la barra, lejos del nombre). Mientras no haya
-// sucursal elegida (p. ej. el instante entre login y que
-// resolveActiveBranch() corra) se muestra solo el nombre del negocio.
-const titleLabel = computed(() =>
-  session.activeBranch
-    ? `${businessName.value} - ${session.activeBranch.name}`
-    : businessName.value,
-)
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
 // Banner de vigencia / gracia / solo lectura del negocio activo (tarea #1905).
@@ -51,32 +47,73 @@ const showPayMock = ref(false)
 // (CLAUDE.md §6.7).
 const menuOpen = ref(false)
 const menuItems = computed<SideMenuItem[]>(() => [
-  { title: 'Agenda', icon: 'mdi-calendar-month-outline', to: '/app/agenda' },
+  { title: 'Inicio', icon: 'mdi-home-outline', to: '/app/inicio', group: 'Operación' },
+  {
+    title: 'Agenda',
+    icon: 'mdi-calendar-month-outline',
+    to: '/app/agenda',
+    group: 'Operación',
+  },
   ...(isFrontDesk(session.role)
-    ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
+    ? [
+        {
+          title: 'Clientes',
+          icon: 'mdi-account-group-outline',
+          to: '/app/clientes',
+          group: 'Operación',
+        },
+      ]
     : []),
-  { title: 'Servicios', icon: 'mdi-clipboard-list-outline', to: '/app/servicios' },
+  {
+    title: 'Servicios',
+    icon: 'mdi-clipboard-list-outline',
+    to: '/app/servicios',
+    group: 'Catálogo',
+  },
   ...(session.canView('inventory')
-    ? [{ title: 'Inventario', icon: 'mdi-package-variant-closed', to: '/app/inventario' }]
+    ? [
+        {
+          title: 'Inventario',
+          icon: 'mdi-package-variant-closed',
+          to: '/app/inventario',
+          group: 'Catálogo',
+        },
+      ]
     : []),
   ...(session.canView('cash_register')
-    ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja' }]
+    ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja', group: 'Operación' }]
     : []),
   ...(session.canView('reports')
-    ? [{ title: 'Reportes', icon: 'mdi-chart-bar', to: '/app/reportes' }]
+    ? [
+        {
+          title: 'Reportes',
+          icon: 'mdi-chart-bar',
+          to: '/app/reportes',
+          group: 'Administración',
+        },
+      ]
     : []),
   ...(session.canView('employees')
-    ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
+    ? [
+        {
+          title: 'Empleados',
+          icon: 'mdi-badge-account-outline',
+          to: '/app/empleados',
+          group: 'Administración',
+        },
+      ]
     : []),
 ])
 
 // Botón flotante de venta de mostrador (fase 13, tarea 13.3). Reemplaza la entrada
 // del menú: se ve desde cualquier pantalla de la app, pero solo dueño y recepción
 // cobran (misma regla que la ruta, `requiresFrontDesk`). En la propia pantalla de
-// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado.
+// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado. En Inicio
+// también: ahí ya está el acceso rápido "Venta de mostrador" en el encabezado.
 const route = useRoute()
 const showPosButton = computed(
-  () => isFrontDesk(session.role) && route.name !== 'venta-mostrador',
+  () =>
+    isFrontDesk(session.role) && route.name !== 'venta-mostrador' && route.name !== 'inicio',
 )
 
 const showFeedback = ref(false)
@@ -98,62 +135,60 @@ function handleBranchChange(branchId: unknown): void {
 </script>
 
 <template>
-  <v-app-bar color="primary" density="comfortable">
+  <v-app-bar color="surface" density="comfortable" flat border="b">
     <!-- Hamburguesa: solo en pantallas angostas, donde el menú lateral está
          oculto y se abre como cajón. -->
     <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
-    <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
-         botón de reportes quedaría pegado a lo de la derecha, lejos del nombre.
-         El v-spacer de abajo empuja el resto a la derecha. -->
-    <v-app-bar-title style="flex: 0 1 auto">
-      <v-icon icon="mdi-paw" class="mr-2" />
-      {{ titleLabel }}
-    </v-app-bar-title>
-    <v-btn
-      prepend-icon="mdi-message-alert-outline"
-      variant="tonal"
-      size="small"
-      class="ml-4"
-      @click="showFeedback = true"
+    <router-link
+      to="/app/inicio"
+      class="brand-link ml-2 mr-4"
+      aria-label="FullPetCare, ir al inicio"
     >
-      Reportar error o sugerencia
-    </v-btn>
+      <BrandLogo :size="28" :show-wordmark="!xs" />
+    </router-link>
     <v-spacer />
 
-    <!-- El selector de sucursal solo tiene sentido si hay más de una que
-         elegir — con una sola, el título de arriba ya la muestra
-         ("Patitas Felices - Sucursal Centro"), así que no hace falta
-         repetirla aquí. -->
-    <v-select
-      v-if="session.activeBranches.length > 1"
-      :model-value="session.activeBranchId"
-      :items="session.activeBranches"
-      item-title="name"
-      item-value="id"
-      density="compact"
-      variant="solo"
-      hide-details
-      style="max-width: 220px"
-      class="mr-4"
-      @update:model-value="handleBranchChange"
-    />
+    <!-- Ayuda: aquí vive "Reportar error o sugerencia", que antes ocupaba un
+         botón grande en la barra. -->
+    <v-menu location="bottom end">
+      <template #activator="{ props: helpProps }">
+        <v-btn
+          v-bind="helpProps"
+          icon="mdi-help-circle-outline"
+          variant="text"
+          aria-label="Ayuda"
+          title="Ayuda"
+        />
+      </template>
+      <v-list density="comfortable">
+        <v-list-item
+          prepend-icon="mdi-message-alert-outline"
+          title="Reportar error o sugerencia"
+          @click="showFeedback = true"
+        />
+      </v-list>
+    </v-menu>
 
-    <v-chip class="mr-4" size="small" variant="tonal">{{
-      roleLabel(session.role)
-    }}</v-chip>
-    <span class="mr-2 text-body-2">{{ userLabel }}</span>
-    <!-- Configuración (tarea #1959): reemplaza los botones de cambiar
-         contraseña y cancelar cuenta, que ahora viven en su sección "Cuenta". -->
-    <v-btn
-      to="/app/configuracion"
-      icon="mdi-cog-outline"
-      variant="text"
-      title="Configuración"
+    <UserMenu
+      :name="userLabel"
+      :role-label="roleLabel(session.role)"
+      :email="session.user?.email"
+      settings-to="/app/configuracion"
+      @logout="handleLogout"
     />
-    <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
 
-  <SideMenu v-model:open="menuOpen" :items="menuItems" />
+  <SideMenu v-model:open="menuOpen" :items="menuItems">
+    <template #header="{ rail }">
+      <WorkspaceSwitcher
+        :tenant-name="businessName"
+        :branches="session.activeBranches"
+        :active-branch-id="session.activeBranchId"
+        :rail="rail"
+        @select-branch="handleBranchChange"
+      />
+    </template>
+  </SideMenu>
 
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
@@ -203,3 +238,11 @@ function handleBranchChange(branchId: unknown): void {
     to="/app/venta-mostrador"
   />
 </template>
+
+<style scoped lang="scss">
+.brand-link {
+  display: inline-flex;
+  color: inherit;
+  text-decoration: none;
+}
+</style>

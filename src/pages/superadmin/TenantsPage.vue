@@ -15,6 +15,7 @@ import {
   tenantStatusLabel,
   type TenantStatus,
 } from '@/lib/platform'
+import PageHeader from '@/components/PageHeader.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 import TenantDetailDialog from '@/components/TenantDetailDialog.vue'
 import TenantFormDialog from '@/components/TenantFormDialog.vue'
@@ -117,11 +118,11 @@ function handlePasswordDialogToggle(open: boolean): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Empresas</h1>
-      <v-spacer />
+    <PageHeader title="Empresas">
+      <template #actions>
       <v-btn color="primary" prepend-icon="mdi-plus" @click="showForm = true">Nueva empresa</v-btn>
-    </div>
+      </template>
+    </PageHeader>
 
     <div class="d-flex flex-wrap ga-4 mb-2">
       <v-text-field

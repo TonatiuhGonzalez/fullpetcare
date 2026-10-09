@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { classifyVaccineStatus, computeNextDueDate } from './vaccination'
+import {
+  buildVaccineTableRows,
+  cardHeadline,
+  cardOverview,
+  classifyVaccineStatus,
+  computeNextDueDate,
+} from './vaccination'
 
 describe('computeNextDueDate', () => {
   it('suma el intervalo a la fecha de aplicación', () => {
@@ -52,5 +58,117 @@ describe('classifyVaccineStatus', () => {
 
   it('un día después del borde de la ventana ya es vigente', () => {
     expect(classifyVaccineStatus('2026-07-16', '2026-06-15')).toBe('current')
+  })
+})
+
+describe('cardOverview y cardHeadline', () => {
+  // Qué prueba: que se cuenta cada estado y que las vacunas sin próxima dosis (null) no
+  // se cuentan en ninguno. Si contaran como "al día", una cartilla sin fechas diría
+  // "Cartilla al día" sin saberse.
+  it('cuenta cada estado e ignora las que no tienen próxima dosis', () => {
+    expect(cardOverview(['overdue', 'due_soon', 'current', 'current', null])).toEqual({
+      overdue: 1,
+      dueSoon: 1,
+      current: 2,
+    })
+  })
+
+  // Qué prueba: la prioridad del mensaje. Con una vencida y otras al día debe avisar de
+  // la vencida; lo contrario le diría al dueño de la mascota que todo está bien.
+  it('prioriza lo vencido, luego lo por vencer y al final "al día"', () => {
+    expect(cardHeadline({ overdue: 2, dueSoon: 1, current: 3 })).toEqual({
+      level: 'overdue',
+      text: '2 vacunas vencidas',
+    })
+    expect(cardHeadline({ overdue: 0, dueSoon: 1, current: 3 })).toEqual({
+      level: 'due_soon',
+      text: '1 vacuna por vencer',
+    })
+    expect(cardHeadline({ overdue: 0, dueSoon: 0, current: 2 })).toEqual({
+      level: 'current',
+      text: 'Cartilla al día',
+    })
+  })
+
+  // Qué prueba: singular y plural en español ("1 vacuna vencida", no "1 vacunas").
+  it('concuerda en singular y plural', () => {
+    expect(cardHeadline({ overdue: 1, dueSoon: 0, current: 0 })?.text).toBe('1 vacuna vencida')
+    expect(cardHeadline({ overdue: 0, dueSoon: 3, current: 0 })?.text).toBe('3 vacunas por vencer')
+  })
+
+  // Qué prueba: sin nada que resumir devuelve null para que la pantalla no muestre un
+  // aviso vacío (mascota sin vacunas o sin fechas de próxima dosis).
+  it('devuelve null si no hay vacunas con próxima dosis', () => {
+    expect(cardHeadline(cardOverview([]))).toBeNull()
+    expect(cardHeadline(cardOverview([null, null]))).toBeNull()
+  })
+})
+
+describe('buildVaccineTableRows', () => {
+  const catalog = [
+    { id: 'rabia', name: 'Rabia' },
+    { id: 'sextuple', name: 'Séxtuple' },
+  ]
+  const applied = (
+    vaccine_id: string,
+    applied_at: string,
+    next_due_date: string | null,
+    batch_number: string | null = null,
+  ) => ({ vaccine_id, vaccineName: vaccine_id, applied_at, next_due_date, batch_number })
+
+  // La tabla debe mostrar TODO el catálogo aunque la mascota no tenga ninguna
+  // vacuna: si solo saliera lo aplicado, recepción no vería qué le falta.
+  it('sin aplicaciones, una fila vacía por cada vacuna del catálogo', () => {
+    const rows = buildVaccineTableRows(catalog, [], '2026-06-15')
+    expect(rows.map((r) => r.vaccineName)).toEqual(['Rabia', 'Séxtuple'])
+    expect(rows[0]).toMatchObject({
+      appliedAt: null,
+      nextDueDate: null,
+      batchNumber: null,
+      status: null,
+    })
+  })
+
+  // Con varias aplicaciones de la misma vacuna manda la más reciente: si se
+  // tomara la primera que aparezca, la cartilla mostraría un refuerzo viejo y
+  // marcaría "vencida" una vacuna que ya se renovó.
+  it('con varias aplicaciones usa la más reciente, sin importar el orden de entrada', () => {
+    const rows = buildVaccineTableRows(
+      catalog,
+      [
+        applied('rabia', '2026-06-01T12:00:00Z', '2027-06-01', 'LOTE-NUEVO'),
+        applied('rabia', '2025-01-01T12:00:00Z', '2026-01-01', 'LOTE-VIEJO'),
+      ],
+      '2026-06-15',
+    )
+    expect(rows[0]).toMatchObject({
+      batchNumber: 'LOTE-NUEVO',
+      nextDueDate: '2027-06-01',
+      status: 'current',
+    })
+  })
+
+  // Una vacuna sin intervalo (sin próxima dosis) no se clasifica: no hay
+  // "vencida" que calcular. Marcarla vencida generaría alertas falsas.
+  it('una vacuna aplicada sin próxima dosis queda sin estado', () => {
+    const rows = buildVaccineTableRows(
+      catalog,
+      [applied('rabia', '2026-06-01T12:00:00Z', null)],
+      '2026-06-15',
+    )
+    expect(rows[0].appliedAt).toBe('2026-06-01T12:00:00Z')
+    expect(rows[0].status).toBeNull()
+  })
+
+  // Lo que la mascota recibió pero ya no está en el catálogo de su especie no
+  // debe desaparecer del expediente: va al final de la tabla.
+  it('agrega al final las vacunas aplicadas que no están en el catálogo', () => {
+    const rows = buildVaccineTableRows(
+      catalog,
+      [applied('leptospirosis', '2026-06-01T12:00:00Z', '2026-12-01')],
+      '2026-06-15',
+    )
+    expect(rows.map((r) => r.vaccineName)).toEqual(['Rabia', 'Séxtuple', 'leptospirosis'])
+    expect(rows[2].status).toBe('current')
   })
 })

@@ -23,7 +23,7 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/app/agenda' },
+    { path: '/', redirect: '/app/inicio' },
     {
       path: '/login',
       name: 'login',
@@ -57,6 +57,11 @@ export const router = createRouter({
       path: '/app',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
+        {
+          path: 'inicio',
+          name: 'inicio',
+          component: () => import('@/pages/inicio/HomePage.vue'),
+        },
         {
           path: 'agenda',
           name: 'agenda',
@@ -276,7 +281,7 @@ router.beforeEach(async (to) => {
       return { path: '/cambiar-contrasena' }
     }
     if (!session.mustChangePassword && isForcePasswordRoute) {
-      return { path: '/app/agenda' }
+      return { path: '/app/inicio' }
     }
   }
 
@@ -288,14 +293,14 @@ router.beforeEach(async (to) => {
   }
 
   // Panel de plataforma (fase 10): quien no es superadmin no tiene nada que
-  // hacer aquí — se le manda a su agenda, igual que con los demás gateos.
+  // hacer aquí — se le manda a Inicio, igual que con los demás gateos.
   if (isPlatformRoute && !session.isPlatformAdmin) {
-    return { path: '/app/agenda' }
+    return { path: '/app/inicio' }
   }
 
   // Un superadmin que no pertenece a ningún negocio no tiene "agenda" ni
   // negocio que elegir: su casa es el panel de plataforma. (Sin esto, tras
-  // iniciar sesión — que manda a /app/agenda por default — vería la
+  // iniciar sesión — que manda a /app/inicio por default — vería la
   // pantalla de selección de negocio vacía, o una agenda sin negocio.)
   const isPlatformOnlyUser = session.isPlatformAdmin && session.memberships.length === 0
   if (isPrivateRoute && isPlatformOnlyUser) {
@@ -310,7 +315,7 @@ router.beforeEach(async (to) => {
     if (isPlatformOnlyUser) return { path: '/superadmin' }
     return session.needsBusinessSelection
       ? { path: '/seleccionar-negocio' }
-      : { path: '/app/agenda' }
+      : { path: '/app/inicio' }
   }
 
   // Rutas marcadas "requiresFrontDesk" (arriba: clientes) — groomer/vet
@@ -320,7 +325,7 @@ router.beforeEach(async (to) => {
   // NewAppointmentDialog.vue, cuyo botón de apertura en AgendaPage.vue ya
   // trae su propio "v-if=isFrontDesk(...)".)
   if (to.meta.requiresFrontDesk && !isFrontDesk(session.role)) {
-    return { path: '/app/agenda' }
+    return { path: '/app/inicio' }
   }
 
   // Mismo criterio que "requiresFrontDesk", pero consultando el permiso
@@ -329,7 +334,7 @@ router.beforeEach(async (to) => {
   // solo evita mostrar una pantalla vacía a quien de todos modos no va a
   // poder ver nada en ella.
   if (to.meta.requiresPermission && !session.canView(to.meta.requiresPermission)) {
-    return { path: '/app/agenda' }
+    return { path: '/app/inicio' }
   }
 
   // Secciones solo del dueño (configuración de sucursales): quien no lo es

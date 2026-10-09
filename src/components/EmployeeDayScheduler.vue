@@ -26,6 +26,7 @@ import '@event-calendar/core/index.css'
 
 import { minutesToSlotTime } from '@/lib/calendarGrid'
 import type { CalendarBlock, HourRange } from '@/lib/calendarGrid'
+import { renderEventContent, toCalendarEvents } from './calendarEvents'
 
 export interface SchedulerRow {
   id: string
@@ -69,18 +70,6 @@ function computeSlotWidth(): number {
   return Math.max(MIN_SLOT_PX, Math.floor(available / hours))
 }
 
-function toEvents(blocks: CalendarBlock[]) {
-  return blocks.map((block) => ({
-    id: block.id,
-    start: block.start,
-    end: block.end,
-    title: block.text,
-    resourceIds: block.resource ? [block.resource] : [],
-    backgroundColor: block.color,
-    textColor: '#ffffff',
-  }))
-}
-
 onMounted(() => {
   if (!host.value) return
   calendar = createCalendar(host.value, [ResourceTimeline], {
@@ -95,8 +84,9 @@ onMounted(() => {
     slotDuration: '01:00',
     slotWidth: computeSlotWidth(),
     resources: props.rows.map((row) => ({ id: row.id, title: row.name })),
-    events: toEvents(props.blocks),
+    events: toCalendarEvents(props.blocks),
     editable: false,
+    eventContent: renderEventContent,
     eventClick: (info) => emit('select', String(info.event.id)),
     // Tooltip nativo con el texto completo: la tarjeta lo recorta si la
     // cita es corta.
@@ -133,7 +123,7 @@ watch(
 )
 watch(
   () => props.blocks,
-  (blocks) => calendar?.setOption('events', toEvents(blocks)),
+  (blocks) => calendar?.setOption('events', toCalendarEvents(blocks)),
 )
 
 onBeforeUnmount(() => {

@@ -11,6 +11,7 @@
 import { addDays, format } from 'date-fns'
 
 import type { BranchHours } from './availability'
+import type { VisitKind } from './visitKind'
 
 /**
  * `count` días consecutivos ('YYYY-MM-DD') empezando en `startDateStr`,
@@ -74,7 +75,12 @@ export interface CalendarBlock {
   start: string
   end: string
   text: string
+  /** Fondo del bloque: el color del ESTADO de la cita. */
   color: string
+  /** Color del texto sobre `color` (cambia entre tema claro y oscuro). */
+  textColor: string
+  /** Tipo de visita: marca la franja y el ícono del bloque. */
+  kind: VisitKind
   resource?: string
 }
 

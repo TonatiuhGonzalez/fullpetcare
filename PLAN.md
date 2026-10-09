@@ -663,6 +663,74 @@ revisa pieza por pieza.
 
 **Pendientes:** ninguno.
 
+### D19 — Clientes y mascotas: acciones en la tabla y modales de edición directa
+
+**Estado:** aprobada (2026-10-08).
+
+**1. Acciones en la tabla.** Columna "Acciones" con editar y eliminar, solo para dueño y recepción. La fila deja de
+ser clicable. Headers en negritas.
+
+**2. Eliminar es borrado suave en cascada.** Cliente: sus mascotas y sus citas **programadas**. Mascota: sus citas **programadas** (las demás se conservan como historia; decidido el 2026-10-08). El expediente nunca se
+borra (§8.5) y las ventas cobradas no se tocan. La cascada vive en una RPC `SECURITY DEFINER` (una sola transacción,
+revalida membresía y rol, §7.3.4), no en varias llamadas desde el navegador: si una falla a la mitad, no queda un
+cliente borrado con sus mascotas vivas. **Alternativa descartada:** encadenar los `softDelete` de los services desde el
+frontend (no es atómico). **Costo aceptado:** una migración y una RPC nuevas.
+
+**3. Modales de edición directa.** El de cliente reemplaza al detalle y al formulario; el de mascota pierde la vista
+previa. Los componentes que queden sin uso no se borran (decisión del usuario).
+
+**4. Cartilla como tabla.** Se arma con el catálogo `vaccines` filtrado por especie; el registro sigue en
+`VaccinationDialog`. La tabla es una función pura en `lib/` (§4).
+
+**5. Sin dependencias nuevas** (§3).
+
+**Pendientes:** el ícono definitivo de esterilización (se usa uno provisional, verde/amarillo).
+
+---
+
+---
+
+### D20 — Identidad visual: tema con tokens, color por tipo de visita apto para daltonismo y logo "Dos mitades"
+
+**Estado:** aprobada (2026-10-08).
+
+**1. Personalidad: clínica y confiable.** Neutros fríos (pizarra) en lugar del fondo cálido actual, verde azulado
+profundo como color de marca (`#0F6B66`), tarjetas con borde fino de 1 px en vez de sombra, un solo radio por
+tipo de control. Todo vive en `plugins/vuetify.ts` (§5.3), no en overrides sueltos.
+
+**2. Color por tipo de visita.** Estética = naranja `#C25400`, veterinaria = azul `#0072B2` (paleta Okabe-Ito, pensada
+para daltonismo). Se usa igual en agenda, chips, historial y reportes. **El color nunca es la única señal:** cada
+tipo lleva también ícono y texto. Contraste calculado contra texto blanco: 4.60:1, 5.19:1 y 6.33:1 (marca); AA exige
+4.5:1. Un test de `lib/` verifica los contrastes para que nadie rompa la paleta sin darse cuenta.
+**Riesgo aceptado (decidido el 2026-10-08):** el verde de marca y el azul de veterinaria se parecen para algunos tipos
+de daltonismo; se mitiga con luminosidad distinta, ícono y texto. **Alternativa descartada:** cambiar el azul por morado.
+
+**3. Tipografía Inter con `@fontsource-variable/inter`.** Se sirve desde nuestro propio dominio. **Alternativas
+descartadas:** `<link>` a Google Fonts (depende de un tercero y le manda la IP del usuario) y pila del sistema (menos
+personalidad). **Costo aceptado:** una dependencia nueva (§3), aprobada por el usuario el 2026-10-08. Cifras
+tabulares en dinero, folios y tickets para que las columnas alineen.
+
+**4. Modo oscuro incluido** (decidido el 2026-10-08). Segundo tema de Vuetify con los mismos roles semánticos; se elige
+según `prefers-color-scheme` y el usuario puede cambiarlo. La preferencia se guarda en el navegador (comodidad por
+persona, no dato de negocio; si el almacenamiento falla, se usa la del sistema).
+
+**5. Logo "C — Dos mitades".** Dos círculos que se cruzan: estética (naranja), veterinaria (azul) y el cruce en verde de
+marca. Cuenta el diferenciador del producto y conecta con el color por tipo de visita. En SVG propio, sin dependencia.
+**Alternativas descartadas:** A (huella con cruz) y B (corazón con huella), ambas más genéricas.
+
+**6. Misma identidad en el superadmin** (decidido el 2026-10-08): `SuperadminLayout` usa el mismo tema y componentes.
+
+**7. Sin servicio externo.** Única dependencia nueva: la fuente.
+
+**8. Pantalla Inicio (acordada el 2026-10-08).** Es la pantalla de entrada, con resumen del día y accesos rápidos; la
+Agenda sigue siendo una opción del menú. Cada bloque se muestra según el rol y el permiso (la regla real la sigue
+imponiendo la base). No agrega tablas: reutiliza citas, ventas, caja y reportes. **Alternativa descartada:** poner las
+tarjetas arriba de la Agenda (mezclaba dos usos en una pantalla que además ocupa todo el ancho). **Costo aceptado:** al
+cambiar la pantalla de entrada hay que actualizar varias redirecciones (router, login, selección de negocio).
+
+**Pendientes:** versión del logo para fondo oscuro y su contraste; colores de naranja y azul en modo oscuro
+(se proponen `#E8793A` y `#3FA0D6`, por verificar con el mismo test); (el dashboard sí lleva tarjetas de resumen, confirmado el 2026-10-08).
+
 ---
 
 ## Parte 4 — Riesgos conocidos

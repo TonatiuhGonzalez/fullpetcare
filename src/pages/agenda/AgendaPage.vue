@@ -12,11 +12,13 @@
 // (visibleDates) — esta página solo arma los bloques a pintar y elige
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 import { toNaiveLocalIso } from '@/lib/datetime'
 import { isFrontDesk } from '@/lib/roles'
+import { VISIT_KINDS, visitKindInfo } from '@/lib/visitKind'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { listUpcomingVaccines } from '@/services/records'
@@ -26,6 +28,7 @@ import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
 import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
@@ -72,20 +75,20 @@ const statusLabels: Record<DisplayStatus, string> = {
   cancelled: 'Cancelada',
   no_show: 'No se presentó',
 }
-// Color por estado, no por tipo de cita — en el calendario lo que más
-// importa distinguir de un vistazo es "¿ya se cobró/canceló esto?", no
-// si es estética o veterinaria (eso ya va en el texto del bloque).
-// rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts en
-// vez de repetir colores a mano.
-const statusColors: Record<DisplayStatus, string> = {
-  scheduled: 'rgb(var(--v-theme-info))',
-  in_progress: 'rgb(var(--v-theme-warning))',
-  completed: 'rgb(var(--v-theme-success))',
-  paid: 'rgb(var(--v-theme-primary))',
-  cancelled: 'rgb(var(--v-theme-error))',
-  no_show: 'rgb(var(--v-theme-error))',
+// El bloque se pinta por ESTADO (¿ya se cobró o canceló?), que es lo que más importa
+// distinguir de un vistazo; el TIPO de visita va aparte, como franja de color e ícono
+// en el propio bloque (components/calendarEvents.ts) — decisión del 2026-10-08
+// (PLAN.md D20). "Agendada" es gris pizarra y no azul, para que el azul quede solo
+// para veterinaria. rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts
+// (cambia sola entre claro y oscuro); cada fondo lleva su `on-*` para el texto.
+const statusStyles: Record<DisplayStatus, { bg: string; text: string }> = {
+  scheduled: { bg: 'rgb(var(--v-theme-secondary))', text: 'rgb(var(--v-theme-on-secondary))' },
+  in_progress: { bg: 'rgb(var(--v-theme-warning))', text: 'rgb(var(--v-theme-on-warning))' },
+  completed: { bg: 'rgb(var(--v-theme-success))', text: 'rgb(var(--v-theme-on-success))' },
+  paid: { bg: 'rgb(var(--v-theme-primary))', text: 'rgb(var(--v-theme-on-primary))' },
+  cancelled: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
+  no_show: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
 }
-const kindLabels: Record<string, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 
 /** El estado a MOSTRAR de una cita — como appointment.status, salvo que ya se cobró. */
 function displayStatus(appointment: Appointment): DisplayStatus {
@@ -100,7 +103,7 @@ const statusLegend = computed(() =>
   (Object.keys(statusLabels) as DisplayStatus[]).map((key) => ({
     key,
     label: statusLabels[key],
-    color: statusColors[key],
+    color: statusStyles[key].bg,
   })),
 )
 
@@ -115,7 +118,7 @@ const schedulerRows = computed<SchedulerRow[]>(() =>
 )
 
 // Marca de texto al inicio del bloque para las visitas sin cita (tarea
-// #1969): el color ya significa "estado" (statusColors), así que el origen
+// #1969): el color ya significa "estado" (statusStyles), así que el origen
 // de la cita va en el texto, sin tocar los componentes del calendario.
 function appointmentBadge(appointment: Appointment): string {
   if (appointment.is_urgent) return '🚨 Urgente · '
@@ -133,8 +136,10 @@ const calendarBlocks = computed<CalendarBlock[]>(() =>
     id: appointment.id,
     start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
     end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
-    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
-    color: statusColors[displayStatus(appointment)],
+    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${visitKindInfo(appointment.kind).label} · ${employeeName(appointment.employee_user_id)}`,
+    color: statusStyles[displayStatus(appointment)].bg,
+    textColor: statusStyles[displayStatus(appointment)].text,
+    kind: appointment.kind,
     resource: appointment.employee_user_id,
   })),
 )
@@ -165,10 +170,28 @@ async function loadUpcomingVaccines(): Promise<void> {
   upcomingVaccines.value = await listUpcomingVaccines(session.activeTenantId, today)
 }
 
+// Los accesos rápidos de Inicio mandan aquí con `?accion=nueva-cita` o
+// `?accion=llegada-sin-cita` para abrir el diálogo correspondiente. Se limpia la
+// URL enseguida: si no, al recargar la página el diálogo se volvería a abrir.
+const route = useRoute()
+const router = useRouter()
+
+function runRequestedAction(): void {
+  const action = route.query.accion
+  if (!action) return
+  // Solo recepción y dueño agendan; para otros roles el parámetro se ignora.
+  if (isFrontDeskView.value) {
+    if (action === 'nueva-cita') showNewAppointmentDialog.value = true
+    if (action === 'llegada-sin-cita') showWalkInDialog.value = true
+  }
+  router.replace({ query: {} })
+}
+
 onMounted(() => {
   agenda.initFromSession()
   loadEmployees()
   loadUpcomingVaccines()
+  runRequestedAction()
 })
 
 // --- Navegación: SOLO para dueño/recepción. Groomer/vet no tienen
@@ -249,9 +272,33 @@ function handleAppointmentCreated(appointment: Appointment): void {
 <template>
   <!-- null (no undefined) para ignorar el ancho global de VContainer: el calendario usa todo el ancho. El cast es solo para vue-tsc. -->
   <v-container class="py-6" :max-width="null as unknown as undefined">
-    <div class="d-flex align-center flex-wrap ga-2 mb-4">
-      <h1 class="text-h5 mr-4">Agenda</h1>
+    <PageHeader title="Agenda">
+      <template #actions>
+        <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
+           lo rechaza para groomer/vet (create_appointment()), esto solo
+           evita mostrar un botón que termina en un error. -->
+        <v-btn
+          v-if="isFrontDeskView"
+          variant="outlined"
+          color="primary"
+          prepend-icon="mdi-walk"
+          @click="showWalkInDialog = true"
+        >
+          Llegada sin cita
+        </v-btn>
+        <v-btn
+          v-if="isFrontDeskView"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="goToNewAppointment"
+        >
+          Nueva cita
+        </v-btn>
+      </template>
+    </PageHeader>
 
+    <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
+    <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <template v-if="isFrontDeskView">
         <v-btn icon="mdi-chevron-left" variant="text" size="small" @click="shiftDay(-1)" />
         <v-text-field
@@ -269,28 +316,6 @@ function handleAppointmentCreated(appointment: Appointment): void {
       <span v-else class="text-body-2 text-medium-emphasis text-capitalize">
         {{ visibleRangeLabel }}
       </span>
-
-      <v-spacer />
-      <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
-           lo rechaza para groomer/vet (create_appointment()), esto solo
-           evita mostrar un botón que termina en un error. -->
-      <v-btn
-        v-if="isFrontDeskView"
-        variant="outlined"
-        color="primary"
-        prepend-icon="mdi-walk"
-        @click="showWalkInDialog = true"
-      >
-        Llegada sin cita
-      </v-btn>
-      <v-btn
-        v-if="isFrontDeskView"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="goToNewAppointment"
-      >
-        Nueva cita
-      </v-btn>
     </div>
 
     <v-alert v-if="agenda.errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
@@ -332,6 +357,18 @@ function handleAppointmentCreated(appointment: Appointment): void {
         >
           <span class="status-dot" :style="{ backgroundColor: item.color }" />
           {{ item.label }}
+        </span>
+      </div>
+      <!-- Tipo de visita: la franja del bloque y su ícono. -->
+      <div class="d-flex flex-wrap ga-3 mb-2">
+        <span
+          v-for="info in Object.values(VISIT_KINDS)"
+          :key="info.kind"
+          class="d-flex align-center ga-1 text-caption text-medium-emphasis"
+        >
+          <span class="kind-swatch" :style="{ backgroundColor: `rgb(var(--v-theme-${info.color}))` }" />
+          <v-icon :icon="info.icon" size="x-small" />
+          {{ info.label }}
         </span>
       </div>
 
@@ -392,5 +429,13 @@ function handleAppointmentCreated(appointment: Appointment): void {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+// Muestra de la franja de tipo de visita (la misma forma que en el bloque del calendario).
+.kind-swatch {
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
 }
 </style>

@@ -8,6 +8,7 @@ import { onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
 import type { CancellationReason } from '@/services/platform'
+import PageHeader from '@/components/PageHeader.vue'
 
 const reasons = ref<CancellationReason[]>([])
 const loading = ref(false)
@@ -88,13 +89,11 @@ async function update(
 </script>
 
 <template>
-  <v-container>
-    <h1 class="text-h5 mb-1">Motivos de suspensión y baja</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      Son los motivos que puedes elegir al suspender o dar de baja una empresa. El cliente
-      ve exactamente este texto al iniciar sesión. Los comentarios internos se escriben
-      aparte, al cambiar el estado, y solo los ves tú.
-    </p>
+  <v-container class="py-6">
+    <PageHeader
+      title="Motivos de suspensión y baja"
+      subtitle="Son los motivos que puedes elegir al suspender o dar de baja una empresa. El cliente ve exactamente este texto al iniciar sesión. Los comentarios internos se escriben aparte, al cambiar el estado, y solo los ves tú."
+    />
 
     <v-alert
       v-if="errorMessage"

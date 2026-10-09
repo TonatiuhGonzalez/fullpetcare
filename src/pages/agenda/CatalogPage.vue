@@ -1,13 +1,15 @@
 <script setup lang="ts">
 // Catálogo de servicios, separado en pestañas Estética / Veterinaria
 // (tarea 3.16).
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import * as servicesService from '@/services/services'
 import type { Service, ServiceKind } from '@/services/services'
 import { formatMXN } from '@/lib/money'
 import { visibleServiceKinds } from '@/lib/roles'
+import { visitKindInfo } from '@/lib/visitKind'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
 
 const session = useSessionStore()
@@ -25,14 +27,62 @@ const showFormDialog = ref(false)
 const editingService = ref<Service | null>(null)
 
 const isOwner = () => session.role === 'owner'
-const kindLabels: Record<ServiceKind, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
+
+// Anchos fijos (la tabla usa `table-layout: fixed`, ver estilos): Nombre toma
+// el resto y se corta con "…" si es largo, así nada cambia de tamaño.
+const headers = computed(() => [
+  { title: 'Nombre', key: 'name', sortable: false, align: 'center' as const },
+  {
+    title: 'Duración',
+    key: 'duration_minutes',
+    sortable: false,
+    align: 'center' as const,
+    width: 120,
+  },
+  {
+    title: 'Costo',
+    key: 'price_cents',
+    sortable: false,
+    align: 'center' as const,
+    width: 140,
+  },
+  ...(isOwner()
+    ? [
+        {
+          title: 'Acciones',
+          key: 'actions',
+          sortable: false,
+          align: 'center' as const,
+          width: 180,
+          cellProps: { class: 'service-actions' },
+        },
+      ]
+    : []),
+])
+
+// Un servicio inactivo se atenúa completo (menos sus acciones, para que el
+// switch siga claro).
+function rowProps({ item }: { item: Service }): Record<string, unknown> {
+  return item.is_active ? {} : { class: 'service-row--inactive' }
+}
+// -1 es "Todos" para v-data-table.
+const itemsPerPageOptions = [
+  { value: 10, title: '10' },
+  { value: 25, title: '25' },
+  { value: 50, title: '50' },
+  { value: 100, title: '100' },
+  { value: -1, title: 'Todos' },
+]
 
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
   loading.value = true
   errorMessage.value = null
   try {
-    services.value = await servicesService.listByKind(session.activeTenantId, activeKind.value)
+    services.value = await servicesService.listByKind(
+      session.activeTenantId,
+      activeKind.value,
+    )
   } catch {
     errorMessage.value = 'No se pudo cargar el catálogo. Revisa tu conexión.'
   } finally {
@@ -58,7 +108,10 @@ function openEditService(service: Service): void {
 // No se usa `loading` de la tabla para esto: solo se carga esa fila.
 const togglingIds = ref<Set<string>>(new Set())
 
-async function handleToggleActive(service: Service, value: boolean | null): Promise<void> {
+async function handleToggleActive(
+  service: Service,
+  value: boolean | null,
+): Promise<void> {
   const isActive = value === true
   togglingIds.value.add(service.id)
   errorMessage.value = null
@@ -75,6 +128,32 @@ async function handleToggleActive(service: Service, value: boolean | null): Prom
   }
 }
 
+// Eliminación (borrado suave) con confirmación. Solo el dueño ve el botón.
+const serviceToDelete = ref<Service | null>(null)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+
+function askDelete(service: Service): void {
+  serviceToDelete.value = service
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!serviceToDelete.value) return
+  deleting.value = true
+  errorMessage.value = null
+  try {
+    await servicesService.remove(serviceToDelete.value.id)
+    showDeleteConfirm.value = false
+    await load()
+  } catch {
+    showDeleteConfirm.value = false
+    errorMessage.value = 'No se pudo eliminar el servicio. Revisa tu conexión.'
+  } finally {
+    deleting.value = false
+  }
+}
+
 function handleSaved(): void {
   load()
 }
@@ -82,66 +161,127 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Catálogo de servicios</h1>
-      <v-spacer />
-      <v-btn v-if="isOwner()" color="primary" prepend-icon="mdi-plus" @click="openNewService">
-        Nuevo servicio
-      </v-btn>
-    </div>
+    <PageHeader title="Catálogo de servicios">
+      <template #actions>
+        <v-btn
+          v-if="isOwner()"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewService"
+        >
+          Nuevo servicio
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <!-- Solo las pestañas visibles para el rol (arriba: visibleServiceKinds) —
          con una sola, v-tabs igual funciona bien, solo no deja nada que
          cambiar. -->
     <v-tabs v-model="activeKind" class="mb-4">
-      <v-tab v-for="kind in visibleKinds" :key="kind" :value="kind">
-        {{ kindLabels[kind] }}
+      <v-tab
+        v-for="kind in visibleKinds"
+        :key="kind"
+        :value="kind"
+        :prepend-icon="visitKindInfo(kind).icon"
+      >
+        {{ visitKindInfo(kind).label }}
       </v-tab>
     </v-tabs>
 
-    <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
+    <v-alert
+      v-if="errorMessage"
+      type="error"
+      density="compact"
+      variant="tonal"
+      class="mb-4"
+    >
       {{ errorMessage }}
     </v-alert>
 
-    <!-- Skeleton con la forma de las filas (título + subtítulo), para que la
-         lista no "salte" al terminar de cargar. -->
-    <v-skeleton-loader
-      v-if="loading"
-      type="list-item-two-line, list-item-two-line, list-item-two-line, list-item-two-line"
-    />
-
-    <v-list v-else lines="two">
-      <v-list-item v-for="service in services" :key="service.id">
-        <template #title>
-          <span :class="{ 'text-medium-emphasis': !service.is_active }">
-            {{ service.name }}
-            <v-chip v-if="!service.is_active" size="x-small" class="ml-2" variant="tonal">
-              inactivo
-            </v-chip>
-          </span>
-        </template>
-        <template #subtitle>
-          {{ service.duration_minutes }} min · {{ formatMXN(service.price_cents) }}
-        </template>
-        <template v-if="isOwner()" #append>
-          <v-btn icon="mdi-pencil" variant="text" size="small" @click="openEditService(service)" />
+    <!-- Tabla paginada. Sin `items-per-page` explícito arranca en 10; "Todos"
+         es -1 en Vuetify. La columna de acciones solo existe para el dueño. -->
+    <v-data-table
+      :headers="headers"
+      :items="services"
+      :loading="loading"
+      :row-props="rowProps"
+      class="services-table"
+      :items-per-page="10"
+      :items-per-page-options="itemsPerPageOptions"
+      items-per-page-text="Elementos por página"
+      no-data-text="No hay servicios en esta categoría todavía."
+      loading-text="Cargando servicios..."
+    >
+      <template #headers="{ columns }">
+        <tr>
+          <th
+            v-for="column in columns"
+            :key="column.key ?? column.title"
+            class="font-weight-bold text-center"
+          >
+            {{ column.title }}
+          </th>
+        </tr>
+      </template>
+      <template #[`item.name`]="{ item }">
+        <div class="service-name" :title="item.name">{{ item.name }}</div>
+      </template>
+      <template #[`item.duration_minutes`]="{ item }"
+        >{{ item.duration_minutes }} min</template
+      >
+      <template #[`item.price_cents`]="{ item }">{{
+        formatMXN(item.price_cents)
+      }}</template>
+      <template #[`item.actions`]="{ item }">
+        <div class="d-flex align-center justify-center">
+          <v-btn
+            icon="mdi-pencil"
+            color="primary"
+            variant="text"
+            size="small"
+            @click="openEditService(item)"
+          />
+          <v-btn
+            icon="mdi-delete"
+            color="error"
+            variant="text"
+            size="small"
+            aria-label="Eliminar servicio"
+            @click="askDelete(item)"
+          />
           <v-switch
-            :model-value="service.is_active"
-            :loading="togglingIds.has(service.id)"
-            :disabled="togglingIds.has(service.id)"
-            :aria-label="service.is_active ? 'Desactivar servicio' : 'Activar servicio'"
+            class="service-switch"
+            :model-value="item.is_active"
+            :loading="togglingIds.has(item.id)"
+            :disabled="togglingIds.has(item.id)"
+            :aria-label="item.is_active ? 'Desactivar servicio' : 'Activar servicio'"
             color="primary"
             density="compact"
             hide-details
-            @update:model-value="handleToggleActive(service, $event)"
+            @update:model-value="handleToggleActive(item, $event)"
           />
-        </template>
-      </v-list-item>
+        </div>
+      </template>
+    </v-data-table>
 
-      <v-list-item v-if="services.length === 0">
-        <template #title>No hay servicios en esta categoría todavía.</template>
-      </v-list-item>
-    </v-list>
+    <v-dialog v-model="showDeleteConfirm" max-width="420">
+      <v-card>
+        <v-card-title>Eliminar servicio</v-card-title>
+        <v-card-text>
+          ¿Seguro que quieres eliminar «{{ serviceToDelete?.name }}»? Dejará de verse en
+          el catálogo. Las citas y ventas donde ya se usó conservan su historial.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="deleting" @click="showDeleteConfirm = false">
+            Cancelar
+          </v-btn>
+          <v-btn color="error" :loading="deleting" @click="confirmDelete"
+            >Confirmar</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <ServiceFormDialog
       v-model="showFormDialog"
@@ -152,3 +292,23 @@ function handleSaved(): void {
     />
   </v-container>
 </template>
+
+<style scoped lang="scss">
+.services-table :deep(table) {
+  table-layout: fixed;
+}
+
+.service-switch {
+  margin-left: 5px;
+}
+
+.service-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.services-table :deep(.service-row--inactive td:not(.service-actions)) {
+  opacity: 0.5;
+}
+</style>

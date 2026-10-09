@@ -12,6 +12,7 @@ import type { Branch } from '@/services/branches'
 import { roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import EmployeeFormDialog from '@/components/EmployeeFormDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const session = useSessionStore()
 
@@ -96,18 +97,18 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Empleados</h1>
-      <v-spacer />
-      <v-btn
-        v-if="session.canEdit('employees')"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewEmployee"
-      >
-        Nuevo empleado
-      </v-btn>
-    </div>
+    <PageHeader title="Empleados">
+      <template #actions>
+        <v-btn
+          v-if="session.canEdit('employees')"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewEmployee"
+        >
+          Nuevo empleado
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ errorMessage }}

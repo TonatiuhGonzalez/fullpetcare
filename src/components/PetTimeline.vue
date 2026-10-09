@@ -19,10 +19,10 @@ const iconByType: Record<TimelineEntry['type'], string> = {
   weight: 'mdi-scale-bathroom',
 }
 const colorByType: Record<TimelineEntry['type'], string> = {
-  grooming: 'secondary',
-  veterinary: 'primary',
+  grooming: 'grooming',
+  veterinary: 'veterinary',
   vaccination: 'warning',
-  weight: 'info',
+  weight: 'secondary',
 }
 
 /** Id único DENTRO de su tipo (cada tipo trae su propio campo de id) — se combina con el tipo para que la key de Vue nunca choque entre tipos distintos. */

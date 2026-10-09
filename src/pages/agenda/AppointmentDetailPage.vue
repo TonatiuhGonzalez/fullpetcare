@@ -16,6 +16,7 @@ import type { EmployeeSummary } from '@/services/memberships'
 import { formatDate, formatTime, fromBranchTime } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
+import VisitKindChip from '@/components/VisitKindChip.vue'
 import { useSessionStore } from '@/stores/session'
 
 const props = defineProps<{ id: string }>()
@@ -39,7 +40,6 @@ const rescheduleDate = ref('')
 const rescheduleTime = ref('')
 const rescheduling = ref(false)
 
-const kindLabels: Record<string, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 const statusLabels: Record<string, string> = {
   scheduled: 'Agendada',
   in_progress: 'En curso',
@@ -158,7 +158,9 @@ async function handleReschedule(): Promise<void> {
         <strong>Cliente:</strong> {{ customer?.first_name }} {{ customer?.last_name }}
       </p>
       <p class="mb-1"><strong>Mascota:</strong> {{ pet?.name }}</p>
-      <p class="mb-1"><strong>Tipo:</strong> {{ kindLabels[appointment.kind] }}</p>
+      <p class="mb-1 d-flex align-center ga-2">
+        <strong>Tipo:</strong> <VisitKindChip :kind="appointment.kind" />
+      </p>
       <p class="mb-1"><strong>Empleado:</strong> {{ employeeName(appointment.employee_user_id) }}</p>
       <p v-if="appointment.notes" class="mb-1 text-body-2 text-medium-emphasis">
         {{ appointment.notes }}
