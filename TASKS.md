@@ -1906,3 +1906,51 @@ Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni
 
 - [ ] **17.10** 📚 Correr `lint`, `test:unit` y el E2E; actualizar `CLAUDE.md` (§4 estructura y §5.6 piezas
   compartidas) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+## Fase 18 — Suscripción modular: motor de derechos (planeada)
+
+**Meta: que lo que una empresa puede usar dependa de los módulos que contrató, y que lo imponga la base y no solo la
+interfaz.** Séptima fase de la **etapa de mejoras** (`CLAUDE.md` §1) y primera del release de suscripciones (fases 18 a
+21). **Estado: planeación aprobada el 2026-10-09; aún no se trabaja (sin fecha).** Decisiones y alternativas
+en `PLAN.md` D23. Sin servicio externo ni dependencia nueva; **no incluye precios ni cobro** (fases 19 a 21).
+
+### 18A. Preparación
+
+- [ ] **18.1** 📚 Revisar `PLAN.md` D23 (ya decidido: base y módulos, Punto de venta depende de Inventario, 1 sucursal y
+  3 empleados incluidos) y darla por vigente al arrancar. _Verificar:_ el usuario aprobó por escrito; D23 sin "propuesta"; la lista de
+  módulos y de tablas por módulo queda anotada aquí.
+- [ ] **18.2** 📚 Inventariar qué tablas, RPC, rutas y entradas de menú pertenecen a cada módulo. _Verificar:_ la lista
+  cubre toda tabla con `tenant_id` que no sea base; las que no encajan se discuten antes de seguir.
+
+### 18B. Base de datos
+
+- [ ] **18.3** 🧪 Migración aditiva: catálogo de módulos y derechos por empresa (con RLS, `tenant_id`, borrado suave y
+  `enforce_tenant_writable`, §6 y §7.3). Las empresas existentes reciben **todos** los módulos para no quitarle nada a
+  nadie. _Verificar:_ test de aislamiento; una empresa nueva y una existente quedan con los derechos esperados.
+- [ ] **18.4** 🧪 `app.has_module()` y `app.within_limit()` (`STABLE`, revalidan membresía). _Verificar:_ tests con
+  módulo activo, apagado, empresa en solo lectura y usuario de otra empresa.
+- [ ] **18.5** 🧪 Restricción de "al menos Estética o Veterinaria". _Verificar:_ intentar apagar el último falla en la
+  base aunque se haga por la API directa.
+- [ ] **18.6** 🧪 Políticas y RPC de cada módulo exigen su derecho para **escribir**; la lectura de datos existentes se
+  conserva (expediente clínico siempre legible, §8.5). _Verificar:_ por módulo, un test de "sin módulo no escribe" y otro
+  de "sin módulo sigue leyendo lo ya guardado".
+
+### 18C. Interfaz
+
+- [ ] **18.7** Store de derechos y `lib/entitlements.ts` (función pura: de derechos a menú y rutas permitidas).
+  _Verificar:_ tests unitarios; un módulo apagado no aparece en el menú ni abre por URL directa.
+- [ ] **18.8** Pantallas con módulo apagado: estética o veterinaria ausentes en agenda, citas y servicios; mensaje
+  "No incluido en tu plan" en rutas bloqueadas. _Verificar:_ en navegador con una empresa solo veterinaria y otra solo
+  estética.
+- [ ] **18.9** Superadmin: ver y editar los módulos de una empresa desde su detalle, con bitácora de plataforma.
+  _Verificar:_ el cambio queda en `platform_audit_log`; un no-superadmin no puede.
+
+### 18D. Cierre
+
+- [ ] **18.10** 🧪 Actualizar la semilla y `demo:reset` (un negocio con todos los módulos, otro parcial) y correr
+  `lint`, `test:unit`, `test:db` y el E2E.
+- [ ] **18.11** 📚 Actualizar `CLAUDE.md` (§1, §6.8 "el plan es solo informativo", §7.2 funciones auxiliares) y marcar la
+  fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+> Fases 19 (constructor de planes y precios), 20 (autoservicio del dueño y prueba gratis) y 21 (pago real) se detallan
+> cuando se apruebe la 18; su resumen está en `PLAN.md` D23, punto 7.
