@@ -8,6 +8,7 @@
 // Tarea 11.11: el ticket de una cita también puede llevar productos extra. La venta de
 // mostrador (sin cita) tiene su propia pantalla desde la fase 13: pages/ventas/PointOfSalePage.vue.
 import PageSkeleton from '@/components/PageSkeleton.vue'
+import PaymentSummary from '@/components/PaymentSummary.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
 
@@ -386,7 +387,8 @@ async function handleCharge(): Promise<void> {
           </v-list-item>
         </v-list>
 
-        <div class="d-flex align-end ga-2 mb-2">
+        <!-- Con el monto cubierto ya no tiene sentido registrar otro pago. -->
+        <div v-if="!cart.isCovered" class="d-flex align-end ga-2 mb-2">
           <v-select
             v-model="newPaymentMethod"
             :items="[
@@ -420,7 +422,7 @@ async function handleCharge(): Promise<void> {
         </div>
 
         <v-select
-          v-if="newPaymentMethod === 'card'"
+          v-if="!cart.isCovered && newPaymentMethod === 'card'"
           v-model="newCardType"
           :items="[
             { title: 'Tarjeta de crédito', value: '04' },
@@ -434,10 +436,7 @@ async function handleCharge(): Promise<void> {
           class="mb-2"
         />
 
-        <p class="text-body-2 mb-3">
-          Pagado: {{ formatMXN(cart.paidCents) }} · Falta:
-          {{ formatMXN(cart.remainingCents) }}
-        </p>
+        <PaymentSummary />
 
         <v-checkbox
           v-model="requiresInvoice"

@@ -278,6 +278,27 @@ begin
   update appointment_products set deleted_at = now()
     where tenant_id = v_tenant_patitas and deleted_at is null;
 
+  -- Categorías base (mismos datos que seed.sql, fase 13G): se reviven las editadas u
+  -- ocultadas y se ocultan (borrado suave) las creadas durante la demo.
+  insert into product_categories (id, tenant_id, name, icon)
+  values
+    ('21000000-0000-4000-8000-000000000001', v_tenant_patitas, 'Alimento', 'mdi-food-drumstick'),
+    ('21000000-0000-4000-8000-000000000002', v_tenant_patitas, 'Higiene', 'mdi-shower-head'),
+    ('21000000-0000-4000-8000-000000000003', v_tenant_patitas, 'Accesorios', 'mdi-dog-service'),
+    ('21000000-0000-4000-8000-000000000004', v_tenant_patitas, 'Juguetes', 'mdi-tennis-ball')
+  on conflict (id) do update set
+    name = excluded.name, icon = excluded.icon, is_active = true, deleted_at = null;
+
+  update product_categories set deleted_at = now()
+    where tenant_id = v_tenant_patitas
+      and deleted_at is null
+      and id <> all(array[
+        '21000000-0000-4000-8000-000000000001'::uuid,
+        '21000000-0000-4000-8000-000000000002'::uuid,
+        '21000000-0000-4000-8000-000000000003'::uuid,
+        '21000000-0000-4000-8000-000000000004'::uuid
+      ]);
+
   -- Catálogo base (mismos datos que seed.sql). Se revive lo que se hubiera
   -- editado u ocultado, y se oculta (borrado suave) cualquier producto creado
   -- durante la demo.
@@ -290,6 +311,10 @@ begin
     name = excluded.name, sku = excluded.sku, price_cents = excluded.price_cents,
     tax_rate_bp = excluded.tax_rate_bp, cost_cents = excluded.cost_cents,
     min_stock = excluded.min_stock, is_active = excluded.is_active, deleted_at = null;
+
+  update products set category_id = '21000000-0000-4000-8000-000000000001' where id = '20000000-0000-4000-8000-000000000001';
+  update products set category_id = '21000000-0000-4000-8000-000000000002' where id = '20000000-0000-4000-8000-000000000002';
+  update products set category_id = '21000000-0000-4000-8000-000000000003' where id = '20000000-0000-4000-8000-000000000003';
 
   update products set deleted_at = now()
     where tenant_id = v_tenant_patitas

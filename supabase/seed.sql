@@ -331,6 +331,20 @@ values
   ('20000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Collar de nylon mediano', 'COL-M', 9900, 1600, null, 0, false),
   ('20000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000002', 'Alimento seco cachorro 2 kg', 'ALI-2KG', 29900, 1600, null, 2, true);
 
+-- Categorías de producto de Patitas Felices (fase 13, 13G) y su asignación a los productos
+-- de arriba. El alimento de cachorro es de Huellitas Spa y no lleva categoría (sus categorías
+-- no existen todavía): la tarjeta "Sin categoría" del punto de venta se prueba con ese caso.
+insert into product_categories (id, tenant_id, name, icon)
+values
+  ('21000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Alimento', 'mdi-food-drumstick'),
+  ('21000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Higiene', 'mdi-shower-head'),
+  ('21000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Accesorios', 'mdi-dog-service'),
+  ('21000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'Juguetes', 'mdi-tennis-ball');
+
+update products set category_id = '21000000-0000-4000-8000-000000000001' where id = '20000000-0000-4000-8000-000000000001';
+update products set category_id = '21000000-0000-4000-8000-000000000002' where id = '20000000-0000-4000-8000-000000000002';
+update products set category_id = '21000000-0000-4000-8000-000000000003' where id = '20000000-0000-4000-8000-000000000003';
+
 -- ===========================================================================
 -- Catálogo de vacunas (fase 4, tarea 4.5)
 -- ===========================================================================

@@ -26,6 +26,17 @@ describe('checkoutErrorMessage', () => {
     ).toMatch(/crédito o de débito/)
   })
 
+  it('explica que solo el efectivo puede pagar de más', () => {
+    // Qué se rompería: si la base rechaza el sobrepago con tarjeta y aquí no se traduce, quien
+    // cobra vería "revisa tu conexión" y reintentaría una y otra vez sin entender el motivo.
+    expect(
+      checkoutErrorMessage({
+        message:
+          'Solo se puede pagar de más en efectivo: el excedente (5000) no se puede devolver.',
+      }),
+    ).toMatch(/solo el efectivo puede pagar de más/i)
+  })
+
   it('con un error desconocido o sin mensaje, cae en el genérico de conexión', () => {
     expect(checkoutErrorMessage(null)).toBe('No se pudo cobrar. Revisa tu conexión.')
     expect(checkoutErrorMessage({ message: 'algo raro' })).toBe(

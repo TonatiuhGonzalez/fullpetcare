@@ -31,10 +31,17 @@ vi.mock('@/services/products', () => ({
   update: vi.fn(),
   setActive: vi.fn(),
 }))
+vi.mock('@/services/productCategories', () => ({
+  list: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  setActive: vi.fn(),
+}))
 vi.mock('@/services/inventory', () => ({ listStock: vi.fn(), registerMovement: vi.fn() }))
 
 import type { ProductInput } from '@/lib/inventory'
 import * as inventoryService from '@/services/inventory'
+import * as categoriesService from '@/services/productCategories'
 import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
 
@@ -45,6 +52,7 @@ function product(id: string, over: Partial<Product> = {}): Product {
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  vi.mocked(categoriesService.list).mockResolvedValue([])
   const session = useSessionStore()
   session.activeTenantId = 'tenant-a'
   session.activeBranchId = 'branch-1'
@@ -207,11 +215,13 @@ describe('saveProduct', () => {
     minStock: 2,
     satProductCode: '01010101',
     satUnitCode: 'h87',
+    categoryId: null,
   }
 
   beforeEach(() => {
     vi.mocked(productsService.list).mockResolvedValue([])
     vi.mocked(inventoryService.listStock).mockResolvedValue([])
+    vi.mocked(categoriesService.list).mockResolvedValue([])
   })
 
   it('un alta se crea con el negocio activo, datos limpios, y recarga', async () => {
@@ -229,6 +239,7 @@ describe('saveProduct', () => {
       min_stock: 2,
       sat_product_code: '01010101',
       sat_unit_code: 'H87',
+      category_id: null,
       tenant_id: 'tenant-a',
     })
     expect(productsService.list).toHaveBeenCalledTimes(1) // recargó
@@ -293,5 +304,74 @@ describe('setProductActive', () => {
 
     expect(error).toBe('No se pudo desactivar el producto. Revisa tu conexión.')
     expect(store.rows[0].product.is_active).toBe(true)
+  })
+})
+
+describe('categorías de producto', () => {
+  beforeEach(() => {
+    vi.mocked(productsService.list).mockResolvedValue([])
+    vi.mocked(inventoryService.listStock).mockResolvedValue([])
+    vi.mocked(categoriesService.list).mockResolvedValue([])
+  })
+
+  it('crea una categoría con el negocio activo, el nombre limpio, y recarga', async () => {
+    // Qué se rompería: sin el negocio activo la política RLS la rechazaría, y un nombre con
+    // espacios sobrantes chocaría con el índice único de la base al "repetirse".
+    const store = useInventoryStore()
+
+    const error = await store.saveCategory({ name: '  Juguetes ', icon: 'mdi-bone' })
+
+    expect(error).toBeNull()
+    expect(categoriesService.create).toHaveBeenCalledWith('tenant-a', {
+      name: 'Juguetes',
+      icon: 'mdi-bone',
+    })
+    expect(categoriesService.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('con categoryId edita en vez de crear', async () => {
+    // Editar con "create" duplicaría la categoría en cada guardado.
+    const store = useInventoryStore()
+
+    await store.saveCategory({ name: 'Juguetes', icon: 'mdi-bone' }, 'c1')
+
+    expect(categoriesService.update).toHaveBeenCalledWith('c1', {
+      name: 'Juguetes',
+      icon: 'mdi-bone',
+    })
+    expect(categoriesService.create).not.toHaveBeenCalled()
+  })
+
+  it('un nombre repetido se traduce a un mensaje claro', async () => {
+    // Qué se rompería: la persona vería "No se pudo guardar. Revisa tu conexión" y creería
+    // que es un problema de red, cuando solo ya existe esa categoría.
+    vi.mocked(categoriesService.create).mockRejectedValueOnce({ code: '23505' })
+    const store = useInventoryStore()
+
+    const error = await store.saveCategory({ name: 'Juguetes', icon: 'mdi-bone' })
+
+    expect(error).toBe('Ya existe una categoría con ese nombre.')
+  })
+
+  it('un dato inválido se rechaza sin llamar a la base', async () => {
+    const store = useInventoryStore()
+
+    const error = await store.saveCategory({ name: '  ', icon: 'mdi-bone' })
+
+    expect(error).toMatch(/nombre/)
+    expect(categoriesService.create).not.toHaveBeenCalled()
+  })
+
+  it('desactivar una categoría no toca la lista de productos', async () => {
+    // Decisión del usuario: sus productos pasan a "Sin categoría" sin modificarlos.
+    const store = useInventoryStore()
+    store.categories = [{ id: 'c1', is_active: true } as never]
+
+    const error = await store.setCategoryActive('c1', false)
+
+    expect(error).toBeNull()
+    expect(categoriesService.setActive).toHaveBeenCalledWith('c1', false)
+    expect(store.categories[0].is_active).toBe(false)
+    expect(productsService.update).not.toHaveBeenCalled()
   })
 })

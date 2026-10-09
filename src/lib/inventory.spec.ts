@@ -168,6 +168,7 @@ describe('validateProduct', () => {
     minStock: 0,
     satProductCode: '01010101',
     satUnitCode: 'H87',
+    categoryId: null,
   }
 
   it('acepta precio 0, costo vacío y mínimo 0', () => {

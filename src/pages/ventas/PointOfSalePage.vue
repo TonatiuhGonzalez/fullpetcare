@@ -11,10 +11,17 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import PaymentSummary from '@/components/PaymentSummary.vue'
+import PosProductTile from '@/components/PosProductTile.vue'
 import TicketView from '@/components/TicketView.vue'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
 import { formatMXN, pesosToCents } from '@/lib/money'
-import { findBySku, searchProducts } from '@/lib/productSearch'
+import {
+  groupByCategory,
+  productsInCategory,
+  recentlySold,
+} from '@/lib/productCategories'
+import { filterProducts, findBySku, searchProducts } from '@/lib/productSearch'
 import { customerFiscalProblems } from '@/lib/validation'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import * as customersService from '@/services/customers'
@@ -33,29 +40,90 @@ const loading = ref(true)
 const loadError = ref<string | null>(null)
 
 // --- Captura de productos ---------------------------------------------------
+/** Campo único: lo que teclea una persona (nombre) o "teclea" un lector (código + Enter). */
 const barcode = ref('')
 const barcodeField = ref<{ focus: () => void } | null>(null)
-const productToAdd = ref<SellableProduct | null>(null)
-/** Texto escrito en "Buscar por nombre": se limpia al elegir para que el campo quede listo para el siguiente. */
-const nameSearch = ref('')
-/** Aviso bajo el campo de código: producto no encontrado o sin existencia suficiente. */
+/** Aviso de captura (se muestra en un toast de 3 s): producto no encontrado o sin existencia suficiente. */
 const entryMessage = ref<string | null>(null)
+const showEntryToast = ref(false)
+/** Cambia en cada aviso: reinicia los 3 segundos si llega otro mientras el anterior sigue visible. */
+const entryToastKey = ref(0)
+/** Último producto agregado: su fila del ticket se resalta un momento para confirmar la captura. */
+const lastAddedId = ref<string | null>(null)
+let flashTimer: ReturnType<typeof setTimeout> | undefined
+
+/** Con texto en el campo, la fila de arriba muestra los productos que coinciden. */
+const searchResults = computed(() => filterProducts(cart.catalog, barcode.value))
+const isSearching = computed(() => barcode.value.trim().length > 0)
+
+// Fila de arriba: categorías, o los productos de la categoría abierta.
+const categoryTiles = computed(() => groupByCategory(cart.catalog, cart.categories))
+const openCategoryId = ref<string | null>(null)
+const openCategory = computed(
+  () => categoryTiles.value.find((c) => c.id === openCategoryId.value) ?? null,
+)
+const categoryProducts = computed(() =>
+  openCategoryId.value
+    ? productsInCategory(cart.catalog, cart.categories, openCategoryId.value)
+    : [],
+)
+
+// Fila de abajo: últimos vendidos, tantos como quepan en el ancho (sin scroll).
+const TILE_WIDTH = 170
+const TILE_GAP = 8
+const recentRow = ref<HTMLElement | null>(null)
+const recentCapacity = ref(4)
+let recentObserver: ResizeObserver | undefined
+const recentProducts = computed(() =>
+  recentlySold(cart.catalog, cart.recentSoldProductIds, recentCapacity.value),
+)
+
+function updateRecentCapacity(width: number): void {
+  recentCapacity.value = Math.max(
+    1,
+    Math.floor((width + TILE_GAP) / (TILE_WIDTH + TILE_GAP)),
+  )
+}
+
+/** Piezas de cada producto que ya lleva el ticket, para marcarlas en su tarjeta. */
+const quantityInTicket = computed(
+  () => new Map(cart.productItems.map((p) => [p.productId, p.quantity])),
+)
+
+/** Muestra un aviso de captura en un toast de 3 s; un aviso nuevo reinicia el tiempo. */
+function setEntryMessage(message: string): void {
+  entryMessage.value = message
+  showEntryToast.value = true
+  entryToastKey.value++
+}
 
 function focusBarcode(): void {
   barcodeField.value?.focus()
 }
 
 /** Suma una pieza al ticket; avisa si la existencia no alcanza (cantidades siempre enteras). */
-function addToTicket(product: SellableProduct): void {
-  entryMessage.value = null
+function addToTicket(product: SellableProduct): boolean {
   if (!cart.addProduct(product, 1)) {
-    entryMessage.value = `Solo hay ${product.stock} pieza(s) de "${product.name}".`
+    setEntryMessage(`Solo hay ${product.stock} pieza(s) de "${product.name}".`)
+    return false
   }
+  lastAddedId.value = product.id
+  clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => (lastAddedId.value = null), 1200)
+  return true
+}
+
+/** Un toque en una tarjeta de producto (de cualquiera de las dos filas): suma una pieza y deja el campo listo para lo siguiente. */
+function handleTileClick(product: SellableProduct): void {
+  addToTicket(product)
+  barcode.value = ''
+  focusBarcode()
 }
 
 /**
  * Un lector de código de barras "teclea" el código y manda Enter, así que Enter (o el
- * botón Agregar) dispara esto. La búsqueda es por código EXACTO (lib/productSearch.ts).
+ * botón Agregar) dispara esto. Con código EXACTO (lib/productSearch.ts) agrega el
+ * producto; si no, el texto se queda y la fila de arriba ya muestra las coincidencias por nombre.
  */
 function handleBarcode(): void {
   const code = barcode.value.trim()
@@ -63,27 +131,32 @@ function handleBarcode(): void {
   const product = findBySku(cart.catalog, code)
   if (product) {
     addToTicket(product)
+    barcode.value = ''
+  } else if (searchResults.value.length > 0) {
+    setEntryMessage(
+      `No hay un producto con el código "${code}". Elige uno de los que aparecen arriba.`,
+    )
   } else {
-    entryMessage.value = `No hay un producto con existencia con el código "${code}".`
+    setEntryMessage(`No hay un producto con existencia que coincida con "${code}".`)
+    barcode.value = ''
   }
-  barcode.value = ''
   focusBarcode()
 }
 
-// Productos sin código (el código es opcional) se agregan por nombre.
-watch(productToAdd, (product) => {
-  if (!product) return
-  addToTicket(product)
-  productToAdd.value = null
-  nameSearch.value = ''
-})
+/** Al volver al campo se selecciona lo escrito: el siguiente escaneo reemplaza el texto en vez de pegarse a él. */
+function selectOnFocus(event: FocusEvent): void {
+  ;(event.target as HTMLInputElement | null)?.select()
+}
 
 function handleQuantity(productId: string, value: string | number): void {
-  entryMessage.value = null
   if (!cart.setProductQuantity(productId, Number(value))) {
-    entryMessage.value =
-      'La cantidad debe ser un entero y no puede pasar de la existencia.'
+    setEntryMessage('La cantidad debe ser un entero y no puede pasar de la existencia.')
   }
+}
+
+/** Botones − y +: cambian la cantidad en uno (la existencia máxima la valida el store). */
+function stepQuantity(productId: string, current: number, delta: number): void {
+  handleQuantity(productId, current + delta)
 }
 
 const pieceCount = computed(() =>
@@ -109,6 +182,7 @@ async function startSale(): Promise<void> {
   loading.value = true
   loadError.value = null
   // Primero se arma la venta (reset) y luego se carga el catálogo: reset() lo vacía.
+  openCategoryId.value = null
   cart.loadCounterSale(branchId)
   await cart.loadCatalog(tenantId, branchId)
   loading.value = false
@@ -118,13 +192,41 @@ async function startSale(): Promise<void> {
 
 function handleCancel(): void {
   showCancel.value = false
-  entryMessage.value = null
+  showEntryToast.value = false
   void startSale()
 }
 
-onMounted(startSale)
+// Atajos: F2 va al campo de captura y F9 abre el cobro. No actúan con un diálogo abierto
+// (se escribiría en el campo de atrás) ni mientras carga.
+function handleShortcut(event: KeyboardEvent): void {
+  if (event.key !== 'F2' && event.key !== 'F9') return
+  if (loading.value || showPayment.value || showCancel.value || showPriceCheck.value)
+    return
+  event.preventDefault()
+  if (event.key === 'F2') {
+    focusBarcode()
+  } else if (cart.productItems.length > 0) {
+    openPayment()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleShortcut)
+  if (recentRow.value && typeof ResizeObserver !== 'undefined') {
+    recentObserver = new ResizeObserver(([entry]) =>
+      updateRecentCapacity(entry.contentRect.width),
+    )
+    recentObserver.observe(recentRow.value)
+  }
+  void startSale()
+})
 // Si el usuario sale a otra pantalla con el ticket a medias, no se arrastra a la siguiente.
-onBeforeUnmount(() => cart.reset())
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleShortcut)
+  recentObserver?.disconnect()
+  clearTimeout(flashTimer)
+  cart.reset()
+})
 
 // --- Cobro ------------------------------------------------------------------------
 const showPayment = ref(false)
@@ -307,53 +409,32 @@ function handleNewSale(): void {
     </v-alert>
 
     <v-card class="pa-4 d-flex flex-column pos-card">
-      <!-- Barra de captura: código de barras, nombre y consulta de precio. -->
+      <!-- Barra de captura: un solo campo para código de barras o nombre, y consulta de precio. -->
       <div class="d-flex flex-wrap align-center ga-3">
         <v-icon icon="mdi-barcode-scan" size="large" class="text-medium-emphasis" />
         <v-text-field
           ref="barcodeField"
           v-model="barcode"
-          label="Código de barras"
+          label="Código de barras o nombre (F2)"
           density="compact"
           hide-details
           autofocus
+          clearable
+          prepend-inner-icon="mdi-magnify"
           class="pos-field"
           :disabled="loading"
+          @focus="selectOnFocus"
           @keydown.enter.prevent="handleBarcode"
         />
         <v-btn
           color="primary"
           variant="tonal"
           prepend-icon="mdi-plus"
-          :disabled="loading || !barcode.trim()"
+          :disabled="loading || !barcode?.trim()"
           @click="handleBarcode"
         >
           Agregar
         </v-btn>
-
-        <v-divider vertical class="mx-1" />
-
-        <v-autocomplete
-          v-model="productToAdd"
-          v-model:search="nameSearch"
-          :items="cart.catalog"
-          item-title="name"
-          return-object
-          label="Buscar por nombre"
-          variant="outlined"
-          density="compact"
-          hide-details
-          class="pos-field"
-          :disabled="loading"
-          no-data-text="No hay productos con existencia"
-        >
-          <template #item="{ props: itemProps, item }">
-            <v-list-item
-              v-bind="itemProps"
-              :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${item.raw.stock}`"
-            />
-          </template>
-        </v-autocomplete>
 
         <v-spacer />
 
@@ -366,9 +447,102 @@ function handleNewSale(): void {
           Consultar precio
         </v-btn>
       </div>
-      <p v-if="entryMessage" class="text-caption text-error mt-2 mb-0">
-        {{ entryMessage }}
-      </p>
+      <!-- Fila de arriba: categorías; al abrir una (o al escribir en el campo), sus productos. -->
+      <div class="d-flex align-center ga-2 mt-3">
+        <!-- Categoría abierta: ocupa el primer lugar de la fila (fija, solo indica; no se toca). -->
+        <v-card
+          v-if="openCategory && !isSearching"
+          variant="flat"
+          color="primary"
+          class="pos-row-item pos-category pos-category--open pa-2 d-flex flex-column align-center justify-center"
+          :aria-label="`Categoría ${openCategory.name}`"
+        >
+          <v-icon :icon="openCategory.icon" size="32" />
+          <div class="pos-category-name text-body-2 font-weight-medium mt-1">
+            {{ openCategory.name }}
+          </div>
+        </v-card>
+        <div class="pos-row" aria-label="Categorías y productos">
+          <template v-if="isSearching">
+            <PosProductTile
+              v-for="product in searchResults"
+              :key="product.id"
+              class="pos-row-item"
+              :product="product"
+              :in-ticket="quantityInTicket.get(product.id) ?? 0"
+              @select="handleTileClick"
+            />
+            <p
+              v-if="searchResults.length === 0"
+              class="text-body-2 text-medium-emphasis align-self-center mb-0"
+            >
+              Ningún producto coincide.
+            </p>
+          </template>
+          <template v-else-if="openCategory">
+            <PosProductTile
+              v-for="product in categoryProducts"
+              :key="product.id"
+              class="pos-row-item"
+              :product="product"
+              :in-ticket="quantityInTicket.get(product.id) ?? 0"
+              @select="handleTileClick"
+            />
+          </template>
+          <template v-else>
+            <v-card
+              v-for="category in categoryTiles"
+              :key="category.id"
+              variant="outlined"
+              class="pos-row-item pos-category pa-2 d-flex flex-column align-center justify-center"
+              role="button"
+              tabindex="0"
+              :aria-label="`Abrir categoría ${category.name}`"
+              @click="openCategoryId = category.id"
+              @keydown.enter.prevent="openCategoryId = category.id"
+              @keydown.space.prevent="openCategoryId = category.id"
+            >
+              <v-icon :icon="category.icon" size="32" color="primary" />
+              <div class="pos-category-name text-body-2 font-weight-medium mt-1">
+                {{ category.name }}
+              </div>
+            </v-card>
+            <p
+              v-if="!loading && categoryTiles.length === 0"
+              class="text-body-2 text-medium-emphasis align-self-center mb-0"
+            >
+              No hay productos con existencia.
+            </p>
+          </template>
+        </div>
+        <v-btn
+          v-if="openCategory && !isSearching"
+          variant="tonal"
+          prepend-icon="mdi-arrow-left"
+          @click="openCategoryId = null"
+        >
+          Volver
+        </v-btn>
+      </div>
+
+      <!-- Fila de abajo: últimos productos vendidos, los que quepan en el ancho. -->
+      <div class="text-caption text-medium-emphasis mt-3 mb-1">Últimos vendidos</div>
+      <div ref="recentRow" class="pos-recent">
+        <PosProductTile
+          v-for="product in recentProducts"
+          :key="product.id"
+          class="pos-row-item"
+          :product="product"
+          :in-ticket="quantityInTicket.get(product.id) ?? 0"
+          @select="handleTileClick"
+        />
+        <p
+          v-if="!loading && recentProducts.length === 0"
+          class="text-body-2 text-medium-emphasis mb-0"
+        >
+          Aún no hay ventas recientes.
+        </p>
+      </div>
 
       <!-- Ticket en curso. -->
       <div class="pos-lines mt-4">
@@ -383,23 +557,44 @@ function handleNewSale(): void {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in cart.productItems" :key="item.productId">
+            <tr
+              v-for="item in cart.productItems"
+              :key="item.productId"
+              :class="{ 'pos-row-flash': item.productId === lastAddedId }"
+            >
               <td class="pos-description" :title="item.description">
                 {{ item.description }}
               </td>
               <td class="text-right">{{ formatMXN(item.unitPriceCents) }}</td>
               <td class="text-center">
-                <v-text-field
-                  :model-value="item.quantity"
-                  type="number"
-                  min="1"
-                  step="1"
-                  density="compact"
-                  hide-details
-                  class="pos-qty"
-                  aria-label="Cantidad"
-                  @update:model-value="handleQuantity(item.productId, $event)"
-                />
+                <div class="d-flex align-center justify-center ga-1">
+                  <v-btn
+                    icon="mdi-minus"
+                    size="x-small"
+                    variant="tonal"
+                    aria-label="Quitar una pieza"
+                    :disabled="item.quantity <= 1"
+                    @click="stepQuantity(item.productId, item.quantity, -1)"
+                  />
+                  <v-text-field
+                    :model-value="item.quantity"
+                    type="number"
+                    min="1"
+                    step="1"
+                    density="compact"
+                    hide-details
+                    class="pos-qty"
+                    aria-label="Cantidad"
+                    @update:model-value="handleQuantity(item.productId, $event)"
+                  />
+                  <v-btn
+                    icon="mdi-plus"
+                    size="x-small"
+                    variant="tonal"
+                    aria-label="Agregar una pieza"
+                    @click="stepQuantity(item.productId, item.quantity, 1)"
+                  />
+                </div>
               </td>
               <td class="text-right">
                 {{ formatMXN(item.unitPriceCents * item.quantity) }}
@@ -418,7 +613,7 @@ function handleNewSale(): void {
               <td colspan="5" class="text-center text-medium-emphasis py-8">
                 <v-progress-circular v-if="loading" indeterminate color="primary" />
                 <template v-else>
-                  Escanea un código de barras o busca un producto por nombre.
+                  Escanea un código, escribe un nombre o toca un producto de arriba.
                 </template>
               </td>
             </tr>
@@ -455,10 +650,21 @@ function handleNewSale(): void {
           :disabled="cart.productItems.length === 0"
           @click="openPayment"
         >
-          Cobrar
+          Cobrar (F9)
         </v-btn>
       </div>
     </v-card>
+
+    <!-- Avisos de captura: toast de 3 segundos (no hay existencia, código no encontrado…). -->
+    <v-snackbar
+      :key="entryToastKey"
+      v-model="showEntryToast"
+      :timeout="3000"
+      color="error"
+      location="top"
+    >
+      {{ entryMessage }}
+    </v-snackbar>
 
     <!-- Consultar precio: busca un producto y muestra su precio, sin tocar el ticket. -->
     <v-dialog v-model="showPriceCheck" max-width="560" @after-leave="priceQuery = ''">
@@ -597,7 +803,8 @@ function handleNewSale(): void {
             </v-list-item>
           </v-list>
 
-          <div class="d-flex align-end ga-2 mb-2">
+          <!-- Con el monto cubierto ya no tiene sentido registrar otro pago. -->
+          <div v-if="!cart.isCovered" class="d-flex align-end ga-2 mb-2">
             <v-select
               v-model="newPaymentMethod"
               :items="[
@@ -631,7 +838,7 @@ function handleNewSale(): void {
           </div>
 
           <v-select
-            v-if="newPaymentMethod === 'card'"
+            v-if="!cart.isCovered && newPaymentMethod === 'card'"
             v-model="newCardType"
             :items="[
               { title: 'Tarjeta de crédito', value: '04' },
@@ -645,10 +852,7 @@ function handleNewSale(): void {
             class="mb-2"
           />
 
-          <p class="text-body-2 mb-3">
-            Pagado: {{ formatMXN(cart.paidCents) }} · Falta:
-            {{ formatMXN(cart.remainingCents) }}
-          </p>
+          <PaymentSummary />
 
           <v-checkbox
             v-model="requiresInvoice"
@@ -774,7 +978,7 @@ function handleNewSale(): void {
 }
 
 .col-qty {
-  width: 140px;
+  width: 190px;
 }
 
 .col-actions {
@@ -802,12 +1006,63 @@ function handleNewSale(): void {
 }
 
 .pos-field {
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 260px;
+  max-width: 420px;
+}
+
+// Fila de arriba: UNA sola fila con scroll horizontal (categorías o productos).
+.pos-row {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+// Fila de abajo: una sola fila SIN scroll; la página calcula cuántas tarjetas caben.
+.pos-recent {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+
+// Mismo ancho y alto para categorías y productos, así las dos filas se alinean.
+.pos-row-item {
+  flex: 0 0 170px;
+  width: 170px;
+  height: 92px;
+}
+
+.pos-category {
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    background-color: rgba(var(--v-theme-primary), 0.08);
+  }
+}
+
+.pos-category--open {
+  cursor: default;
+}
+
+.pos-category-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Fila recién agregada: confirma que la captura entró.
+.pos-row-flash td {
+  background-color: rgba(var(--v-theme-primary), 0.14);
 }
 
 .pos-qty {
-  width: 90px;
+  width: 72px;
   margin: 0 auto;
 }
 </style>

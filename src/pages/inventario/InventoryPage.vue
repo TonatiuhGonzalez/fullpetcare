@@ -12,6 +12,7 @@ import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ProductCategoriesDialog from '@/components/ProductCategoriesDialog.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
 
@@ -50,6 +51,7 @@ watch(
   () => inventory.load(),
 )
 
+const showCategoriesDialog = ref(false)
 const showProductDialog = ref(false)
 const editingProduct = ref<Product | null>(null)
 
@@ -89,6 +91,15 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
   <v-container class="py-6">
     <PageHeader title="Inventario">
       <template #actions>
+        <v-btn
+          v-if="canEdit"
+          variant="outlined"
+          prepend-icon="mdi-shape-outline"
+          class="mr-2"
+          @click="showCategoriesDialog = true"
+        >
+          Categorías
+        </v-btn>
         <v-btn
           v-if="canEdit"
           color="primary"
@@ -225,6 +236,7 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       </v-list-item>
     </v-list>
 
+    <ProductCategoriesDialog v-model="showCategoriesDialog" />
     <ProductFormDialog v-model="showProductDialog" :product="editingProduct" />
     <StockMovementDialog
       v-model="showMovementDialog"

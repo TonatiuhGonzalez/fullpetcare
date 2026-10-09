@@ -661,6 +661,30 @@ revisa pieza por pieza.
 
 **5. Sin dependencias nuevas** (§3). Todo con Vue, Vuetify y lo que ya existe.
 
+**6. Extensión de captura (2026-10-09, aprobada por el usuario).** Escribir el código o el nombre era poco amigable.
+Se agrega una **cuadrícula de productos tocables debajo de la barra de captura**, un solo campo "código de barras o
+nombre" que además filtra la cuadrícula, resaltado de la fila agregada, botones − y + en la cantidad y atajos F2
+(captura) y F9 (cobrar). **Esto revoca el "sin atajos" del punto 2.** *Alternativas descartadas por ahora:* cuadrícula
+junto al ticket (menos espacio para el ticket), categorías (necesitan migración y campo en Inventario), fotos de
+producto (bucket y columna nuevos) y escaneo con cámara (dependencia nueva, §3). *Costo aceptado:* la cuadrícula
+muestra todo el catálogo con existencia, que con cientos de productos obliga a filtrar; por eso el campo la filtra.
+
+**7. Categorías y dos filas (2026-10-09, aprobada por el usuario; reemplaza la cuadrícula única del punto 6).**
+La cuadrícula plana no escala con un catálogo grande. Los productos se agrupan en **categorías**; el punto de venta
+muestra **dos filas**: arriba, categorías (o los productos de la categoría abierta, con "Volver") en una sola fila con
+scroll horizontal; abajo, los **últimos productos vendidos**, tantos como quepan en el ancho. Decisiones del usuario:
+- *Modelo:* tabla `product_categories` por negocio (nombre + ícono, RLS con el permiso `inventory`), no un enum fijo.
+  **Alternativa descartada:** enum de Postgres (más simple, pero todos los negocios tendrían las mismas y agregar una
+  pide migración). **Costo aceptado:** migración, RLS, bitácora y una pantalla de administración.
+- *Administración:* en Inventario (diálogo de categorías y selector en el formulario de producto).
+- *Íconos:* lista curada de ~24 de Material Design; no se guarda texto libre.
+- *Sin categoría:* tarjeta "Sin categoría" (solo si hay productos sin ella). Desactivar una categoría (borrado suave)
+  **no modifica sus productos**: pasan ahí.
+- *Campo de captura:* escribir reemplaza la fila superior por los productos que coinciden; el código exacto sigue
+  agregando directo.
+- *Fila inferior:* últimos productos **vendidos** (no dados de alta), con existencia en la sucursal.
+*Costo aceptado:* "últimos vendidos" depende de que haya ventas; en un negocio nuevo la fila inferior empieza vacía.
+
 **Pendientes:** ninguno.
 
 ### D19 — Clientes y mascotas: acciones en la tabla y modales de edición directa

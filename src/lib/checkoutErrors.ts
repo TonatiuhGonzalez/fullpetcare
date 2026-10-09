@@ -26,6 +26,9 @@ export function checkoutErrorMessage(err: unknown): string {
 
   if (/no cubre el total/i.test(message))
     return 'El monto pagado no cubre el total de la venta.'
+  if (/solo se puede pagar de más en efectivo/i.test(message)) {
+    return 'Solo el efectivo puede pagar de más: lo que sobre de una tarjeta o transferencia no se puede devolver.'
+  }
   if (/no tiene existencia|no hay existencia suficiente/i.test(message)) {
     return 'Un producto ya no tiene existencia suficiente. Quítalo o baja la cantidad.'
   }

@@ -99,6 +99,8 @@ export interface ProductInput {
   minStock: number
   satProductCode: string
   satUnitCode: string
+  /** Categoría para agrupar el punto de venta; null = sin categoría. */
+  categoryId: string | null
 }
 
 /**

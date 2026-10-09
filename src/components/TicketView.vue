@@ -2,11 +2,23 @@
 // Ticket imprimible de una venta ya cobrada (tarea 5.15). Componente
 // "tonto" (CLAUDE.md §4): solo recibe el ticket ya armado por
 // services/checkout.ts#charge()/getTicket() — no habla con Supabase.
+import { computed } from 'vue'
+
 import { formatDate, formatTime } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
+import { paymentChange } from '@/lib/paymentChange'
 import type { Ticket } from '@/services/checkout'
 
 const props = defineProps<{ ticket: Ticket }>()
+
+// El cambio no se guarda: se deriva de los pagos y el total, con la misma regla de Caja.
+const changeCents = computed(
+  () =>
+    paymentChange(
+      props.ticket.sale.total_cents,
+      props.ticket.payments.map((p) => ({ method: p.method, amountCents: p.amount_cents })),
+    ).changeCents,
+)
 
 const methodLabels: Record<string, string> = {
   cash: 'Efectivo',
@@ -79,6 +91,14 @@ function print(): void {
           <span v-if="payment.reference" class="text-medium-emphasis"> ({{ payment.reference }})</span>
         </span>
         <span>{{ formatMXN(payment.amount_cents) }}</span>
+      </div>
+      <!-- Cambio: lo recibido en efectivo de más (misma regla que Caja); no se guarda, se deriva. -->
+      <div
+        v-if="changeCents > 0"
+        class="d-flex justify-space-between text-subtitle-2 font-weight-bold mt-1"
+      >
+        <span>Cambio</span>
+        <span>{{ formatMXN(changeCents) }}</span>
       </div>
     </div>
 

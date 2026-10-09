@@ -58,6 +58,7 @@ import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
 import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
+import PaymentSummary from '@/components/PaymentSummary.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import TicketView from '@/components/TicketView.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
@@ -686,7 +687,8 @@ function checkoutErrorMessage(err: unknown): string {
               </v-list-item>
             </v-list>
 
-            <div class="d-flex align-end ga-2 mb-2">
+            <!-- Con el monto cubierto ya no tiene sentido registrar otro pago. -->
+            <div v-if="!cart.isCovered" class="d-flex align-end ga-2 mb-2">
               <v-select
                 v-model="newPaymentMethod"
                 :items="[
@@ -712,9 +714,7 @@ function checkoutErrorMessage(err: unknown): string {
               <v-btn icon="mdi-plus" color="primary" variant="tonal" @click="handleAddPayment" />
             </div>
 
-            <p class="text-body-2 mb-3">
-              Pagado: {{ formatMXN(cart.paidCents) }} · Falta: {{ formatMXN(cart.remainingCents) }}
-            </p>
+            <PaymentSummary />
 
             <v-checkbox
               v-model="requiresInvoice"

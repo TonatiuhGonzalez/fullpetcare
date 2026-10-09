@@ -55,6 +55,13 @@ export const PRODUCT_SHAMPOO = '20000000-0000-4000-8000-000000000002'
 export const PRODUCT_COLLAR_INACTIVO = '20000000-0000-4000-8000-000000000003'
 export const PRODUCT_HUELLITAS = '20000000-0000-4000-8000-000000000004'
 
+// Categorías de producto (fase 13, 13G) — las cuatro son de Patitas Felices. Alimento y Higiene
+// tienen producto asignado en la semilla; Accesorios lo tiene el collar inactivo.
+export const CATEGORY_ALIMENTO = '21000000-0000-4000-8000-000000000001'
+export const CATEGORY_HIGIENE = '21000000-0000-4000-8000-000000000002'
+export const CATEGORY_ACCESORIOS = '21000000-0000-4000-8000-000000000003'
+export const CATEGORY_JUGUETES = '21000000-0000-4000-8000-000000000004'
+
 // Catálogo de vacunas (fase 4, tarea 4.5) — todas en Patitas Felices.
 export const VACCINE_RABIA = '10000000-0000-4000-8000-000000000001'
 export const VACCINE_TRIPLE_FELINA = '10000000-0000-4000-8000-000000000002'

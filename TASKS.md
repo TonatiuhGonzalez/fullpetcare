@@ -1326,6 +1326,92 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
   solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.
 
+### 13F. Extensión: captura más amigable (aprobada el 2026-10-09; `PLAN.md` D18, punto 6)
+
+Solo interfaz (Vue/Vuetify): sin migración, sin dependencia nueva, sin tocar dinero ni RLS. Cambia la decisión 9
+de arriba: **ahora sí hay atajos de teclado** (F2 y F9).
+
+- [ ] **13.8** 🧪 Cuadrícula de productos tocables debajo de la barra de captura: tarjeta con nombre, precio y
+  existencia; un toque suma una pieza; muestra cuántas lleva el ticket. Se filtra en vivo con el mismo campo de
+  captura. Lógica de filtrado pura en `lib/productSearch.ts`. _Verificar:_ test de `filterProducts()` (texto vacío,
+  acentos, por código) y, en el navegador, vender tocando tarjetas.
+- [x] **13.9** Campo único "código de barras o nombre" (reemplaza al autocompletado aparte): Enter con código
+  exacto agrega; si no hay coincidencia exacta, la cuadrícula ya muestra las sugerencias y se avisa. _Verificar:_
+  escanear un código existente, uno inexistente y escribir un nombre parcial.
+- [x] **13.10** Retroalimentación al agregar (se resalta la fila recién agregada), botones − y + en la cantidad, y
+  atajos F2 (ir al campo de captura) y F9 (cobrar). _Verificar:_ en el navegador, con el diálogo de cobro y los
+  demás diálogos cerrados y abiertos (los atajos no deben actuar con un diálogo abierto).
+- [x] **13.11** 📚 Actualizar `CLAUDE.md` §6.5 (descripción del punto de venta) y marcar la extensión terminada.
+  **Hecho 2026-10-09** (con 13G): el campo único existe y la cuadrícula de 13.8 pasó a ser la fila de arriba. **Verificado** en el navegador: nombre parcial (`shampoo` filtra la fila de arriba). **No cubierto en el navegador:** escanear un código exacto y uno inexistente (cubierto solo por los tests de `findBySku`).
+  **Hecho 2026-10-09:** fila resaltada, − y + y atajos F2/F9. **Verificado** en el navegador: fila resaltada al agregar, − deshabilitado en 1, F9 abre el cobro. **No cubierto:** F2, + y − con existencia máxima, y que los atajos no actúen con un diálogo abierto (lo cubre el código, no lo probé).
+  **Hecho 2026-10-09:** cubierto por la 13.18 (`CLAUDE.md` §6.5 describe la captura completa).
+
+**No entra (decidido el 2026-10-09):** chips de categoría (los productos no tienen categoría; sería una migración
+aparte), fotos de producto y escaneo con cámara. Los productos agotados siguen sin aparecer (decisión 2 de la
+tarea 13.4): la cuadrícula muestra los mismos que el catálogo de venta.
+
+### 13G. Extensión: categorías de producto y dos filas en el punto de venta (aprobada el 2026-10-09; `PLAN.md` D18, punto 7)
+
+Reemplaza la cuadrícula única de 13.8. A diferencia de 13F, **sí lleva migración** (`product_categories`) y toca
+Inventario (fase 11). Sin dependencia nueva.
+
+- [x] **13.12** 🧪 Migración aditiva: tabla `product_categories` (`tenant_id`, `name`, `icon`, `is_active`, borrado suave,
+  RLS con el permiso `inventory`, bitácora y `enforce_tenant_writable`) y `products.category_id` (nulo). _Verificar:_
+  test de base con aislamiento entre negocios, permisos por rol, nombre repetido dentro de un negocio y que
+  `category_id` no apunte a una categoría de otro negocio; `db:types` regenerado.
+- [x] **13.13** 🧪 `lib/productCategories.ts`: lista curada de ~24 íconos, agrupación del catálogo por categoría (con la
+  tarjeta "Sin categoría" solo si hay productos sin ella) y orden de "últimos vendidos". _Verificar:_ tests de
+  producto de categoría desactivada, catálogo sin categorías, ventas repetidas del mismo producto y producto vendido
+  que ya no tiene existencia.
+- [x] **13.14** Inventario: diálogo para crear, renombrar, elegir ícono y desactivar categorías, y selector de
+  categoría en el formulario de producto. Desactivar una categoría **no toca sus productos**: pasan a "Sin
+  categoría". _Verificar:_ en el navegador como dueño y como recepción; groomer sin acceso.
+- [x] **13.15** Punto de venta con dos filas: arriba, categorías (tarjeta con ícono arriba y nombre abajo) o, al
+  abrir una, sus productos con botón "Volver" a la derecha; abajo, los últimos productos vendidos. Ambas en una sola
+  fila; la de arriba con scroll horizontal y la de abajo muestra tantas tarjetas como quepan en el ancho. Escribir
+  en el campo de captura reemplaza la fila de arriba por los productos que coinciden. _Verificar:_ en el navegador,
+  con ventana ancha y angosta.
+- [x] **13.16** Consulta de "últimos vendidos" de la sucursal activa (ventas cobradas, más reciente primero).
+  _Verificar:_ test de servicio y, en el navegador, tras vender un producto aparece primero.
+- [x] **13.17** Semilla: categorías de Patitas Felices y asignación a sus productos. _Verificar:_ `db:reset` deja el
+  punto de venta con categorías.
+- [x] **13.18** 📚 Actualizar `CLAUDE.md` (§6.5 punto de venta, §6 tabla nueva) y marcar 13G terminada.
+  **Hecho 2026-10-09:** migración `20261013120000_product_categories.sql`: `product_categories` (nombre, ícono con forma `mdi-…`, `is_active`, borrado suave, RLS con el permiso `inventory`, nombre único por negocio sin importar mayúsculas y solo entre las no ocultas) y `products.category_id` con **llave foránea compuesta** `(tenant_id, category_id)`, para que un producto no pueda apuntar a la categoría de otro negocio. Sin bitácora (`log_change`), igual que `products`. Test nuevo `product-categories-rls.spec.ts` (12 tests). **Verificado:** `db:reset` y `test:db` en verde salvo los mismos 55 de Edge Functions y Storage (§12).
+  **Hecho 2026-10-09:** `lib/productCategories.ts` (24 íconos, `groupByCategory`, `productsInCategory`, `recentlySold`, `validateCategory`) con 18 tests. **Decisiones mías que conviene revisar:** (1) una categoría **sin productos con existencia no aparece** en el punto de venta (no deja vender nada); (2) las categorías se ordenan por nombre y "Sin categoría" va al final; (3) nombre de categoría de máximo 40 caracteres.
+  **Hecho 2026-10-09:** `ProductCategoriesDialog.vue` (crear, renombrar, elegir ícono, desactivar/activar; botón "Categorías" en Inventario solo con `inventory:edit`) y selector "Categoría" en `ProductFormDialog.vue` (muestra también la actual si está desactivada). Store con `saveCategory` y `setCategoryActive` (nombre repetido → mensaje claro); 5 tests. **No cubierto:** probado solo como código y con tests de store; **no abrí Inventario en el navegador**.
+  **Hecho 2026-10-09:** punto de venta con dos filas (`PointOfSalePage.vue` y `PosProductTile.vue`). Arriba: categorías (ícono arriba, nombre abajo) en una fila con scroll horizontal; al abrir una, sus productos y "Volver" a la derecha; al escribir, los productos que coinciden. Abajo: "Últimos vendidos", tantos como quepan (`ResizeObserver`). **Verificado** en el navegador como recepción (Playwright, 1280 y 700 px): categorías con ícono, abrir Juguetes, Volver, búsqueda por nombre, tarjeta "Sin categoría", cobro con F9 y la fila inferior tras vender. **Ajustes 2026-10-09 (a pedido del usuario):** los avisos de captura (existencia insuficiente, código no encontrado, cantidad inválida) salen en un **toast de 3 s** en vez de texto rojo fijo, con el mismo texto; y la categoría abierta ocupa el **primer lugar de la fila** como tarjeta fija y resaltada (solo indica, no se toca; "Volver" sigue a la derecha). Verificado en el navegador: el toast sale, sigue al elegir otro producto y desaparece a los ~3 s. **No cubierto:** el ancho de la fila inferior con muchos vendidos (con 2 productos no se ve el recorte); lector de código real.
+  **Hecho 2026-10-09:** `listRecentlySoldProductIds()` en `services/checkout.ts` (últimas 40 ventas **cobradas** de la sucursal, más reciente primero; las canceladas no cuentan). **Verificado** en el navegador: tras cobrar Pelota y Cepillo aparecen en la fila inferior, y la Cuerda (vendida y agotada, existencia 0) no. Test nuevo en `checkout-service.spec.ts` (2 tests: orden por venta más reciente, y que no cuenta canceladas ni otra sucursal). **No cubierto:** dentro de una misma venta el orden de los productos no está definido.
+  **Hecho 2026-10-09:** `CLAUDE.md` §6.5 agrega el apartado "Captura del punto de venta" (campo único, dos filas, categorías, atajos). **Pendiente:** §1 sigue diciendo "ya construido (fase 13)" sin mencionar las categorías; no lo toqué porque la extensión es parte de esa fase.
+
+**Reemplaza** la tarea 13.8 (cuadrícula única, que queda sin marcar a propósito); 13.9 y 13.10 se conservan y ya están en el código (el campo único, el resaltado, − y +, F2 y F9).
+
+### 13H. Extensión: cambio al pagar de más en efectivo (aprobada el 2026-10-09)
+
+Solo interfaz; sin migración ni dependencia nueva. Decisiones del usuario: se muestra en **el punto de venta y en el
+cobro de citas** (`CheckoutPage` y `AppointmentDialog`), **en vivo en el diálogo y en el ticket**, y un sobrepago que
+no sea en efectivo **avisa y no deja cobrar**.
+
+- [x] **13.20** 🧪 Refuerzo en la base y pantalla de cobro más limpia. **Hecho 2026-10-09.** Migración
+  `20261013130000_checkout_change_rule.sql` (`create or replace` de `app.finalize_sale`): lo pagado de más no puede
+  superar el efectivo recibido, para que una llamada directa a la API no cobre de más a una tarjeta o transferencia
+  (la usan `checkout_appointment()` y `checkout_counter_sale()`). El mensaje se traduce en `checkoutErrors.ts`. Y
+  cuando el monto ya está cubierto (`cart.isCovered`) **se oculta el formulario de agregar pago** (método, monto,
+  "Todo", tipo de tarjeta) en las tres pantallas; al quitar el pago vuelve. **Verificado:** 5 tests de base nuevos
+  (efectivo de más, tarjeta, transferencia, tarjeta + efectivo extra con su borde, y cobro de cita), 2 tests de
+  store y 1 de mensaje; en el navegador (punto de venta): con el monto cubierto el formulario desaparece, al quitar
+  el pago reaparece, y con tarjeta de más sigue oculto con el aviso y "Cobrar" deshabilitado. **No cubierto:**
+  `CheckoutPage` y `AppointmentDialog` en el navegador. **Ojo:** el test de base `delete-customer-pet-rpc.spec.ts >
+  no borra el expediente` falló en 1 de 2 corridas completas idénticas (55 vs 56 fallos); en una base recién
+  reseteada pasa solo. Cuenta filas de expediente de Rocky, que otros tests dejan (el expediente no se borra), así que
+  depende del orden de ejecución; **no lo causa este cambio**, pero conviene arreglarlo.
+- [x] **13.19** 🧪 `lib/paymentChange.ts` (reutiliza la regla de Caja: solo el efectivo da cambio y nunca más del
+  efectivo recibido), `changeCents` y `unpayableExcessCents` en el store del carrito, `PaymentSummary.vue` (reemplaza
+  el "Pagado / Falta" de las tres pantallas) y la línea "Cambio" de `TicketView`. **Hecho 2026-10-09.** Tests: 7 de
+  `paymentChange` y 2 del store. **Verificado** en el navegador (punto de venta): tarjeta por $100 en una cuenta de
+  $79 muestra el aviso y deshabilita "Cobrar"; efectivo por $100 muestra "Cambio a devolver $21.00" y el ticket trae
+  la línea "Cambio $21.00". **No cubierto:** `CheckoutPage` y `AppointmentDialog` no se abrieron en el navegador (usan
+  el mismo componente y el mismo store, pero no los probé); el cambio del ticket se deriva y no se guarda.
+
 ## Fase 14 — Clientes y mascotas: acciones en la tabla y edición directa
 
 **Meta: que en Clientes se edite y se elimine desde la propia tabla, y que el modal de cliente y el de mascota
