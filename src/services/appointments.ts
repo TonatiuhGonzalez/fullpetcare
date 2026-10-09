@@ -149,6 +149,25 @@ export async function listServices(appointmentId: string): Promise<AppointmentSe
   return data ?? []
 }
 
+/**
+ * Los servicios de VARIAS citas en una sola consulta (pantalla Inicio: total
+ * estimado por cobrar) — evita pedir `listServices` una vez por cita.
+ */
+export async function listServicesForAppointments(
+  appointmentIds: string[],
+): Promise<AppointmentService[]> {
+  if (appointmentIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('appointment_services')
+    .select('*')
+    .in('appointment_id', appointmentIds)
+    .is('deleted_at', null)
+
+  if (error) throw error
+  return data ?? []
+}
+
 export async function create(args: NewAppointmentArgs): Promise<Appointment> {
   const { data, error } = await supabase.rpc('create_appointment', {
     p_tenant_id: args.tenantId,

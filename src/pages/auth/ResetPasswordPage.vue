@@ -42,7 +42,7 @@ async function handleSubmit(): Promise<void> {
     // La contraseña ya cambió (y con ello se apaga la marca de contraseña
     // temporal): se recarga la cuenta y se entra a la app.
     await session.completePasswordChange()
-    await router.replace('/app/agenda')
+    await router.replace('/app/inicio')
   } catch {
     errorMessage.value =
       'Tu contraseña se cambió, pero no se pudo cargar tu cuenta. Vuelve a iniciar sesión.'

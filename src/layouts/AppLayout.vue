@@ -47,6 +47,7 @@ const showPayMock = ref(false)
 // (CLAUDE.md §6.7).
 const menuOpen = ref(false)
 const menuItems = computed<SideMenuItem[]>(() => [
+  { title: 'Inicio', icon: 'mdi-home-outline', to: '/app/inicio', group: 'Operación' },
   {
     title: 'Agenda',
     icon: 'mdi-calendar-month-outline',
@@ -107,10 +108,12 @@ const menuItems = computed<SideMenuItem[]>(() => [
 // Botón flotante de venta de mostrador (fase 13, tarea 13.3). Reemplaza la entrada
 // del menú: se ve desde cualquier pantalla de la app, pero solo dueño y recepción
 // cobran (misma regla que la ruta, `requiresFrontDesk`). En la propia pantalla de
-// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado.
+// venta se oculta: ahí taparía el botón de cobrar y no lleva a ningún lado. En Inicio
+// también: ahí ya está el acceso rápido "Venta de mostrador" en el encabezado.
 const route = useRoute()
 const showPosButton = computed(
-  () => isFrontDesk(session.role) && route.name !== 'venta-mostrador',
+  () =>
+    isFrontDesk(session.role) && route.name !== 'venta-mostrador' && route.name !== 'inicio',
 )
 
 const showFeedback = ref(false)
@@ -137,9 +140,9 @@ function handleBranchChange(branchId: unknown): void {
          oculto y se abre como cajón. -->
     <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
     <router-link
-      to="/app/agenda"
+      to="/app/inicio"
       class="brand-link ml-2 mr-4"
-      aria-label="FullPetCare, ir a la agenda"
+      aria-label="FullPetCare, ir al inicio"
     >
       <BrandLogo :size="28" :show-wordmark="!xs" />
     </router-link>

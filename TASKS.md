@@ -1592,3 +1592,32 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   donde estaban; no hay test automático del componente (§9). **Incidente de proceso:** al formatear con prettier se
   reformateó código ajeno en archivos existentes (el repo no está formateado a `printWidth: 90`); se revirtió con una
   fusión a tres bandas y los diffs de los 22 archivos tocados contienen solo cambios míos.
+- [x] **15.11** Pantalla **Inicio** (decisión 12): lógica pura de resumen en `lib/homeSummary.ts`, store `home` y
+  `pages/inicio/HomePage.vue`; ruta `/app/inicio` como pantalla de entrada (login, selección de negocio, logo y
+  redirecciones) y primera opción del menú. Sin tablas ni funciones SQL nuevas: usa citas, ventas, caja y reportes que
+  ya existen. _Verificar:_ test unitario de `lib/homeSummary.ts` y del store; en el navegador, las cifras coinciden con
+  Agenda, Cobro y Caja, y cada rol (dueño, recepción, groomer, vet) ve solo lo que le toca.
+  **Hecho 2026-10-08:** pantalla `pages/inicio/HomePage.vue` en `/app/inicio`, **primera opción del menú y pantalla de
+  entrada**: el login, la selección de negocio, el cambio y el restablecimiento de contraseña, la raíz `/`, el logo y los
+  desvíos del router (sin permiso, no superadmin) mandan ahora a Inicio. Contenido: encabezado con "Hola, {nombre} · día
+  y fecha" en la zona de la sucursal; accesos rápidos **Nueva cita**, **Llegada sin cita** y **Venta de mostrador**
+  (dueño y recepción); **Citas de hoy** (total, chips por estado, "Lo que sigue" con hora, mascota, cliente y tipo con su
+  ícono y color); **Por cobrar** (conteo, total estimado y botón "Cobrar" por cita; dueño y recepción); **Caja** (abierta
+  desde la hora y efectivo esperado, o cerrada con acceso a abrirla; permiso Caja) y **Ventas de hoy** (permiso
+  Reportes). Piezas nuevas: `lib/homeSummary.ts` (9 tests), `stores/home.ts` (7 tests), `lib/datetime.ts` →
+  `formatWeekdayDate` (1 test) y `appointments.listServicesForAppointments` (una consulta para varias citas). Sin tablas
+  ni funciones SQL nuevas. Cada bloque opcional se consulta solo si la persona puede verlo y, si la caja o las ventas
+  fallan, no tumban el resto. La Agenda acepta `?accion=nueva-cita` y `?accion=llegada-sin-cita` (abre el diálogo y limpia
+  la URL, así recargar no lo reabre). `vue-tsc -b`, `lint` y 517 tests unitarios en verde y **el E2E completo pasa**.
+  **Verificado** en el navegador con citas de prueba de hoy (ya borradas): dueño y recepción ven 4 citas, 2 por cobrar y
+  **$449.00** (25 000 + 2×9 950 centavos); el dueño ve además caja ($250.00 en ventas, caja cerrada) y la recepción la
+  caja pero no las ventas; el groomer ve solo sus 3 citas y ningún otro bloque; accesos rápidos, "Cobrar", logo y clic en
+  una fila ("Lo que sigue" → detalle de la cita) funcionan; claro, oscuro y móvil de 390 px sin desborde ni errores.
+  **Decisiones mías a revisar:** (1) el **total por cobrar es estimado**: suma solo los servicios de la cita; los
+  productos o consumos que se agreguen al cobrar no entran, y la pantalla lo dice; (2) se **oculta el botón flotante de
+  venta de mostrador en Inicio** porque ya está en el encabezado; (3) las cifras son de **la sucursal activa**, no de
+  todo el negocio; (4) las filas de "Lo que sigue" abren la página de detalle de la cita, no el diálogo de la Agenda.
+  **No cubierto:** el **veterinario no se vio con datos** (su sucursal demo es Del Valle y las citas de prueba se
+  sembraron en Centro; solo se comprobó que sin citas muestra 0); no hay test automático de la página (§9); las
+  cifras no se refrescan solas (se recalculan al entrar y al cambiar de sucursal); estado vacío es solo texto, la
+  ilustración llega en 15.14.

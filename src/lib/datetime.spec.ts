@@ -4,6 +4,7 @@ import {
   branchToday,
   dayRangeUtc,
   formatDate,
+  formatWeekdayDate,
   formatTime,
   fromBranchTime,
   toBranchTime,
@@ -90,6 +91,17 @@ describe('formatDate', () => {
     // fenómeno que dayRangeUtc, visto desde formatDate.
     const instant = '2026-07-16T01:00:00Z'
     expect(formatDate(instant, 'America/Mexico_City')).toBe('15 de julio de 2026')
+  })
+})
+
+describe('formatWeekdayDate', () => {
+  // Qué prueba: que el día de la semana y la fecha salen en español y en la zona de la
+  // SUCURSAL. A las 02:00 UTC del 9 de octubre todavía es 8 de octubre (jueves) en la
+  // Ciudad de México; con la hora del navegador o UTC saldría "viernes 9".
+  it('da el día de la semana y la fecha en español, en la zona de la sucursal', () => {
+    expect(formatWeekdayDate('2026-10-09T02:00:00Z', 'America/Mexico_City')).toBe(
+      'jueves 8 de octubre',
+    )
   })
 })
 

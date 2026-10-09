@@ -12,6 +12,7 @@
 // (visibleDates) — esta página solo arma los bloques a pintar y elige
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -166,10 +167,28 @@ async function loadUpcomingVaccines(): Promise<void> {
   upcomingVaccines.value = await listUpcomingVaccines(session.activeTenantId, today)
 }
 
+// Los accesos rápidos de Inicio mandan aquí con `?accion=nueva-cita` o
+// `?accion=llegada-sin-cita` para abrir el diálogo correspondiente. Se limpia la
+// URL enseguida: si no, al recargar la página el diálogo se volvería a abrir.
+const route = useRoute()
+const router = useRouter()
+
+function runRequestedAction(): void {
+  const action = route.query.accion
+  if (!action) return
+  // Solo recepción y dueño agendan; para otros roles el parámetro se ignora.
+  if (isFrontDeskView.value) {
+    if (action === 'nueva-cita') showNewAppointmentDialog.value = true
+    if (action === 'llegada-sin-cita') showWalkInDialog.value = true
+  }
+  router.replace({ query: {} })
+}
+
 onMounted(() => {
   agenda.initFromSession()
   loadEmployees()
   loadUpcomingVaccines()
+  runRequestedAction()
 })
 
 // --- Navegación: SOLO para dueño/recepción. Groomer/vet no tienen

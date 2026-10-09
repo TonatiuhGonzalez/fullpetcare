@@ -25,10 +25,10 @@ onMounted(() => {
 
 function goHome(): Promise<unknown> {
   // Si el guard del router mandó aquí por intentar entrar a una ruta
-  // privada (?redirect=/app/...), se vuelve a esa. Si no, a /app/agenda
+  // privada (?redirect=/app/...), se vuelve a esa. Si no, a /app/inicio
   // — el guard decide desde ahí si hace falta elegir negocio primero.
   const redirectTo =
-    typeof route.query.redirect === 'string' ? route.query.redirect : '/app/agenda'
+    typeof route.query.redirect === 'string' ? route.query.redirect : '/app/inicio'
   return router.push(redirectTo)
 }
 

@@ -143,6 +143,13 @@ export function formatDate(utcInstant: Date | string, branchTimezone: string): s
   })
 }
 
+/** Fecha local de la sucursal con día de la semana ("jueves 8 de octubre"), para encabezados. */
+export function formatWeekdayDate(utcInstant: Date | string, branchTimezone: string): string {
+  return format(toBranchTime(utcInstant, branchTimezone), "EEEE d 'de' MMMM", {
+    locale: es,
+  })
+}
+
 /**
  * El rango [inicio, fin) en UTC de un día calendario de la sucursal —
  * lo que necesita "la agenda del día" (tarea 3.17): un `where starts_at
