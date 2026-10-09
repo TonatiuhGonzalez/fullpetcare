@@ -1694,3 +1694,17 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   estado vacío de la vista pública (sin vacunas ni visitas) también sigue en texto. **No cubierto:** el caso "Aún no hay
   clientes / mascotas / productos" (negocio sin datos) no se vio en pantalla porque la demo tiene datos; solo los de
   "Sin resultados"; no hay test automático del componente (§9).
+
+- [x] **15.15** `SuperadminLayout` con la misma identidad. _Verificar:_ en navegador, como superadmin.
+  **Hecho 2026-10-08:** el panel de superadmin **ya compartía la identidad** por lo hecho en 15.1 a 15.12 (mismo tema
+  claro y oscuro, logo y barra con el chip "Plataforma", menú de usuario con tema y "Cambiar contraseña", menú lateral con
+  la opción activa marcada, `PageHeader`, tablas y diálogos con el tema); esta tarea fue **recorrerlo y corregir lo que
+  desentonaba**. Se encontró un solo defecto: **Planes, Motivos y Reportes** tenían el título pegado a la barra por no
+  llevar el margen vertical (`py-6`) que ya tenían Empresas y Superadmins; se igualó. No hay colores fijos en sus
+  pantallas ni diálogos (se buscó). `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright, como superadmin): entra a `/superadmin/empresas`, las cinco pantallas, el detalle de una empresa y el
+  formulario de alta, en claro y oscuro, y la pantalla de empresas en móvil de 390 px (sin desborde); sin errores de
+  consola. **No cubierto:** el menú del superadmin **no lleva cabecera ni secciones** (son 5 opciones; el selector de
+  negocio no aplica); en móvil las tablas se desplazan horizontalmente dentro de su tarjeta (es un panel de escritorio, ya
+  lo decía el código); "Todavía no hay reportes" sigue como texto (no hay ilustración para reportes); no se ejecutó
+  "Cambiar contraseña" ni crear o restablecer hasta el final.

@@ -89,7 +89,7 @@ async function update(
 </script>
 
 <template>
-  <v-container>
+  <v-container class="py-6">
     <PageHeader
       title="Motivos de suspensión y baja"
       subtitle="Son los motivos que puedes elegir al suspender o dar de baja una empresa. El cliente ve exactamente este texto al iniciar sesión. Los comentarios internos se escriben aparte, al cambiar el estado, y solo los ves tú."

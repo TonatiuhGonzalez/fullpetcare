@@ -77,7 +77,7 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
 </script>
 
 <template>
-  <v-container>
+  <v-container class="py-6">
     <PageHeader title="Planes" subtitle="Son los planes que puedes asignar a una empresa. Es solo informativo: el plan por sí solo no limita nada — lo que controla el acceso es el estado y, si la vigencia vence, el modo solo lectura. Un plan ya asignado no se borra: se desactiva y deja de ofrecerse para asignaciones nuevas." />
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">

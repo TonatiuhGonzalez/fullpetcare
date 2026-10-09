@@ -49,7 +49,7 @@ async function openScreenshot(report: FeedbackReport): Promise<void> {
 </script>
 
 <template>
-  <v-container>
+  <v-container class="py-6">
     <PageHeader
       title="Reportes y sugerencias"
       subtitle="Comentarios que los usuarios envían desde el menú de ayuda de la barra superior, del más reciente al más antiguo."
