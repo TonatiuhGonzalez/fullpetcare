@@ -30,6 +30,7 @@ import { canAttendKind } from '@/lib/roles'
 import { isValidPhone } from '@/lib/validation'
 import { speciesLabel } from '@/lib/petLabels'
 import { computeEmployeeWaits, waitLabel, type WalkInBusyRange } from '@/lib/walkIn'
+import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 
@@ -475,14 +476,16 @@ async function handleSubmit(): Promise<void> {
             <p class="text-overline text-medium-emphasis">Tipo de visita</p>
             <div class="d-flex ga-2 mb-2">
               <v-btn
-                :color="kind === 'grooming' ? 'primary' : undefined"
+                :color="visitKindInfo('grooming').color"
+                :prepend-icon="visitKindInfo('grooming').icon"
                 :variant="kind === 'grooming' ? 'flat' : 'outlined'"
                 @click="kind = 'grooming'"
               >
                 Estética
               </v-btn>
               <v-btn
-                :color="kind === 'veterinary' ? 'primary' : undefined"
+                :color="visitKindInfo('veterinary').color"
+                :prepend-icon="visitKindInfo('veterinary').icon"
                 :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
                 @click="kind = 'veterinary'"
               >

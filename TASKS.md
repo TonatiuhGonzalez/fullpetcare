@@ -1621,3 +1621,31 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   sembraron en Centro; solo se comprobó que sin citas muestra 0); no hay test automático de la página (§9); las
   cifras no se refrescan solas (se recalculan al entrar y al cambiar de sucursal); estado vacío es solo texto, la
   ilustración llega en 15.14.
+
+### 15E. Color por tipo de visita
+
+- [x] **15.12** Aplicar `visitKind` en agenda (ambos calendarios), chips de cita, historial de la mascota y reportes.
+  _Verificar:_ en navegador; simulando daltonismo (DevTools → Rendering) los dos tipos se distinguen por ícono y texto.
+  **Hecho 2026-10-08:** el tipo de visita se ve igual en toda la app. **Calendario** (los dos: día y semana): el bloque
+  conserva su color de **estado** y se le agrega una **franja** a la izquierda del color del tipo (naranja / azul) y el
+  **ícono** (tijeras / estetoscopio) antes del título; la leyenda gana una fila de tipos. Ayudantes compartidos en
+  `components/calendarEvents.ts` (5 tests; el contenido del bloque se arma con nodos de texto, nunca como HTML, y se
+  comprobó que el test falla si se rompe eso); `CalendarBlock` ahora trae `textColor` y `kind`. **Cambios de color por
+  estado** (acordados): "Agendada" pasó de azul a **gris pizarra** (`secondary`) para dejar el azul solo a veterinaria; el
+  texto de cada bloque usa el `on-*` de su estado en vez de blanco fijo, con lo que en **modo oscuro** ya se lee (antes
+  era blanco sobre verde claro). Chip nuevo `VisitKindChip.vue` en el detalle de cita (página y diálogo) e Inicio; en el
+  diálogo y en "próximas citas" de la mascota se usa el nombre desde `lib/visitKind.ts` (se quitaron los `kindLabels`
+  copiados de 4 archivos); los selectores de tipo de "Nueva cita" y "Llegada sin cita" llevan color e ícono; las pestañas
+  del catálogo llevan ícono; el historial de la mascota usa los colores del tipo. `vue-tsc -b`, `lint`, 522 tests
+  unitarios y el **E2E completo** en verde. **Verificado** en el navegador (Playwright, con citas de prueba ya
+  borradas): día como dueño y semana como groomer, claro y oscuro, con franja, ícono y estados correctos; el diálogo
+  muestra el chip; los dos botones de tipo y las dos pestañas se ven bien; el historial de Rocky usa `bg-grooming` con
+  tijeras. **Decisiones mías a revisar:** (1) en el historial de la mascota el punto de **peso** pasó de `info` (azul) a
+  gris pizarra por el mismo choque con el azul de veterinaria; (2) en Inicio los chips de estado ahora usan los mismos
+  colores que la Agenda (en curso ámbar, por cobrar verde, cobrada verde azulado), antes eran otros; (3) la **vista
+  pública del cliente** conserva por ahora su `kindLabels` (es la tarea 15.13); (4) **Reportes no cambia**: ninguno de
+  sus datos está desglosado por tipo de visita, y hacerlo pide cambiar las funciones SQL de reportes, que sería una
+  mejora aparte. **No cubierto:** citas de **veterinaria** en el calendario no se vieron con datos (solo estética: el
+  veterinario trabaja en otra sucursal); el estado "En curso" y "Agendada" en gris no se vieron en pantalla (los datos
+  de prueba eran completadas y una cancelada); con bloques muy cortos (30 min en la vista de día) el título se
+  recorta como antes y solo se ve en el tooltip; no hay test del calendario montado (§9).

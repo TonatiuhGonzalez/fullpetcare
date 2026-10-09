@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale'
 
 import { toNaiveLocalIso } from '@/lib/datetime'
 import { isFrontDesk } from '@/lib/roles'
+import { VISIT_KINDS, visitKindInfo } from '@/lib/visitKind'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { listUpcomingVaccines } from '@/services/records'
@@ -74,20 +75,20 @@ const statusLabels: Record<DisplayStatus, string> = {
   cancelled: 'Cancelada',
   no_show: 'No se presentó',
 }
-// Color por estado, no por tipo de cita — en el calendario lo que más
-// importa distinguir de un vistazo es "¿ya se cobró/canceló esto?", no
-// si es estética o veterinaria (eso ya va en el texto del bloque).
-// rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts en
-// vez de repetir colores a mano.
-const statusColors: Record<DisplayStatus, string> = {
-  scheduled: 'rgb(var(--v-theme-info))',
-  in_progress: 'rgb(var(--v-theme-warning))',
-  completed: 'rgb(var(--v-theme-success))',
-  paid: 'rgb(var(--v-theme-primary))',
-  cancelled: 'rgb(var(--v-theme-error))',
-  no_show: 'rgb(var(--v-theme-error))',
+// El bloque se pinta por ESTADO (¿ya se cobró o canceló?), que es lo que más importa
+// distinguir de un vistazo; el TIPO de visita va aparte, como franja de color e ícono
+// en el propio bloque (components/calendarEvents.ts) — decisión del 2026-10-08
+// (PLAN.md D20). "Agendada" es gris pizarra y no azul, para que el azul quede solo
+// para veterinaria. rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts
+// (cambia sola entre claro y oscuro); cada fondo lleva su `on-*` para el texto.
+const statusStyles: Record<DisplayStatus, { bg: string; text: string }> = {
+  scheduled: { bg: 'rgb(var(--v-theme-secondary))', text: 'rgb(var(--v-theme-on-secondary))' },
+  in_progress: { bg: 'rgb(var(--v-theme-warning))', text: 'rgb(var(--v-theme-on-warning))' },
+  completed: { bg: 'rgb(var(--v-theme-success))', text: 'rgb(var(--v-theme-on-success))' },
+  paid: { bg: 'rgb(var(--v-theme-primary))', text: 'rgb(var(--v-theme-on-primary))' },
+  cancelled: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
+  no_show: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
 }
-const kindLabels: Record<string, string> = { grooming: 'Estética', veterinary: 'Veterinaria' }
 
 /** El estado a MOSTRAR de una cita — como appointment.status, salvo que ya se cobró. */
 function displayStatus(appointment: Appointment): DisplayStatus {
@@ -102,7 +103,7 @@ const statusLegend = computed(() =>
   (Object.keys(statusLabels) as DisplayStatus[]).map((key) => ({
     key,
     label: statusLabels[key],
-    color: statusColors[key],
+    color: statusStyles[key].bg,
   })),
 )
 
@@ -117,7 +118,7 @@ const schedulerRows = computed<SchedulerRow[]>(() =>
 )
 
 // Marca de texto al inicio del bloque para las visitas sin cita (tarea
-// #1969): el color ya significa "estado" (statusColors), así que el origen
+// #1969): el color ya significa "estado" (statusStyles), así que el origen
 // de la cita va en el texto, sin tocar los componentes del calendario.
 function appointmentBadge(appointment: Appointment): string {
   if (appointment.is_urgent) return '🚨 Urgente · '
@@ -135,8 +136,10 @@ const calendarBlocks = computed<CalendarBlock[]>(() =>
     id: appointment.id,
     start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
     end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
-    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${kindLabels[appointment.kind]} · ${employeeName(appointment.employee_user_id)}`,
-    color: statusColors[displayStatus(appointment)],
+    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${visitKindInfo(appointment.kind).label} · ${employeeName(appointment.employee_user_id)}`,
+    color: statusStyles[displayStatus(appointment)].bg,
+    textColor: statusStyles[displayStatus(appointment)].text,
+    kind: appointment.kind,
     resource: appointment.employee_user_id,
   })),
 )
@@ -356,6 +359,18 @@ function handleAppointmentCreated(appointment: Appointment): void {
           {{ item.label }}
         </span>
       </div>
+      <!-- Tipo de visita: la franja del bloque y su ícono. -->
+      <div class="d-flex flex-wrap ga-3 mb-2">
+        <span
+          v-for="info in Object.values(VISIT_KINDS)"
+          :key="info.kind"
+          class="d-flex align-center ga-1 text-caption text-medium-emphasis"
+        >
+          <span class="kind-swatch" :style="{ backgroundColor: `rgb(var(--v-theme-${info.color}))` }" />
+          <v-icon :icon="info.icon" size="x-small" />
+          {{ info.label }}
+        </span>
+      </div>
 
       <EmployeeDayScheduler
         v-if="isFrontDeskView"
@@ -414,5 +429,13 @@ function handleAppointmentCreated(appointment: Appointment): void {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+// Muestra de la franja de tipo de visita (la misma forma que en el bloque del calendario).
+.kind-swatch {
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
 }
 </style>

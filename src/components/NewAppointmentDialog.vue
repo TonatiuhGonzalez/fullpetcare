@@ -25,6 +25,7 @@ import { formatMXN } from '@/lib/money'
 import { formatTime, fromBranchTime } from '@/lib/datetime'
 import { computeAvailableSlots, hoursForDate, type AvailableSlot } from '@/lib/availability'
 import { canAttendKind } from '@/lib/roles'
+import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import TimeSlotPicker from '@/components/TimeSlotPicker.vue'
@@ -377,14 +378,16 @@ async function handleSubmit(): Promise<void> {
             <p class="text-overline text-medium-emphasis">Tipo de cita</p>
             <div class="d-flex ga-2 mb-2">
               <v-btn
-                :color="kind === 'grooming' ? 'primary' : undefined"
+                :color="visitKindInfo('grooming').color"
+                :prepend-icon="visitKindInfo('grooming').icon"
                 :variant="kind === 'grooming' ? 'flat' : 'outlined'"
                 @click="kind = 'grooming'"
               >
                 Estética
               </v-btn>
               <v-btn
-                :color="kind === 'veterinary' ? 'primary' : undefined"
+                :color="visitKindInfo('veterinary').color"
+                :prepend-icon="visitKindInfo('veterinary').icon"
                 :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
                 @click="kind = 'veterinary'"
               >

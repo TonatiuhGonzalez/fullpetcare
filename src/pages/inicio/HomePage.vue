@@ -9,10 +9,10 @@ import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
+import VisitKindChip from '@/components/VisitKindChip.vue'
 import { formatTime, formatWeekdayDate } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
-import { visitKindInfo } from '@/lib/visitKind'
 import { useHomeStore } from '@/stores/home'
 import { useSessionStore } from '@/stores/session'
 
@@ -159,14 +159,7 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
                   appointment.customerName
                 }}</v-list-item-subtitle>
                 <template #append>
-                  <v-chip
-                    size="x-small"
-                    variant="flat"
-                    :color="visitKindInfo(appointment.kind).color"
-                    :prepend-icon="visitKindInfo(appointment.kind).icon"
-                  >
-                    {{ visitKindInfo(appointment.kind).label }}
-                  </v-chip>
+                  <VisitKindChip :kind="appointment.kind" size="x-small" />
                 </template>
               </v-list-item>
             </v-list>

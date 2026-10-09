@@ -54,3 +54,31 @@ html,
 a:not([class*='v-']) {
   color: rgb(var(--v-theme-primary));
 }
+
+// Franja del tipo de visita en los bloques de la agenda (EventCalendar pinta su propio
+// DOM, por eso va aquí y no en un componente). El bloque conserva su color de estado;
+// la franja de color a la izquierda, con un filete claro, marca estética o veterinaria.
+// Va junto con un ícono dentro del bloque (components/calendarEvents.ts).
+.ec-event.ec-kind-grooming {
+  box-shadow:
+    inset 6px 0 0 rgb(var(--v-theme-grooming)),
+    inset 8px 0 0 rgba(255, 255, 255, 0.9);
+}
+
+.ec-event.ec-kind-veterinary {
+  box-shadow:
+    inset 6px 0 0 rgb(var(--v-theme-veterinary)),
+    inset 8px 0 0 rgba(255, 255, 255, 0.9);
+}
+
+// El bloque trae solo 2px de relleno: sin esto la franja (8px) tapa el inicio del texto.
+.ec-event.ec-kind-grooming .ec-event-body,
+.ec-event.ec-kind-veterinary .ec-event-body {
+  padding-inline-start: 8px;
+}
+
+.ec-event .ec-event-kind-icon {
+  margin-right: 4px;
+  font-size: 0.95em;
+  vertical-align: -1px;
+}
