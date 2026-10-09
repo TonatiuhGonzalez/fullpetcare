@@ -1499,3 +1499,16 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   nombres en español, ícono/texto/color distintos, el color existe con su `on-*` en ambos temas, y cada entrada se
   identifica con su clave. **No cubierto:** todavía nadie lo usa; hoy `kindLabels` está copiado en 5 archivos
   (`AgendaPage`, `AppointmentDetailPage`, `AppointmentDialog`, `PublicPetPage`, `CatalogPage`) y se reemplaza en 15.12.
+- [x] **15.5** 🧪 Composable `useThemeMode` (sistema, claro, oscuro) con preferencia guardada en el navegador.
+  _Verificar:_ test: sin almacenamiento disponible usa el del sistema y no truena.
+  **Hecho 2026-10-08:** lógica pura en `lib/themeMode.ts` (`parseThemeMode`, `resolveThemeName`, nombres de los temas,
+  que ahora usa también `plugins/vuetify.ts`) y estado compartido en `composables/useThemeMode.ts`
+  (`initThemeMode`, llamado en `main.ts` antes de montar, y `useThemeMode()` con `mode`, `isDark`, `setMode`). La
+  preferencia se guarda en `localStorage` (`fpc.themeMode`) con `try/catch`. 11 tests nuevos: valores inválidos,
+  almacenamiento que lanza error (no truena y usa el sistema), navegador sin `matchMedia` (claro), modo guardado gana al
+  sistema, `setMode` aplica y guarda, guardar falla pero igual cambia, y el modo "sistema" sigue los cambios del sistema
+  mientras uno fijo no. `vue-tsc -b`, `lint` y 491 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright): con sistema oscuro el login sale oscuro (fondo `#0E1B1E`, botón `#4FD1C5`); con "light" guardado sale
+  claro aunque el sistema sea oscuro; y con el sistema cambiando a oscuro con la app abierta, se actualiza solo.
+  **No cubierto:** aún no hay interruptor en la interfaz (llega en 15.8, menú de usuario); solo se miró el login en
+  oscuro, el resto de pantallas se recorre en 15.16 (hay colores fijos `#ffffff` en los calendarios, 15.12).

@@ -8,6 +8,7 @@ import { createVuetify, type ThemeDefinition } from 'vuetify'
 import { es } from 'vuetify/locale'
 
 import { darkPalette, lightPalette } from '@/lib/palette'
+import { DARK_THEME, LIGHT_THEME } from '@/lib/themeMode'
 
 // Paleta clínica: neutros fríos (pizarra) y un verde azulado profundo de marca.
 // Los colores viven en lib/palette.ts (datos puros, con su test de contraste).
@@ -33,8 +34,8 @@ export const darkTheme: ThemeDefinition = {
 export const vuetify = createVuetify({
   theme: {
     // El tema inicial lo elige useThemeMode (sistema / claro / oscuro).
-    defaultTheme: 'fullPetCareLight',
-    themes: { fullPetCareLight: lightTheme, fullPetCareDark: darkTheme },
+    defaultTheme: LIGHT_THEME,
+    themes: { [LIGHT_THEME]: lightTheme, [DARK_THEME]: darkTheme },
   },
   // La UI es solo en español de México (CLAUDE.md §5.5: sin i18n como
   // librería aparte). Esto traduce los textos internos de Vuetify
