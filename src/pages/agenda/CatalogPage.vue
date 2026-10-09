@@ -7,7 +7,9 @@ import * as servicesService from '@/services/services'
 import type { Service, ServiceKind } from '@/services/services'
 import { formatMXN } from '@/lib/money'
 import { visibleServiceKinds } from '@/lib/roles'
+import { visitKindInfo } from '@/lib/visitKind'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
 
 const session = useSessionStore()
@@ -71,10 +73,6 @@ const itemsPerPageOptions = [
   { value: 100, title: '100' },
   { value: -1, title: 'Todos' },
 ]
-const kindLabels: Record<ServiceKind, string> = {
-  grooming: 'Estética',
-  veterinary: 'Veterinaria',
-}
 
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
@@ -163,25 +161,30 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Catálogo de servicios</h1>
-      <v-spacer />
-      <v-btn
-        v-if="isOwner()"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewService"
-      >
-        Nuevo servicio
-      </v-btn>
-    </div>
+    <PageHeader title="Catálogo de servicios">
+      <template #actions>
+        <v-btn
+          v-if="isOwner()"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewService"
+        >
+          Nuevo servicio
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <!-- Solo las pestañas visibles para el rol (arriba: visibleServiceKinds) —
          con una sola, v-tabs igual funciona bien, solo no deja nada que
          cambiar. -->
     <v-tabs v-model="activeKind" class="mb-4">
-      <v-tab v-for="kind in visibleKinds" :key="kind" :value="kind">
-        {{ kindLabels[kind] }}
+      <v-tab
+        v-for="kind in visibleKinds"
+        :key="kind"
+        :value="kind"
+        :prepend-icon="visitKindInfo(kind).icon"
+      >
+        {{ visitKindInfo(kind).label }}
       </v-tab>
     </v-tabs>
 

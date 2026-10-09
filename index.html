@@ -2,8 +2,18 @@
 <html lang="es-MX">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- El navegador guarda el ícono de la pestaña en una caché propia y lo refresca muy
+         tarde: sin el "?v=" seguiría mostrando el rayo de Vite aunque el archivo ya cambió.
+         Sube el número cada vez que se cambie public/favicon.svg. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="FullPetCare: estética canina y veterinaria en una sola plataforma."
+    />
+    <!-- Color de la barra del navegador en móvil: el verde de marca en claro y el fondo oscuro de la app en oscuro. -->
+    <meta name="theme-color" content="#0F6B66" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0E1B1E" media="(prefers-color-scheme: dark)" />
     <title>FullPetCare</title>
   </head>
   <body>

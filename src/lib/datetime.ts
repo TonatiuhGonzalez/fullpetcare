@@ -60,7 +60,7 @@
 // "America/Tijuana")`. Así SÍ se interpreta como "las 14:30 de esa
 // fecha, en esa zona", sin pasar por ninguna zona intermedia.
 import { TZDate } from '@date-fns/tz'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 /**
@@ -139,6 +139,22 @@ export function branchToday(branchTimezone: string, now: Date = new Date()): str
 /** Fecha local de la sucursal en español ("15 de julio de 2026"). */
 export function formatDate(utcInstant: Date | string, branchTimezone: string): string {
   return format(toBranchTime(utcInstant, branchTimezone), "d 'de' MMMM 'de' yyyy", {
+    locale: es,
+  })
+}
+
+/**
+ * Una fecha SIN hora ('YYYY-MM-DD': cumpleaños, próxima vacuna) en español ("5 de marzo de
+ * 2024"). A diferencia de formatDate no recibe zona horaria: un cumpleaños no la tiene
+ * (CLAUDE.md §8.3), y convertirla desde UTC la correría un día.
+ */
+export function formatDateOnly(dateStr: string): string {
+  return format(parseISO(dateStr), "d 'de' MMMM 'de' yyyy", { locale: es })
+}
+
+/** Fecha local de la sucursal con día de la semana ("jueves 8 de octubre"), para encabezados. */
+export function formatWeekdayDate(utcInstant: Date | string, branchTimezone: string): string {
+  return format(toBranchTime(utcInstant, branchTimezone), "EEEE d 'de' MMMM", {
     locale: es,
   })
 }

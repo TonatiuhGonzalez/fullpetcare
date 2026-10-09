@@ -8,6 +8,7 @@ import type { PlatformAdminUser } from '@/services/platform'
 import { formatPlatformDate } from '@/lib/platform'
 import { useSessionStore } from '@/stores/session'
 import AdminFormDialog from '@/components/AdminFormDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 
 const session = useSessionStore()
@@ -103,13 +104,13 @@ async function confirmRemove(): Promise<void> {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Superadmins</h1>
-      <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="showFormDialog = true">
-        Agregar superadmin
-      </v-btn>
-    </div>
+    <PageHeader title="Superadmins">
+      <template #actions>
+        <v-btn color="primary" prepend-icon="mdi-plus" @click="showFormDialog = true">
+          Agregar superadmin
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ errorMessage }}

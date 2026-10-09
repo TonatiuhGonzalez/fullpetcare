@@ -5,13 +5,17 @@
 // (PLAN.md D14), así que aquí no existe selector de sucursal.
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 
+import BrandLogo from '@/components/BrandLogo.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
+import UserMenu from '@/components/UserMenu.vue'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const router = useRouter()
+const { xs } = useDisplay()
 
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
@@ -39,28 +43,31 @@ async function handleLogout(): Promise<void> {
 </script>
 
 <template>
-  <v-app-bar color="primary" density="comfortable">
+  <v-app-bar color="surface" density="comfortable" flat border="b">
     <!-- Hamburguesa: solo en pantallas angostas (el menú lateral se oculta). -->
     <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
-    <v-app-bar-title>
-      <v-icon icon="mdi-shield-crown-outline" class="mr-2" />
-      FullPetCare · Plataforma
-    </v-app-bar-title>
+    <span class="brand-link ml-2 mr-3">
+      <BrandLogo :size="28" :show-wordmark="!xs" />
+    </span>
+    <v-chip
+      size="small"
+      variant="tonal"
+      color="primary"
+      prepend-icon="mdi-shield-crown-outline"
+    >
+      Plataforma
+    </v-chip>
 
     <v-spacer />
 
-    <!-- En pantallas angostas la barra no alcanza para el chip y el nombre, y
-         se amontonaban en tres líneas: se ocultan. Este panel es de
-         escritorio (solo la vista pública de mascotas es mobile-first). -->
-    <v-chip class="mr-4 d-none d-sm-flex" size="small" variant="tonal">Superadmin</v-chip>
-    <span class="mr-2 text-body-2 d-none d-md-inline">{{ userLabel }}</span>
-    <v-btn
-      icon="mdi-lock-reset"
-      variant="text"
-      title="Cambiar contraseña"
-      @click="showChangePassword = true"
+    <UserMenu
+      :name="userLabel"
+      role-label="Superadmin"
+      :email="session.user?.email"
+      can-change-password
+      @change-password="showChangePassword = true"
+      @logout="handleLogout"
     />
-    <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
 
   <SideMenu v-model:open="menuOpen" :items="menuItems" />
@@ -79,3 +86,9 @@ async function handleLogout(): Promise<void> {
     <router-view />
   </v-main>
 </template>
+
+<style scoped lang="scss">
+.brand-link {
+  display: inline-flex;
+}
+</style>

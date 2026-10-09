@@ -3,7 +3,7 @@
 // usuario pertenece a un único negocio con una única sucursal,
 // useSessionStore ya la seleccionó sola al cargar las membresías
 // (loadMemberships(), ver CLAUDE.md/PLAN.md §1.5) y el guard del router
-// (router/index.ts) nunca manda aquí — va directo a /app/agenda. Un
+// (router/index.ts) nunca manda aquí — va directo a /app/inicio. Un
 // "owner" tampoco llega al paso de sucursal aunque tenga varias: para él,
 // resolveActiveBranch() (stores/session.ts) siempre elige una por
 // default — solo puede llegar aquí en el paso de TENANT, si pertenece a
@@ -29,13 +29,13 @@ async function chooseTenant(tenantId: string): Promise<void> {
   // selectTenant() ya intenta autoseleccionar la sucursal si solo hay una
   // — si lo logró, no hace falta preguntar y se avanza directo.
   if (session.activeBranchId) {
-    router.push('/app/agenda')
+    router.push('/app/inicio')
   }
 }
 
 function chooseBranch(branchId: string): void {
   session.selectBranch(branchId)
-  router.push('/app/agenda')
+  router.push('/app/inicio')
 }
 </script>
 

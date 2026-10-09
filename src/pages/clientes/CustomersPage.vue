@@ -14,6 +14,8 @@ import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetsPanel from './PetsPanel.vue'
 
@@ -131,26 +133,26 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Clientes</h1>
-      <v-spacer />
-      <v-btn
-        v-if="tab === 'clientes'"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewCustomer"
-      >
-        Nuevo cliente
-      </v-btn>
-      <v-btn
-        v-else
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="petsPanel?.openNewPet()"
-      >
-        Nueva mascota
-      </v-btn>
-    </div>
+    <PageHeader title="Clientes">
+      <template #actions>
+        <v-btn
+          v-if="tab === 'clientes'"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewCustomer"
+        >
+          Nuevo cliente
+        </v-btn>
+        <v-btn
+          v-else
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="petsPanel?.openNewPet()"
+        >
+          Nueva mascota
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-tabs v-model="tab" class="mb-4">
       <v-tab value="clientes">Clientes</v-tab>
@@ -185,9 +187,21 @@ function handleSaved(): void {
         :headers="headers"
         :items="rows"
         :loading="loading"
-        no-data-text="No hay clientes que coincidan con la búsqueda."
         loading-text="Cargando clientes…"
       >
+        <template #no-data>
+          <EmptyState
+            compact
+            illustration="customers"
+            :title="searchTerm.trim() ? 'Sin resultados' : 'Aún no hay clientes'"
+            :message="
+              searchTerm.trim()
+                ? 'No hay clientes que coincidan con la búsqueda.'
+                : 'Los clientes que des de alta aparecerán aquí.'
+            "
+          />
+        </template>
+
         <!-- Sintaxis de corchetes en vez de "#item.fullName": el "." en un
            nombre de slot corto se interpreta como si fuera un modificador
            de directiva (que v-slot no soporta), así que hay que pasar el

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildVaccineTableRows,
+  cardHeadline,
+  cardOverview,
   classifyVaccineStatus,
   computeNextDueDate,
 } from './vaccination'
@@ -56,6 +58,49 @@ describe('classifyVaccineStatus', () => {
 
   it('un día después del borde de la ventana ya es vigente', () => {
     expect(classifyVaccineStatus('2026-07-16', '2026-06-15')).toBe('current')
+  })
+})
+
+describe('cardOverview y cardHeadline', () => {
+  // Qué prueba: que se cuenta cada estado y que las vacunas sin próxima dosis (null) no
+  // se cuentan en ninguno. Si contaran como "al día", una cartilla sin fechas diría
+  // "Cartilla al día" sin saberse.
+  it('cuenta cada estado e ignora las que no tienen próxima dosis', () => {
+    expect(cardOverview(['overdue', 'due_soon', 'current', 'current', null])).toEqual({
+      overdue: 1,
+      dueSoon: 1,
+      current: 2,
+    })
+  })
+
+  // Qué prueba: la prioridad del mensaje. Con una vencida y otras al día debe avisar de
+  // la vencida; lo contrario le diría al dueño de la mascota que todo está bien.
+  it('prioriza lo vencido, luego lo por vencer y al final "al día"', () => {
+    expect(cardHeadline({ overdue: 2, dueSoon: 1, current: 3 })).toEqual({
+      level: 'overdue',
+      text: '2 vacunas vencidas',
+    })
+    expect(cardHeadline({ overdue: 0, dueSoon: 1, current: 3 })).toEqual({
+      level: 'due_soon',
+      text: '1 vacuna por vencer',
+    })
+    expect(cardHeadline({ overdue: 0, dueSoon: 0, current: 2 })).toEqual({
+      level: 'current',
+      text: 'Cartilla al día',
+    })
+  })
+
+  // Qué prueba: singular y plural en español ("1 vacuna vencida", no "1 vacunas").
+  it('concuerda en singular y plural', () => {
+    expect(cardHeadline({ overdue: 1, dueSoon: 0, current: 0 })?.text).toBe('1 vacuna vencida')
+    expect(cardHeadline({ overdue: 0, dueSoon: 3, current: 0 })?.text).toBe('3 vacunas por vencer')
+  })
+
+  // Qué prueba: sin nada que resumir devuelve null para que la pantalla no muestre un
+  // aviso vacío (mascota sin vacunas o sin fechas de próxima dosis).
+  it('devuelve null si no hay vacunas con próxima dosis', () => {
+    expect(cardHeadline(cardOverview([]))).toBeNull()
+    expect(cardHeadline(cardOverview([null, null]))).toBeNull()
   })
 })
 

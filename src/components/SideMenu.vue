@@ -9,16 +9,24 @@
 //    expandido (el estado no se guarda).
 //  - Móvil: oculto; el botón de hamburguesa del layout lo abre como cajón
 //    sobre el contenido (v-model "open").
-import { ref } from 'vue'
+//
+// Las opciones pueden traer una sección (`group`, p. ej. "Operación"): se dibujan
+// agrupadas bajo su título. Arriba del menú hay un espacio (`#header`) para el
+// selector de negocio y sucursal; recibe `rail` para adaptarse al modo angosto.
+import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
+
+import { groupMenuItems } from '@/lib/menuGroups'
 
 export interface SideMenuItem {
   title: string
   icon: string
   to: string
+  group?: string
 }
 
-defineProps<{ items: SideMenuItem[] }>()
+const props = defineProps<{ items: SideMenuItem[] }>()
+const groups = computed(() => groupMenuItems(props.items))
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -38,19 +46,40 @@ const rail = ref(false)
     :rail="!mobile && rail"
     @update:model-value="open = $event"
   >
-    <v-list nav density="comfortable">
-      <!-- "title" también va en el tooltip nativo: en modo riel solo se ve el
-           ícono y sin esto no se sabría a qué vista lleva. -->
-      <v-list-item
-        v-for="item in items"
-        :key="item.to"
-        :to="item.to"
-        :prepend-icon="item.icon"
-        :title="item.title"
-        :aria-label="item.title"
-        color="primary"
-        @click="open = false"
-      />
+    <template #prepend>
+      <div class="side-menu__header">
+        <slot name="header" :rail="!mobile && rail" />
+      </div>
+    </template>
+
+    <v-list nav density="comfortable" class="side-menu__list">
+      <template v-for="(group, index) in groups" :key="group.title ?? 'sin-seccion'">
+        <!-- Título de sección. En modo riel no cabe: se cambia por una línea
+             (y la primera sección no necesita ninguna). -->
+        <template v-if="group.title">
+          <template v-if="!mobile && rail">
+            <v-divider v-if="index > 0" class="my-2" />
+          </template>
+          <v-list-subheader v-else class="side-menu__group">
+            {{ group.title }}
+          </v-list-subheader>
+        </template>
+
+        <!-- "title" también va en el tooltip nativo: en modo riel solo se ve el
+             ícono y sin esto no se sabría a qué vista lleva. -->
+        <v-list-item
+          v-for="item in group.items"
+          :key="item.to"
+          :to="item.to"
+          :prepend-icon="item.icon"
+          :title="item.title"
+          :aria-label="item.title"
+          color="primary"
+          rounded="lg"
+          class="side-menu__item"
+          @click="open = false"
+        />
+      </template>
     </v-list>
 
     <template v-if="!mobile" #append>
@@ -64,3 +93,26 @@ const rail = ref(false)
     </template>
   </v-navigation-drawer>
 </template>
+
+<style scoped lang="scss">
+.side-menu {
+  &__header {
+    padding: 8px 8px 0;
+  }
+
+  // Sección activa: barra de color de marca a la izquierda y título más grueso, para que
+  // no dependa solo del tinte de fondo (que en modo oscuro es muy sutil).
+  &__item.v-list-item--active {
+    box-shadow: inset 3px 0 0 rgb(var(--v-theme-primary));
+    font-weight: 600;
+  }
+
+  &__group {
+    min-height: 32px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+</style>

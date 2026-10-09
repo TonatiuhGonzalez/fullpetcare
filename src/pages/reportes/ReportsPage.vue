@@ -19,6 +19,8 @@ import {
 import type { BranchRow, DayRow, StaffRow, TopItem } from '@/services/reports'
 import { useReportsStore } from '@/stores/reports'
 import { useSessionStore } from '@/stores/session'
+import EmptyState from '@/components/EmptyState.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const session = useSessionStore()
 const reports = useReportsStore()
@@ -167,11 +169,11 @@ function exportStaff(): void {
 </script>
 
 <template>
-  <v-container class="py-4">
-    <h1 class="text-h5 mb-1">Reportes</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal.
-    </p>
+  <v-container class="py-6">
+    <PageHeader
+      title="Reportes"
+      subtitle="Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal."
+    />
 
     <!-- Filtros -->
     <v-row dense class="mb-2">
@@ -402,9 +404,12 @@ function exportStaff(): void {
         class="pa-4 mb-4"
       >
         <h2 class="text-subtitle-1 mb-2">{{ group.title }}</h2>
-        <p v-if="group.rows.length === 0" class="text-body-2 text-medium-emphasis">
-          Sin ventas en este periodo.
-        </p>
+        <EmptyState
+          v-if="group.rows.length === 0"
+          compact
+          illustration="sales"
+          title="Sin ventas en este periodo"
+        />
         <v-table v-else density="compact">
           <thead>
             <tr>

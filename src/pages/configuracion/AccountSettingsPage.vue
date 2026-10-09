@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 
 import CancelAccountDialog from '@/components/CancelAccountDialog.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
@@ -39,7 +40,7 @@ async function handleCancelAccount(comment: string): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-h5 mb-4">Cuenta</h1>
+    <PageHeader title="Cuenta" />
 
     <v-list lines="two" class="border rounded">
       <v-list-item

@@ -21,7 +21,7 @@ async function handleChanged(): Promise<void> {
     // La contraseña ya cambió: se recarga el profile (la marca ya vale false)
     // y con ello negocios y rol. El guard decide a dónde va cada quien.
     await session.completePasswordChange()
-    await router.replace('/app/agenda')
+    await router.replace('/app/inicio')
   } catch {
     errorMessage.value =
       'Tu contraseña se cambió, pero no se pudo cargar tu cuenta. Vuelve a iniciar sesión.'

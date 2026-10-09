@@ -26,6 +26,7 @@ import VaccinationCard from '@/components/VaccinationCard.vue'
 import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
+import { visitKindInfo } from '@/lib/visitKind'
 
 const props = defineProps<{
   modelValue: boolean
@@ -215,7 +216,7 @@ function handleSaved(): void {
                   {{ formatTime(appointment.starts_at, appointment.branchTimezone) }}
                 </template>
                 <template #subtitle>
-                  {{ appointment.kind === 'grooming' ? 'Estética' : 'Veterinaria' }} ·
+                  {{ visitKindInfo(appointment.kind).label }} ·
                   {{ appointment.branchName }}
                 </template>
               </v-list-item>

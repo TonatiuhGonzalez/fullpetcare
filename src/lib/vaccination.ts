@@ -51,6 +51,48 @@ export function classifyVaccineStatus(
   return 'current'
 }
 
+export interface CardOverview {
+  overdue: number
+  dueSoon: number
+  current: number
+}
+
+/** Cuenta las vacunas por estado. Las que no tienen próxima dosis (estado null) no cuentan. */
+export function cardOverview(statuses: Array<VaccineStatus | null>): CardOverview {
+  const overview: CardOverview = { overdue: 0, dueSoon: 0, current: 0 }
+  for (const status of statuses) {
+    if (status === 'overdue') overview.overdue += 1
+    else if (status === 'due_soon') overview.dueSoon += 1
+    else if (status === 'current') overview.current += 1
+  }
+  return overview
+}
+
+/**
+ * La frase que resume la cartilla, con el estado más urgente: primero lo vencido, luego lo
+ * por vencer y, si todo está bien, "Cartilla al día". null si no hay nada que resumir (sin
+ * vacunas o ninguna con próxima dosis).
+ */
+export function cardHeadline(
+  overview: CardOverview,
+): { level: VaccineStatus; text: string } | null {
+  const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+  if (overview.overdue > 0) {
+    return {
+      level: 'overdue',
+      text: plural(overview.overdue, 'vacuna vencida', 'vacunas vencidas'),
+    }
+  }
+  if (overview.dueSoon > 0) {
+    return {
+      level: 'due_soon',
+      text: plural(overview.dueSoon, 'vacuna por vencer', 'vacunas por vencer'),
+    }
+  }
+  if (overview.current > 0) return { level: 'current', text: 'Cartilla al día' }
+  return null
+}
+
 /** Una fila de la cartilla en forma de tabla (fase 14): una por vacuna del catálogo. */
 export interface VaccineTableRow {
   vaccineId: string

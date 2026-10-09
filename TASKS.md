@@ -1433,3 +1433,312 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
   modales de edición directa, qué componentes viejos se conservan y por qué) y el borrado en cascada por RPC.
   `PLAN.md` D19 pasa a aprobada. **Pendiente al cerrar:** probar la subida de foto de la mascota en staging (falla en el
   Storage local, ver 14.5) y abrir el PR hacia `develop`.
+
+
+## Fase 15 — Identidad visual
+
+**Meta: que FullPetCare deje de verse genérico: tema propio (claro y oscuro), logo, tipografía, color por tipo de
+visita apto para daltonismo, y un layout más profesional en toda la app, incluida la vista pública y el superadmin.**
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. **Una dependencia nueva:**
+`@fontsource-variable/inter` (aprobada el 2026-10-08).
+
+**Estado: terminada (2026-10-08).** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D20.
+
+### Decisiones (acordadas con el usuario el 2026-10-08)
+
+| #   | Decisión                  | Propuesta                                                                                                                   |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Personalidad              | Clínica y confiable: neutros fríos, verde azulado profundo de marca (`#0F6B66`), bordes finos en vez de sombras.             |
+| 2   | Tipo de visita            | Estética naranja `#C25400`, veterinaria azul `#0072B2` (Okabe-Ito). Siempre con ícono y texto, nunca solo color.             |
+| 3   | Accesibilidad             | Texto sobre cada color con contraste AA (4.5:1), verificado por un test. Aplica a claro y oscuro.                           |
+| 4   | Tipografía                | Inter con `@fontsource-variable/inter`; cifras tabulares en dinero y folios.                                                |
+| 5   | Modo oscuro               | Incluido, según el sistema y con interruptor manual.                                                                        |
+| 6   | Logo                      | Opción C "Dos mitades" (círculos naranja y azul, cruce verde). SVG propio, favicon y versión para fondo oscuro.             |
+| 7   | Layout                    | Barra superior ligera con menú de usuario; selector de negocio y sucursal en el menú lateral; menú agrupado; encabezado de página estándar. |
+| 8   | Login                     | Dos paneles (formulario y panel de marca); en móvil solo el formulario.                                                     |
+| 9   | Vista pública            | Con la identidad nueva; foto grande de la mascota y cartilla con estados (al día, próxima, vencida).                        |
+| 10  | Superadmin                | Misma identidad.                                                                                                            |
+| 11  | Estados vacíos            | Ilustración SVG propia y mensaje en lugar de texto gris.                                                                    |
+| 12  | Pantalla Inicio           | Pantalla nueva `/app/inicio`, **la de entrada** al iniciar sesión (y del logo); la Agenda sigue en el menú. Visible para todos los roles, con contenido según rol y permisos: accesos rápidos (Nueva cita, Llegada sin cita, Venta de mostrador; recepción y dueño), citas de hoy (conteo por estado y las próximas; groomer/vet solo las suyas), por cobrar (citas atendidas sin cobrar y su total estimado; recepción y dueño), estado de la caja (permiso Caja) y ventas de hoy (permiso Reportes). Acordado el 2026-10-08. |
+
+### 15A. Preparación
+
+- [x] **15.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D20. _Verificar:_ el usuario aprobó por
+  escrito; D20 sin "pendiente de aprobación".
+  **Hecho 2026-10-08:** el usuario aprobó la fase por escrito, incluidas las tarjetas de resumen del dashboard (15.11)
+  y los colores del modo oscuro propuestos (sujetos al test de 15.3).
+
+### 15B. Fundamentos
+
+- [x] **15.2** 🧪 Instalar `@fontsource-variable/inter` y cargarla en `main.ts`; definir en `plugins/vuetify.ts` el tema
+  claro y el oscuro (paleta, radios, bordes, tipografía) y los `defaults` de componentes. _Verificar:_ la app arranca y
+  se ve igual de usable en ambos temas; `lint` y `test:unit` en verde.
+  **Hecho 2026-10-08:** `@fontsource-variable/inter` instalada y cargada en `main.ts`. `plugins/vuetify.ts` define
+  `fullPetCareLight` y `fullPetCareDark` (paleta con `on-*` explícitos, colores propios `grooming` y `veterinary`,
+  borde fino por variable del tema) y los `defaults`: tarjetas con borde y sin sombra (radio `lg`), controles con radio
+  `md`, botones sin sombra. `styles/main.scss` pisa Roboto (Vuetify la fija en `html` y en cada `.text-*`), activa cifras
+  tabulares en tablas (`.tabular` para sueltas) y da color de marca a los enlaces de texto. `vue-tsc -b`, `lint` y 432
+  tests unitarios en verde. **Verificado** en el navegador (Playwright): el login usa Inter (la fuente cargó), el botón
+  es `#0F6B66`, la tarjeta tiene borde de 1 px y el enlace ya no es azul del navegador. **No cubierto:** el tema oscuro
+  aún no se puede activar (llega en 15.5), así que solo está verificado en papel (contrastes calculados, test en 15.3);
+  las demás pantallas no se recorrieron todavía (15.16). El login conserva su `elevation` explícito hasta 15.7.
+- [x] **15.3** 🧪 `lib/contrast.ts` (razón de contraste WCAG) y su test: cada par texto/fondo de la paleta, en claro y
+  en oscuro, llega a 4.5:1. _Verificar:_ el test falla si se cambia un color a uno que no cumple.
+  **Hecho 2026-10-08:** `lib/contrast.ts` (`contrastRatio`, `meetsAA`) y `lib/palette.ts`: la paleta salió de
+  `plugins/vuetify.ts` a datos puros para poder probarla sin cargar Vuetify (el plugin la importa). 44 tests nuevos
+  (`contrast.spec.ts`, `palette.spec.ts`): extremos 21 y 1, valor de referencia de WCAG, el umbral 4.5 a ambos lados,
+  texto sobre cada color de fondo, color como texto sobre la tarjeta, y que oscuro defina los mismos colores que claro.
+  **Verificado que el test detecta el error:** con el naranja anterior (`#D55E00`) falla con "grooming: 3.87:1".
+  `vue-tsc -b`, `lint` y 476 tests unitarios en verde. **No cubierto:** el contraste de los estados (hover, deshabilitado)
+  y de los chips tonales con fondo mezclado; solo se miden los pares base. Ojo: naranja y azul tienen luminosidad
+  parecida (se distinguen por tono, no por claridad); en escala de grises se parecerían, por eso cada tipo lleva ícono y texto.
+- [x] **15.4** 🧪 `lib/visitKind.ts` (tipo de visita → color, ícono y etiqueta) y su test. _Verificar:_ ambos tipos
+  tienen ícono y etiqueta distintos, no solo color.
+  **Hecho 2026-10-08:** `lib/visitKind.ts` (`VISIT_KINDS`, `visitKindInfo`): estética = "Estética",
+  `mdi-content-cut`, color `grooming`; veterinaria = "Veterinaria", `mdi-stethoscope`, color `veterinary`. 4 tests:
+  nombres en español, ícono/texto/color distintos, el color existe con su `on-*` en ambos temas, y cada entrada se
+  identifica con su clave. **No cubierto:** todavía nadie lo usa; hoy `kindLabels` está copiado en 5 archivos
+  (`AgendaPage`, `AppointmentDetailPage`, `AppointmentDialog`, `PublicPetPage`, `CatalogPage`) y se reemplaza en 15.12.
+- [x] **15.5** 🧪 Composable `useThemeMode` (sistema, claro, oscuro) con preferencia guardada en el navegador.
+  _Verificar:_ test: sin almacenamiento disponible usa el del sistema y no truena.
+  **Hecho 2026-10-08:** lógica pura en `lib/themeMode.ts` (`parseThemeMode`, `resolveThemeName`, nombres de los temas,
+  que ahora usa también `plugins/vuetify.ts`) y estado compartido en `composables/useThemeMode.ts`
+  (`initThemeMode`, llamado en `main.ts` antes de montar, y `useThemeMode()` con `mode`, `isDark`, `setMode`). La
+  preferencia se guarda en `localStorage` (`fpc.themeMode`) con `try/catch`. 11 tests nuevos: valores inválidos,
+  almacenamiento que lanza error (no truena y usa el sistema), navegador sin `matchMedia` (claro), modo guardado gana al
+  sistema, `setMode` aplica y guarda, guardar falla pero igual cambia, y el modo "sistema" sigue los cambios del sistema
+  mientras uno fijo no. `vue-tsc -b`, `lint` y 491 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright): con sistema oscuro el login sale oscuro (fondo `#0E1B1E`, botón `#4FD1C5`); con "light" guardado sale
+  claro aunque el sistema sea oscuro; y con el sistema cambiando a oscuro con la app abierta, se actualiza solo.
+  **No cubierto:** aún no hay interruptor en la interfaz (llega en 15.8, menú de usuario); solo se miró el login en
+  oscuro, el resto de pantallas se recorre en 15.16 (hay colores fijos `#ffffff` en los calendarios, 15.12).
+
+### 15C. Marca
+
+- [x] **15.6** `BrandLogo.vue` (isotipo y palabra, variantes claro/oscuro), `public/favicon.svg` nuevo y
+  `<title>`/meta del `index.html`. _Verificar:_ se ve nítido a 16 y 32 px en ambos temas.
+  **Hecho 2026-10-08:** `components/BrandLogo.vue` (isotipo "Dos mitades" en SVG propio, palabra con "Full" en negritas;
+  props `size`, `showWordmark` y `onDark` para fondos oscuros fijos; colores del tema activo; id de recorte único por
+  instancia con `useId`). `public/favicon.svg` reemplaza el rayo morado que traía Vite; usa los colores claros u
+  oscuros según `prefers-color-scheme`. `index.html`: descripción y `theme-color` (verde de marca / fondo oscuro).
+  **Verificado** renderizando el favicon a 16 y 32 px reales, ampliado sin suavizar, en claro y oscuro: se distinguen
+  los dos círculos y el cruce. **Decisiones mías:** el isotipo es ancho, así que en un favicon cuadrado ocupa ~60 % del
+  alto; lo dejé así en vez de recortarlo. `theme-color` sigue al sistema, no al interruptor manual de 15.5.
+- [x] **15.7** Login en dos paneles. _Verificar:_ en navegador, escritorio y móvil; el flujo de entrar, olvidé mi
+  contraseña y cambio forzado de contraseña sigue igual.
+  **Hecho 2026-10-08:** `components/AuthPanelLayout.vue` (formulario a la izquierda, panel de marca a la derecha desde
+  `md`; en móvil solo el formulario) y `LoginPage.vue` lo usa, con el logo, título "Inicia sesión" y el mismo formulario,
+  alertas, diálogo de negocio bloqueado y enlace de recuperación. El panel lleva un degradado verde, dos círculos
+  translúcidos (eco del logo) y la frase "Estética y veterinaria, en un solo lugar." **Verificado** en el navegador
+  (Playwright): escritorio claro y oscuro y móvil de 390 px, sin errores de consola ni desborde horizontal; con
+  credenciales malas sale "No se pudo iniciar sesión…" y con las del dueño demo entra a `/app/agenda`. `vue-tsc -b`,
+  `lint` y 491 tests unitarios en verde. **Decisiones mías que conviene revisar:** (1) **la frase y su subtítulo son
+  texto que yo redacté**, ajústalos a tu gusto; (2) los círculos son blancos translúcidos porque en naranja y azul se
+  veían turbios (olivo) sobre el verde; (3) el panel usa colores fijos, se ve igual en claro y oscuro. **No cubierto:**
+  "olvidé mi contraseña", "restablecer" y "cambio forzado" **siguen con su tarjeta anterior** (no estaban en esta tarea;
+  `AuthPanelLayout` ya sirve para envolverlas); el E2E completo no se corrió (su paso de login no cambió); no se
+  probó el diálogo de negocio bloqueado.
+
+### 15D. Layout y navegación
+
+- [x] **15.8** Barra superior ligera con menú de usuario (avatar con iniciales, rol, configuración, tema, salir) y
+  "Reportar error o sugerencia" movido a un menú de ayuda. _Verificar:_ todas las acciones de antes siguen
+  alcanzables, en escritorio y móvil.
+  **Hecho 2026-10-08:** barra blanca con borde inferior (`AppLayout` y `SuperadminLayout`): logo (solo el isotipo en
+  teléfono) que lleva a la agenda, negocio y sucursal como texto, menú de ayuda (`mdi-help-circle-outline`) con "Reportar
+  error o sugerencia" y el menú de usuario nuevo `UserMenu.vue` (avatar con iniciales, nombre, rol y correo, Configuración,
+  "Cambiar contraseña" en el superadmin, selector Sistema / Claro / Oscuro y Salir). Función pura nueva `lib/initials.ts`
+  con 5 tests. Esto **activa el interruptor de tema** de 15.5. `vue-tsc -b`, `lint` y 496 tests unitarios en verde.
+  **Verificado** en el navegador (Playwright, contra Supabase local): como dueño, el menú muestra "Fernanda Ruiz Gómez · Dueño ·
+  correo"; elegir "Oscuro" cambia la app y guarda `dark`; "Ayuda → Reportar error" abre el diálogo; en móvil (390 px)
+  no hay desborde horizontal ni errores de consola; como superadmin el menú ofrece "Cambiar contraseña" y "Salir".
+  **Decisiones mías:** (1) el chip de rol y el nombre sueltos pasaron al menú de usuario; (2) negocio y sucursal quedan
+  como texto en la barra y el selector de sucursal se mantiene **provisionalmente** (15.9 los mueve al menú lateral); en
+  móvil el selector queda apretado hasta entonces; (3) el avatar muestra iniciales, no la foto de perfil (`avatarPath` no
+  se carga en ninguna pantalla hoy). **No cubierto:** groomer, vet y recepción (solo se probó dueño y superadmin);
+  "Cambiar contraseña" del superadmin no se ejecutó hasta guardar; no hay test automático del componente (§9).
+- [x] **15.9** Selector de negocio y sucursal en el menú lateral; menú agrupado (Operación, Catálogo, Administración)
+  con sección activa marcada. _Verificar:_ el permiso de cada entrada sigue igual (`session.canView`).
+  **Hecho 2026-10-08:** `WorkspaceSwitcher.vue` en la cabecera del menú lateral (ficha con iniciales del negocio, nombre y
+  sucursal; con más de una sucursal abre una lista para elegir, con una sola es solo informativa; en modo riel queda la
+  ficha). `SideMenu.vue` agrupa por sección con `lib/menuGroups.ts` (4 tests): Operación (Agenda, Clientes, Caja),
+  Catálogo (Servicios, Inventario) y Administración (Reportes, Empleados); título de sección en mayúsculas pequeñas,
+  línea separadora en modo riel, y la opción activa con barra de color de marca y texto más grueso. Se quitaron de la
+  barra superior el texto de negocio/sucursal y el selector provisional de 15.8, con lo que en móvil la barra ya no se
+  aprieta. `vue-tsc -b`, `lint` y 500 tests unitarios en verde. **Verificado** en el navegador (Playwright): el dueño
+  ve las 3 secciones y las 7 opciones, cambia de "Sucursal Centro" a "Del Valle" y queda guardada; recepción, groomer y
+  vet ven solo lo suyo (el groomer: Agenda y Servicios, sin título "Administración"); el modo oscuro, el modo riel y
+  el cajón en móvil se ven bien; sin errores de consola. Se corrigió un defecto visto en la prueba: en modo riel el
+  título de la primera sección salía cortado ("O."). **Decisión mía a revisar:** el selector cambia de **sucursal**, no de
+  **negocio**. Hoy la app no tiene forma de cambiar de negocio estando dentro (solo la pantalla de selección tras el
+  login) y no hay datos de demo con varios negocios para probarlo, así que agregarlo sería una función nueva sin poder
+  verificarla; el negocio solo se muestra. **No cubierto:** cambiar de negocio; no hay test automático de los
+  componentes (§9).
+- [x] **15.10** `PageHeader.vue` (título, subtítulo, acciones) y aplicarlo a las pantallas. _Verificar:_ ninguna
+  pantalla queda sin título ni acciones.
+  **Hecho 2026-10-08:** `components/PageHeader.vue` (título `h1` en negritas, subtítulo opcional y slot `actions` a la
+  derecha; en pantallas angostas las acciones bajan debajo del título). Aplicado en **16 pantallas**: Agenda, Clientes,
+  Catálogo de servicios, Inventario, Caja, Reportes, Empleados, Empresa y sucursales, Facturación, Cuenta y, en el
+  superadmin, Empresas, Motivos, Planes, Reportes y Superadmins. En la **Agenda** el título y los botones quedan en el
+  encabezado y la navegación por día (flechas, fecha, "Hoy") pasa a su propia fila debajo; para groomer/vet esa fila
+  muestra el rango visible. **Verificado** en el navegador (Playwright) visitando las 18 rutas como dueño, groomer y
+  superadmin: cada una tiene un solo `h1` dentro del encabezado, los botones de acción siguen donde estaban, sin
+  desborde horizontal ni errores de consola; la Agenda en móvil (390 px) baja los botones bajo el título. `vue-tsc -b`,
+  `lint` y 500 tests unitarios en verde. **Decisiones mías a revisar:** (1) **no** se aplicó a las pantallas de tarea
+  enfocada que llevan su título dentro de una tarjeta (Atender, Cobrar, Detalle de cita, Detalle de venta, Venta de
+  mostrador) ni a Configuración (el marco con su menú); se pueden convertir si lo quieres; (2) el texto de Reportes del
+  superadmin decía "desde el botón de la barra superior" y se corrigió a "desde el menú de ayuda de la barra superior",
+  porque 15.8 movió ese botón. **No cubierto:** las acciones de Caja (abrir/cerrar caja) no viven en el encabezado, quedan
+  donde estaban; no hay test automático del componente (§9). **Incidente de proceso:** al formatear con prettier se
+  reformateó código ajeno en archivos existentes (el repo no está formateado a `printWidth: 90`); se revirtió con una
+  fusión a tres bandas y los diffs de los 22 archivos tocados contienen solo cambios míos.
+- [x] **15.11** Pantalla **Inicio** (decisión 12): lógica pura de resumen en `lib/homeSummary.ts`, store `home` y
+  `pages/inicio/HomePage.vue`; ruta `/app/inicio` como pantalla de entrada (login, selección de negocio, logo y
+  redirecciones) y primera opción del menú. Sin tablas ni funciones SQL nuevas: usa citas, ventas, caja y reportes que
+  ya existen. _Verificar:_ test unitario de `lib/homeSummary.ts` y del store; en el navegador, las cifras coinciden con
+  Agenda, Cobro y Caja, y cada rol (dueño, recepción, groomer, vet) ve solo lo que le toca.
+  **Hecho 2026-10-08:** pantalla `pages/inicio/HomePage.vue` en `/app/inicio`, **primera opción del menú y pantalla de
+  entrada**: el login, la selección de negocio, el cambio y el restablecimiento de contraseña, la raíz `/`, el logo y los
+  desvíos del router (sin permiso, no superadmin) mandan ahora a Inicio. Contenido: encabezado con "Hola, {nombre} · día
+  y fecha" en la zona de la sucursal; accesos rápidos **Nueva cita**, **Llegada sin cita** y **Venta de mostrador**
+  (dueño y recepción); **Citas de hoy** (total, chips por estado, "Lo que sigue" con hora, mascota, cliente y tipo con su
+  ícono y color); **Por cobrar** (conteo, total estimado y botón "Cobrar" por cita; dueño y recepción); **Caja** (abierta
+  desde la hora y efectivo esperado, o cerrada con acceso a abrirla; permiso Caja) y **Ventas de hoy** (permiso
+  Reportes). Piezas nuevas: `lib/homeSummary.ts` (9 tests), `stores/home.ts` (7 tests), `lib/datetime.ts` →
+  `formatWeekdayDate` (1 test) y `appointments.listServicesForAppointments` (una consulta para varias citas). Sin tablas
+  ni funciones SQL nuevas. Cada bloque opcional se consulta solo si la persona puede verlo y, si la caja o las ventas
+  fallan, no tumban el resto. La Agenda acepta `?accion=nueva-cita` y `?accion=llegada-sin-cita` (abre el diálogo y limpia
+  la URL, así recargar no lo reabre). `vue-tsc -b`, `lint` y 517 tests unitarios en verde y **el E2E completo pasa**.
+  **Verificado** en el navegador con citas de prueba de hoy (ya borradas): dueño y recepción ven 4 citas, 2 por cobrar y
+  **$449.00** (25 000 + 2×9 950 centavos); el dueño ve además caja ($250.00 en ventas, caja cerrada) y la recepción la
+  caja pero no las ventas; el groomer ve solo sus 3 citas y ningún otro bloque; accesos rápidos, "Cobrar", logo y clic en
+  una fila ("Lo que sigue" → detalle de la cita) funcionan; claro, oscuro y móvil de 390 px sin desborde ni errores.
+  **Decisiones mías a revisar:** (1) el **total por cobrar es estimado**: suma solo los servicios de la cita; los
+  productos o consumos que se agreguen al cobrar no entran, y la pantalla lo dice; (2) se **oculta el botón flotante de
+  venta de mostrador en Inicio** porque ya está en el encabezado; (3) las cifras son de **la sucursal activa**, no de
+  todo el negocio; (4) las filas de "Lo que sigue" abren la página de detalle de la cita, no el diálogo de la Agenda.
+  **No cubierto:** el **veterinario no se vio con datos** (su sucursal demo es Del Valle y las citas de prueba se
+  sembraron en Centro; solo se comprobó que sin citas muestra 0); no hay test automático de la página (§9); las
+  cifras no se refrescan solas (se recalculan al entrar y al cambiar de sucursal); estado vacío es solo texto, la
+  ilustración llega en 15.14.
+
+### 15E. Color por tipo de visita
+
+- [x] **15.12** Aplicar `visitKind` en agenda (ambos calendarios), chips de cita, historial de la mascota y reportes.
+  _Verificar:_ en navegador; simulando daltonismo (DevTools → Rendering) los dos tipos se distinguen por ícono y texto.
+  **Hecho 2026-10-08:** el tipo de visita se ve igual en toda la app. **Calendario** (los dos: día y semana): el bloque
+  conserva su color de **estado** y se le agrega una **franja** a la izquierda del color del tipo (naranja / azul) y el
+  **ícono** (tijeras / estetoscopio) antes del título; la leyenda gana una fila de tipos. Ayudantes compartidos en
+  `components/calendarEvents.ts` (5 tests; el contenido del bloque se arma con nodos de texto, nunca como HTML, y se
+  comprobó que el test falla si se rompe eso); `CalendarBlock` ahora trae `textColor` y `kind`. **Cambios de color por
+  estado** (acordados): "Agendada" pasó de azul a **gris pizarra** (`secondary`) para dejar el azul solo a veterinaria; el
+  texto de cada bloque usa el `on-*` de su estado en vez de blanco fijo, con lo que en **modo oscuro** ya se lee (antes
+  era blanco sobre verde claro). Chip nuevo `VisitKindChip.vue` en el detalle de cita (página y diálogo) e Inicio; en el
+  diálogo y en "próximas citas" de la mascota se usa el nombre desde `lib/visitKind.ts` (se quitaron los `kindLabels`
+  copiados de 4 archivos); los selectores de tipo de "Nueva cita" y "Llegada sin cita" llevan color e ícono; las pestañas
+  del catálogo llevan ícono; el historial de la mascota usa los colores del tipo. `vue-tsc -b`, `lint`, 522 tests
+  unitarios y el **E2E completo** en verde. **Verificado** en el navegador (Playwright, con citas de prueba ya
+  borradas): día como dueño y semana como groomer, claro y oscuro, con franja, ícono y estados correctos; el diálogo
+  muestra el chip; los dos botones de tipo y las dos pestañas se ven bien; el historial de Rocky usa `bg-grooming` con
+  tijeras. **Decisiones mías a revisar:** (1) en el historial de la mascota el punto de **peso** pasó de `info` (azul) a
+  gris pizarra por el mismo choque con el azul de veterinaria; (2) en Inicio los chips de estado ahora usan los mismos
+  colores que la Agenda (en curso ámbar, por cobrar verde, cobrada verde azulado), antes eran otros; (3) la **vista
+  pública del cliente** conserva por ahora su `kindLabels` (es la tarea 15.13); (4) **Reportes no cambia**: ninguno de
+  sus datos está desglosado por tipo de visita, y hacerlo pide cambiar las funciones SQL de reportes, que sería una
+  mejora aparte. **No cubierto:** citas de **veterinaria** en el calendario no se vieron con datos (solo estética: el
+  veterinario trabaja en otra sucursal); el estado "En curso" y "Agendada" en gris no se vieron en pantalla (los datos
+  de prueba eran completadas y una cancelada); con bloques muy cortos (30 min en la vista de día) el título se
+  recorta como antes y solo se ve en el tooltip; no hay test del calendario montado (§9).
+
+### 15F. Vista pública, estados vacíos y superadmin
+
+- [x] **15.13** Vista pública con la identidad nueva: foto grande y cartilla con estados. _Verificar:_ en móvil, con un
+  link válido; sin cambiar lo que la Edge Function devuelve (§7.4).
+  **Hecho 2026-10-08:** `PublicPetPage.vue` rediseñada y `PublicLayout.vue` con la identidad nueva. **Barra:** ficha con
+  las iniciales y el nombre del **negocio** (con quien tiene relación quien abre el link); mientras carga, el logo de
+  FullPetCare; logo discreto al pie. **Cabecera de la mascota:** franja de color de marca y **foto grande** (136 px, con
+  borde) encima (sin foto, el ícono de perro o gato), nombre grande, chips de especie, raza y sexo, y "Nació el 15 de marzo
+  de 2021". **Cartilla:** un aviso resumen con lo más urgente ("1 vacuna vencida", "2 por vencer" o "Cartilla al día") y,
+  por vacuna, nombre, estado con **ícono y texto** (Vigente, Por vencer, Vencida), fecha de aplicación y **próxima dosis**.
+  **Próximas citas e historial:** el tipo de visita con `VisitKindChip` (se quitó el `kindLabels` de esta página).
+  Lógica pura nueva y probada: `cardOverview` y `cardHeadline` en `lib/vaccination.ts` (4 tests) y `formatDateOnly` en
+  `lib/datetime.ts` (1 test). **La Edge Function no se tocó:** el DTO es el mismo (ya traía `photoUrl`).
+  `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador con un link temporal de Rocky y tres
+  vacunas de prueba (vencida, por vencer y vigente): móvil de 390 px en claro y oscuro y escritorio, sin desborde ni
+  errores de consola; el link inválido muestra el aviso de siempre con el logo de FullPetCare en la barra. **Decisiones
+  mías a revisar:** (1) **"hoy" ahora es el de la zona del negocio**, no el del teléfono de quien abre el link (antes usaba
+  el reloj del navegador, contra §8.3), lo que puede cambiar un día el estado de una vacuna que vence esa noche;
+  (2) "Nació" y "Próxima dosis" antes salían crudos (`2021-03-15`) y ahora en español; (3) en el historial el título es
+  la fecha y el detalle y el empleado van debajo (antes "Tipo — detalle"), porque el tipo ya va en la etiqueta;
+  (4) el logo de FullPetCare al pie es adición mía. **No cubierto:** no se vio con **foto real** (Rocky no tiene; es el
+  mismo `photoUrl` de antes); no se vio la sección "Próximas citas" con datos; sin vacunas se queda el texto de
+  siempre (la ilustración llega en 15.14). **Proceso:** los datos de prueba (3 vacunas y el link) se insertaron en la base
+  **local** con los disparadores desactivados en mi sesión (el expediente no permite borrado, §8.5) y se borraron; no
+  quedó rastro en la bitácora. Hubo que levantar `supabase functions serve` para probar y se detuvo al terminar.
+
+- [x] **15.14** Estados vacíos con ilustración SVG propia (agenda, clientes, productos, ventas). _Verificar:_ se ven
+  en ambos temas.
+  **Hecho 2026-10-08:** `components/EmptyState.vue` (ilustración, título, frase opcional, acciones opcionales y versión
+  `compact`) con **cuatro ilustraciones SVG propias** —calendario, clientes, productos y ventas— que llevan el motivo de
+  los dos círculos del logo y toman sus colores del tema (claro y oscuro). Aplicado en: **Inicio** ("No hay citas para
+  hoy"; se oculta el "0 citas" grande cuando no hay), **Clientes** y **Mascotas** (tablas, distinguiendo "Aún no hay…" de
+  "Sin resultados" según haya búsqueda), **Inventario** y **Reportes → Lo más vendido** ("Sin ventas en este periodo",
+  en Servicios y en Productos). `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright) en claro y oscuro: Inicio sin citas, búsquedas sin resultados en Clientes, Mascotas e Inventario, y un
+  rango de 2020 sin ventas en Reportes; sin errores de consola. **Decisiones mías a revisar:** (1) los textos nuevos
+  ("Las citas del día aparecerán aquí", "Los clientes que des de alta aparecerán aquí", etc.) los redacté yo; (2) **la
+  Agenda no lleva ilustración**: con 0 citas es una cuadrícula vacía, no un texto, y ponerle un aviso encima sería un
+  comportamiento nuevo; el estado vacío de "citas" vive en Inicio; (3) no se agregaron botones de acción dentro de los
+  estados vacíos (el componente los admite); (4) el estado vacío de **Reportes → Empleados** ("Sin actividad…") y los
+  demás textos sueltos (caja, sucursales, historial de la mascota, cartilla, etc.) **se dejaron como texto**; (5) el
+  estado vacío de la vista pública (sin vacunas ni visitas) también sigue en texto. **No cubierto:** el caso "Aún no hay
+  clientes / mascotas / productos" (negocio sin datos) no se vio en pantalla porque la demo tiene datos; solo los de
+  "Sin resultados"; no hay test automático del componente (§9).
+
+- [x] **15.15** `SuperadminLayout` con la misma identidad. _Verificar:_ en navegador, como superadmin.
+  **Hecho 2026-10-08:** el panel de superadmin **ya compartía la identidad** por lo hecho en 15.1 a 15.12 (mismo tema
+  claro y oscuro, logo y barra con el chip "Plataforma", menú de usuario con tema y "Cambiar contraseña", menú lateral con
+  la opción activa marcada, `PageHeader`, tablas y diálogos con el tema); esta tarea fue **recorrerlo y corregir lo que
+  desentonaba**. Se encontró un solo defecto: **Planes, Motivos y Reportes** tenían el título pegado a la barra por no
+  llevar el margen vertical (`py-6`) que ya tenían Empresas y Superadmins; se igualó. No hay colores fijos en sus
+  pantallas ni diálogos (se buscó). `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright, como superadmin): entra a `/superadmin/empresas`, las cinco pantallas, el detalle de una empresa y el
+  formulario de alta, en claro y oscuro, y la pantalla de empresas en móvil de 390 px (sin desborde); sin errores de
+  consola. **No cubierto:** el menú del superadmin **no lleva cabecera ni secciones** (son 5 opciones; el selector de
+  negocio no aplica); en móvil las tablas se desplazan horizontalmente dentro de su tarjeta (es un panel de escritorio, ya
+  lo decía el código); "Todavía no hay reportes" sigue como texto (no hay ilustración para reportes); no se ejecutó
+  "Cambiar contraseña" ni crear o restablecer hasta el final.
+
+### 15G. Cierre
+
+- [x] **15.16** 📚 Revisar contrastes y recorrer las pantallas principales en claro y oscuro; correr `lint`,
+  `test:unit` y el E2E. Actualizar `CLAUDE.md` (§1, §3 dependencia nueva, §5.3 sobre el tema, estructura de
+  carpetas) y marcar la fase terminada. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-08:** **recorrido** automatizado de las pantallas principales como dueño (12), recepción (6), groomer
+  (4) y veterinario (5), en claro y oscuro: ninguna redirige donde no debe, ninguna se desborda y no hay errores de consola;
+  en oscuro se buscaron elementos con fondo blanco o texto negro puros (colores que se escaparon del tema) y no hay; a
+  ojo se revisaron además Punto de venta, Facturación y Caja en oscuro. Se igualó el margen vertical de **Caja y Reportes**
+  (`py-4` → `py-6`) con el resto. `vue-tsc -b`, `lint`, **527 tests unitarios** y el **E2E completo** en verde (incluye
+  el build de producción). **`CLAUDE.md` actualizado:** §1 (fase 15 construida; en el alcance de v1 la entrada ahora es
+  Inicio), §3 (dependencia `@fontsource-variable/inter`), §4 (estructura: `palette`, `visitKind`, `themeMode`,
+  `useThemeMode`, `pages/inicio`), §5.3 (apunta a §5.6) y una **§5.6 nueva** con las reglas de identidad visual (colores
+  solo en `lib/palette.ts`, contraste AA, tipo de visita siempre con ícono y texto, piezas compartidas e Inicio).
+  `PLAN.md` D20 queda aprobada y con sus 8 puntos. **No cubierto:** `npm run test:db` **no se corrió** (la fase no toca
+  la base: ninguna migración ni función SQL); la revisión visual de oscuro fue a ojo en 3 pantallas y programática en el
+  resto, no en las 27; no se probó en un teléfono real ni en Safari (solo Chromium); el recorrido usó la base local con
+  datos de demo. **Pendiente:** nada se ha **commiteado ni subido**: la fase vive sin commit en `feat/visual-identity`; falta
+  decidir cómo partirla en commits y abrir el PR hacia `develop` (§10). Antes de pasar a `main`, **probar en staging** (la
+  carga de fuentes desde el propio dominio y la subida de foto de mascota, que sigue pendiente de la fase 14).
+
+### Qué se puede demostrar (fase 15)
+
+1. **Entrar** y ver el login nuevo (dos paneles, logo "Dos mitades"); en móvil, solo el formulario.
+2. **Inicio**: saludo y fecha, accesos rápidos, citas de hoy, por cobrar, caja y ventas, cada uno según el rol (recepción,
+   dueño y groomer ven cosas distintas).
+3. **Modo oscuro** desde el menú de usuario (Sistema / Claro / Oscuro) y cómo toda la app lo respeta.
+4. **Agenda** con la franja y el ícono del tipo de visita (estética naranja con tijeras, veterinaria azul con estetoscopio)
+   y la leyenda; el mismo tipo en el detalle de la cita y el historial de la mascota.
+5. **Menú lateral** con secciones, selector de sucursal y menú colapsable.
+6. **Vista pública del cliente** en un teléfono: foto grande, cartilla con "1 vacuna vencida / por vencer / al día".
+7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
+8. **Superadmin** con la misma identidad.
