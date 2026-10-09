@@ -904,6 +904,126 @@ pantalla, nunca se desactiva a nadie solo). La base lo revalida también al apli
 
 ---
 
+### D24 — Recordatorios de citas y vacunas: primero a mano con un toque, después automáticos
+
+**Estado:** propuesta (2026-10-09); no se construye hasta que el usuario la apruebe.
+
+**Problema.** La cartilla guarda `next_due_date` y la agenda guarda las citas, pero nadie avisa al cliente: hoy el link
+se copia y se pega a mano (§1). Es donde más valor se pierde en una veterinaria o estética: citas a las que el cliente
+no llega y vacunas que nadie recuerda.
+
+**1. Se construye en dos escalones.** El primero no necesita ningún servicio externo.
+- **Escalón 1 (fase 22B y 22C): lista de recordatorios con envío "de un toque".** Una pantalla muestra a quién hay que
+  avisar hoy o mañana y arma el mensaje; el botón abre WhatsApp con el texto ya escrito (enlace `wa.me`) y la persona
+  solo presiona enviar. Se registra que se avisó. Costo: cero. Contra: lo manda una persona, desde el teléfono o el
+  WhatsApp Web del negocio.
+- **Escalón 2 (fase 22D): envío automático.** Requiere un servicio externo y se justifica con el usuario antes (§3).
+
+**2. Canal del envío automático (pendiente de elegir).**
+
+| Canal | A favor | En contra |
+| --- | --- | --- |
+| **A. WhatsApp Business API** (directo con Meta o con un proveedor intermediario) | Es el canal que el cliente sí lee en México | Cobra por conversación según tarifas vigentes (verificar antes de decidir); exige verificar el negocio y que Meta apruebe las plantillas; sin la respuesta del cliente no hay conversación |
+| **B. Correo** (servicio de correo transaccional) | Casi gratis, sin aprobación de plantillas, mismo canal que el código de acceso de D21 | Mucha gente no lo lee para esto; requiere dominio con SPF/DKIM para no caer en spam |
+| **C. SMS** | Llega a cualquier teléfono | Caro por mensaje y poco profesional; no se recomienda |
+
+Recomendación: empezar por **B** (o por el escalón 1 solamente) y dejar **A** como segundo canal cuando haya un negocio
+que lo pague, porque el costo por mensaje puede volverse un módulo o extra de la suscripción (D23, fases 19 a 21).
+
+**3. Qué se recuerda (primera versión).** (a) Cita agendada, con antelación configurable por negocio (por defecto 24 h).
+(b) Vacuna próxima, a 7 días del `next_due_date`. **No se recuerda** una cita `walk_in`, cancelada, ni de un cliente sin
+consentimiento. Queda como candidato aparte la `next_visit_date` de la consulta.
+
+**4. Consentimiento (obligatorio).** `customers.accepts_reminders` (booleano, `false` por defecto) con su fecha. Se marca
+en el formulario del cliente. WhatsApp exige el permiso del cliente y la ley mexicana de datos personales pide un aviso
+de privacidad; **sin consentimiento no se envía nada**, ni a mano ni automático. Los clientes que ya existen quedan en
+`false` (más seguro; el importador de D25 trae una columna opcional para marcarlo). Se necesita una forma de baja:
+enlace en el correo y, para WhatsApp, responder "BAJA" (esto último pide recibir mensajes entrantes, fuera de esta fase).
+
+**5. Diseño de datos.**
+- Tabla `reminders` (§6: `tenant_id`, borrado suave, RLS): `kind` (`appointment` | `vaccination`), `appointment_id` o
+  `vaccination_id` (un `check` exige exactamente uno), `customer_id`, `channel` (`manual_whatsapp` | `whatsapp` |
+  `email`), `scheduled_for`, `status` (`pending` | `sent` | `failed` | `skipped`), `sent_at`, `sent_by`, `attempts`,
+  `error_message`, `provider_message_id`. Un **índice único parcial** impide dos recordatorios vivos de lo mismo
+  (idempotencia: si el trabajo corre dos veces, no manda doble). Sin política de DELETE.
+- Los usuarios solo insertan `manual_whatsapp` (lo que ellos mismos mandaron); los envíos automáticos y sus estados los
+  escribe únicamente la Edge Function, mismo patrón que `invoice_requests` (§6.5).
+- Ajustes por negocio en `tenant_reminder_settings` (activar cada tipo, antelación, canal) y un módulo nuevo de
+  permisos `reminders` en `role_permissions` (dueño y recepción ver/editar; groomer y vet nada), como `cash_register`.
+- **Horas en la zona de la sucursal (§8.3).** `scheduled_for` es `timestamptz`; "mañana" se calcula con la zona IANA de
+  la sucursal, y no se envía de noche (ventana propuesta: 08:00 a 21:00 locales).
+
+**6. Envío automático.** `pg_cron` (ya lo usa `suspend_expired_tenants`, §6.8) corre cada hora y encola lo que toca
+(`app.enqueue_due_reminders()`, solo `postgres`/`service_role`). Una Edge Function `send-reminders` toma los pendientes
+(`for update skip locked`, para que dos ejecuciones no tomen la misma fila), envía, registra el resultado y reintenta
+hasta 3 veces. La llave del proveedor vive solo en las variables de la función, nunca en el frontend (§10). Si se
+reprograma o cancela la cita, el recordatorio pendiente se descarta.
+
+**7. Privacidad del mensaje.** Solo lo mínimo: nombre de la mascota, fecha, hora y sucursal. **Nunca** diagnóstico,
+tratamiento, montos ni notas internas (mismo criterio que la vista pública, §7.4).
+
+**8. El demo nunca manda mensajes reales.** Producción es el demo (D10). Local, staging y las empresas marcadas
+`is_demo` usan un **proveedor simulado** que solo registra; así ningún cliente ficticio, ni uno real por error, recibe un
+mensaje durante una presentación. Los tests de la Edge Function usan ese mismo simulado (sin mocks elaborados, §9).
+
+**9. Fuera de esta decisión:** confirmar la cita respondiendo el mensaje (necesita recibir mensajes entrantes),
+campañas o promociones, y recordatorios push de la PWA (D21).
+
+**Pendientes:** aprobar o ajustar el escalón 1; elegir canal del escalón 2 y proveedor; consentimiento de los clientes ya
+existentes; antelación y ventana de envío por defecto.
+
+---
+
+### D25 — Importador de clientes y mascotas desde CSV
+
+**Estado:** propuesta (2026-10-09); no se construye hasta que el usuario la apruebe.
+
+**Problema.** Casi ningún negocio empieza desde cero: trae cientos de clientes en Excel, en un cuaderno capturado o en otro
+sistema. Capturarlos uno por uno es la razón más probable por la que un negocio no se cambie.
+
+**1. Formato: un CSV, una fila por mascota.** Se ofrece una **plantilla descargable** con columnas fijas; los datos del
+cliente se repiten en cada una de sus mascotas y las filas con el mismo teléfono se agrupan en un solo cliente. Una fila
+sin datos de mascota crea un cliente sin mascotas. **Alternativas descartadas:** dos archivos (clientes y mascotas; el
+usuario tendría que ligarlos por una llave que no existe en sus hojas) y mapeo libre de columnas (más pantalla, más
+errores; se reconsidera si los negocios traen formatos muy distintos).
+
+**2. Excel (`.xlsx`) no se lee en esta fase.** Leer `.xlsx` en el navegador pide una librería nueva (§3). El usuario guarda
+la hoja como "CSV UTF-8" (se explica en la propia pantalla). El lector de CSV se escribe a mano en `lib/csv.ts`
+(comillas, comas y saltos de línea dentro de comillas, BOM, saltos CRLF y separador `;`, que Excel con configuración
+regional en español usa a veces). Si resulta frágil, se propone `papaparse` y se justifica aparte.
+
+**3. Todo se valida en el navegador y se revalida en la base.** La lógica es una función pura en
+`lib/importCustomers.ts`: de filas y clientes existentes a un plan (`crear`, `omitir`, `error`, con la fila y el motivo).
+Reutiliza `lib/validation.ts` (teléfono, RFC, CP, `customerFiscalProblems`). La vista previa muestra los errores por
+fila **antes** de escribir nada. Como el navegador no es de fiar (§7), la RPC vuelve a validar.
+
+**4. Duplicados.** Un cliente es duplicado si su teléfono normalizado (10 dígitos) ya existe en el negocio o se repite en
+el archivo (si no trae teléfono, por correo). **Política: omitir, nunca sobrescribir** lo que ya está capturado. Una
+mascota es duplicada si el mismo cliente ya tiene una del mismo nombre y especie.
+
+**5. Aplicar: una sola RPC atómica.** `import_customers(p_rows jsonb, p_file_name text)` (`SECURITY DEFINER`, revalida
+membresía y rol dueño o recepción en la primera línea, §7.3.4). **Todo o nada** en una transacción, con un máximo de
+**1 000 filas por archivo** (un archivo mayor se parte). Devuelve el resumen (creados, omitidos, errores).
+**Alternativa descartada:** un `insert` por cliente desde el navegador (no es atómico: una conexión caída dejaría la
+importación a medias, mismo argumento que el borrado en cascada de D19).
+
+**6. Deshacer.** Cada importación crea un registro en `import_batches` (`tenant_id`, quién, nombre del archivo, conteos) y
+`customers`/`pets` ganan `import_batch_id` (nullable, migración aditiva, §8.1). La RPC `undo_import(p_batch_id)` oculta
+(borrado suave, §8.5) lo importado **que todavía no tenga citas ni ventas**; lo que ya se usó se queda y se informa. Sin
+esto, un archivo mal armado ensucia la cartera y arreglarlo es a mano.
+
+**7. Privacidad.** El archivo se procesa en el navegador y **no se guarda**; solo queda el resumen. Los datos de los tests y
+de la plantilla de ejemplo son ficticios (§11). Los clientes importados quedan con `accepts_reminders = false`, salvo
+que el archivo traiga la columna opcional `acepta_recordatorios` (D24).
+
+**8. Fuera de esta decisión:** importar citas, ventas, historial clínico, cartillas de vacunación y productos
+(candidatos posteriores; la cartilla es el más pedido), y leer `.xlsx`.
+
+**Pendientes:** aprobar la plantilla de columnas (propuesta en 23.1), si el lector de CSV se escribe a mano o con
+librería, y el máximo de filas.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
