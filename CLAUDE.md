@@ -33,7 +33,8 @@ clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5
 (fase 13): la venta de mostrador como punto de venta** (§6.5). **Ya construido
 (fase 14): acciones y edición directa en Clientes** (§6.2). **Ya construido
 (fase 15): identidad visual** (tema claro y oscuro, logo, tipografía, color por tipo de
-visita) **y la pantalla de Inicio** (§5.6).
+visita) **y la pantalla de Inicio** (§5.6). **Ya construido (fase 17): estados de carga**
+(siluetas, barra al cambiar de pantalla y aviso de versión nueva, §5.6).
 
 Reglas de esta etapa:
 
