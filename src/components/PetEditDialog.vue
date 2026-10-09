@@ -8,6 +8,7 @@
 //
 // Solo dueño y recepción editan (pets_update); groomer y vet ven los mismos datos
 // con los campos bloqueados. No reemplaza a PetDetailDialog: la agenda lo sigue usando.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { format } from 'date-fns'
 
@@ -59,6 +60,7 @@ const timeline = ref<TimelineEntry[]>([])
 const upcomingAppointments = ref<UpcomingAppointment[]>([])
 const photoUrl = ref<string | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -267,7 +269,10 @@ async function handleVaccinationSaved(): Promise<void> {
       </v-card-title>
 
       <v-card-text>
-        <v-progress-circular v-if="loading && !pet" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton && !pet"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <template v-else-if="pet">
           <!-- Foto centrada; presionarla abre el selector de archivos. -->

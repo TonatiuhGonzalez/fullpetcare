@@ -5,6 +5,8 @@
 // marca `completed` (tarea 4.16). El estado en sí lo valida
 // services/appointments.ts#changeStatus() con lib/appointmentStatus.ts
 // (tareas 4.8-4.9); esta página solo decide CUÁNDO llamarlo.
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { onMounted, ref } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -41,6 +43,7 @@ const existingMedical = ref<MedicalRecord | null>(null)
 const appliedVaccines = ref<VaccinationWithName[]>([])
 
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 const justCompleted = ref(false)
 const showVaccinationDialog = ref(false)
@@ -177,7 +180,7 @@ async function handleVaccinationSaved(): Promise<void> {
       <router-link :to="`/app/citas/${props.id}/cobrar`">Ir a cobrar</router-link>
     </v-alert>
 
-    <v-progress-circular v-if="loading" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton" />
 
     <v-card v-else-if="appointment && pet" class="pa-4">
       <h1 class="text-h5 mb-1">{{ pet.name }}</h1>

@@ -33,6 +33,7 @@
 // el diálogo muestra directo el ticket (TicketView, que ya trae su propio
 // botón "Imprimir") en vez de la información editable — sin "Cobrar" y sin
 // pasar por el slide, porque no hay nada que cobrar de nuevo.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -95,6 +96,7 @@ const existingMedical = ref<MedicalRecord | null>(null)
 const appliedVaccines = ref<VaccinationWithName[]>([])
 
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 
 const showReschedule = ref(false)
@@ -449,7 +451,10 @@ function checkoutErrorMessage(err: unknown): string {
           {{ errorMessage }}
         </v-alert>
 
-        <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton && !appointment"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <!-- La cita ya se cobró (ahora o antes): solo el ticket, sin
              pasar por el slide de abajo — no hay nada que cobrar de

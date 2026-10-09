@@ -7,6 +7,8 @@
 //
 // Tarea 11.11: el ticket de una cita también puede llevar productos extra. La venta de
 // mostrador (sin cita) tiene su propia pantalla desde la fase 13: pages/ventas/PointOfSalePage.vue.
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -32,6 +34,7 @@ const cart = useCartStore()
 const appointment = ref<Appointment | null>(null)
 const customer = ref<Customer | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const loadError = ref<string | null>(null)
 
 const discountInPesos = ref<number | null>(null)
@@ -196,7 +199,7 @@ async function handleCharge(): Promise<void> {
       {{ loadError }}
     </v-alert>
 
-    <v-progress-circular v-if="loading" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton" />
 
     <template v-else-if="appointment">
       <v-alert
