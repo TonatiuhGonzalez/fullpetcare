@@ -221,7 +221,7 @@ FullPetCare/
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     ├── stores/                  # Pinia: session, tenant, agenda, cart
     ├── types/database.ts        # GENERADO. No editar a mano.
-    ├── composables/             # useThemeMode (modo de color, §5.6)
+    ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6)
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
     ├── pages/                   # una carpeta por área: auth, inicio, agenda, clientes, atencion, cobro, ventas, publico, superadmin
@@ -325,6 +325,13 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   encabezado de pantalla: título, subtítulo y acciones), `EmptyState` (estado vacío con
   ilustración), `UserMenu`, `WorkspaceSwitcher`, `SideMenu` (con secciones por `group`),
   `AuthPanelLayout` (hoy solo el login) y `VisitKindChip`.
+- **Estados de carga (fase 17, PLAN.md D22):** en la **primera** carga de una pantalla se muestra la
+  silueta de lo que viene (`TableSkeleton`, `CardSkeleton`, `PageSkeleton`, `CalendarSkeleton`); en las
+  **recargas** (filtrar, guardar, refrescar) se conservan las filas y solo va la barra fina. Se decide con
+  `useFirstLoad(loading)`, que usa `useDelayedLoading` (≈150 ms de retraso para que una respuesta rápida no
+  parpadee). `NavigationProgress` (en `App.vue`) es la barra global al cambiar de pantalla, y
+  `lib/chunkError.ts` reconoce el fallo de descarga de una pantalla tras un despliegue para que el router avise
+  con "Recarga la página". No se deja un círculo de carga suelto en pantallas nuevas.
 - **Inicio** (`/app/inicio`, `stores/home.ts`, `lib/homeSummary.ts`) es la pantalla de entrada.
   Cada bloque se consulta y se muestra solo si el rol o el permiso lo permite (la regla real la
   impone la base). El total "por cobrar" es **estimado**: solo suma servicios. Los accesos

@@ -6,7 +6,10 @@
 import { computed, onMounted, ref } from 'vue'
 
 import BranchFormDialog from '@/components/BranchFormDialog.vue'
+import CardSkeleton from '@/components/CardSkeleton.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { BRANCH_TIMEZONES } from '@/lib/branchSettings'
 import * as branchesService from '@/services/branches'
 import type { Branch } from '@/services/branches'
@@ -19,6 +22,8 @@ const session = useSessionStore()
 const company = ref<Company | null>(null)
 const branches = ref<Branch[]>([])
 const loading = ref(false)
+// Primera carga = silueta; recargas (tras guardar o habilitar) = filas conservadas y barra fina (D22).
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 const showForm = ref(false)
@@ -121,10 +126,10 @@ async function toggleActive(branch: Branch): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-card class="mb-6" variant="outlined">
+    <CardSkeleton v-if="isFirstLoad && showSkeleton" class="mb-6" :lines="4" />
+    <v-card v-else-if="!isFirstLoad" class="mb-6" variant="outlined">
       <v-card-title class="text-subtitle-1">Datos de la empresa</v-card-title>
       <v-card-text>
-        <v-progress-linear v-if="loading && !company" indeterminate />
         <v-row dense>
           <v-col v-for="row in companyRows" :key="row.label" cols="12" sm="6">
             <div class="text-caption text-medium-emphasis">{{ row.label }}</div>
@@ -140,7 +145,9 @@ async function toggleActive(branch: Branch): Promise<void> {
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Añadir sucursal</v-btn>
     </div>
 
-    <v-list lines="two" class="border rounded">
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="3" :rows="3" />
+    <v-progress-linear v-else-if="!isFirstLoad && loading" indeterminate />
+    <v-list v-if="!isFirstLoad" lines="two" class="border rounded">
       <v-list-item v-for="branch in branches" :key="branch.id">
         <v-list-item-title>
           {{ branch.name }}
