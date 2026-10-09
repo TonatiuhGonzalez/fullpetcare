@@ -9,6 +9,8 @@
 // base revalida cada acción) y habla con services/platform.ts, nunca con
 // supabase.ts (CLAUDE.md §4). Cuando algo cambia emite `changed` para que
 // la lista recargue.
+import CardSkeleton from '@/components/CardSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as platformService from '@/services/platform'
@@ -85,6 +87,9 @@ function close(): void {
 // Métricas
 // ---------------------------------------------------------------------------
 const metricsLoading = ref(false)
+const showMetricsSkeleton = useDelayedLoading(
+  () => metricsLoading.value && !metrics.value,
+)
 const metricsError = ref<string | null>(null)
 
 async function loadMetrics(): Promise<void> {
@@ -142,6 +147,9 @@ async function saveNotes(): Promise<void> {
 // Bitácora
 // ---------------------------------------------------------------------------
 const auditLoading = ref(false)
+const showAuditSkeleton = useDelayedLoading(
+  () => auditLoading.value && audit.value.length === 0,
+)
 const auditError = ref<string | null>(null)
 
 async function loadAudit(): Promise<void> {
@@ -444,7 +452,8 @@ function handlePasswordDialogToggle(open: boolean): void {
 
           <!-- ============================ Métricas ============================ -->
           <v-window-item value="metricas">
-            <v-progress-linear v-if="metricsLoading" indeterminate class="mb-4" />
+            <v-progress-linear v-if="metricsLoading && metrics" indeterminate class="mb-4" />
+            <CardSkeleton v-if="showMetricsSkeleton" :count="6" :lines="1" />
             <v-alert v-if="metricsError" type="error" density="compact" variant="tonal">
               {{ metricsError }}
             </v-alert>
@@ -488,7 +497,8 @@ function handlePasswordDialogToggle(open: boolean): void {
 
           <!-- ============================ Bitácora ============================ -->
           <v-window-item value="bitacora">
-            <v-progress-linear v-if="auditLoading" indeterminate class="mb-4" />
+            <v-progress-linear v-if="auditLoading && audit.length > 0" indeterminate class="mb-4" />
+            <v-skeleton-loader v-if="showAuditSkeleton" type="list-item-two-line@4" />
             <v-alert v-if="auditError" type="error" density="compact" variant="tonal">
               {{ auditError }}
             </v-alert>
