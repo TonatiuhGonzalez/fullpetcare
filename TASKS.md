@@ -1767,3 +1767,48 @@ que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
 - [ ] **16.6** Pantalla de entrada del cliente y lista de sus mascotas. _Verificar:_ solo ve las suyas; el DTO sigue en
   lista blanca (§7.4).
 - [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+
+## Fase 17 — Estados de carga: skeletons y aviso de navegación (propuesta)
+
+**Meta: que mientras llegan los datos se vea la forma de lo que viene (tablas y tarjetas), que navegar desde el menú dé
+señal de que algo está cargando, y que una pantalla que no baja tras un despliegue avise en vez de quedarse muda.**
+Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+**Estado: propuesta, trabajo a futuro; no se construye hasta que el usuario la apruebe.** Decisiones y alternativas en
+`PLAN.md` D22. **Fuera de alcance (decidido el 2026-10-08):** la pantalla en blanco al recargar la página (F5).
+
+### 17A. Preparación
+
+- [ ] **17.1** 📚 Revisar y aprobar `PLAN.md` D22; listar las pantallas con spinner suelto o tabla con `:loading`
+  (hoy: 23 spinners y 62 usos de `:loading`; solo Inventario tiene skeleton). _Verificar:_ el usuario aprobó por
+  escrito; D22 sin "propuesta"; la lista de pantallas queda anotada aquí.
+
+### 17B. Piezas compartidas
+
+- [ ] **17.2** 🧪 Composable `useDelayedLoading` (retraso de ~150 ms antes de mostrar, para que una respuesta rápida no
+  parpadee). _Verificar:_ tests unitarios: respuesta más rápida que el retraso no muestra nada; más lenta sí lo
+  muestra; al terminar se apaga; sin fugas si el componente se desmonta.
+- [ ] **17.3** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader`, con `prefers-reduced-motion`.
+  Documentarlos en `CLAUDE.md` §5.6 al cerrar. _Verificar:_ en navegador, claro y oscuro, sin desborde en móvil de 390 px.
+- [ ] **17.4** Barra de progreso global atada al router (aparece pasados ~150 ms, desaparece al terminar o fallar).
+  _Verificar:_ en navegador con la red limitada (Slow 3G) se ve al cambiar de pantalla desde el menú; con red normal no
+  aparece; también en superadmin.
+- [ ] **17.5** 🧪 Error al bajar una pantalla: función pura en `lib/` que reconoce el fallo de importación dinámica
+  (Chrome, Firefox y Safari) y `router.onError` que muestra el aviso con botón para recargar, una sola vez por sesión
+  de navegación. _Verificar:_ tests unitarios con los tres mensajes y con errores que **no** son de importación;
+  en navegador, simular el fallo (bloquear el archivo de una pantalla) y ver el aviso, sin bucle de recargas.
+
+### 17C. Migración de pantallas
+
+- [ ] **17.6** Tablas: primera carga con `TableSkeleton`, recargas conservan las filas y llevan solo la barra fina
+  (Clientes, Mascotas, Empleados, Inventario, ventas y las demás de 17.1). _Verificar:_ en navegador, la tabla no
+  parpadea al recargar y no hay salto de diseño al llegar los datos.
+- [ ] **17.7** Tarjetas y tableros: Inicio, Reportes y Caja con skeleton de la forma real. _Verificar:_ en navegador,
+  claro y oscuro.
+- [ ] **17.8** Pantallas de detalle: cobro, atención, venta, cita y los diálogos de cliente y mascota dejan de mostrar
+  un círculo solo. _Verificar:_ en navegador, ninguna se ve vacía mientras carga.
+- [ ] **17.9** Superadmin y vista pública. _Verificar:_ en navegador; la vista pública en móvil.
+
+### 17D. Cierre
+
+- [ ] **17.10** 📚 Correr `lint`, `test:unit` y el E2E; actualizar `CLAUDE.md` (§4 estructura y §5.6 piezas
+  compartidas) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.

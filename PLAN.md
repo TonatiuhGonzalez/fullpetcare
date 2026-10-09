@@ -770,6 +770,48 @@ reserva en línea.
 
 ---
 
+### D22 — Estados de carga: skeletons, barra de navegación y error de pantalla que no baja
+
+**Estado:** propuesta, pendiente de aprobación (2026-10-08). Trabajo a futuro.
+
+**Problema.** Hoy hay 23 spinners o barras sueltas (`v-progress-circular` / `v-progress-linear`) y solo una pantalla
+usa skeleton (Inventario). Las tablas quedan vacías con una barra fina y "Cargando…". Varias pantallas de detalle
+(cobro, atención, venta, cita) muestran un círculo chico y nada más, y al navegar desde el menú no hay ninguna señal
+mientras baja el código de la pantalla nueva (las rutas son `() => import(...)`).
+
+**1. Skeletons compartidos.** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader` (ya se usa en
+Inventario, sin dependencia nueva). Se muestran **solo en la primera carga**; al recargar, la tabla conserva sus filas y
+solo lleva la barra fina, para que no parpadee. Con un **retraso de ~150 ms**: una respuesta rápida no enseña nada.
+Respetan `prefers-reduced-motion`. Pieza compartida de §5.6: se usa en lugar de rehacerla. **Alternativa descartada:**
+un spinner mejor estilizado (no dice qué viene ni evita el salto de diseño cuando llegan los datos).
+
+**2. Barra de progreso global arriba**, atada al router (`beforeEach` / `afterEach`). Aparece si la navegación tarda más
+de ~150 ms. Resuelve que, desde el menú, la pantalla anterior se queda quieta sin explicación mientras baja la nueva.
+**Alternativa descartada:** poner el skeleton en `AppLayout` (no cubre las rutas de superadmin ni la pública, y hoy la
+pantalla anterior sigue visible hasta que la nueva baja).
+
+**3. Error al bajar una pantalla (`router.onError`).** Tras un despliegue, los archivos con hash del build anterior
+desaparecen y la importación falla; hoy no hay manejo, así que no hay aviso. Se detecta el error de importación dinámica
+(el mensaje cambia entre Chrome, Firefox y Safari, así que la detección es una función pura en `lib/`, con tests) y se
+muestra "Hay una versión nueva de la aplicación" con botón para recargar. **No se recarga solo en bucle:** a lo más una
+vez por sesión de navegación (marca en `sessionStorage`, con `try/catch`, §5.6).
+
+**4. Skeleton por pantalla**, con la forma real de cada contenido, en lugar del círculo: Inicio, Reportes, Caja, cobro,
+atención, detalle de venta y de cita, diálogos de cliente y mascota, y las pantallas de superadmin. Se migra por lotes.
+
+**5. Fuera de esta decisión.**
+- **La pantalla en blanco al recargar la página (F5)** se **ignora a propósito** (decidido el 2026-10-08): no se
+  atiende en esta fase.
+- Precarga de pantallas al pasar el mouse por el menú: queda como opcional, solo si tras el punto 2 aún se nota la espera.
+- Cambiar cómo cargan los stores o los services: solo se cambia lo que se ve mientras llegan los datos.
+
+**6. Sin dependencias nuevas** (§3). No toca la base ni las reglas de §7 y §8.
+
+**Pendientes:** el texto exacto del aviso de versión nueva, y si el retraso de 150 ms se ajusta tras probarlo en
+staging con red lenta.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
