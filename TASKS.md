@@ -1433,3 +1433,37 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
   modales de edición directa, qué componentes viejos se conservan y por qué) y el borrado en cascada por RPC.
   `PLAN.md` D19 pasa a aprobada. **Pendiente al cerrar:** probar la subida de foto de la mascota en staging (falla en el
   Storage local, ver 14.5) y abrir el PR hacia `develop`.
+
+
+## Fase 15 — Identidad visual
+
+**Meta: que FullPetCare deje de verse genérico: tema propio (claro y oscuro), logo, tipografía, color por tipo de
+visita apto para daltonismo, y un layout más profesional en toda la app, incluida la vista pública y el superadmin.**
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. **Una dependencia nueva:**
+`@fontsource-variable/inter` (aprobada el 2026-10-08).
+
+**Estado: terminada (2026-10-08).** Aprobada el 2026-10-08. Decisiones y alternativas en `PLAN.md` D20.
+
+### Decisiones (acordadas con el usuario el 2026-10-08)
+
+| #   | Decisión                  | Propuesta                                                                                                                   |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Personalidad              | Clínica y confiable: neutros fríos, verde azulado profundo de marca (`#0F6B66`), bordes finos en vez de sombras.             |
+| 2   | Tipo de visita            | Estética naranja `#C25400`, veterinaria azul `#0072B2` (Okabe-Ito). Siempre con ícono y texto, nunca solo color.             |
+| 3   | Accesibilidad             | Texto sobre cada color con contraste AA (4.5:1), verificado por un test. Aplica a claro y oscuro.                           |
+| 4   | Tipografía                | Inter con `@fontsource-variable/inter`; cifras tabulares en dinero y folios.                                                |
+| 5   | Modo oscuro               | Incluido, según el sistema y con interruptor manual.                                                                        |
+| 6   | Logo                      | Opción C "Dos mitades" (círculos naranja y azul, cruce verde). SVG propio, favicon y versión para fondo oscuro.             |
+| 7   | Layout                    | Barra superior ligera con menú de usuario; selector de negocio y sucursal en el menú lateral; menú agrupado; encabezado de página estándar. |
+| 8   | Login                     | Dos paneles (formulario y panel de marca); en móvil solo el formulario.                                                     |
+| 9   | Vista pública            | Con la identidad nueva; foto grande de la mascota y cartilla con estados (al día, próxima, vencida).                        |
+| 10  | Superadmin                | Misma identidad.                                                                                                            |
+| 11  | Estados vacíos            | Ilustración SVG propia y mensaje en lugar de texto gris.                                                                    |
+| 12  | Pantalla Inicio           | Pantalla nueva `/app/inicio`, **la de entrada** al iniciar sesión (y del logo); la Agenda sigue en el menú. Visible para todos los roles, con contenido según rol y permisos: accesos rápidos (Nueva cita, Llegada sin cita, Venta de mostrador; recepción y dueño), citas de hoy (conteo por estado y las próximas; groomer/vet solo las suyas), por cobrar (citas atendidas sin cobrar y su total estimado; recepción y dueño), estado de la caja (permiso Caja) y ventas de hoy (permiso Reportes). Acordado el 2026-10-08. |
+
+### 15A. Preparación
+
+- [x] **15.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D20. _Verificar:_ el usuario aprobó por
+  escrito; D20 sin "pendiente de aprobación".
+  **Hecho 2026-10-08:** el usuario aprobó la fase por escrito, incluidas las tarjetas de resumen del dashboard (15.11)
+  y los colores del modo oscuro propuestos (sujetos al test de 15.3).
