@@ -465,6 +465,21 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   (selector de clientes; si le faltan datos fiscales se le piden al momento). La forma de los datos fiscales
   se valida en `lib/validation.ts` (`fiscalReceiverProblems`, `customerFiscalProblems`); que exista en el
   catálogo del SAT lo decide el PAC. El cobro de una cita sigue en `pages/agenda/CheckoutPage.vue`.
+- **Captura del punto de venta (13F y 13G, PLAN.md D18 puntos 6 y 7):** un solo campo "código de barras o nombre"
+  (Enter con código exacto agrega; escribir reemplaza la fila de arriba por las coincidencias) y **dos filas** de
+  tarjetas (`components/PosProductTile.vue`): arriba, **categorías** (ícono y nombre) en una fila con scroll
+  horizontal o, al abrir una, sus productos (con la categoría como tarjeta fija en el primer lugar) y "Volver" a la derecha; abajo, los **últimos productos vendidos** de la
+  sucursal, tantos como quepan en el ancho. Los productos sin categoría (o con la categoría desactivada) caen en la
+  tarjeta "Sin categoría"; una categoría sin productos con existencia no se muestra. Los avisos de captura salen en un
+  toast de 3 s. Atajos: F2 va al campo y F9 cobra (no actúan con un diálogo abierto). Las categorías son la tabla `product_categories` (nombre + ícono de la
+  lista curada de `lib/productCategories.ts`, RLS con el permiso `inventory`, borrado suave) y `products.category_id`
+  con llave compuesta `(tenant_id, category_id)`; se administran en Inventario (`ProductCategoriesDialog`).
+  Desactivar una categoría no toca sus productos.
+- **Cambio (13H):** al pagar de más en efectivo, el diálogo de cobro muestra "Cambio a devolver" (`PaymentSummary`,
+  el mismo en punto de venta y cobro de citas) y el ticket una línea "Cambio". Se **deriva** con `lib/paymentChange.ts`
+  (la regla de Caja: solo el efectivo da cambio); no se guarda. Un sobrepago con tarjeta o transferencia no deja
+  cobrar, y la base también lo rechaza (`finalize_sale`: lo pagado de más no puede superar el efectivo recibido). Con el monto
+  cubierto, el formulario de agregar pago se oculta.
 
 - **Caja (fase 12, `cash_sessions` y `cash_movements`):** un turno de caja por sucursal. `cash_sessions` se abre
   con un fondo inicial (`opening_float_cents`) y se cierra contando el efectivo; al cerrar se congelan
