@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { findBySku, normalizeSearch, searchProducts } from './productSearch'
+import {
+  filterProducts,
+  findBySku,
+  normalizeSearch,
+  searchProducts,
+} from './productSearch'
 
 const PRODUCTS = [
   { name: 'Shampóo hipoalergénico', sku: '7501001' },
@@ -71,5 +76,34 @@ describe('searchProducts (texto)', () => {
     expect(searchProducts(PRODUCTS, 'collar').map((p) => p.name)).toEqual([
       'Collar ajustable',
     ])
+  })
+})
+
+describe('filterProducts (cuadrícula del punto de venta)', () => {
+  it('con texto vacío muestra todo el catálogo', () => {
+    // Qué se rompería: la cuadrícula aparecería vacía al abrir la pantalla y recepción
+    // tendría que escribir para ver algo, que es justo lo que la cuadrícula evita.
+    expect(filterProducts(PRODUCTS, '')).toHaveLength(4)
+    expect(filterProducts(PRODUCTS, '   ')).toHaveLength(4)
+  })
+
+  it('filtra por nombre sin importar acentos y por código parcial', () => {
+    // Qué se rompería: tras un escaneo fallido o un nombre a medias, no habría
+    // sugerencias y recepción no encontraría el producto.
+    expect(filterProducts(PRODUCTS, 'shampoo').map((p) => p.name)).toEqual([
+      'Shampóo hipoalergénico',
+      'Shampoo de avena',
+    ])
+    expect(filterProducts(PRODUCTS, '75010')).toHaveLength(2)
+  })
+
+  it('no recorta a 20 resultados como searchProducts', () => {
+    // Qué se rompería: en un catálogo grande, productos válidos quedarían fuera de la
+    // cuadrícula aunque coincidan con el texto.
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      name: `Croqueta ${i}`,
+      sku: null,
+    }))
+    expect(filterProducts(many, 'croqueta')).toHaveLength(30)
   })
 })

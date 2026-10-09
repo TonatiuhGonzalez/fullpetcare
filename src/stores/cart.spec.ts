@@ -160,6 +160,36 @@ describe('agregar y quitar pagos recalcula lo que falta por cubrir', () => {
 
     expect(cart.remainingCents).toBe(0)
     expect(cart.isFullyPaid).toBe(true)
+    expect(cart.changeCents).toBe(5000)
+    expect(cart.isCovered).toBe(true)
+  })
+
+  it('el monto cuenta como cubierto solo cuando ya no falta nada', async () => {
+    // Qué se rompería: se ocultaría el formulario de agregar pago con la cuenta a medias y no
+    // habría forma de completarla.
+    vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+
+    expect(cart.isCovered).toBe(false)
+    cart.addPayment({ method: 'cash', amountCents: 10000 })
+    expect(cart.isCovered).toBe(false)
+    cart.addPayment({ method: 'cash', amountCents: 15000 })
+    expect(cart.isCovered).toBe(true)
+  })
+
+  it('pagar de más con tarjeta no deja cobrar: no se da cambio de una tarjeta', async () => {
+    // Qué se rompería: se cobraría a la tarjeta más de lo que vale la cuenta, sin forma de
+    // devolver la diferencia en el mostrador.
+    vi.mocked(buildSummary).mockResolvedValue(summaryWith([BANO]))
+    const cart = useCartStore()
+    await cart.loadAppointment('appt-1')
+
+    cart.addPayment({ method: 'card', amountCents: 30000, paymentFormCode: '04' })
+
+    expect(cart.changeCents).toBe(0)
+    expect(cart.unpayableExcessCents).toBe(5000)
+    expect(cart.isFullyPaid).toBe(false)
   })
 })
 
@@ -237,6 +267,7 @@ const ALIMENTO: SellableProduct = {
   priceCents: 10000,
   taxRateBp: 1600,
   stock: 3,
+  categoryId: null,
 }
 
 describe('productos en el ticket (tarea 11.11)', () => {

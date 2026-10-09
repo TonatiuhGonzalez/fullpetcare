@@ -47,3 +47,13 @@ export function searchProducts<T extends Searchable>(
     )
     .slice(0, limit)
 }
+
+/**
+ * Lo que muestra la cuadrícula del punto de venta: con texto vacío, TODO el catálogo
+ * (a diferencia de searchProducts, que no devuelve nada); con texto, los que coinciden
+ * por nombre o código, sin límite (la cuadrícula hace scroll).
+ */
+export function filterProducts<T extends Searchable>(products: T[], query: string): T[] {
+  if (!normalizeSearch(query)) return products
+  return searchProducts(products, query, products.length)
+}

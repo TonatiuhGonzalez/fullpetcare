@@ -173,3 +173,86 @@ describe('services/checkout.ts contra Supabase local', () => {
     expect(fetched.payments).toHaveLength(1)
   })
 })
+
+// "Últimos vendidos" del punto de venta (fase 13, 13G). Se insertan ventas directo con
+// service_role (el cobro ya está probado arriba y en checkout-products-rpc.spec.ts); lo que
+// se prueba aquí es la consulta: orden, sucursal y ventas canceladas.
+describe('listRecentlySoldProductIds (últimos vendidos del punto de venta)', () => {
+  const PRODUCT_ALIMENTO = '20000000-0000-4000-8000-000000000001'
+  const PRODUCT_SHAMPOO = '20000000-0000-4000-8000-000000000002'
+  const BRANCH_DEL_VALLE = 'c0000000-0000-4000-8000-000000000002'
+  const createdSaleIds: string[] = []
+
+  async function insertSale(
+    status: 'paid' | 'cancelled',
+    branchId: string,
+    paidAt: string,
+    productId: string,
+  ): Promise<void> {
+    const client = await cleanupPool.connect()
+    try {
+      await client.query('set role service_role')
+      // Folio alto para no chocar con los de las ventas reales de otros tests.
+      const folio = 900000 + createdSaleIds.length + Math.floor(Math.random() * 90000)
+      const { rows } = await client.query(
+        `insert into sales (tenant_id, branch_id, folio, status, paid_at)
+         values ($1, $2, $3, $4, $5) returning id`,
+        [TENANT_PATITAS, branchId, folio, status, paidAt],
+      )
+      createdSaleIds.push(rows[0].id)
+      await client.query(
+        `insert into sale_items (tenant_id, sale_id, item_type, product_id, description,
+                                 quantity, unit_price_cents, tax_rate_bp, tax_cents, line_total_cents)
+         values ($1, $2, 'product', $3, 'Producto de prueba', 1, 1000, 1600, 138, 1000)`,
+        [TENANT_PATITAS, rows[0].id, productId],
+      )
+    } finally {
+      client.release()
+    }
+  }
+
+  afterEach(async () => {
+    const client = await cleanupPool.connect()
+    try {
+      await client.query('set role service_role')
+      for (const id of createdSaleIds.splice(0)) {
+        await client.query('delete from sale_items where sale_id = $1', [id])
+        await client.query('delete from sales where id = $1', [id])
+      }
+    } finally {
+      client.release()
+    }
+  })
+
+  async function signInAsOwner(): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (error) throw error
+  }
+
+  it('devuelve los productos de la venta más reciente primero', async () => {
+    // Qué se rompería: la fila "Últimos vendidos" mostraría lo vendido hace semanas arriba
+    // de lo que se acaba de vender.
+    await insertSale('paid', BRANCH_CENTRO, '2026-01-01T10:00:00Z', PRODUCT_ALIMENTO)
+    await insertSale('paid', BRANCH_CENTRO, '2026-01-02T10:00:00Z', PRODUCT_SHAMPOO)
+    await signInAsOwner()
+
+    const ids = await checkoutService.listRecentlySoldProductIds(TENANT_PATITAS, BRANCH_CENTRO)
+
+    expect(ids.slice(0, 2)).toEqual([PRODUCT_SHAMPOO, PRODUCT_ALIMENTO])
+  })
+
+  it('no cuenta las ventas canceladas ni las de otra sucursal', async () => {
+    // Qué se rompería: se ofrecería como "reciente" un producto cuya venta se canceló, o uno
+    // que solo se vende en otra sucursal (donde quizá ni hay existencia).
+    await insertSale('cancelled', BRANCH_CENTRO, '2026-02-01T10:00:00Z', PRODUCT_ALIMENTO)
+    await insertSale('paid', BRANCH_DEL_VALLE, '2026-02-02T10:00:00Z', PRODUCT_SHAMPOO)
+    await signInAsOwner()
+
+    const ids = await checkoutService.listRecentlySoldProductIds(TENANT_PATITAS, BRANCH_CENTRO)
+
+    expect(ids).toEqual([])
+  })
+})
