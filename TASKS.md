@@ -1557,3 +1557,20 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   móvil el selector queda apretado hasta entonces; (3) el avatar muestra iniciales, no la foto de perfil (`avatarPath` no
   se carga en ninguna pantalla hoy). **No cubierto:** groomer, vet y recepción (solo se probó dueño y superadmin);
   "Cambiar contraseña" del superadmin no se ejecutó hasta guardar; no hay test automático del componente (§9).
+- [x] **15.9** Selector de negocio y sucursal en el menú lateral; menú agrupado (Operación, Catálogo, Administración)
+  con sección activa marcada. _Verificar:_ el permiso de cada entrada sigue igual (`session.canView`).
+  **Hecho 2026-10-08:** `WorkspaceSwitcher.vue` en la cabecera del menú lateral (ficha con iniciales del negocio, nombre y
+  sucursal; con más de una sucursal abre una lista para elegir, con una sola es solo informativa; en modo riel queda la
+  ficha). `SideMenu.vue` agrupa por sección con `lib/menuGroups.ts` (4 tests): Operación (Agenda, Clientes, Caja),
+  Catálogo (Servicios, Inventario) y Administración (Reportes, Empleados); título de sección en mayúsculas pequeñas,
+  línea separadora en modo riel, y la opción activa con barra de color de marca y texto más grueso. Se quitaron de la
+  barra superior el texto de negocio/sucursal y el selector provisional de 15.8, con lo que en móvil la barra ya no se
+  aprieta. `vue-tsc -b`, `lint` y 500 tests unitarios en verde. **Verificado** en el navegador (Playwright): el dueño
+  ve las 3 secciones y las 7 opciones, cambia de "Sucursal Centro" a "Del Valle" y queda guardada; recepción, groomer y
+  vet ven solo lo suyo (el groomer: Agenda y Servicios, sin título "Administración"); el modo oscuro, el modo riel y
+  el cajón en móvil se ven bien; sin errores de consola. Se corrigió un defecto visto en la prueba: en modo riel el
+  título de la primera sección salía cortado ("O."). **Decisión mía a revisar:** el selector cambia de **sucursal**, no de
+  **negocio**. Hoy la app no tiene forma de cambiar de negocio estando dentro (solo la pantalla de selección tras el
+  login) y no hay datos de demo con varios negocios para probarlo, así que agregarlo sería una función nueva sin poder
+  verificarla; el negocio solo se muestra. **No cubierto:** cambiar de negocio; no hay test automático de los
+  componentes (§9).

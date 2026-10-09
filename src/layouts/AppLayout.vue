@@ -7,6 +7,7 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
 import UserMenu from '@/components/UserMenu.vue'
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
@@ -17,16 +18,6 @@ const router = useRouter()
 const { xs } = useDisplay()
 
 const businessName = computed(() => session.activeMembership?.tenantName ?? '')
-// "Patitas Felices - Sucursal Centro" — la sucursal activa va pegada al
-// nombre del negocio en el título (pedido explícito, antes solo se veía
-// más a la derecha de la barra, lejos del nombre). Mientras no haya
-// sucursal elegida (p. ej. el instante entre login y que
-// resolveActiveBranch() corra) se muestra solo el nombre del negocio.
-const titleLabel = computed(() =>
-  session.activeBranch
-    ? `${businessName.value} - ${session.activeBranch.name}`
-    : businessName.value,
-)
 const userLabel = computed(() => session.profile?.fullName ?? session.user?.email ?? '')
 
 // Banner de vigencia / gracia / solo lectura del negocio activo (tarea #1905).
@@ -56,22 +47,60 @@ const showPayMock = ref(false)
 // (CLAUDE.md §6.7).
 const menuOpen = ref(false)
 const menuItems = computed<SideMenuItem[]>(() => [
-  { title: 'Agenda', icon: 'mdi-calendar-month-outline', to: '/app/agenda' },
+  {
+    title: 'Agenda',
+    icon: 'mdi-calendar-month-outline',
+    to: '/app/agenda',
+    group: 'Operación',
+  },
   ...(isFrontDesk(session.role)
-    ? [{ title: 'Clientes', icon: 'mdi-account-group-outline', to: '/app/clientes' }]
+    ? [
+        {
+          title: 'Clientes',
+          icon: 'mdi-account-group-outline',
+          to: '/app/clientes',
+          group: 'Operación',
+        },
+      ]
     : []),
-  { title: 'Servicios', icon: 'mdi-clipboard-list-outline', to: '/app/servicios' },
+  {
+    title: 'Servicios',
+    icon: 'mdi-clipboard-list-outline',
+    to: '/app/servicios',
+    group: 'Catálogo',
+  },
   ...(session.canView('inventory')
-    ? [{ title: 'Inventario', icon: 'mdi-package-variant-closed', to: '/app/inventario' }]
+    ? [
+        {
+          title: 'Inventario',
+          icon: 'mdi-package-variant-closed',
+          to: '/app/inventario',
+          group: 'Catálogo',
+        },
+      ]
     : []),
   ...(session.canView('cash_register')
-    ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja' }]
+    ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja', group: 'Operación' }]
     : []),
   ...(session.canView('reports')
-    ? [{ title: 'Reportes', icon: 'mdi-chart-bar', to: '/app/reportes' }]
+    ? [
+        {
+          title: 'Reportes',
+          icon: 'mdi-chart-bar',
+          to: '/app/reportes',
+          group: 'Administración',
+        },
+      ]
     : []),
   ...(session.canView('employees')
-    ? [{ title: 'Empleados', icon: 'mdi-badge-account-outline', to: '/app/empleados' }]
+    ? [
+        {
+          title: 'Empleados',
+          icon: 'mdi-badge-account-outline',
+          to: '/app/empleados',
+          group: 'Administración',
+        },
+      ]
     : []),
 ])
 
@@ -114,31 +143,7 @@ function handleBranchChange(branchId: unknown): void {
     >
       <BrandLogo :size="28" :show-wordmark="!xs" />
     </router-link>
-    <!-- Negocio y sucursal activos. Provisional: la tarea 15.9 los pasa a un
-         selector en el menú lateral. -->
-    <span
-      v-if="titleLabel"
-      class="d-none d-md-inline text-body-2 text-medium-emphasis border-s ps-4"
-    >
-      {{ titleLabel }}
-    </span>
     <v-spacer />
-
-    <!-- El selector de sucursal solo tiene sentido si hay más de una que
-         elegir — con una sola, la etiqueta de arriba ya la muestra. -->
-    <v-select
-      v-if="session.activeBranches.length > 1"
-      :model-value="session.activeBranchId"
-      :items="session.activeBranches"
-      item-title="name"
-      item-value="id"
-      density="compact"
-      variant="outlined"
-      hide-details
-      style="max-width: 220px"
-      class="mr-2"
-      @update:model-value="handleBranchChange"
-    />
 
     <!-- Ayuda: aquí vive "Reportar error o sugerencia", que antes ocupaba un
          botón grande en la barra. -->
@@ -170,7 +175,17 @@ function handleBranchChange(branchId: unknown): void {
     />
   </v-app-bar>
 
-  <SideMenu v-model:open="menuOpen" :items="menuItems" />
+  <SideMenu v-model:open="menuOpen" :items="menuItems">
+    <template #header="{ rail }">
+      <WorkspaceSwitcher
+        :tenant-name="businessName"
+        :branches="session.activeBranches"
+        :active-branch-id="session.activeBranchId"
+        :rail="rail"
+        @select-branch="handleBranchChange"
+      />
+    </template>
+  </SideMenu>
 
   <v-snackbar v-model="showPayMock" :timeout="4000">
     El pago en línea estará disponible pronto.
