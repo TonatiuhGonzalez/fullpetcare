@@ -8,9 +8,11 @@
 import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import CardSkeleton from '@/components/CardSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { formatTime, formatWeekdayDate } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
@@ -33,6 +35,7 @@ const subtitle = computed(() => {
 })
 
 const loading = computed(() => home.status === 'idle' || home.status === 'loading')
+const showSkeleton = useDelayedLoading(loading)
 
 onMounted(() => home.load())
 // Cambiar de sucursal desde el menú lateral cambia de qué sucursal es el resumen.
@@ -86,7 +89,7 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
       {{ home.errorMessage }}
     </v-alert>
 
-    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <CardSkeleton v-if="loading && showSkeleton" :count="4" :columns="2" :lines="3" />
 
     <v-row v-else-if="home.status === 'ready'">
       <!-- Citas de hoy: para todos los roles. -->

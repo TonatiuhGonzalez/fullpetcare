@@ -7,6 +7,7 @@
 // como la instancia no se remonta en cada apertura (a diferencia de una
 // página, que se creaba de cero por navegación), hace falta reiniciar el
 // formulario cada vez que se abre — mismo patrón que CustomerFormDialog.vue.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 import { format } from 'date-fns'
 
@@ -135,6 +136,7 @@ const selectedDate = ref(format(new Date(), 'yyyy-MM-dd'))
 const availableSlots = ref<AvailableSlot[]>([])
 const selectedSlot = ref<AvailableSlot | null>(null)
 const loadingSlots = ref(false)
+const showSlotsSkeleton = useDelayedLoading(loadingSlots)
 
 // Solo quien de verdad puede ATENDER este tipo de cita aparece como
 // opción — mismo criterio que valida create_appointment() en la base
@@ -464,7 +466,9 @@ async function handleSubmit(): Promise<void> {
                  huecos (empleado + al menos un servicio). Antes de eso
                  no hay una búsqueda real que haya fallado, así que no
                  corresponde mostrar "no hay huecos disponibles". -->
-            <v-progress-circular v-if="loadingSlots" indeterminate color="primary" />
+            <div v-if="loadingSlots" style="min-height: 48px">
+              <v-skeleton-loader v-if="showSlotsSkeleton" type="chip@6" />
+            </div>
             <TimeSlotPicker
               v-else-if="selectedEmployeeId && totalDurationMinutes > 0"
               v-model="selectedSlot"

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 // Detalle de una cita: reagendar, cancelar (tarea 3.19).
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { onMounted, ref } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -33,6 +35,7 @@ const employees = ref<EmployeeSummary[]>([])
 // Venta ya cobrada de esta cita (si la hay): desde ahí se factura (tarea 11.19).
 const paidSaleId = ref<string | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 
 const showReschedule = ref(false)
@@ -140,7 +143,7 @@ async function handleReschedule(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton && !appointment" />
 
     <v-card v-else-if="appointment && branch" class="pa-4">
       <div class="d-flex align-center mb-2">

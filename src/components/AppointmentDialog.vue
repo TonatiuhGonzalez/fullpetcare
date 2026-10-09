@@ -33,6 +33,7 @@
 // el diálogo muestra directo el ticket (TicketView, que ya trae su propio
 // botón "Imprimir") en vez de la información editable — sin "Cobrar" y sin
 // pasar por el slide, porque no hay nada que cobrar de nuevo.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -66,6 +67,14 @@ const props = defineProps<{
   modelValue: boolean
   /** null cuando no hay ninguna cita seleccionada todavía. */
   appointmentId: string | null
+  /**
+   * La agenda ya sabe si la cita está cobrada (stores/agenda.ts#paidAppointmentIds).
+   * Con esto el diálogo abre directo en "Cobro" y pide el ticket desde el primer
+   * momento, en lugar de enseñar el detalle con "Cobrar" y cambiar al recibo
+   * cuando por fin llega la respuesta. Es solo una pista: si luego no se encuentra
+   * la venta, el diálogo cae al detalle normal.
+   */
+  isPaid?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -95,7 +104,12 @@ const existingMedical = ref<MedicalRecord | null>(null)
 const appliedVaccines = ref<VaccinationWithName[]>([])
 
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
+
+// Cita cobrada (lo sabe la agenda) cuyo ticket aún no llega: se pinta la silueta del
+// recibo y no el detalle, para que la pantalla no cambie de forma a media carga.
+const awaitingTicket = computed(() => props.isPaid === true && !ticket.value && loading.value)
 
 const showReschedule = ref(false)
 const rescheduleDate = ref('')
@@ -164,6 +178,12 @@ function employeeName(userId: string): string {
   return employees.value.find((e) => e.userId === userId)?.fullName ?? '(empleado)'
 }
 
+/** El ticket de la venta que cubre la cita, o null si no tiene venta. */
+async function findTicketForAppointment(appointmentId: string): Promise<Ticket | null> {
+  const saleId = await checkoutService.findSaleIdForAppointment(appointmentId)
+  return saleId ? await checkoutService.getTicket(saleId) : null
+}
+
 async function load(id: string): Promise<void> {
   const tenantId = session.activeTenantId
   if (!tenantId) return
@@ -171,34 +191,58 @@ async function load(id: string): Promise<void> {
   // Limpia lo que hubiera de una cita anterior — sin esto, al abrir el
   // diálogo para OTRA cita se alcanza a ver un instante los datos viejos
   // antes de que termine de cargar la nueva.
+  // Debe limpiarse TODO lo que se muestra de la cita, no solo `appointment`: la
+  // cita llega primero y el resto después. Si branch/customer/pet/lines/employees
+  // conservaran los de la cita anterior, el contenido se pintaría ya con la cita
+  // nueva mezclada con datos viejos hasta que termine la segunda tanda de consultas.
   appointment.value = null
+  branch.value = null
+  customer.value = null
+  pet.value = null
+  lines.value = []
+  employees.value = []
   existingGrooming.value = null
   existingMedical.value = null
   appliedVaccines.value = []
   view.value = 'appointment'
   ticket.value = null
   chargeError.value = null
+  showReschedule.value = false
+  discountInPesos.value = null
+  newPaymentMethod.value = 'cash'
+  newPaymentAmountInPesos.value = null
+  requiresInvoice.value = false
 
   loading.value = true
   errorMessage.value = null
+
+  // Si la agenda ya dijo que está cobrada, el ticket se pide EN PARALELO con la cita
+  // (no depende de ella) en lugar de esperar a saber su estado. El `.catch` vacío solo
+  // evita un aviso de "promesa sin manejar" si otra consulta falla primero; el error
+  // real se vuelve a lanzar donde se espera esta promesa (más abajo).
+  const ticketLookup = props.isPaid ? findTicketForAppointment(id) : null
+  ticketLookup?.catch(() => undefined)
+
   try {
     const found = await appointmentsService.getById(tenantId, id)
-    appointment.value = found
     if (!found) return
 
-    const [foundBranch, foundCustomer, foundPet, foundLines] = await Promise.all([
-      branchesService.getById(found.branch_id),
-      customersService.getById(tenantId, found.customer_id),
-      petsService.getById(tenantId, found.pet_id),
-      appointmentsService.listServices(found.id),
-    ])
+    // Todo junto: la cita se publica hasta tener también su sucursal, cliente,
+    // mascota, servicios y empleados, así el contenido nunca se pinta a medias.
+    const [foundBranch, foundCustomer, foundPet, foundLines, foundEmployees] =
+      await Promise.all([
+        branchesService.getById(found.branch_id),
+        customersService.getById(tenantId, found.customer_id),
+        petsService.getById(tenantId, found.pet_id),
+        appointmentsService.listServices(found.id),
+        listBranchEmployees(tenantId, found.branch_id),
+      ])
     branch.value = foundBranch
     customer.value = foundCustomer
     pet.value = foundPet
     lines.value = foundLines
-    if (foundBranch) {
-      employees.value = await listBranchEmployees(tenantId, found.branch_id)
-    }
+    employees.value = foundEmployees
+    appointment.value = found
 
     if (found.status === 'in_progress') {
       if (found.kind === 'grooming') {
@@ -213,8 +257,7 @@ async function load(id: string): Promise<void> {
     // ESTA apertura del diálogo, `ticket` ya lo tiene handleCharge() sin
     // pasar por aquí). Ver el comentario de cabecera.
     if (found.status === 'completed') {
-      const saleId = await checkoutService.findSaleIdForAppointment(found.id)
-      if (saleId) ticket.value = await checkoutService.getTicket(saleId)
+      ticket.value = ticketLookup ? await ticketLookup : await findTicketForAppointment(found.id)
     }
   } catch {
     errorMessage.value = 'No se pudo cargar la cita. Revisa tu conexión.'
@@ -441,7 +484,7 @@ function checkoutErrorMessage(err: unknown): string {
   >
     <v-card>
       <v-card-title>
-        {{ ticket ? 'Cobro' : view === 'checkout' ? 'Cobrar' : stage === 'attend' ? 'Atender cita' : 'Detalle de la cita' }}
+        {{ ticket || awaitingTicket ? 'Cobro' : view === 'checkout' ? 'Cobrar' : stage === 'attend' ? 'Atender cita' : 'Detalle de la cita' }}
       </v-card-title>
 
       <v-card-text>
@@ -449,7 +492,18 @@ function checkoutErrorMessage(err: unknown): string {
           {{ errorMessage }}
         </v-alert>
 
-        <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+        <!-- Cita cobrada: se sabe desde que se abre, así que desde el primer
+             instante se enseña la silueta del recibo (sin retraso, para que el
+             diálogo no abra vacío). -->
+        <v-skeleton-loader
+          v-if="awaitingTicket"
+          type="heading, text, text, list-item-two-line, list-item-two-line, text"
+        />
+
+        <v-skeleton-loader
+          v-else-if="showSkeleton && !appointment"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <!-- La cita ya se cobró (ahora o antes): solo el ticket, sin
              pasar por el slide de abajo — no hay nada que cobrar de
@@ -690,7 +744,7 @@ function checkoutErrorMessage(err: unknown): string {
         </v-window>
       </v-card-text>
 
-      <v-card-actions v-if="appointment">
+      <v-card-actions v-if="appointment && !awaitingTicket">
         <v-btn variant="text" @click="close">Cerrar</v-btn>
         <v-spacer />
 

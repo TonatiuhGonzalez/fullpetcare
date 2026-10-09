@@ -7,6 +7,7 @@
 // solo tenía foto/datos/peso actual — el historial completo necesitaba
 // que existieran citas de verdad (fase 3) y fichas de atención (fase 4),
 // que en la fase 2 todavía no existían.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as petsService from '@/services/pets'
@@ -49,6 +50,7 @@ const timeline = ref<TimelineEntry[]>([])
 const upcomingAppointments = ref<UpcomingAppointment[]>([])
 const photoUrl = ref<string | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 const showEditPet = ref(false)
 
@@ -146,7 +148,10 @@ function handleSaved(): void {
           {{ errorMessage }}
         </v-alert>
 
-        <v-progress-circular v-if="loading && !pet" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton && !pet"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <template v-else-if="pet">
           <v-card class="pa-4 mb-4">

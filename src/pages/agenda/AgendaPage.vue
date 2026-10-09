@@ -16,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { toNaiveLocalIso } from '@/lib/datetime'
 import { isFrontDesk } from '@/lib/roles'
 import { VISIT_KINDS, visitKindInfo } from '@/lib/visitKind'
@@ -27,6 +28,7 @@ import type { Appointment, AppointmentStatus } from '@/services/appointments'
 import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
+import CalendarSkeleton from '@/components/CalendarSkeleton.vue'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
@@ -39,6 +41,11 @@ const session = useSessionStore()
 const agenda = useAgendaStore()
 
 const isFrontDeskView = computed(() => isFrontDesk(session.role))
+// 'idle' cuenta como cargando (ver el comentario sobre el calendario en el template).
+const isAgendaLoading = computed(
+  () => agenda.status === 'loading' || agenda.status === 'idle',
+)
+const showCalendarSkeleton = useDelayedLoading(isAgendaLoading)
 
 const employees = ref<EmployeeSummary[]>([])
 // Vacunas por reforzar, del negocio COMPLETO — no llevan sucursal (una
@@ -328,10 +335,9 @@ function handleAppointmentCreated(appointment: Appointment): void {
          agenda.activeDate todavía en null (fecha vacía), y el calendario
          tronaba tratando de parsear un string vacío como fecha
          (verificado a mano en el navegador). -->
-    <v-progress-circular
-      v-if="agenda.status === 'loading' || agenda.status === 'idle'"
-      indeterminate
-      color="primary"
+    <CalendarSkeleton
+      v-if="isAgendaLoading && showCalendarSkeleton"
+      :variant="isFrontDeskView ? 'timeline' : 'week'"
     />
 
     <!-- El "&& agenda.visibleDates.length > 0" de aquí abajo es la misma
@@ -418,6 +424,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"
+      :is-paid="!!selectedAppointmentId && agenda.paidAppointmentIds.has(selectedAppointmentId)"
       @changed="agenda.load()"
     />
   </v-container>

@@ -1768,23 +1768,31 @@ que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
   lista blanca (§7.4).
 - [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
 
-## Fase 17 — Estados de carga: skeletons y aviso de navegación (propuesta)
+## Fase 17 — Estados de carga: skeletons y aviso de navegación
 
 **Meta: que mientras llegan los datos se vea la forma de lo que viene (tablas y tarjetas), que navegar desde el menú dé
 señal de que algo está cargando, y que una pantalla que no baja tras un despliegue avise en vez de quedarse muda.**
 Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
-**Estado: propuesta, trabajo a futuro; no se construye hasta que el usuario la apruebe.** Decisiones y alternativas en
+**Estado: aprobada el 2026-10-09, en construcción.** Decisiones y alternativas en
 `PLAN.md` D22. **Fuera de alcance (decidido el 2026-10-08):** la pantalla en blanco al recargar la página (F5).
 
 ### 17A. Preparación
 
-- [ ] **17.1** 📚 Revisar y aprobar `PLAN.md` D22; listar las pantallas con spinner suelto o tabla con `:loading`
+- [x] **17.1** 📚 Revisar y aprobar `PLAN.md` D22; listar las pantallas con spinner suelto o tabla con `:loading`
   (hoy: 23 spinners y 62 usos de `:loading`; solo Inventario tiene skeleton). _Verificar:_ el usuario aprobó por
   escrito; D22 sin "propuesta"; la lista de pantallas queda anotada aquí.
+  **Inventario (2026-10-09).** Spinner o barra de carga de datos: `CheckoutPage`, `AttendPage`, `AppointmentDetailPage`,
+  `SaleDetailPage`, `HomePage`, `ReportsPage`, `CashRegisterPage`, `AgendaPage`, `PointOfSalePage`,
+  `BranchesSettingsPage`, `PublicPetPage`; superadmin: `PlansPage`, `ReasonsPage`, `FeedbackPage`, `TenantDetailDialog`;
+  diálogos: `CustomerDetailDialog`, `CustomerEditDialog`, `PetDetailDialog`, `PetEditDialog`, `AppointmentDialog`,
+  `NewAppointmentDialog`, `InvoicePanel`. Tablas con carga de datos: `CustomersPage`, `PetsPanel`, `EmployeesPage`,
+  `CatalogPage`, `CashRegisterPage`, `BranchesSettingsPage`, superadmin (`TenantsPage`, `PlansPage`, `ReasonsPage`,
+  `AdminsPage`). La mayoría de los 62 `:loading` son botones "Guardando…" de formularios y **no se tocan**. Aviso de
+  versión nueva: "Hay una versión nueva de FullPetCare. Recarga la página para continuar." con botón "Recargar".
 
 ### 17B. Piezas compartidas
 
-- [ ] **17.2** 🧪 Composable `useDelayedLoading` (retraso de ~150 ms antes de mostrar, para que una respuesta rápida no
+- [x] **17.2** 🧪 Composable `useDelayedLoading` (retraso de ~150 ms antes de mostrar, para que una respuesta rápida no
   parpadee). _Verificar:_ tests unitarios: respuesta más rápida que el retraso no muestra nada; más lenta sí lo
   muestra; al terminar se apaga; sin fugas si el componente se desmonta.
 - [ ] **17.3** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader`, con `prefers-reduced-motion`.

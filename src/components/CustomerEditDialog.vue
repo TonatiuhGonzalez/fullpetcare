@@ -7,6 +7,7 @@
 //
 // No reemplaza a CustomerFormDialog: ese lo sigue usando el punto de venta para
 // pedir los datos de la factura (fase 13, modo `invoice-required`).
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
@@ -39,6 +40,7 @@ const isNew = computed(() => props.customerId === null)
 const customer = ref<Customer | null>(null)
 const pets = ref<Pet[]>([])
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -186,7 +188,10 @@ async function handlePetSaved(): Promise<void> {
       </v-card-title>
 
       <v-card-text>
-        <v-progress-circular v-if="loading" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <template v-else>
           <!-- Mascotas: solo con el cliente ya guardado, porque cada mascota
