@@ -1512,3 +1512,15 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   claro aunque el sistema sea oscuro; y con el sistema cambiando a oscuro con la app abierta, se actualiza solo.
   **No cubierto:** aún no hay interruptor en la interfaz (llega en 15.8, menú de usuario); solo se miró el login en
   oscuro, el resto de pantallas se recorre en 15.16 (hay colores fijos `#ffffff` en los calendarios, 15.12).
+
+### 15C. Marca
+
+- [x] **15.6** `BrandLogo.vue` (isotipo y palabra, variantes claro/oscuro), `public/favicon.svg` nuevo y
+  `<title>`/meta del `index.html`. _Verificar:_ se ve nítido a 16 y 32 px en ambos temas.
+  **Hecho 2026-10-08:** `components/BrandLogo.vue` (isotipo "Dos mitades" en SVG propio, palabra con "Full" en negritas;
+  props `size`, `showWordmark` y `onDark` para fondos oscuros fijos; colores del tema activo; id de recorte único por
+  instancia con `useId`). `public/favicon.svg` reemplaza el rayo morado que traía Vite; usa los colores claros u
+  oscuros según `prefers-color-scheme`. `index.html`: descripción y `theme-color` (verde de marca / fondo oscuro).
+  **Verificado** renderizando el favicon a 16 y 32 px reales, ampliado sin suavizar, en claro y oscuro: se distinguen
+  los dos círculos y el cruce. **Decisiones mías:** el isotipo es ancho, así que en un favicon cuadrado ocupa ~60 % del
+  alto; lo dejé así en vez de recortarlo. `theme-color` sigue al sistema, no al interruptor manual de 15.5.
