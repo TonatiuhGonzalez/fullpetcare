@@ -1492,3 +1492,10 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   `vue-tsc -b`, `lint` y 476 tests unitarios en verde. **No cubierto:** el contraste de los estados (hover, deshabilitado)
   y de los chips tonales con fondo mezclado; solo se miden los pares base. Ojo: naranja y azul tienen luminosidad
   parecida (se distinguen por tono, no por claridad); en escala de grises se parecerían, por eso cada tipo lleva ícono y texto.
+- [x] **15.4** 🧪 `lib/visitKind.ts` (tipo de visita → color, ícono y etiqueta) y su test. _Verificar:_ ambos tipos
+  tienen ícono y etiqueta distintos, no solo color.
+  **Hecho 2026-10-08:** `lib/visitKind.ts` (`VISIT_KINDS`, `visitKindInfo`): estética = "Estética",
+  `mdi-content-cut`, color `grooming`; veterinaria = "Veterinaria", `mdi-stethoscope`, color `veterinary`. 4 tests:
+  nombres en español, ícono/texto/color distintos, el color existe con su `on-*` en ambos temas, y cada entrada se
+  identifica con su clave. **No cubierto:** todavía nadie lo usa; hoy `kindLabels` está copiado en 5 archivos
+  (`AgendaPage`, `AppointmentDetailPage`, `AppointmentDialog`, `PublicPetPage`, `CatalogPage`) y se reemplaza en 15.12.
