@@ -424,6 +424,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"
+      :is-paid="!!selectedAppointmentId && agenda.paidAppointmentIds.has(selectedAppointmentId)"
       @changed="agenda.load()"
     />
   </v-container>
