@@ -4,6 +4,7 @@ import {
   branchToday,
   dayRangeUtc,
   formatDate,
+  formatDateOnly,
   formatWeekdayDate,
   formatTime,
   fromBranchTime,
@@ -91,6 +92,16 @@ describe('formatDate', () => {
     // fenómeno que dayRangeUtc, visto desde formatDate.
     const instant = '2026-07-16T01:00:00Z'
     expect(formatDate(instant, 'America/Mexico_City')).toBe('15 de julio de 2026')
+  })
+})
+
+describe('formatDateOnly', () => {
+  // Qué prueba: que una fecha sin hora sale con su MISMO día. Si se tratara como un
+  // instante UTC y se convirtiera a hora de México, "2024-03-05" saldría "4 de marzo":
+  // el cumpleaños de una mascota aparecería un día antes en la cartilla.
+  it('conserva el mismo día, sin correrlo por zona horaria', () => {
+    expect(formatDateOnly('2024-03-05')).toBe('5 de marzo de 2024')
+    expect(formatDateOnly('2026-01-01')).toBe('1 de enero de 2026')
   })
 })
 

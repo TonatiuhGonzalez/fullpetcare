@@ -1649,3 +1649,29 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   veterinario trabaja en otra sucursal); el estado "En curso" y "Agendada" en gris no se vieron en pantalla (los datos
   de prueba eran completadas y una cancelada); con bloques muy cortos (30 min en la vista de día) el título se
   recorta como antes y solo se ve en el tooltip; no hay test del calendario montado (§9).
+
+### 15F. Vista pública, estados vacíos y superadmin
+
+- [x] **15.13** Vista pública con la identidad nueva: foto grande y cartilla con estados. _Verificar:_ en móvil, con un
+  link válido; sin cambiar lo que la Edge Function devuelve (§7.4).
+  **Hecho 2026-10-08:** `PublicPetPage.vue` rediseñada y `PublicLayout.vue` con la identidad nueva. **Barra:** ficha con
+  las iniciales y el nombre del **negocio** (con quien tiene relación quien abre el link); mientras carga, el logo de
+  FullPetCare; logo discreto al pie. **Cabecera de la mascota:** franja de color de marca y **foto grande** (136 px, con
+  borde) encima (sin foto, el ícono de perro o gato), nombre grande, chips de especie, raza y sexo, y "Nació el 15 de marzo
+  de 2021". **Cartilla:** un aviso resumen con lo más urgente ("1 vacuna vencida", "2 por vencer" o "Cartilla al día") y,
+  por vacuna, nombre, estado con **ícono y texto** (Vigente, Por vencer, Vencida), fecha de aplicación y **próxima dosis**.
+  **Próximas citas e historial:** el tipo de visita con `VisitKindChip` (se quitó el `kindLabels` de esta página).
+  Lógica pura nueva y probada: `cardOverview` y `cardHeadline` en `lib/vaccination.ts` (4 tests) y `formatDateOnly` en
+  `lib/datetime.ts` (1 test). **La Edge Function no se tocó:** el DTO es el mismo (ya traía `photoUrl`).
+  `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador con un link temporal de Rocky y tres
+  vacunas de prueba (vencida, por vencer y vigente): móvil de 390 px en claro y oscuro y escritorio, sin desborde ni
+  errores de consola; el link inválido muestra el aviso de siempre con el logo de FullPetCare en la barra. **Decisiones
+  mías a revisar:** (1) **"hoy" ahora es el de la zona del negocio**, no el del teléfono de quien abre el link (antes usaba
+  el reloj del navegador, contra §8.3), lo que puede cambiar un día el estado de una vacuna que vence esa noche;
+  (2) "Nació" y "Próxima dosis" antes salían crudos (`2021-03-15`) y ahora en español; (3) en el historial el título es
+  la fecha y el detalle y el empleado van debajo (antes "Tipo — detalle"), porque el tipo ya va en la etiqueta;
+  (4) el logo de FullPetCare al pie es adición mía. **No cubierto:** no se vio con **foto real** (Rocky no tiene; es el
+  mismo `photoUrl` de antes); no se vio la sección "Próximas citas" con datos; sin vacunas se queda el texto de
+  siempre (la ilustración llega en 15.14). **Proceso:** los datos de prueba (3 vacunas y el link) se insertaron en la base
+  **local** con los disparadores desactivados en mi sesión (el expediente no permite borrado, §8.5) y se borraron; no
+  quedó rastro en la bitácora. Hubo que levantar `supabase functions serve` para probar y se detuvo al terminar.
