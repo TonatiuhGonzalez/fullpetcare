@@ -6,6 +6,7 @@
 import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AppUpdateNotice from '@/components/AppUpdateNotice.vue'
 import NavigationProgress from '@/components/NavigationProgress.vue'
 import { useSessionStore } from '@/stores/session'
 
@@ -31,6 +32,7 @@ watch(
 <template>
   <v-app>
     <NavigationProgress />
+    <AppUpdateNotice />
     <router-view />
   </v-app>
 </template>

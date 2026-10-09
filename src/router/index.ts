@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { finishNavigation, startNavigation } from '@/composables/useNavigationProgress'
+import { showAppUpdateNotice } from '@/composables/useAppUpdateNotice'
+import { isChunkLoadError } from '@/lib/chunkError'
 import { isFrontDesk } from '@/lib/roles'
 import type { PermissionModule } from '@/lib/permissions'
 import { useSessionStore } from '@/stores/session'
@@ -253,8 +255,11 @@ router.beforeEach(() => {
 router.afterEach(() => {
   finishNavigation()
 })
-router.onError(() => {
+router.onError((error) => {
   finishNavigation()
+  // Tras un despliegue, la pantalla pedida ya no existe en el servidor: se avisa en
+  // lugar de dejar el clic sin respuesta (PLAN.md D22). Otros errores no tocan esto.
+  if (isChunkLoadError(error)) showAppUpdateNotice()
 })
 
 // Guard de sesión: corre ANTES de cada navegación, para las tres rutas
