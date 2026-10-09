@@ -10,6 +10,7 @@ import { formatMXN } from '@/lib/money'
 import type { Product } from '@/services/products'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
 
@@ -85,18 +86,18 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Inventario</h1>
-      <v-spacer />
-      <v-btn
-        v-if="canEdit"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewProduct"
-      >
-        Nuevo producto
-      </v-btn>
-    </div>
+    <PageHeader title="Inventario">
+      <template #actions>
+        <v-btn
+          v-if="canEdit"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewProduct"
+        >
+          Nuevo producto
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-alert
       v-if="inventory.errorMessage"

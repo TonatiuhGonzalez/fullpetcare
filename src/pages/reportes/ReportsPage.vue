@@ -19,6 +19,7 @@ import {
 import type { BranchRow, DayRow, StaffRow, TopItem } from '@/services/reports'
 import { useReportsStore } from '@/stores/reports'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 
 const session = useSessionStore()
 const reports = useReportsStore()
@@ -168,10 +169,10 @@ function exportStaff(): void {
 
 <template>
   <v-container class="py-4">
-    <h1 class="text-h5 mb-1">Reportes</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal.
-    </p>
+    <PageHeader
+      title="Reportes"
+      subtitle="Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal."
+    />
 
     <!-- Filtros -->
     <v-row dense class="mb-2">

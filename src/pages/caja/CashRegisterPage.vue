@@ -10,6 +10,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CashClosingReceipt from '@/components/CashClosingReceipt.vue'
 import CashCloseDialog from '@/components/CashCloseDialog.vue'
 import CashMovementDialog from '@/components/CashMovementDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { MOVEMENT_LABELS, type CashMovementKind } from '@/lib/cashRegister'
 import { cashDifference, describeDifference } from '@/lib/cashCount'
 import { formatDate, formatTime } from '@/lib/datetime'
@@ -97,12 +98,7 @@ const methodRows = computed(() => {
 
 <template>
   <v-container class="py-4">
-    <div class="d-flex align-center mb-4">
-      <div>
-        <h1 class="text-h5">Caja</h1>
-        <p class="text-body-2 text-medium-emphasis">{{ branchName }}</p>
-      </div>
-    </div>
+    <PageHeader title="Caja" :subtitle="branchName" />
 
     <v-alert
       v-if="cashRegister.errorMessage"

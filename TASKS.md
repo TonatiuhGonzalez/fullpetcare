@@ -1574,3 +1574,21 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   login) y no hay datos de demo con varios negocios para probarlo, así que agregarlo sería una función nueva sin poder
   verificarla; el negocio solo se muestra. **No cubierto:** cambiar de negocio; no hay test automático de los
   componentes (§9).
+- [x] **15.10** `PageHeader.vue` (título, subtítulo, acciones) y aplicarlo a las pantallas. _Verificar:_ ninguna
+  pantalla queda sin título ni acciones.
+  **Hecho 2026-10-08:** `components/PageHeader.vue` (título `h1` en negritas, subtítulo opcional y slot `actions` a la
+  derecha; en pantallas angostas las acciones bajan debajo del título). Aplicado en **16 pantallas**: Agenda, Clientes,
+  Catálogo de servicios, Inventario, Caja, Reportes, Empleados, Empresa y sucursales, Facturación, Cuenta y, en el
+  superadmin, Empresas, Motivos, Planes, Reportes y Superadmins. En la **Agenda** el título y los botones quedan en el
+  encabezado y la navegación por día (flechas, fecha, "Hoy") pasa a su propia fila debajo; para groomer/vet esa fila
+  muestra el rango visible. **Verificado** en el navegador (Playwright) visitando las 18 rutas como dueño, groomer y
+  superadmin: cada una tiene un solo `h1` dentro del encabezado, los botones de acción siguen donde estaban, sin
+  desborde horizontal ni errores de consola; la Agenda en móvil (390 px) baja los botones bajo el título. `vue-tsc -b`,
+  `lint` y 500 tests unitarios en verde. **Decisiones mías a revisar:** (1) **no** se aplicó a las pantallas de tarea
+  enfocada que llevan su título dentro de una tarjeta (Atender, Cobrar, Detalle de cita, Detalle de venta, Venta de
+  mostrador) ni a Configuración (el marco con su menú); se pueden convertir si lo quieres; (2) el texto de Reportes del
+  superadmin decía "desde el botón de la barra superior" y se corrigió a "desde el menú de ayuda de la barra superior",
+  porque 15.8 movió ese botón. **No cubierto:** las acciones de Caja (abrir/cerrar caja) no viven en el encabezado, quedan
+  donde estaban; no hay test automático del componente (§9). **Incidente de proceso:** al formatear con prettier se
+  reformateó código ajeno en archivos existentes (el repo no está formateado a `printWidth: 90`); se revirtió con una
+  fusión a tres bandas y los diffs de los 22 archivos tocados contienen solo cambios míos.

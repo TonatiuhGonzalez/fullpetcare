@@ -9,6 +9,7 @@ import { TAX_REGIMES, fiscalProblems, isReadyToInvoice } from '@/lib/fiscalSetup
 import type { FiscalData, InvoicingStatus } from '@/lib/fiscalSetup'
 import * as invoicing from '@/services/invoicingSettings'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 
 const session = useSessionStore()
 const tenantId = computed(() => session.activeTenantId ?? '')
@@ -128,7 +129,7 @@ async function uploadCertificate(): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-h5 mb-4">Facturación</h1>
+    <PageHeader title="Facturación" />
 
     <v-alert
       v-if="errorMessage"

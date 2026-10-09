@@ -26,6 +26,7 @@ import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
 import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
@@ -249,9 +250,33 @@ function handleAppointmentCreated(appointment: Appointment): void {
 <template>
   <!-- null (no undefined) para ignorar el ancho global de VContainer: el calendario usa todo el ancho. El cast es solo para vue-tsc. -->
   <v-container class="py-6" :max-width="null as unknown as undefined">
-    <div class="d-flex align-center flex-wrap ga-2 mb-4">
-      <h1 class="text-h5 mr-4">Agenda</h1>
+    <PageHeader title="Agenda">
+      <template #actions>
+        <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
+           lo rechaza para groomer/vet (create_appointment()), esto solo
+           evita mostrar un botón que termina en un error. -->
+        <v-btn
+          v-if="isFrontDeskView"
+          variant="outlined"
+          color="primary"
+          prepend-icon="mdi-walk"
+          @click="showWalkInDialog = true"
+        >
+          Llegada sin cita
+        </v-btn>
+        <v-btn
+          v-if="isFrontDeskView"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="goToNewAppointment"
+        >
+          Nueva cita
+        </v-btn>
+      </template>
+    </PageHeader>
 
+    <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
+    <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <template v-if="isFrontDeskView">
         <v-btn icon="mdi-chevron-left" variant="text" size="small" @click="shiftDay(-1)" />
         <v-text-field
@@ -269,28 +294,6 @@ function handleAppointmentCreated(appointment: Appointment): void {
       <span v-else class="text-body-2 text-medium-emphasis text-capitalize">
         {{ visibleRangeLabel }}
       </span>
-
-      <v-spacer />
-      <!-- Agendar es tarea de recepción (CLAUDE.md §6.1); el backend ya
-           lo rechaza para groomer/vet (create_appointment()), esto solo
-           evita mostrar un botón que termina en un error. -->
-      <v-btn
-        v-if="isFrontDeskView"
-        variant="outlined"
-        color="primary"
-        prepend-icon="mdi-walk"
-        @click="showWalkInDialog = true"
-      >
-        Llegada sin cita
-      </v-btn>
-      <v-btn
-        v-if="isFrontDeskView"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="goToNewAppointment"
-      >
-        Nueva cita
-      </v-btn>
     </div>
 
     <v-alert v-if="agenda.errorMessage" type="error" density="compact" variant="tonal" class="mb-4">

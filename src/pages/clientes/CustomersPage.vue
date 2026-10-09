@@ -14,6 +14,7 @@ import type { Customer } from '@/services/customers'
 import { useSessionStore } from '@/stores/session'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetsPanel from './PetsPanel.vue'
 
@@ -131,26 +132,26 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Clientes</h1>
-      <v-spacer />
-      <v-btn
-        v-if="tab === 'clientes'"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewCustomer"
-      >
-        Nuevo cliente
-      </v-btn>
-      <v-btn
-        v-else
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="petsPanel?.openNewPet()"
-      >
-        Nueva mascota
-      </v-btn>
-    </div>
+    <PageHeader title="Clientes">
+      <template #actions>
+        <v-btn
+          v-if="tab === 'clientes'"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewCustomer"
+        >
+          Nuevo cliente
+        </v-btn>
+        <v-btn
+          v-else
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="petsPanel?.openNewPet()"
+        >
+          Nueva mascota
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <v-tabs v-model="tab" class="mb-4">
       <v-tab value="clientes">Clientes</v-tab>

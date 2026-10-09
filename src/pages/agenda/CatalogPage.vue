@@ -8,6 +8,7 @@ import type { Service, ServiceKind } from '@/services/services'
 import { formatMXN } from '@/lib/money'
 import { visibleServiceKinds } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
+import PageHeader from '@/components/PageHeader.vue'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
 
 const session = useSessionStore()
@@ -163,18 +164,18 @@ function handleSaved(): void {
 
 <template>
   <v-container class="py-6">
-    <div class="d-flex align-center mb-4">
-      <h1 class="text-h5">Catálogo de servicios</h1>
-      <v-spacer />
-      <v-btn
-        v-if="isOwner()"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openNewService"
-      >
-        Nuevo servicio
-      </v-btn>
-    </div>
+    <PageHeader title="Catálogo de servicios">
+      <template #actions>
+        <v-btn
+          v-if="isOwner()"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="openNewService"
+        >
+          Nuevo servicio
+        </v-btn>
+      </template>
+    </PageHeader>
 
     <!-- Solo las pestañas visibles para el rol (arriba: visibleServiceKinds) —
          con una sola, v-tabs igual funciona bien, solo no deja nada que

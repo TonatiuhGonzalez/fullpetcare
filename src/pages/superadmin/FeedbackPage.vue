@@ -9,6 +9,7 @@ import { onMounted, ref } from 'vue'
 import { formatDate, formatTime } from '@/lib/datetime'
 import * as platformService from '@/services/platform'
 import type { FeedbackReport } from '@/services/platform'
+import PageHeader from '@/components/PageHeader.vue'
 
 const PLATFORM_TIMEZONE = 'America/Mexico_City'
 
@@ -49,11 +50,10 @@ async function openScreenshot(report: FeedbackReport): Promise<void> {
 
 <template>
   <v-container>
-    <h1 class="text-h5 mb-1">Reportes y sugerencias</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      Comentarios que los usuarios envían desde el botón de la barra superior, del más
-      reciente al más antiguo.
-    </p>
+    <PageHeader
+      title="Reportes y sugerencias"
+      subtitle="Comentarios que los usuarios envían desde el menú de ayuda de la barra superior, del más reciente al más antiguo."
+    />
 
     <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ errorMessage }}

@@ -6,6 +6,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import BranchFormDialog from '@/components/BranchFormDialog.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { BRANCH_TIMEZONES } from '@/lib/branchSettings'
 import * as branchesService from '@/services/branches'
 import type { Branch } from '@/services/branches'
@@ -114,7 +115,7 @@ async function toggleActive(branch: Branch): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-h5 mb-4">Empresa y sucursales</h1>
+    <PageHeader title="Empresa y sucursales" />
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" density="compact" class="mb-4">
       {{ errorMessage }}
