@@ -15,6 +15,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import ProductCategoriesDialog from '@/components/ProductCategoriesDialog.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 
 const session = useSessionStore()
 const inventory = useInventoryStore()
@@ -22,6 +24,11 @@ const inventory = useInventoryStore()
 const canEdit = computed(() => session.canEdit('inventory'))
 const search = ref('')
 const errorMessage = ref<string | null>(null)
+
+// Primera carga = silueta con retraso; recargas (guardar un movimiento, cambiar de sucursal) =
+// filas conservadas y barra fina (PLAN.md D22).
+const loading = computed(() => inventory.status === 'loading')
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 
 const statusColor: Record<StockStatus, string> = {
   ok: 'success',
@@ -151,12 +158,10 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       class="mb-4"
     />
 
-    <v-skeleton-loader
-      v-if="inventory.status === 'loading' && inventory.rows.length === 0"
-      type="list-item-two-line, list-item-two-line, list-item-two-line, list-item-two-line"
-    />
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="3" />
+    <v-progress-linear v-else-if="!isFirstLoad && loading" indeterminate />
 
-    <v-list v-else lines="two">
+    <v-list v-if="!isFirstLoad" lines="two">
       <v-list-item v-for="row in visibleRows" :key="row.product.id">
         <template #title>
           <span :class="{ 'text-medium-emphasis': !row.product.is_active }">
