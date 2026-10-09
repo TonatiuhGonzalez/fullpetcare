@@ -735,7 +735,7 @@ cambiar la pantalla de entrada hay que actualizar varias redirecciones (router, 
 
 ### D21 — Acceso del cliente: PWA instalable y cuenta propia (sin app nativa)
 
-**Estado:** propuesta, pendiente de aprobación (2026-10-08). Trabajo a futuro.
+**Estado:** aprobada el 2026-10-09. Se construye en la rama `feat/loading-states` (fase 17).
 
 **Problema.** Hoy el cliente consulta a su mascota solo con un link con token (§7.4) que la recepción copia y pega.
 Si lo pierde, hay que generar otro; no hay forma de "entrar" por su cuenta ni de ver todas sus mascotas juntas.
@@ -807,8 +807,9 @@ atención, detalle de venta y de cita, diálogos de cliente y mascota, y las pan
 
 **6. Sin dependencias nuevas** (§3). No toca la base ni las reglas de §7 y §8.
 
-**Pendientes:** el texto exacto del aviso de versión nueva, y si el retraso de 150 ms se ajusta tras probarlo en
-staging con red lenta.
+**Texto del aviso (decidido el 2026-10-09):** "Hay una versión nueva de FullPetCare. Recarga la página para continuar.", con el botón "Recargar".
+
+**Pendiente:** si el retraso de 150 ms se ajusta tras probarlo en staging con red lenta.
 
 ---
 
