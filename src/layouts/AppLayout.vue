@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 
+import BrandLogo from '@/components/BrandLogo.vue'
 import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import SideMenu, { type SideMenuItem } from '@/components/SideMenu.vue'
+import UserMenu from '@/components/UserMenu.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const router = useRouter()
+// En teléfono la barra no alcanza para el nombre junto al logo: solo el isotipo.
+const { xs } = useDisplay()
 
 const businessName = computed(() => session.activeMembership?.tenantName ?? '')
 // "Patitas Felices - Sucursal Centro" — la sucursal activa va pegada al
@@ -98,32 +103,29 @@ function handleBranchChange(branchId: unknown): void {
 </script>
 
 <template>
-  <v-app-bar color="primary" density="comfortable">
+  <v-app-bar color="surface" density="comfortable" flat border="b">
     <!-- Hamburguesa: solo en pantallas angostas, donde el menú lateral está
          oculto y se abre como cajón. -->
     <v-app-bar-nav-icon class="d-md-none" @click="menuOpen = !menuOpen" />
-    <!-- flex: 0 1 auto — por defecto el título ocupa todo el ancho libre y el
-         botón de reportes quedaría pegado a lo de la derecha, lejos del nombre.
-         El v-spacer de abajo empuja el resto a la derecha. -->
-    <v-app-bar-title style="flex: 0 1 auto">
-      <v-icon icon="mdi-paw" class="mr-2" />
-      {{ titleLabel }}
-    </v-app-bar-title>
-    <v-btn
-      prepend-icon="mdi-message-alert-outline"
-      variant="tonal"
-      size="small"
-      class="ml-4"
-      @click="showFeedback = true"
+    <router-link
+      to="/app/agenda"
+      class="brand-link ml-2 mr-4"
+      aria-label="FullPetCare, ir a la agenda"
     >
-      Reportar error o sugerencia
-    </v-btn>
+      <BrandLogo :size="28" :show-wordmark="!xs" />
+    </router-link>
+    <!-- Negocio y sucursal activos. Provisional: la tarea 15.9 los pasa a un
+         selector en el menú lateral. -->
+    <span
+      v-if="titleLabel"
+      class="d-none d-md-inline text-body-2 text-medium-emphasis border-s ps-4"
+    >
+      {{ titleLabel }}
+    </span>
     <v-spacer />
 
     <!-- El selector de sucursal solo tiene sentido si hay más de una que
-         elegir — con una sola, el título de arriba ya la muestra
-         ("Patitas Felices - Sucursal Centro"), así que no hace falta
-         repetirla aquí. -->
+         elegir — con una sola, la etiqueta de arriba ya la muestra. -->
     <v-select
       v-if="session.activeBranches.length > 1"
       :model-value="session.activeBranchId"
@@ -131,26 +133,41 @@ function handleBranchChange(branchId: unknown): void {
       item-title="name"
       item-value="id"
       density="compact"
-      variant="solo"
+      variant="outlined"
       hide-details
       style="max-width: 220px"
-      class="mr-4"
+      class="mr-2"
       @update:model-value="handleBranchChange"
     />
 
-    <v-chip class="mr-4" size="small" variant="tonal">{{
-      roleLabel(session.role)
-    }}</v-chip>
-    <span class="mr-2 text-body-2">{{ userLabel }}</span>
-    <!-- Configuración (tarea #1959): reemplaza los botones de cambiar
-         contraseña y cancelar cuenta, que ahora viven en su sección "Cuenta". -->
-    <v-btn
-      to="/app/configuracion"
-      icon="mdi-cog-outline"
-      variant="text"
-      title="Configuración"
+    <!-- Ayuda: aquí vive "Reportar error o sugerencia", que antes ocupaba un
+         botón grande en la barra. -->
+    <v-menu location="bottom end">
+      <template #activator="{ props: helpProps }">
+        <v-btn
+          v-bind="helpProps"
+          icon="mdi-help-circle-outline"
+          variant="text"
+          aria-label="Ayuda"
+          title="Ayuda"
+        />
+      </template>
+      <v-list density="comfortable">
+        <v-list-item
+          prepend-icon="mdi-message-alert-outline"
+          title="Reportar error o sugerencia"
+          @click="showFeedback = true"
+        />
+      </v-list>
+    </v-menu>
+
+    <UserMenu
+      :name="userLabel"
+      :role-label="roleLabel(session.role)"
+      :email="session.user?.email"
+      settings-to="/app/configuracion"
+      @logout="handleLogout"
     />
-    <v-btn icon="mdi-logout" variant="text" title="Salir" @click="handleLogout" />
   </v-app-bar>
 
   <SideMenu v-model:open="menuOpen" :items="menuItems" />
@@ -203,3 +220,11 @@ function handleBranchChange(branchId: unknown): void {
     to="/app/venta-mostrador"
   />
 </template>
+
+<style scoped lang="scss">
+.brand-link {
+  display: inline-flex;
+  color: inherit;
+  text-decoration: none;
+}
+</style>

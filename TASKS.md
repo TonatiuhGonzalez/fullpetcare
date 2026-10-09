@@ -1538,3 +1538,22 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   "olvidé mi contraseña", "restablecer" y "cambio forzado" **siguen con su tarjeta anterior** (no estaban en esta tarea;
   `AuthPanelLayout` ya sirve para envolverlas); el E2E completo no se corrió (su paso de login no cambió); no se
   probó el diálogo de negocio bloqueado.
+
+### 15D. Layout y navegación
+
+- [x] **15.8** Barra superior ligera con menú de usuario (avatar con iniciales, rol, configuración, tema, salir) y
+  "Reportar error o sugerencia" movido a un menú de ayuda. _Verificar:_ todas las acciones de antes siguen
+  alcanzables, en escritorio y móvil.
+  **Hecho 2026-10-08:** barra blanca con borde inferior (`AppLayout` y `SuperadminLayout`): logo (solo el isotipo en
+  teléfono) que lleva a la agenda, negocio y sucursal como texto, menú de ayuda (`mdi-help-circle-outline`) con "Reportar
+  error o sugerencia" y el menú de usuario nuevo `UserMenu.vue` (avatar con iniciales, nombre, rol y correo, Configuración,
+  "Cambiar contraseña" en el superadmin, selector Sistema / Claro / Oscuro y Salir). Función pura nueva `lib/initials.ts`
+  con 5 tests. Esto **activa el interruptor de tema** de 15.5. `vue-tsc -b`, `lint` y 496 tests unitarios en verde.
+  **Verificado** en el navegador (Playwright, contra Supabase local): como dueño, el menú muestra "Fernanda Ruiz Gómez · Dueño ·
+  correo"; elegir "Oscuro" cambia la app y guarda `dark`; "Ayuda → Reportar error" abre el diálogo; en móvil (390 px)
+  no hay desborde horizontal ni errores de consola; como superadmin el menú ofrece "Cambiar contraseña" y "Salir".
+  **Decisiones mías:** (1) el chip de rol y el nombre sueltos pasaron al menú de usuario; (2) negocio y sucursal quedan
+  como texto en la barra y el selector de sucursal se mantiene **provisionalmente** (15.9 los mueve al menú lateral); en
+  móvil el selector queda apretado hasta entonces; (3) el avatar muestra iniciales, no la foto de perfil (`avatarPath` no
+  se carga en ninguna pantalla hoy). **No cubierto:** groomer, vet y recepción (solo se probó dueño y superadmin);
+  "Cambiar contraseña" del superadmin no se ejecutó hasta guardar; no hay test automático del componente (§9).
