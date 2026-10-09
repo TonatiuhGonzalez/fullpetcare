@@ -835,6 +835,73 @@ atención, detalle de venta y de cita, diálogos de cliente y mascota, y las pan
 
 **Pendiente:** si el retraso de 150 ms se ajusta tras probarlo en staging con red lenta.
 
+### D23 — Suscripción modular: plan = base + módulos + extras, con derechos que impone la base
+
+**Estado:** aprobada como **planeación** el 2026-10-09; **aún no se trabaja** (no hay fecha). Las decisiones de producto
+de abajo ya las tomó el usuario; solo quedan pendientes los precios.
+
+**Problema.** Hoy el plan es solo informativo (§6.8): no limita nada, el dueño no puede elegirlo y no hay cobro real.
+Cada negocio necesita pagar por lo que usa: una veterinaria sin estética, un negocio que ya tiene su inventario o su
+terminal de cobro, etc.
+
+**Decidido por el usuario (2026-10-09).**
+1. **Precio = base + módulos sumados** (cuota dinámica). Los planes del catálogo pasan a ser **plantillas** que precargan
+   módulos; el superadmin puede ajustar a una empresa en particular. **Alternativa descartada:** planes cerrados
+   (Básico/Pro/Premium) con personalización como excepción.
+2. **Estética y Veterinaria son módulos independientes, pero se exige al menos uno.** Lo impone la base (restricción o
+   trigger), no solo el formulario.
+3. **Los cambios de plan aplican en el siguiente corte**, sin prorrateo. Se guardan como "cambio programado" y se
+   aplican al renovar. **Alternativa descartada:** prorratear (cálculo de saldos y devoluciones, más superficie de error).
+4. **Sucursales y empleados extra cobran por unidad pasada una cantidad incluida.** **Incluidos en la base: 1 sucursal y 3 empleados con acceso** (decidido el 2026-10-09); el umbral se guarda como dato
+   del catálogo, no en código, para poder ajustarlo sin migración.
+5. **Prueba gratis desde el primer release.** Duración: 14 días con todos los módulos (decidido el 2026-10-09). Al terminar sin plan
+   elegido entra al mecanismo que ya existe (vigencia vencida → gracia → solo lectura → baja, §6.8): no se inventa uno nuevo.
+
+**1. Derechos (*entitlements*) en la base, no en la interfaz.** Mismo patrón que `tenant_access_level()` (§6.8) y
+`has_permission()` (D13): `app.has_module(tenant_id, módulo)` y `app.within_limit(tenant_id, límite, cantidad)`,
+`STABLE`, que consultan las políticas RLS y las RPC (con `SECURITY DEFINER` donde haga falta, revalidando membresía,
+§7.3.4). Ocultar menús con `v-if` es comodidad, nunca la regla. Cada tabla de un módulo lleva su test: sin el módulo,
+ni la API directa escribe.
+
+**2. Qué es base y qué es módulo (confirmado el 2026-10-09).**
+- **Base (siempre):** clientes, mascotas, agenda, catálogo de servicios, cobro de citas, empleados y permisos, vista
+  pública, Inicio.
+- **Módulos:** Estética, Veterinaria, Inventario y productos, Punto de venta, Caja, Reportes, Facturación (CFDI).
+- **Dependencias:** Punto de venta requiere Inventario (solo vende productos); Facturación y Reportes no tienen
+  dependencia (confirmado).
+- **Límites:** sucursales y empleados con acceso. Almacenamiento queda fuera de esta decisión.
+
+**3. Apagar un módulo no borra nada (§8.5).** Los datos se conservan. Un módulo apagado deja de aceptar escrituras y
+desaparece de menús y rutas; el **expediente clínico sigue legible** aunque Veterinaria se apague, porque es un
+documento legal. Citas ya agendadas de un tipo apagado se pueden atender y cobrar hasta cerrarlas. Reactivar el módulo
+devuelve todo como estaba.
+
+**4. Precio como dato, con copia al contratar.** `module_prices` y límites en el catálogo; la suscripción guarda una
+**copia** de lo contratado (`*_snapshot`, como en §6.3), así que subir un precio del catálogo no toca a quien ya paga.
+Todo en centavos (§8.2) con IVA incluido (D5). Anual con descuento propuesto (porcentaje en *basis points*). La suma
+vive en `lib/subscriptionPricing.ts` (función pura, muy probada) y la repite la base, como `cashCount` (D17).
+
+**5. Pago real: se decide al final.** Se construye todo con pago simulado, como SPEI/OpenPay hoy, y el proveedor se elige
+cuando el modelo esté estable. Candidatos: Stripe, Conekta/OpenPay, Mercado Pago. Al elegir se justifica con el usuario
+(costo, alternativas y contras, §3) y entra por Edge Function con webhooks, sin tocar la `service_role` desde el frontend.
+
+**6. Cambia lo escrito en §6.8:** "el plan es solo informativo" y "autoservicio fuera de alcance". Se actualizan en el
+mismo PR de la fase 18.
+
+**7. Fases propuestas.**
+- **Fase 18, motor de derechos:** módulos, `has_module`, límites, menús y rutas limitados, restricción de "al menos uno",
+  tests de aislamiento. Aún sin precios ni cobro.
+- **Fase 19, constructor de planes:** el superadmin arma plantillas, precios y ajustes por empresa; calculadora.
+- **Fase 20, autoservicio del dueño:** elegir plan al darse de alta, prueba gratis, "Mi suscripción", cambios
+  programados al corte y pago simulado.
+- **Fase 21, pago real:** proveedor, webhooks, reintentos de cobro y factura de la suscripción.
+
+**Cambio de plan que choca con un límite (decidido el 2026-10-09):** si el plan nuevo permite menos sucursales o
+empleados de los que hay activos, el cambio **no se programa** hasta que el dueño desactive los sobrantes (se le pide en
+pantalla, nunca se desactiva a nadie solo). La base lo revalida también al aplicarse en el corte.
+
+**Pendiente:** precios de cada módulo, de la sucursal y del empleado extra, y el porcentaje de descuento anual.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
