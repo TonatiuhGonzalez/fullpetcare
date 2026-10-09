@@ -18,14 +18,21 @@ vi.mock('@/services/checkout', () => ({
   charge: vi.fn(),
   chargeCounterSale: vi.fn(),
   listSellableProducts: vi.fn(),
+  listRecentlySoldProductIds: vi.fn(),
 }))
+
+// El store ahora también carga las categorías. Se mockea para que el test no importe el
+// cliente real de Supabase (en CI no hay .env.local y fallaría al importarlo).
+vi.mock('@/services/productCategories', () => ({ listActive: vi.fn() }))
 
 import {
   buildSummary,
   charge,
   chargeCounterSale,
+  listRecentlySoldProductIds,
   listSellableProducts,
 } from '@/services/checkout'
+import { listActive as listActiveCategories } from '@/services/productCategories'
 
 // Baño, $250.00 con IVA al 16% incluido — mismos números que
 // lib/money.spec.ts (splitTaxIncluded(25000, 1600) = 21552 neto + 3448 IVA).
@@ -426,5 +433,50 @@ describe('insumos cobrables de la consulta (tarea 11.14)', () => {
 
     expect(cart.supplyItems).toEqual([])
     expect(cart.totalCents).toBe(25000)
+  })
+})
+
+describe('loadCatalog (categorías y últimos vendidos)', () => {
+  it('carga productos, categorías y últimos vendidos juntos', async () => {
+    // Qué se rompería: el punto de venta no tendría con qué armar las dos filas.
+    vi.mocked(listSellableProducts).mockResolvedValue([ALIMENTO])
+    vi.mocked(listActiveCategories).mockResolvedValue([{ id: 'c1' } as never])
+    vi.mocked(listRecentlySoldProductIds).mockResolvedValue(['product-alimento'])
+    const cart = useCartStore()
+
+    await cart.loadCatalog('tenant-a', 'branch-1')
+
+    expect(cart.catalog).toEqual([ALIMENTO])
+    expect(cart.categories).toHaveLength(1)
+    expect(cart.recentSoldProductIds).toEqual(['product-alimento'])
+    expect(cart.errorMessage).toBeNull()
+  })
+
+  it('si fallan las categorías o los últimos vendidos, el catálogo igual sirve', async () => {
+    // Qué se rompería: un fallo en una comodidad (categorías, últimos vendidos) bloquearía
+    // toda la venta; el catálogo es lo único indispensable para cobrar.
+    vi.mocked(listSellableProducts).mockResolvedValue([ALIMENTO])
+    vi.mocked(listActiveCategories).mockRejectedValue(new Error('sin red'))
+    vi.mocked(listRecentlySoldProductIds).mockRejectedValue(new Error('sin red'))
+    const cart = useCartStore()
+
+    await cart.loadCatalog('tenant-a', 'branch-1')
+
+    expect(cart.catalog).toEqual([ALIMENTO])
+    expect(cart.categories).toEqual([])
+    expect(cart.recentSoldProductIds).toEqual([])
+    expect(cart.errorMessage).toBeNull()
+  })
+
+  it('si falla el catálogo, avisa y lo deja vacío', async () => {
+    vi.mocked(listSellableProducts).mockRejectedValue(new Error('sin red'))
+    vi.mocked(listActiveCategories).mockResolvedValue([])
+    vi.mocked(listRecentlySoldProductIds).mockResolvedValue([])
+    const cart = useCartStore()
+
+    await cart.loadCatalog('tenant-a', 'branch-1')
+
+    expect(cart.catalog).toEqual([])
+    expect(cart.errorMessage).toMatch(/productos/)
   })
 })
