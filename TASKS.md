@@ -1524,3 +1524,17 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   **Verificado** renderizando el favicon a 16 y 32 px reales, ampliado sin suavizar, en claro y oscuro: se distinguen
   los dos círculos y el cruce. **Decisiones mías:** el isotipo es ancho, así que en un favicon cuadrado ocupa ~60 % del
   alto; lo dejé así en vez de recortarlo. `theme-color` sigue al sistema, no al interruptor manual de 15.5.
+- [x] **15.7** Login en dos paneles. _Verificar:_ en navegador, escritorio y móvil; el flujo de entrar, olvidé mi
+  contraseña y cambio forzado de contraseña sigue igual.
+  **Hecho 2026-10-08:** `components/AuthPanelLayout.vue` (formulario a la izquierda, panel de marca a la derecha desde
+  `md`; en móvil solo el formulario) y `LoginPage.vue` lo usa, con el logo, título "Inicia sesión" y el mismo formulario,
+  alertas, diálogo de negocio bloqueado y enlace de recuperación. El panel lleva un degradado verde, dos círculos
+  translúcidos (eco del logo) y la frase "Estética y veterinaria, en un solo lugar." **Verificado** en el navegador
+  (Playwright): escritorio claro y oscuro y móvil de 390 px, sin errores de consola ni desborde horizontal; con
+  credenciales malas sale "No se pudo iniciar sesión…" y con las del dueño demo entra a `/app/agenda`. `vue-tsc -b`,
+  `lint` y 491 tests unitarios en verde. **Decisiones mías que conviene revisar:** (1) **la frase y su subtítulo son
+  texto que yo redacté**, ajústalos a tu gusto; (2) los círculos son blancos translúcidos porque en naranja y azul se
+  veían turbios (olivo) sobre el verde; (3) el panel usa colores fijos, se ve igual en claro y oscuro. **No cubierto:**
+  "olvidé mi contraseña", "restablecer" y "cambio forzado" **siguen con su tarjeta anterior** (no estaban en esta tarea;
+  `AuthPanelLayout` ya sirve para envolverlas); el E2E completo no se corrió (su paso de login no cambió); no se
+  probó el diálogo de negocio bloqueado.
