@@ -82,3 +82,11 @@ a:not([class*='v-']) {
   font-size: 0.95em;
   vertical-align: -1px;
 }
+
+// Estados de carga (PLAN.md D22): el brillo que recorre las siluetas se apaga si la
+// persona pidió reducir animaciones en su sistema. Las siluetas quedan quietas.
+@media (prefers-reduced-motion: reduce) {
+  .v-skeleton-loader__bone::after {
+    animation: none;
+  }
+}
