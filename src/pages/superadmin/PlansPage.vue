@@ -3,6 +3,8 @@
 // renombrar y activar/desactivar. Un plan ya asignado no se borra: se
 // desactiva y deja de ofrecerse para asignaciones nuevas, pero las empresas
 // que ya lo tienen lo conservan (tenant_platform_info.plan_name_snapshot).
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
@@ -11,6 +13,7 @@ import PageHeader from '@/components/PageHeader.vue'
 
 const plans = ref<Plan[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 async function load(): Promise<void> {
@@ -97,9 +100,10 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
       </v-btn>
     </v-form>
 
-    <v-progress-linear v-if="loading" indeterminate class="mb-2" />
+    <v-progress-linear v-if="loading && !isFirstLoad" indeterminate class="mb-2" />
 
-    <v-table density="comfortable">
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="3" />
+    <v-table v-else-if="!isFirstLoad" density="comfortable">
       <thead>
         <tr>
           <th>Plan</th>

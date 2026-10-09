@@ -6,6 +6,8 @@
 // clientes por tenant), traer todo de una vez y paginar en el navegador
 // es simple y suficientemente rápido (CLAUDE.md §11, "simple sobre
 // elegante").
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -34,6 +36,7 @@ watch(tab, (value) => {
 
 const customers = ref<Customer[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
@@ -183,7 +186,9 @@ function handleSaved(): void {
         {{ errorMessage }}
       </v-alert>
 
+      <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
       <v-data-table
+        v-else-if="!isFirstLoad"
         :headers="headers"
         :items="rows"
         :loading="loading"

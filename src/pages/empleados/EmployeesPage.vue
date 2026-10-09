@@ -3,6 +3,8 @@
 // CustomersPage.vue: tabla completa cargada de una vez y paginada del
 // lado del cliente (v-data-table de fábrica) — alcanza de sobra para el
 // tamaño de un demo (CLAUDE.md §11).
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref } from 'vue'
 
 import * as employeesService from '@/services/employees'
@@ -19,6 +21,7 @@ const session = useSessionStore()
 const employees = ref<Employee[]>([])
 const branches = ref<Branch[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 const showFormDialog = ref(false)
 const editingEmployee = ref<Employee | null>(null)
@@ -114,7 +117,9 @@ function handleSaved(): void {
       {{ errorMessage }}
     </v-alert>
 
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
     <v-data-table
+      v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
       :loading="loading"

@@ -3,6 +3,8 @@
 // con su especie y su dueño, buscador propio y alta de mascota. Igual que
 // la pestaña de clientes, trae todo y filtra en el navegador (CLAUDE.md
 // §11, "simple sobre elegante"): son decenas de registros por tenant.
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref } from 'vue'
 
 import * as customersService from '@/services/customers'
@@ -22,6 +24,7 @@ const session = useSessionStore()
 const pets = ref<Pet[]>([])
 const ownerNames = ref<Record<string, string>>({})
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 const searchTerm = ref('')
 const showFormDialog = ref(false)
@@ -141,7 +144,9 @@ async function confirmDelete(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
     <v-data-table
+      v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
       :loading="loading"

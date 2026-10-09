@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Catálogo de servicios, separado en pestañas Estética / Veterinaria
 // (tarea 3.16).
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import * as servicesService from '@/services/services'
@@ -21,6 +23,7 @@ const visibleKinds = visibleServiceKinds(session.role)
 const activeKind = ref<ServiceKind>(visibleKinds[0])
 const services = ref<Service[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 const showFormDialog = ref(false)
@@ -200,7 +203,9 @@ function handleSaved(): void {
 
     <!-- Tabla paginada. Sin `items-per-page` explícito arranca en 10; "Todos"
          es -1 en Vuetify. La columna de acciones solo existe para el dueño. -->
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
     <v-data-table
+      v-else-if="!isFirstLoad"
       :headers="headers"
       :items="services"
       :loading="loading"

@@ -3,6 +3,8 @@
 // EmployeesPage.vue: se carga la lista completa de una vez y se filtra y
 // pagina del lado del cliente (v-data-table de fábrica) — alcanza de sobra
 // para las decenas de empresas de un demo (CLAUDE.md §11).
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
@@ -22,6 +24,7 @@ import TenantFormDialog from '@/components/TenantFormDialog.vue'
 
 const tenants = ref<PlatformTenant[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 const search = ref('')
@@ -147,7 +150,9 @@ function handlePasswordDialogToggle(open: boolean): void {
       {{ errorMessage }}
     </v-alert>
 
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
     <v-data-table
+      v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
       :loading="loading"
