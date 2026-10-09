@@ -9,8 +9,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import CashClosingReceipt from '@/components/CashClosingReceipt.vue'
 import CashCloseDialog from '@/components/CashCloseDialog.vue'
+import CardSkeleton from '@/components/CardSkeleton.vue'
 import CashMovementDialog from '@/components/CashMovementDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { MOVEMENT_LABELS, type CashMovementKind } from '@/lib/cashRegister'
 import { cashDifference, describeDifference } from '@/lib/cashCount'
 import { formatDate, formatTime } from '@/lib/datetime'
@@ -22,6 +24,10 @@ import { useSessionStore } from '@/stores/session'
 const session = useSessionStore()
 const cashRegister = useCashRegisterStore()
 
+const isFirstLoad = computed(
+  () => cashRegister.status === 'loading' && !cashRegister.openSession,
+)
+const showSkeleton = useDelayedLoading(isFirstLoad)
 const canEdit = computed(() => session.canEdit('cash_register'))
 const branchName = computed(() => session.activeBranch?.name ?? '')
 const timezone = computed(() => session.activeBranch?.timezone ?? 'America/Mexico_City')
@@ -109,11 +115,7 @@ const methodRows = computed(() => {
     >
       {{ cashRegister.errorMessage }}
     </v-alert>
-    <v-progress-linear
-      v-if="cashRegister.status === 'loading' && !cashRegister.openSession"
-      indeterminate
-      class="mb-4"
-    />
+    <CardSkeleton v-if="isFirstLoad && showSkeleton" :lines="4" class="mb-4" />
 
     <!-- Sin sucursal elegida -->
     <v-alert v-if="!session.activeBranchId" type="info" variant="tonal" density="compact">
