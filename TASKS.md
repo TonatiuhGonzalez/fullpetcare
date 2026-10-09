@@ -1902,7 +1902,7 @@ Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni
 - [ ] **17.6** Tablas: primera carga con `TableSkeleton`, recargas conservan las filas y llevan solo la barra fina
   (Clientes, Mascotas, Empleados, Inventario, ventas y las demás de 17.1). _Verificar:_ en navegador, la tabla no
   parpadea al recargar y no hay salto de diseño al llegar los datos.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** las tablas de 17.1 usan `useFirstLoad` y `TableSkeleton`; Sucursales se migró hoy (silueta de tarjeta y de lista). Inventario conserva su propio skeleton y falta confirmar que cumpla el mismo patrón.
+  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** las tablas de 17.1 usan `useFirstLoad` y `TableSkeleton`; Sucursales se migró hoy (silueta de tarjeta y de lista). Inventario también se migró a `useFirstLoad` y `TableSkeleton` (antes tenía un skeleton suelto, sin retraso y con un hueco antes de empezar a cargar).
 - [ ] **17.7** Tarjetas y tableros: Inicio, Reportes y Caja con skeleton de la forma real. _Verificar:_ en navegador,
   claro y oscuro.
 - [ ] **17.8** Pantallas de detalle: cobro, atención, venta, cita y los diálogos de cliente y mascota dejan de mostrar
