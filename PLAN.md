@@ -796,7 +796,7 @@ reserva en línea.
 
 ### D22 — Estados de carga: skeletons, barra de navegación y error de pantalla que no baja
 
-**Estado:** propuesta, pendiente de aprobación (2026-10-08). Trabajo a futuro.
+**Estado:** aprobada el 2026-10-09 y construida en la fase 17.
 
 **Problema.** Hoy hay 23 spinners o barras sueltas (`v-progress-circular` / `v-progress-linear`) y solo una pantalla
 usa skeleton (Inventario). Las tablas quedan vacías con una barra fina y "Cargando…". Varias pantallas de detalle
