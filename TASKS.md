@@ -1467,3 +1467,18 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   escrito; D20 sin "pendiente de aprobación".
   **Hecho 2026-10-08:** el usuario aprobó la fase por escrito, incluidas las tarjetas de resumen del dashboard (15.11)
   y los colores del modo oscuro propuestos (sujetos al test de 15.3).
+
+### 15B. Fundamentos
+
+- [x] **15.2** 🧪 Instalar `@fontsource-variable/inter` y cargarla en `main.ts`; definir en `plugins/vuetify.ts` el tema
+  claro y el oscuro (paleta, radios, bordes, tipografía) y los `defaults` de componentes. _Verificar:_ la app arranca y
+  se ve igual de usable en ambos temas; `lint` y `test:unit` en verde.
+  **Hecho 2026-10-08:** `@fontsource-variable/inter` instalada y cargada en `main.ts`. `plugins/vuetify.ts` define
+  `fullPetCareLight` y `fullPetCareDark` (paleta con `on-*` explícitos, colores propios `grooming` y `veterinary`,
+  borde fino por variable del tema) y los `defaults`: tarjetas con borde y sin sombra (radio `lg`), controles con radio
+  `md`, botones sin sombra. `styles/main.scss` pisa Roboto (Vuetify la fija en `html` y en cada `.text-*`), activa cifras
+  tabulares en tablas (`.tabular` para sueltas) y da color de marca a los enlaces de texto. `vue-tsc -b`, `lint` y 432
+  tests unitarios en verde. **Verificado** en el navegador (Playwright): el login usa Inter (la fuente cargó), el botón
+  es `#0F6B66`, la tarjeta tiene borde de 1 px y el enlace ya no es azul del navegador. **No cubierto:** el tema oscuro
+  aún no se puede activar (llega en 15.5), así que solo está verificado en papel (contrastes calculados, test en 15.3);
+  las demás pantallas no se recorrieron todavía (15.16). El login conserva su `elevation` explícito hasta 15.7.

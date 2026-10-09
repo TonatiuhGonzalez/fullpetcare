@@ -1,9 +1,56 @@
 // Punto de entrada de estilos globales. Vuetify ya trae su propio reset y
 // utilidades (v-app, spacing helpers como "pa-6"); este archivo es solo
-// para lo que el tema de Vuetify no cubre.
+// para lo que el tema de Vuetify no cubre. Colores y formas NO van aquí: viven
+// en plugins/vuetify.ts (CLAUDE.md §5.3).
 
 html,
 body {
   margin: 0;
   padding: 0;
+}
+
+// Tipografía de marca. Vuetify fija "Roboto" en `html` y de nuevo en cada clase
+// `.text-h1` … `.text-overline`, así que hay que pisarla en ambos sitios.
+$brand-font:
+  'Inter Variable',
+  system-ui,
+  -apple-system,
+  'Segoe UI',
+  sans-serif;
+
+html,
+.v-application,
+.v-btn,
+.v-field,
+.v-list-item,
+.v-chip,
+[class*='text-h'],
+[class*='text-body'],
+[class*='text-subtitle'],
+.text-caption,
+.text-button,
+.text-overline {
+  font-family: $brand-font;
+}
+
+// Cifras de ancho fijo: en tablas, precios y folios, los dígitos se alinean en
+// columna (un "1" ocupa lo mismo que un "8"). Se activa en tablas y con la clase
+// `.tabular` para cifras sueltas (tickets, totales).
+.v-table,
+.v-data-table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.v-btn {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+// Enlaces de texto con el color de marca del tema activo (claro u oscuro). Sin
+// esto, un <a> o <router-link> suelto sale en el azul por defecto del navegador,
+// que no está en nuestra paleta y no se ve bien en modo oscuro. Los enlaces de
+// Vuetify (botones, ítems de lista) llevan su propio color y no se tocan.
+a:not([class*='v-']) {
+  color: rgb(var(--v-theme-primary));
 }
