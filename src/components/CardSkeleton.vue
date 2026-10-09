@@ -3,17 +3,28 @@
 // que las reales) con un título y unas líneas grises. `count` pone varias en rejilla
 // (tableros como Inicio o Reportes); `lines` ajusta cuánto contenido aparenta tener.
 // Combínala con `useDelayedLoading` para que una respuesta rápida no la haga parpadear.
+//
+// `columns` fija cuántas columnas tiene la rejilla en pantallas medianas y grandes (desde
+// 960 px, el `md` de Vuetify), y una sola debajo; úsalo para copiar la disposición de la
+// pantalla real (Inicio son 2 columnas). Sin `columns`, las tarjetas se acomodan solas.
 withDefaults(
   defineProps<{
     count?: number
     lines?: number
+    columns?: number
   }>(),
-  { count: 1, lines: 2 },
+  { count: 1, lines: 2, columns: undefined },
 )
 </script>
 
 <template>
-  <div class="card-skeleton" role="status" aria-busy="true" aria-label="Cargando datos">
+  <div
+    :class="['card-skeleton', { 'card-skeleton--fixed': columns }]"
+    :style="columns ? { '--skeleton-columns': columns } : undefined"
+    role="status"
+    aria-busy="true"
+    aria-label="Cargando datos"
+  >
     <v-card v-for="n in count" :key="n" class="pa-4">
       <v-skeleton-loader type="heading" class="card-skeleton__title" />
       <v-skeleton-loader v-for="l in lines" :key="l" type="text" />
@@ -30,6 +41,15 @@ withDefaults(
 
   :deep(.v-skeleton-loader) {
     background: transparent;
+  }
+}
+
+// Disposición fija: una columna en pantallas chicas y `columns` desde `md` (960 px).
+.card-skeleton--fixed {
+  grid-template-columns: 1fr;
+
+  @media (min-width: 960px) {
+    grid-template-columns: repeat(var(--skeleton-columns), minmax(0, 1fr));
   }
 }
 

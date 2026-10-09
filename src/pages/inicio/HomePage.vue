@@ -89,7 +89,7 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
       {{ home.errorMessage }}
     </v-alert>
 
-    <CardSkeleton v-if="loading && showSkeleton" :count="4" :lines="3" />
+    <CardSkeleton v-if="loading && showSkeleton" :count="4" :columns="2" :lines="3" />
 
     <v-row v-else-if="home.status === 'ready'">
       <!-- Citas de hoy: para todos los roles. -->
