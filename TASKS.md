@@ -1482,3 +1482,13 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   es `#0F6B66`, la tarjeta tiene borde de 1 px y el enlace ya no es azul del navegador. **No cubierto:** el tema oscuro
   aún no se puede activar (llega en 15.5), así que solo está verificado en papel (contrastes calculados, test en 15.3);
   las demás pantallas no se recorrieron todavía (15.16). El login conserva su `elevation` explícito hasta 15.7.
+- [x] **15.3** 🧪 `lib/contrast.ts` (razón de contraste WCAG) y su test: cada par texto/fondo de la paleta, en claro y
+  en oscuro, llega a 4.5:1. _Verificar:_ el test falla si se cambia un color a uno que no cumple.
+  **Hecho 2026-10-08:** `lib/contrast.ts` (`contrastRatio`, `meetsAA`) y `lib/palette.ts`: la paleta salió de
+  `plugins/vuetify.ts` a datos puros para poder probarla sin cargar Vuetify (el plugin la importa). 44 tests nuevos
+  (`contrast.spec.ts`, `palette.spec.ts`): extremos 21 y 1, valor de referencia de WCAG, el umbral 4.5 a ambos lados,
+  texto sobre cada color de fondo, color como texto sobre la tarjeta, y que oscuro defina los mismos colores que claro.
+  **Verificado que el test detecta el error:** con el naranja anterior (`#D55E00`) falla con "grooming: 3.87:1".
+  `vue-tsc -b`, `lint` y 476 tests unitarios en verde. **No cubierto:** el contraste de los estados (hover, deshabilitado)
+  y de los chips tonales con fondo mezclado; solo se miden los pares base. Ojo: naranja y azul tienen luminosidad
+  parecida (se distinguen por tono, no por claridad); en escala de grises se parecerían, por eso cada tipo lleva ícono y texto.
