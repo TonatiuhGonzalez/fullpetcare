@@ -1954,3 +1954,136 @@ en `PLAN.md` D23. Sin servicio externo ni dependencia nueva; **no incluye precio
 
 > Fases 19 (constructor de planes y precios), 20 (autoservicio del dueño y prueba gratis) y 21 (pago real) se detallan
 > cuando se apruebe la 18; su resumen está en `PLAN.md` D23, punto 7.
+
+## Fase 22 — Recordatorios de citas y vacunas (propuesta)
+
+**Meta: que el cliente reciba un aviso antes de su cita y cuando le toca una vacuna, primero con un toque de una persona
+y después de forma automática.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta (2026-10-09);
+no se construye hasta que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D24. **22A a 22C no necesitan
+servicio externo ni dependencia nueva.** 22D sí (correo o WhatsApp) y se justifica con el usuario antes de empezar (§3).
+
+### 22A. Preparación
+
+- [ ] **22.1** 📚 Revisar `PLAN.md` D24 y decidir: si se aprueba el escalón 1 solo o también el 2, el consentimiento de
+  los clientes ya existentes, la antelación (24 h) y la ventana de envío (08:00 a 21:00). _Verificar:_ el usuario aprobó
+  por escrito; D24 sin "propuesta".
+- [ ] **22.2** 📚 Inventariar de dónde salen los datos: citas (`appointments.starts_at`, estados que sí se recuerdan),
+  vacunas (`vaccinations.next_due_date`), teléfono y correo en `customers`, zona de la sucursal; y confirmar que una
+  visita sin cita (`is_walk_in`) no genera recordatorio. _Verificar:_ la lista queda anotada aquí.
+
+### 22B. Base de datos
+
+- [ ] **22.3** 🧪 Migración aditiva: `customers.accepts_reminders` (`false` por defecto) y `reminders_consent_at`.
+  _Verificar:_ test de que el dueño y recepción lo cambian, el groomer no, y un cliente de otro negocio no se toca.
+- [ ] **22.4** 🧪 Tabla `reminders` con RLS, `tenant_id`, borrado suave, sin política de DELETE y con
+  `enforce_tenant_writable` (§6 y §7.3). Índice único parcial contra duplicados; un `check` exige exactamente un
+  origen (cita o vacuna). Los usuarios solo insertan `manual_whatsapp`. _Verificar:_ test de aislamiento entre negocios;
+  groomer y vet no la ven; insertar dos veces lo mismo falla; un usuario no puede insertar un envío automático.
+- [ ] **22.5** 🧪 `tenant_reminder_settings` y módulo de permisos `reminders` (dueño y recepción ver/editar; groomer y
+  vet nada). _Verificar:_ test de permisos por rol; cambiar una fila cambia el resultado sin tocar código (D13).
+
+### 22C. Escalón 1: lista de recordatorios con envío de un toque
+
+- [ ] **22.6** 🧪 `lib/reminders.ts` (función pura): de citas, vacunas, recordatorios ya hechos, ajustes y fecha a la
+  lista de avisos pendientes, con el texto armado y el teléfono en formato internacional de México. _Verificar:_ tests
+  de bordes: cita a las 00:30 y sucursal en otra zona (Tijuana vista desde Mérida), cita cancelada, visita sin cita,
+  cliente sin teléfono o sin consentimiento, vacuna vencida hace semanas, ya avisado, mensaje sin datos clínicos (§7.4).
+- [ ] **22.7** 🧪 `services/reminders.ts` y store: leer pendientes, registrar el aviso como enviado. _Verificar:_ tests
+  contra Supabase local con sesión real.
+- [ ] **22.8** Casilla "El cliente acepta recibir recordatorios" en `CustomerFormDialog` y `CustomerEditDialog`.
+  _Verificar:_ en navegador, queda guardada y se ve en la ficha.
+- [ ] **22.9** Pantalla `/app/recordatorios` (dueño y recepción; menú y ruta según el permiso): pendientes de hoy y de
+  mañana por sucursal, botón "Enviar por WhatsApp" que abre el chat con el mensaje escrito y registra el aviso.
+  _Verificar:_ en navegador y en móvil de 390 px; el botón no aparece sin teléfono ni consentimiento; avisar dos veces el
+  mismo recordatorio no es posible.
+- [ ] **22.10** Ajustes de recordatorios (antelación, tipos activos, texto del mensaje con variables limitadas) y un
+  bloque en Inicio con los pendientes del día (`stores/home.ts`, §5.6). _Verificar:_ en navegador, solo con permiso.
+
+### 22D. Escalón 2: envío automático (requiere aprobar canal y proveedor)
+
+- [ ] **22.11** 📚 Justificar con el usuario el canal y el proveedor (costo por mensaje, alternativas y contras, §3);
+  dar de alta la cuenta y guardar las llaves solo en las variables de la Edge Function y en GitHub Secrets (§10).
+  _Verificar:_ el usuario eligió por escrito; `.env.example` lleva la variable con valor vacío.
+- [ ] **22.12** 🧪 📚 Edge Function `send-reminders`: solo la invoca el cron o `service_role` (revalida antes de tocar
+  nada), toma pendientes con `for update skip locked`, envía, registra y reintenta hasta 3 veces. **Explicar el
+  proveedor simulado** (qué es, por qué no es un mock elaborado). _Verificar:_ tests con el simulado: éxito, fallo con
+  reintento, tercer fallo, dos ejecuciones simultáneas sin mensaje doble.
+- [ ] **22.13** 🧪 `app.enqueue_due_reminders()` y trabajo `pg_cron` cada hora, solo para `postgres`/`service_role`.
+  _Verificar:_ correrlo dos veces no duplica; respeta consentimiento y ventana horaria de la sucursal; una cita
+  reprogramada o cancelada descarta su recordatorio pendiente.
+- [ ] **22.14** 🧪 Baja del cliente: enlace en el correo que apaga `accepts_reminders` (token firmado, mismo cuidado que
+  §7.4). La baja por respuesta de WhatsApp queda para una fase posterior. _Verificar:_ token inválido, usado y de otro
+  negocio; tras la baja no se envía nada más.
+- [ ] **22.15** 🧪 El demo nunca manda mensajes reales: local, staging y empresas `is_demo` usan siempre el simulado.
+  _Verificar:_ test que fuerza una empresa `is_demo` con proveedor real configurado y comprueba que no se envía.
+
+### 22E. Cierre
+
+- [ ] **22.16** 🧪 Actualizar la semilla y `demo:reset` (recordatorios de ejemplo para hoy y mañana) y correr `lint`,
+  `test:unit`, `test:db` y el E2E. _Verificar:_ todo en verde; tras `demo:reset` la pantalla muestra datos.
+- [ ] **22.17** 📚 Actualizar `CLAUDE.md` (§1, §4 estructura, §6 tablas nuevas, §6.7 módulo `reminders`, §12 si hay
+  comandos) y marcar la fase; decir qué se puede demostrar. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+## Fase 23 — Importador de clientes y mascotas (propuesta)
+
+**Meta: que un negocio que ya tiene sus clientes en una hoja de cálculo los cargue en minutos y pueda deshacerlo si se
+equivocó.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta (2026-10-09); no se construye hasta que
+el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D25. Sin servicio externo ni dependencia nueva (el lector
+de CSV se escribe a mano). Trabaja mejor después de la fase 22 (usa su columna de consentimiento), pero no depende de ella.
+
+### 23A. Preparación
+
+- [ ] **23.1** 📚 Revisar `PLAN.md` D25 y aprobar la plantilla de columnas. Propuesta: `cliente_nombre`,
+  `cliente_apellido`, `cliente_telefono`, `cliente_correo`, `cliente_notas`, `acepta_recordatorios` (sí/no, opcional),
+  datos fiscales opcionales (`rfc`, `razon_social`, `regimen_fiscal`, `uso_cfdi`, `codigo_postal`), `mascota_nombre`,
+  `mascota_especie`, `mascota_raza`, `mascota_sexo`, `mascota_nacimiento` (AAAA-MM-DD), `mascota_esterilizada` (sí/no),
+  `mascota_notas`. _Verificar:_ el usuario aprobó por escrito; D25 sin "propuesta".
+- [ ] **23.2** 📚 Inventariar los campos obligatorios y los valores permitidos de `customers` y `pets` (especies, sexo,
+  formato de teléfono) y qué hace hoy `validation.ts`. _Verificar:_ la lista queda anotada aquí.
+
+### 23B. Piezas puras (`lib/`)
+
+- [ ] **23.3** 🧪 `lib/csv.ts`: lector de CSV. _Verificar:_ tests de bordes: comillas con comas y saltos de línea
+  adentro, comillas escapadas, BOM al inicio, CRLF, separador `;`, archivo vacío, solo encabezado, fila con menos
+  columnas, acentos y eñes.
+- [ ] **23.4** 🧪 `lib/importCustomers.ts`: de filas y clientes existentes al plan (`crear`, `omitir`, `error` con fila y
+  motivo en español). _Verificar:_ tests de bordes: teléfono con espacios, guiones y `+52`; dos filas del mismo cliente
+  agrupadas; cliente ya existente omitido sin sobrescribir; mascota duplicada; especie desconocida; fecha futura; RFC
+  inválido; más de 1 000 filas; fila sin teléfono ni correo.
+- [ ] **23.5** Plantilla descargable con filas de ejemplo ficticias y la instrucción de guardar como "CSV UTF-8".
+  _Verificar:_ el archivo descargado se abre en Excel y vuelve a leerse en el importador sin errores.
+
+### 23C. Base de datos
+
+- [ ] **23.6** 🧪 Migración aditiva: tabla `import_batches` (RLS, `tenant_id`, `enforce_tenant_writable`, sin DELETE) y
+  `import_batch_id` nullable en `customers` y `pets`. _Verificar:_ test de aislamiento; las filas existentes quedan
+  intactas.
+- [ ] **23.7** 🧪 📚 RPC `import_customers(p_rows jsonb, p_file_name text)` `SECURITY DEFINER`: revalida membresía y rol
+  dueño o recepción en la primera línea, vuelve a validar formato y duplicados, es atómica y tiene tope de 1 000 filas.
+  **Explicar por qué se revalida lo que el navegador ya validó.** _Verificar:_ tests: usuario de otro negocio, groomer
+  rechazado, una fila inválida revierte todo, duplicado omitido, tope excedido, negocio en solo lectura rechazado.
+- [ ] **23.8** 🧪 RPC `undo_import(p_batch_id)`: oculta (borrado suave) lo importado sin citas ni ventas e informa lo que
+  se conserva. _Verificar:_ tests: deshace un lote limpio; conserva un cliente que ya tiene una cita; otro negocio no
+  puede; deshacer dos veces no falla.
+
+### 23D. Interfaz
+
+- [ ] **23.9** `services/importCustomers.ts`: parte el archivo, llama a la RPC y devuelve el resumen. _Verificar:_ test
+  contra Supabase local con sesión real.
+- [ ] **23.10** Diálogo "Importar clientes" en Clientes (dueño y recepción), por pasos: plantilla, subir archivo, vista
+  previa con errores por fila, confirmar y resumen con "Deshacer". _Verificar:_ en navegador con un archivo ficticio de 5
+  filas con errores de cada tipo y otro de 1 000 filas; móvil de 390 px, claro y oscuro; skeleton de carga (fase 17).
+- [ ] **23.11** Lista corta de importaciones recientes con su "Deshacer". _Verificar:_ en navegador, tras deshacer los
+  clientes desaparecen de Clientes y el historial lo refleja.
+
+### 23E. Cierre
+
+- [ ] **23.12** 🧪 Correr `lint`, `test:unit`, `test:db` y el E2E; archivo de ejemplo ficticio en la semilla de pruebas.
+  _Verificar:_ todo en verde, sin datos reales (§11).
+- [ ] **23.13** 📚 Actualizar `CLAUDE.md` (§1, §4 estructura, §6.2 clientes) y marcar la fase; decir qué se puede
+  demostrar. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+> Candidatos posteriores, sin fase: importar la cartilla de vacunación (el más pedido), citas e historial, y leer `.xlsx`.
+> También sin fase, por decidir según el primer cliente piloto: pagos reales, paquetes y membresías, comisiones por
+> empleado y la "clínica a fondo" (receta y cartilla imprimibles, desparasitación, lotes y caducidades, fotos antes y
+> después).
