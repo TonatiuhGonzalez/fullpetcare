@@ -8,6 +8,7 @@
 import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { formatTime, formatWeekdayDate } from '@/lib/datetime'
@@ -137,9 +138,13 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
               </v-chip>
             </div>
 
-            <p v-if="home.summary.total === 0" class="text-body-2 text-medium-emphasis">
-              No hay citas para hoy.
-            </p>
+            <EmptyState
+              v-if="home.summary.total === 0"
+              compact
+              illustration="calendar"
+              title="No hay citas para hoy"
+              message="Las citas del día aparecerán aquí."
+            />
 
             <v-list v-else-if="home.upcoming.length > 0" density="compact" class="pa-0">
               <div class="text-caption text-medium-emphasis mb-1">Lo que sigue</div>

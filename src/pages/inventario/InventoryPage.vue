@@ -10,6 +10,7 @@ import { formatMXN } from '@/lib/money'
 import type { Product } from '@/services/products'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
+import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
@@ -212,9 +213,15 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       </v-list-item>
 
       <v-list-item v-if="visibleRows.length === 0">
-        <template #title>
-          {{ search ? 'No hay productos que coincidan.' : 'Todavía no hay productos.' }}
-        </template>
+        <EmptyState
+          illustration="products"
+          :title="search ? 'Sin resultados' : 'Todavía no hay productos'"
+          :message="
+            search
+              ? 'No hay productos que coincidan con la búsqueda.'
+              : 'Los productos que des de alta aparecerán aquí.'
+          "
+        />
       </v-list-item>
     </v-list>
 

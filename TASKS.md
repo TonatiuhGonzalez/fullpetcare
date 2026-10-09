@@ -1675,3 +1675,22 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   siempre (la ilustración llega en 15.14). **Proceso:** los datos de prueba (3 vacunas y el link) se insertaron en la base
   **local** con los disparadores desactivados en mi sesión (el expediente no permite borrado, §8.5) y se borraron; no
   quedó rastro en la bitácora. Hubo que levantar `supabase functions serve` para probar y se detuvo al terminar.
+
+- [x] **15.14** Estados vacíos con ilustración SVG propia (agenda, clientes, productos, ventas). _Verificar:_ se ven
+  en ambos temas.
+  **Hecho 2026-10-08:** `components/EmptyState.vue` (ilustración, título, frase opcional, acciones opcionales y versión
+  `compact`) con **cuatro ilustraciones SVG propias** —calendario, clientes, productos y ventas— que llevan el motivo de
+  los dos círculos del logo y toman sus colores del tema (claro y oscuro). Aplicado en: **Inicio** ("No hay citas para
+  hoy"; se oculta el "0 citas" grande cuando no hay), **Clientes** y **Mascotas** (tablas, distinguiendo "Aún no hay…" de
+  "Sin resultados" según haya búsqueda), **Inventario** y **Reportes → Lo más vendido** ("Sin ventas en este periodo",
+  en Servicios y en Productos). `vue-tsc -b`, `lint` y 527 tests unitarios en verde. **Verificado** en el navegador
+  (Playwright) en claro y oscuro: Inicio sin citas, búsquedas sin resultados en Clientes, Mascotas e Inventario, y un
+  rango de 2020 sin ventas en Reportes; sin errores de consola. **Decisiones mías a revisar:** (1) los textos nuevos
+  ("Las citas del día aparecerán aquí", "Los clientes que des de alta aparecerán aquí", etc.) los redacté yo; (2) **la
+  Agenda no lleva ilustración**: con 0 citas es una cuadrícula vacía, no un texto, y ponerle un aviso encima sería un
+  comportamiento nuevo; el estado vacío de "citas" vive en Inicio; (3) no se agregaron botones de acción dentro de los
+  estados vacíos (el componente los admite); (4) el estado vacío de **Reportes → Empleados** ("Sin actividad…") y los
+  demás textos sueltos (caja, sucursales, historial de la mascota, cartilla, etc.) **se dejaron como texto**; (5) el
+  estado vacío de la vista pública (sin vacunas ni visitas) también sigue en texto. **No cubierto:** el caso "Aún no hay
+  clientes / mascotas / productos" (negocio sin datos) no se vio en pantalla porque la demo tiene datos; solo los de
+  "Sin resultados"; no hay test automático del componente (§9).

@@ -15,6 +15,7 @@ import PetEditDialog from '@/components/PetEditDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetFormDialog from '@/components/PetFormDialog.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const session = useSessionStore()
 
@@ -144,9 +145,21 @@ async function confirmDelete(): Promise<void> {
       :headers="headers"
       :items="rows"
       :loading="loading"
-      no-data-text="No hay mascotas que coincidan con la búsqueda."
       loading-text="Cargando mascotas…"
     >
+      <template #no-data>
+        <EmptyState
+          compact
+          illustration="customers"
+          :title="searchTerm.trim() ? 'Sin resultados' : 'Aún no hay mascotas'"
+          :message="
+            searchTerm.trim()
+              ? 'No hay mascotas que coincidan con la búsqueda.'
+              : 'Las mascotas que des de alta aparecerán aquí.'
+          "
+        />
+      </template>
+
       <template #[`item.name`]="{ item }">
         <span class="font-weight-medium">{{ item.name }}</span>
       </template>
