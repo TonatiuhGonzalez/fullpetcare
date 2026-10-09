@@ -97,7 +97,7 @@ const methodRows = computed(() => {
 </script>
 
 <template>
-  <v-container class="py-4">
+  <v-container class="py-6">
     <PageHeader title="Caja" :subtitle="branchName" />
 
     <v-alert

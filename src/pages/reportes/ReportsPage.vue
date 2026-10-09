@@ -169,7 +169,7 @@ function exportStaff(): void {
 </script>
 
 <template>
-  <v-container class="py-4">
+  <v-container class="py-6">
     <PageHeader
       title="Reportes"
       subtitle="Solo cuentan las ventas pagadas. Las fechas son las de cada sucursal."

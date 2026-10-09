@@ -1708,3 +1708,37 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
   negocio no aplica); en móvil las tablas se desplazan horizontalmente dentro de su tarjeta (es un panel de escritorio, ya
   lo decía el código); "Todavía no hay reportes" sigue como texto (no hay ilustración para reportes); no se ejecutó
   "Cambiar contraseña" ni crear o restablecer hasta el final.
+
+### 15G. Cierre
+
+- [x] **15.16** 📚 Revisar contrastes y recorrer las pantallas principales en claro y oscuro; correr `lint`,
+  `test:unit` y el E2E. Actualizar `CLAUDE.md` (§1, §3 dependencia nueva, §5.3 sobre el tema, estructura de
+  carpetas) y marcar la fase terminada. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-08:** **recorrido** automatizado de las pantallas principales como dueño (12), recepción (6), groomer
+  (4) y veterinario (5), en claro y oscuro: ninguna redirige donde no debe, ninguna se desborda y no hay errores de consola;
+  en oscuro se buscaron elementos con fondo blanco o texto negro puros (colores que se escaparon del tema) y no hay; a
+  ojo se revisaron además Punto de venta, Facturación y Caja en oscuro. Se igualó el margen vertical de **Caja y Reportes**
+  (`py-4` → `py-6`) con el resto. `vue-tsc -b`, `lint`, **527 tests unitarios** y el **E2E completo** en verde (incluye
+  el build de producción). **`CLAUDE.md` actualizado:** §1 (fase 15 construida; en el alcance de v1 la entrada ahora es
+  Inicio), §3 (dependencia `@fontsource-variable/inter`), §4 (estructura: `palette`, `visitKind`, `themeMode`,
+  `useThemeMode`, `pages/inicio`), §5.3 (apunta a §5.6) y una **§5.6 nueva** con las reglas de identidad visual (colores
+  solo en `lib/palette.ts`, contraste AA, tipo de visita siempre con ícono y texto, piezas compartidas e Inicio).
+  `PLAN.md` D20 queda aprobada y con sus 8 puntos. **No cubierto:** `npm run test:db` **no se corrió** (la fase no toca
+  la base: ninguna migración ni función SQL); la revisión visual de oscuro fue a ojo en 3 pantallas y programática en el
+  resto, no en las 27; no se probó en un teléfono real ni en Safari (solo Chromium); el recorrido usó la base local con
+  datos de demo. **Pendiente:** nada se ha **commiteado ni subido**: la fase vive sin commit en `feat/visual-identity`; falta
+  decidir cómo partirla en commits y abrir el PR hacia `develop` (§10). Antes de pasar a `main`, **probar en staging** (la
+  carga de fuentes desde el propio dominio y la subida de foto de mascota, que sigue pendiente de la fase 14).
+
+### Qué se puede demostrar (fase 15)
+
+1. **Entrar** y ver el login nuevo (dos paneles, logo "Dos mitades"); en móvil, solo el formulario.
+2. **Inicio**: saludo y fecha, accesos rápidos, citas de hoy, por cobrar, caja y ventas, cada uno según el rol (recepción,
+   dueño y groomer ven cosas distintas).
+3. **Modo oscuro** desde el menú de usuario (Sistema / Claro / Oscuro) y cómo toda la app lo respeta.
+4. **Agenda** con la franja y el ícono del tipo de visita (estética naranja con tijeras, veterinaria azul con estetoscopio)
+   y la leyenda; el mismo tipo en el detalle de la cita y el historial de la mascota.
+5. **Menú lateral** con secciones, selector de sucursal y menú colapsable.
+6. **Vista pública del cliente** en un teléfono: foto grande, cartilla con "1 vacuna vencida / por vencer / al día".
+7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
+8. **Superadmin** con la misma identidad.

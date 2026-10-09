@@ -31,7 +31,9 @@ sobre lo que existe. Candidatos hablados hasta hoy: **inventario y venta de prod
 línea, paquetes/membresías, pagos reales, comisiones por empleado, importador de
 clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5). **Ya construido
 (fase 13): la venta de mostrador como punto de venta** (§6.5). **Ya construido
-(fase 14): acciones y edición directa en Clientes** (§6.2).
+(fase 14): acciones y edición directa en Clientes** (§6.2). **Ya construido
+(fase 15): identidad visual** (tema claro y oscuro, logo, tipografía, color por tipo de
+visita) **y la pantalla de Inicio** (§5.6).
 
 Reglas de esta etapa:
 
@@ -51,7 +53,8 @@ Reglas de esta etapa:
 El flujo completo de principio a fin, ya construido:
 
 1. Login y selección de tenant/sucursal
-2. Dashboard con la agenda del día
+2. Pantalla de entrada con el resumen del día (Inicio, desde la fase 15, §5.6) y la agenda
+   del día
 3. Crear cita: cliente y mascota (o alta nueva), tipo (estética o veterinaria),
    servicios, horario y empleado
 4. Atender la cita: ficha según el tipo (corte y notas, o consulta y vacunas)
@@ -160,6 +163,10 @@ Las aprobadas hasta ahora:
   no se activa `nowIndicator` (usaría el reloj del navegador). (4) La opción `views`
   solo se lee al crear el calendario. Historial: se descartó `@schedule-x/calendar`
   (no gustó el resultado visual y su vista de recursos también es de paga).
+- `@fontsource-variable/inter` — tipografía de marca (2026-10-08, fase 15). Se sirve desde
+  nuestro propio dominio: sin pedir nada a Google Fonts ni mandarle la IP del usuario.
+  Se carga en `main.ts`; el reemplazo de Roboto vive en `styles/main.scss` (Vuetify la fija
+  en `html` y en cada `.text-*`).
 - `eslint`, `prettier`, `eslint-plugin-vue`, `vitest`, `@vue/test-utils`,
   `@playwright/test`, `vite-plugin-vuetify` — herramientas.
 
@@ -205,16 +212,19 @@ FullPetCare/
     │   ├── money.ts             #   centavos, IVA, redondeo
     │   ├── datetime.ts          #   UTC ↔ zona de sucursal
     │   ├── availability.ts      #   cálculo de huecos en la agenda
-    │   └── validation.ts        #   RFC, teléfono, CP
+    │   ├── validation.ts        #   RFC, teléfono, CP
+    │   ├── palette.ts           #   colores del tema como datos; contrast.ts mide su contraste (§5.6)
+    │   ├── visitKind.ts         #   tipo de visita → nombre, ícono y color (§5.6)
+    │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     ├── stores/                  # Pinia: session, tenant, agenda, cart
     ├── types/database.ts        # GENERADO. No editar a mano.
-    ├── composables/
+    ├── composables/             # useThemeMode (modo de color, §5.6)
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
-    ├── pages/                   # una carpeta por área: auth, agenda, clientes, atencion, cobro, ventas, publico, superadmin
+    ├── pages/                   # una carpeta por área: auth, inicio, agenda, clientes, atencion, cobro, ventas, publico, superadmin
     └── styles/
 ```
 
@@ -275,7 +285,7 @@ con un `// TODO: tipar` es aceptable en un demo. No se optimiza el sistema de ti
 - Props tipadas con `defineProps<{...}>()`. Nada de `props: { type: String }`.
 - Componentes de presentación sin estado global. El estado vive en stores.
 - Vuetify se usa tal cual viene; el tema se personaliza en `plugins/vuetify.ts`, no con
-  overrides de CSS regados por los componentes.
+  overrides de CSS regados por los componentes (colores, radios, bordes: ver §5.6).
 
 ### 5.4 Errores
 
@@ -290,6 +300,35 @@ con un `// TODO: tipar` es aceptable en un demo. No se optimiza el sistema de ti
 La UI es solo español. No se instala `vue-i18n`. Los textos van directo en los
 templates. Si algún día hay que internacionalizar, es un refactor mecánico y aislado;
 pagar esa complejidad hoy no compra nada.
+
+### 5.6 Identidad visual (fase 15, PLAN.md D20)
+
+Personalidad **clínica y confiable**: neutros fríos, verde azulado de marca (`#0F6B66`),
+tarjetas con borde fino y sin sombra. Reglas que no se rompen:
+
+- **Los colores viven en `lib/palette.ts`** (claro y oscuro, cada uno con su `on-*`) y
+  `plugins/vuetify.ts` los registra como los temas `fullPetCareLight` y `fullPetCareDark`.
+  En componentes **no se escriben colores a mano**: se usa `color="primary"` o
+  `rgb(var(--v-theme-…))`, así cambian solos con el tema. Excepciones deliberadas: el panel
+  de marca del login y el filete claro de la franja del calendario.
+- **Contraste AA (4.5:1) obligatorio.** `lib/palette.spec.ts` lo verifica en ambos temas:
+  un color nuevo que no cumpla rompe el test. No se agrega un color sin su `on-*`.
+- **Tipo de visita = color + ícono + texto.** Estética es `grooming` (naranja) y veterinaria
+  es `veterinary` (azul), de la paleta Okabe-Ito (se distingue con daltonismo). **El color
+  nunca va solo.** La fuente única es `lib/visitKind.ts`; se muestra con `VisitKindChip`, y en
+  el calendario como franja + ícono (`components/calendarEvents.ts`). No se repiten
+  "Estética"/"Veterinaria" a mano. Para no confundirlos, el azul y el naranja **no se usan para
+  otra cosa**: "Agendada" y el peso en el historial son gris pizarra (`secondary`), no `info`.
+- **Modo claro, oscuro o del sistema:** `useThemeMode` (se elige en el menú de usuario; la
+  preferencia es una comodidad del navegador, `fpc.themeMode`, nunca un dato de negocio).
+- **Piezas compartidas** (úsalas en lugar de rehacerlas): `BrandLogo`, `PageHeader` (todo
+  encabezado de pantalla: título, subtítulo y acciones), `EmptyState` (estado vacío con
+  ilustración), `UserMenu`, `WorkspaceSwitcher`, `SideMenu` (con secciones por `group`),
+  `AuthPanelLayout` (hoy solo el login) y `VisitKindChip`.
+- **Inicio** (`/app/inicio`, `stores/home.ts`, `lib/homeSummary.ts`) es la pantalla de entrada.
+  Cada bloque se consulta y se muestra solo si el rol o el permiso lo permite (la regla real la
+  impone la base). El total "por cobrar" es **estimado**: solo suma servicios. Los accesos
+  rápidos mandan a la Agenda con `?accion=nueva-cita` o `?accion=llegada-sin-cita`.
 
 ---
 
