@@ -2400,6 +2400,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_customer_with_pet: {
+        Args: {
+          p_cfdi_use?: string
+          p_email?: string
+          p_first_name: string
+          p_last_name: string
+          p_legal_name?: string
+          p_notes?: string
+          p_pet_birth_date?: string
+          p_pet_breed?: string
+          p_pet_grooming_notes?: string
+          p_pet_is_sterilized?: boolean
+          p_pet_medical_alerts?: string
+          p_pet_name?: string
+          p_pet_sex?: Database["public"]["Enums"]["pet_sex"]
+          p_pet_species?: Database["public"]["Enums"]["pet_species"]
+          p_phone?: string
+          p_postal_code?: string
+          p_requires_invoice?: boolean
+          p_rfc?: string
+          p_tax_regime_code?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       create_employee_membership: {
         Args: {
           p_birth_date: string
