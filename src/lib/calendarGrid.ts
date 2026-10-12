@@ -11,6 +11,7 @@
 import { addDays, format } from 'date-fns'
 
 import type { BranchHours } from './availability'
+import type { AgendaStatus } from './agendaStatus'
 import type { VisitKind } from './visitKind'
 
 /**
@@ -74,15 +75,25 @@ export interface CalendarBlock {
   id: string
   start: string
   end: string
+  /** Texto completo de la cita: es el tooltip del bloque (el bloque lo recorta). */
   text: string
-  /** Fondo del bloque: el color del ESTADO de la cita. */
-  color: string
-  /** Color del texto sobre `color` (cambia entre tema claro y oscuro). */
-  textColor: string
+  customer: string
+  pet: string
+  /** Estado a mostrar: el bloque lleva su color, su ícono y su nombre (lib/agendaStatus.ts). */
+  status: AgendaStatus
   /** Tipo de visita: marca la franja y el ícono del bloque. */
   kind: VisitKind
+  /** Visita sin cita o urgente (ícono aparte); nulo en una cita normal. */
+  origin: 'walk_in' | 'urgent' | null
   resource?: string
 }
+
+/**
+ * Cuánto pesa el color del estado en el fondo tonal del bloque (0.16 = 16 %). Lo usa
+ * `styles/main.scss` en `color-mix()` y el test de contraste de `palette.spec.ts`: los dos
+ * tienen que coincidir o el contraste que se mide no es el que se ve.
+ */
+export const TONAL_WEIGHT = 0.16
 
 /**
  * Minutos desde medianoche → 'HH:MM', el formato que EventCalendar espera

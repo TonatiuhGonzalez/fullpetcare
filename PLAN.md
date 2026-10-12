@@ -1144,6 +1144,39 @@ dice la fórmula; se ajusta a ojo en 1366, 1440, 1920 y 2560 px. `SettingsPage` 
 del contenedor (`settings-container`): **debe quedarse en 860 explícito**, o el riel se mueve. Sin dependencias nuevas
 (§3), sin tocar la base ni §7 y §8.
 
+### D28 — Calendario de la agenda: bloques tonales, marco de tarjeta y barra única
+
+**Estado:** aprobada el 2026-10-12 (el usuario eligió las propuestas A y B). Se construye en la fase 25.
+
+**Problema.** El calendario de la agenda (`EmployeeDayScheduler.vue`, `EmployeeWeekCalendar.vue`) se ve básico junto
+al resto del sistema: cada cita es un relleno sólido y saturado del color de su estado, el calendario flota sin
+tarjeta, los encabezados son los de la librería, el origen de la cita se marca con emojis y el filete de la franja de
+tipo es blanco fijo (se ve duro en modo oscuro).
+
+**Decisión.**
+1. **Bloque tonal.** Fondo = el color del estado mezclado al 16 % con `surface`, texto `on-surface`, borde fino del
+   color del estado y radio `md`; punteado en cancelada y "no se presentó". El bloque **no lleva íconos** (decisión del
+   usuario, 2026-10-12): el nombre del estado va en el tooltip y en la leyenda (`lib/agendaStatus.ts`), que sí usa el
+   ícono. Excepción a "el color nunca va solo" (§5.6), igual que la franja de tipo.
+2. **Franja de tipo.** Se queda como única señal del tipo dentro del bloque (sin ícono; el nombre va en el tooltip,
+   decisión del usuario del 2026-10-12, excepción a "el color nunca va solo" de D20); su filete usa `surface`.
+3. **Origen de la cita.** Sin ícono en el bloque; "Sin cita" y "Urgente" van en el tooltip. Fuera los emojis.
+4. **Marco.** `v-card` con borde que agrupa barra, leyenda y calendario. Barra única con `‹ Hoy ›` y la fecha escrita,
+   que abre un `v-date-picker`.
+5. **Encabezados.** Empleado con avatar de iniciales y contador de citas del día; días de la semana con la tipografía
+   de marca.
+6. **Sin estado vacío.** Se construyó un `EmptyState` compacto sobre la cuadrícula y el usuario lo quitó por redundante
+   (2026-10-12): un día sin citas es la cuadrícula vacía, con los empleados en "Sin citas".
+
+**Alternativas descartadas.** (a) Mantener el relleno sólido y solo afinar bordes: no resuelve la sensación de peso.
+(b) Tarjeta que cambia de contenido según su alto, tooltip propio y línea de "ahora" (propuesta C): se pospone; depende
+de cómo se comporte `eventContent` con la altura real de cada bloque y la línea de "ahora" exige un reloj de sucursal.
+(c) Cambiar de librería de calendario: descartado en D20 y en `CLAUDE.md` §3.
+
+**Contras y riesgos.** El fondo tonal es más claro que el relleno sólido: el contraste debe medirse (25.3) y se
+revisa a ojo en ambos temas. `color-mix()` exige un navegador reciente (2023 en adelante), el mismo piso que ya pide
+Vuetify 3.13. Sin dependencias nuevas (§3), sin tocar la base ni §7 y §8.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
