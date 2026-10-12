@@ -219,3 +219,56 @@ export function hoursForDate(
   const dayOfWeek = new Date(year, month - 1, day).getDay()
   return openingHours[WEEKDAY_KEYS[dayOfWeek]] ?? null
 }
+
+export interface FindOverlapArgs {
+  /** Citas del día — de CUALQUIER empleado; la función filtra por `employeeId`. */
+  existingAppointments: ExistingAppointment[]
+  employeeId: string
+  /** 'HH:mm', hora local de la sucursal, del horario que se quiere revisar. */
+  startsAt: string
+  endsAt: string
+}
+
+/**
+ * La primera cita del MISMO empleado con la que choca el horario [startsAt, endsAt), o
+ * `null` si no choca con ninguna. Es la misma regla que `computeSlotStatuses` (extremos
+ * que se tocan no cuentan), pero para UN horario libre: lo que necesita reprogramar,
+ * donde la hora no sale de una rejilla de huecos. Solo avisa; no decide si se permite
+ * (D26 punto 1: el traslape se permite con aviso). Quien llama excluye antes la propia
+ * cita y las canceladas o no asistidas.
+ */
+export function findOverlap({
+  existingAppointments,
+  employeeId,
+  startsAt,
+  endsAt,
+}: FindOverlapArgs): ExistingAppointment | null {
+  const start = parseMinutes(startsAt)
+  const end = parseMinutes(endsAt)
+  return (
+    existingAppointments.find(
+      (a) =>
+        a.employeeId === employeeId &&
+        overlaps(start, end, parseMinutes(a.startsAt), parseMinutes(a.endsAt)),
+    ) ?? null
+  )
+}
+
+/**
+ * true si una cita que empieza a `startsAt` ('HH:mm') y dura `durationMinutes` cabe
+ * completa dentro del horario de la sucursal ese día. Con `branchHours` nulo (día
+ * cerrado) nunca cabe. A diferencia de `computeAvailableSlots` no exige que `startsAt`
+ * caiga en la rejilla de pasos: al reprogramar la hora es libre.
+ */
+export function fitsWithinHours(
+  branchHours: BranchHours | null,
+  startsAt: string,
+  durationMinutes: number,
+): boolean {
+  if (!branchHours) return false
+  const start = parseMinutes(startsAt)
+  return (
+    start >= parseMinutes(branchHours.opensAt) &&
+    start + durationMinutes <= parseMinutes(branchHours.closesAt)
+  )
+}
