@@ -2092,7 +2092,7 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
   fuera de horario y día cerrado. **Llegada sin cita (`WalkInDialog`):** al elegir un hueco que se traslapa, avisa que
   ya hay una cita y que aceptar puede alterar la cronología, y pide **confirmar** o elegir otro. _Verificar:_ en navegador, claro y oscuro, escritorio y móvil de 390 px; test del
   componente `TimeSlotPicker` (ya existe `TimeSlotPicker.spec.ts`).
-- [ ] **C1.11** Alta de cliente con su mascota (modal): componente nuevo que usa `create_customer_with_pet()`; se abre
+- [x] **C1.11** Alta de cliente con su mascota (modal): componente nuevo que usa `create_customer_with_pet()`; se abre
   sobre la nueva cita y la deja con el cliente y la mascota ya elegidos. Se usa también en Clientes y en el punto de
   venta (que hoy usa `CustomerFormDialog`). _Verificar:_ en navegador: sin mascota no deja guardar; correo repetido
   avisa; tras guardar, la cita queda lista para elegir servicios.
@@ -2103,7 +2103,7 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
   botones.
 - [x] **C1.13** Reprogramar (`AppointmentDialog`, `AppointmentDetailPage`): fecha mínima hoy y las mismas reglas y
   avisos que agendar. _Verificar:_ en navegador: pasado, fuera de horario y día cerrado se rechazan con mensaje claro.
-- [ ] **C1.14** Correo: `isValidEmail` y mensaje "Este correo ya está registrado" en alta, edición y punto de venta;
+- [x] **C1.14** Correo: `isValidEmail` y mensaje "Este correo ya está registrado" en alta, edición y punto de venta;
   el error de la base se traduce a ese mensaje (§5.4). _Verificar:_ en navegador; el correo vacío sigue permitido.
 - [x] **C1.15** Clientes: una sola tabla (Nombre, Teléfono, Correo, **Mascotas** como chips con el ícono de su especie,
   Acciones); se retira la pestaña Mascotas (`PetsPanel.vue` se conserva sin uso, como acordó D19) y la fila abre la
