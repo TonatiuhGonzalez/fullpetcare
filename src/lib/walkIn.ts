@@ -114,3 +114,28 @@ export function waitLabel(waitMinutes: number): string {
   const minutes = waitMinutes % 60
   return minutes === 0 ? `Espera ~${hours} h` : `Espera ~${hours} h ${minutes} min`
 }
+
+/**
+ * ¿La visita (de `startsAt` a `endsAt`, 'HH:mm' locales) se encima con una cita del
+ * MISMO empleado? Regresa la primera cita con la que choca, o `null` si no choca. Mismo
+ * criterio estricto que `computeEmployeeWaits`: terminar justo cuando otra empieza no es
+ * choque. Quien llama decide qué hacer: la base ya no rechaza el traslape (D26), así que
+ * la interfaz pide confirmación antes de registrar la visita encima de otra cita.
+ */
+export function findWalkInOverlap(args: {
+  employeeId: string
+  busyRanges: WalkInBusyRange[]
+  startsAt: string
+  endsAt: string
+}): WalkInBusyRange | null {
+  const start = parseMinutes(args.startsAt)
+  const end = parseMinutes(args.endsAt)
+  return (
+    args.busyRanges.find(
+      (range) =>
+        range.employeeId === args.employeeId &&
+        start < parseMinutes(range.endsAt) &&
+        end > parseMinutes(range.startsAt),
+    ) ?? null
+  )
+}

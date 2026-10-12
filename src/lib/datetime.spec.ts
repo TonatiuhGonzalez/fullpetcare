@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  branchNow,
   branchToday,
   dayRangeUtc,
   formatDate,
@@ -166,5 +167,23 @@ describe('branchToday', () => {
     const instant = new Date('2026-07-16T03:00:00Z')
     expect(branchToday('America/Tijuana', instant)).toBe('2026-07-15')
     expect(branchToday('Asia/Tokyo', instant)).toBe('2026-07-16')
+  })
+})
+
+describe('branchNow', () => {
+  it('da la fecha y la hora de la sucursal, no las del navegador ni las de UTC', () => {
+    // 03:30 UTC del 16 de julio: en Tijuana (UTC-7) son las 20:30 del 15 y en Tokio
+    // (UTC+9) las 12:30 del 16. Si usara el reloj del navegador, una recepcionista en
+    // Mérida vería como "ya pasado" (o disponible) un horario de Tijuana por error.
+    const instant = new Date('2026-07-16T03:30:00Z')
+    expect(branchNow('America/Tijuana', instant)).toEqual({ date: '2026-07-15', time: '20:30' })
+    expect(branchNow('Asia/Tokyo', instant)).toEqual({ date: '2026-07-16', time: '12:30' })
+  })
+
+  it('justo a medianoche local cambia de día y la hora es 00:00', () => {
+    // 06:00 UTC es medianoche en CDMX (UTC-6, sin horario de verano). Un día mal
+    // calculado aquí dejaría los horarios de "hoy" marcados como pasados o libres.
+    const instant = new Date('2026-01-16T06:00:00Z')
+    expect(branchNow('America/Mexico_City', instant)).toEqual({ date: '2026-01-16', time: '00:00' })
   })
 })

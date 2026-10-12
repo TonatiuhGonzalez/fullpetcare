@@ -29,7 +29,12 @@ import { branchToday, formatTime, fromBranchTime } from '@/lib/datetime'
 import { canAttendKind } from '@/lib/roles'
 import { isValidPhone } from '@/lib/validation'
 import { speciesLabel } from '@/lib/petLabels'
-import { computeEmployeeWaits, waitLabel, type WalkInBusyRange } from '@/lib/walkIn'
+import {
+  computeEmployeeWaits,
+  findWalkInOverlap,
+  waitLabel,
+  type WalkInBusyRange,
+} from '@/lib/walkIn'
 import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
@@ -183,6 +188,42 @@ const selectedWait = computed(
   () => employeeWaits.value.find((w) => w.employeeId === selectedEmployeeId.value) ?? null,
 )
 
+// Por defecto, un empleado ocupado deja la visita para cuando se libere. Recepción
+// puede decidir atenderla ya aunque encime otra cita (C1.10): entonces se pide
+// confirmación antes de registrarla, porque altera la cronología de esa cita.
+const startNowAnyway = ref(false)
+watch(selectedEmployeeId, () => {
+  startNowAnyway.value = false
+})
+
+/** Con qué hueco se registraría la visita ('HH:mm' locales de la sucursal). */
+const plannedSlot = computed(() => {
+  const wait = selectedWait.value
+  if (!wait) return null
+  if (wait.waitMinutes > 0 && startNowAnyway.value) {
+    const [h, m] = nowTime.value.split(':').map(Number)
+    const end = h * 60 + m + totalDurationMinutes.value
+    const hh = String(Math.floor(end / 60) % 24).padStart(2, '0')
+    const mm = String(end % 60).padStart(2, '0')
+    return { startsAt: nowTime.value, endsAt: `${hh}:${mm}`, startsNow: true }
+  }
+  return { startsAt: wait.startsAt, endsAt: wait.endsAt, startsNow: wait.waitMinutes === 0 }
+})
+
+// La cita del mismo empleado con la que se encimaría ese hueco, si hay una.
+const plannedOverlap = computed(() => {
+  const slot = plannedSlot.value
+  if (!slot || !selectedEmployeeId.value) return null
+  return findWalkInOverlap({
+    employeeId: selectedEmployeeId.value,
+    busyRanges: busyRanges.value,
+    startsAt: slot.startsAt,
+    endsAt: slot.endsAt,
+  })
+})
+
+const confirmOverlapOpen = ref(false)
+
 // Preselecciona a quien menos espera (la lista ya viene ordenada así); si el
 // empleado elegido deja de ser opción (cambió el tipo, por ejemplo), se
 // reemplaza.
@@ -248,6 +289,8 @@ watch(
     isUrgent.value = false
     notes.value = ''
     selectedEmployeeId.value = null
+    startNowAnyway.value = false
+    confirmOverlapOpen.value = false
 
     loadEmployees()
     loadServices()
@@ -285,7 +328,17 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+// Si el hueco se encima con otra cita del empleado, primero se pide confirmar.
+function requestSubmit(): void {
+  if (plannedOverlap.value) {
+    confirmOverlapOpen.value = true
+    return
+  }
+  handleSubmit()
+}
+
 async function handleSubmit(): Promise<void> {
+  confirmOverlapOpen.value = false
   const tenantId = session.activeTenantId
   const wait = selectedWait.value
   if (!tenantId || !branchId.value || !selectedEmployeeId.value || !wait) return
@@ -330,7 +383,7 @@ async function handleSubmit(): Promise<void> {
     // quede libre, y la cita queda "agendada" hasta entonces.
     const duration = totalDurationMinutes.value
     const startsAt =
-      wait.waitMinutes === 0
+      plannedSlot.value?.startsNow
         ? new Date()
         : fromBranchTime(branchToday(branchTimezone.value), wait.startsAt, branchTimezone.value)
     const endsAt = new Date(startsAt.getTime() + duration * 60_000)
@@ -586,6 +639,13 @@ async function handleSubmit(): Promise<void> {
                   {{ selectedWait.startsAt }} ({{ waitLabel(selectedWait.waitMinutes).toLowerCase() }}).
                 </template>
               </v-alert>
+              <v-checkbox
+                v-if="selectedWait && selectedWait.waitMinutes > 0"
+                v-model="startNowAnyway"
+                label="Atender ahora de todos modos (se encima con una cita)"
+                density="compact"
+                hide-details
+              />
             </template>
           </v-col>
         </v-row>
@@ -598,10 +658,35 @@ async function handleSubmit(): Promise<void> {
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="close">Cancelar</v-btn>
-        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="handleSubmit">
+        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="requestSubmit">
           Registrar visita
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Confirmación de traslape (C1.10). El aviso va en texto normal; el
+         amarillo solo acompaña como acento. -->
+    <v-dialog v-model="confirmOverlapOpen" max-width="460">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-alert" color="overlap" class="mr-2" />
+          Ya hay una cita
+        </v-card-title>
+        <v-card-text>
+          <p v-if="plannedOverlap">
+            Este empleado ya tiene una cita de las {{ plannedOverlap.startsAt }} a las
+            {{ plannedOverlap.endsAt }}. Si registras la visita ahora, puede alterar la
+            cronología de los eventos de su agenda.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="confirmOverlapOpen = false">Elegir otro</v-btn>
+          <v-btn color="primary" :loading="saving" @click="handleSubmit">
+            Registrar de todos modos
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>
