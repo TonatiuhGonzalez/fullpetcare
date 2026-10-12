@@ -6,6 +6,7 @@
 import { supabase } from './supabase'
 import type { MemberRole } from './memberships'
 import type { Database } from '@/types/database'
+import { friendlyEmployeeActionMessage } from '@/lib/employeeActions'
 
 // El generador de tipos (supabase gen types) marca los argumentos del RPC
 // como `string` a secas, no `string | null` — no sabe que Postgres acepta
@@ -245,6 +246,53 @@ export async function resetPassword(
   return { employeeEmail: data.employeeEmail, temporaryPassword: data.temporaryPassword }
 }
 
+/**
+ * Elimina (borrado suave) a un empleado: la RPC delete_employee() oculta su
+ * membresía y sus sucursales en una sola transacción. Pierde el acceso al
+ * negocio; sus citas atendidas, ventas y expediente se conservan (§8.5).
+ * La base rechaza (con mensaje en español) eliminarse a sí mismo, al último
+ * dueño y a quien tiene citas programadas.
+ */
+export async function remove(membershipId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_employee', { p_membership_id: membershipId })
+  if (error) {
+    throw new Error(
+      friendlyEmployeeActionMessage(
+        error,
+        'No se pudo eliminar al empleado. Revisa tu conexión.',
+      ),
+    )
+  }
+}
+
+/**
+ * Desactiva o reactiva el acceso de un empleado sin tocar el resto de su
+ * ficha (update() exige la ficha completa). Al desactivar, el trigger de la
+ * base rechaza a quien tiene citas programadas y dice cuántas.
+ */
+export async function setActive(membershipId: string, isActive: boolean): Promise<void> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .update({ is_active: isActive })
+    .eq('id', membershipId)
+    .select('id')
+
+  if (error) {
+    throw new Error(
+      friendlyEmployeeActionMessage(
+        error,
+        isActive
+          ? 'No se pudo activar al empleado. Revisa tu conexión.'
+          : 'No se pudo desactivar al empleado. Revisa tu conexión.',
+      ),
+    )
+  }
+  // RLS no marca error cuando no deja actualizar: simplemente no toca filas.
+  if (!data || data.length === 0) {
+    throw new Error('No se pudo actualizar el acceso del empleado. Revisa tus permisos.')
+  }
+}
+
 export interface EmployeeUpdateInput {
   fullName: string
   role: MemberRole
@@ -334,7 +382,16 @@ export async function update(
     .from('memberships')
     .update({ role: input.role, is_active: input.isActive })
     .eq('id', membershipId)
-  if (membershipError) throw membershipError
+  if (membershipError) {
+    // Al desactivar desde el formulario, el trigger de citas programadas
+    // explica por qué no se puede ("Tiene 2 citas programadas; ...").
+    throw new Error(
+      friendlyEmployeeActionMessage(
+        membershipError,
+        'No se pudo guardar el empleado. Revisa tu conexión.',
+      ),
+    )
+  }
 
   // El dueño ve todas las sucursales del tenant por rol, sin fila en
   // membership_branches (CLAUDE.md §6.1) — igual criterio que el RPC
