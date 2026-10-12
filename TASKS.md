@@ -2132,9 +2132,15 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
 
 ### C1E. Cierre
 
-- [ ] **C1.21** 🧪 Semilla y `demo:reset` (un cliente con correo repetido **no**; citas con horas válidas), E2E (agendar →
+- [x] **C1.21** 🧪 Semilla y `demo:reset` (un cliente con correo repetido **no**; citas con horas válidas), E2E (agendar →
   atender → cobrar) revisado porque ahora el pasado se rechaza: el flujo debe agendar **a una hora futura**, aunque se
   corra tarde. Correr `lint`, `vue-tsc -b`, `test:unit`, `test:db` y `test:e2e`. _Verificar:_ todo en verde.
+  **Hecho 2026-10-12** (rama `feat/c1-customer-with-pet`): `db:reset` aplica las 9 migraciones nuevas y la semilla sin
+  chocar con la regla del correo; `lint`, `vue-tsc`, `test:unit` (676) y `test:e2e` en verde (el E2E ya agendaba al
+  siguiente día hábil). `test:db`: 824 pasan; fallan `delete-customer-pet-rpc` (intermitente de siempre) y los tests de
+  Storage (`storage-rls`, `employee-documents-rls`, `feedback-service`) con `42P10` al subir archivos: la migración 72 del
+  contenedor de Storage de la CLI local quitó el índice único que su versión 1.73.1 usa en `ON CONFLICT`; es del
+  entorno local tras el `db:reset`, no de estos cambios (el CI, con base nueva, los corre en verde).
 - [x] **C1.22** 📚 Actualizar `CLAUDE.md` (§1 fase construida; §5.6 tooltips y color de aviso; §6.2 Clientes y la página
   de cliente; §6.3 el traslape ya no se rechaza; §7.6 (los empleados ahora entran en la contraseña temporal obligatoria al restablecerse); §3 la extensión
   `unaccent`; §4 estructura) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
