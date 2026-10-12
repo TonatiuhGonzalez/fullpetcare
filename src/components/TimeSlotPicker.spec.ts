@@ -91,6 +91,20 @@ describe('TimeSlotPicker', () => {
     expect(overlapChip.find('.mdi-alert').exists()).toBe(true)
   })
 
+  it('el chip con traslape lleva la clase que lo pinta amarillo aunque no esté elegido', () => {
+    // Vuetify ignora la prop `color` de un chip dentro de un grupo hasta que se elige:
+    // con `color="overlap"` el horario se veía gris y solo se ponía amarillo al
+    // seleccionarlo (se vio en el navegador). El amarillo va por clase propia; este test
+    // protege que esa clase siga en el chip no seleccionado y NO en los libres.
+    const wrapper = mountPicker({ slots: statusSlots, modelValue: null })
+    const chips = wrapper.findAll('.v-chip')
+    const overlapChip = chips.find((c) => c.text().includes('10:00'))!
+    const freeChip = chips.find((c) => c.text().includes('09:30'))!
+
+    expect(overlapChip.classes()).toContain('slot-chip--overlap')
+    expect(freeChip.classes()).not.toContain('slot-chip--overlap')
+  })
+
   it('al elegir un horario con traslape muestra el aviso con la cita que choca', () => {
     // Sin el aviso, la persona no sabría con qué cita se encima ni por qué el chip
     // es amarillo. Elegir un horario libre no debe mostrar ningún aviso.
