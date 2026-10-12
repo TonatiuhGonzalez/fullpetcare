@@ -38,7 +38,8 @@ visita) **y la pantalla de Inicio** (§5.6). **Ya construido (fase 17): estados 
 (Correcciones 1, 2026-10-12, PLAN.md D26): 12 observaciones de uso** — cliente nuevo con su
 mascota desde la cita, horarios que avisan el traslape, página de cliente, búsquedas sin
 acentos, validaciones de correo y de fecha, acciones de empleados y tooltips (§5.6, §6.2,
-§6.3, §7.6).
+§6.3, §7.6). **Ya construido (fase 25, PLAN.md D28): el calendario de la Agenda con la
+identidad visual** (bloques tonales, marco de tarjeta, barra de fecha única, §5.6).
 
 Reglas de esta etapa:
 
@@ -228,6 +229,7 @@ FullPetCare/
     │   ├── appointmentErrors.ts #   mensajes de las reglas de fecha y hora de una cita y aviso de traslape (§6.3)
     │   ├── customerErrors.ts    #   correo repetido y otros rechazos al guardar un cliente (§6.2)
     │   ├── visitKind.ts         #   tipo de visita → nombre, ícono y color (§5.6)
+    │   ├── agendaStatus.ts      #   estado que muestra la agenda → nombre, ícono y color (§5.6)
     │   ├── contentWidth.ts      #   ancho del contenido: ancho (listados) y angosto (formularios), §5.6
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
@@ -329,8 +331,10 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   un color nuevo que no cumpla rompe el test. No se agrega un color sin su `on-*`.
 - **Tipo de visita = color + ícono + texto.** Estética es `grooming` (naranja) y veterinaria
   es `veterinary` (azul), de la paleta Okabe-Ito (se distingue con daltonismo). **El color
-  nunca va solo.** La fuente única es `lib/visitKind.ts`; se muestra con `VisitKindChip`, y en
-  el calendario como franja + ícono (`components/calendarEvents.ts`). No se repiten
+  nunca va solo, salvo en el bloque del calendario de la Agenda**, donde el tipo es solo la franja de color y su
+  nombre va en el tooltip (el ícono sería redundante; la leyenda de arriba lo explica con ícono y texto).
+  La fuente única es `lib/visitKind.ts`; se muestra con `VisitKindChip` y, en el calendario, como franja
+  (`components/calendarEvents.ts`). No se repiten
   "Estética"/"Veterinaria" a mano. Para no confundirlos, el azul y el naranja **no se usan para
   otra cosa**: "Agendada" y el peso en el historial son gris pizarra (`secondary`), no `info`.
 - **Ancho del contenido (fase 24, PLAN.md D27):** hay dos anchos, definidos en `lib/contentWidth.ts`. El default de
@@ -358,6 +362,14 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   rápidos ("Nueva cita", "Llegada sin cita") abren su diálogo **sobre Inicio** (`HomePage` los
   monta; la sucursal y la fecha vienen de `stores/agenda`) y, al guardar, la persona se queda en
   Inicio y el resumen se recarga: ya no se navega a la Agenda.
+- **Calendario de la Agenda (fase 25, PLAN.md D28):** cada cita es un bloque **tonal** (fondo = el color del
+  estado al 16 % sobre `surface`, `TONAL_WEIGHT` en `lib/calendarGrid.ts`; `palette.spec.ts` mide su contraste) con
+  borde del color del estado, punteado en cancelada y "no se presentó". El estado sale de `lib/agendaStatus.ts` (nombre,
+  ícono y color; no se repite en la página). **El bloque no lleva íconos** (decisión del usuario, 2026-10-12): solo
+  hora, mascota y cliente, y estado, tipo, origen y empleado van en el tooltip; la leyenda sí usa los íconos del
+  estado. Nunca emojis. Los estilos de los bloques viven en `styles/main.scss` (`ec-status-*`, `ec-kind-*`),
+  no en cada componente. La Agenda va en una `v-card` con barra única (`‹ Hoy ›` y la fecha escrita, que abre un
+  `v-date-picker`).
 - **Aviso de traslape (Correcciones 1):** token `overlap` en la paleta (amarillo Okabe-Ito
   `#F0E442`, con `on-overlap` oscuro; en tema oscuro, mismo tono con su `on-`). Solo marca "este
   horario se encima con otra cita del mismo empleado": **nunca va solo**, siempre con el ícono
