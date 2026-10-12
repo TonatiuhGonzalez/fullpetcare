@@ -1920,6 +1920,222 @@ Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni
   **Qué se puede demostrar:** navegar con la red lenta y ver siluetas en lugar de pantallas vacías, la barra de arriba al cambiar de pantalla, y el aviso de versión nueva si una pantalla no baja tras un despliegue.
   **Sin cubrir:** Firefox y Safari (solo Chromium), el Slow 3G real de DevTools y la pantalla en blanco al recargar con F5 (fuera de alcance de la fase).
 
+## Correcciones 1 — Observaciones de uso: citas, clientes, empleados e inventario
+
+**Meta: atender las 12 observaciones que salieron de usar el sistema (agendar sin salir de Inicio, cliente y mascota
+en un solo lugar, horarios que avisan en vez de ocultarse, búsquedas sin acentos y validaciones de correo y de fecha).**
+Primera fase de **correcciones** de la **etapa de mejoras** (`CLAUDE.md` §1). Su nombre es "Correcciones 1" y no un
+número porque no agrega producto nuevo: corrige y completa lo ya construido. Sin servicio externo ni dependencia npm
+nueva; sí una **extensión de Postgres** (`unaccent`, aprobada el 2026-10-12).
+
+**Estado: planeada, decisiones y pendientes resueltos con el usuario el 2026-10-12; aún no se construye.** Decisiones y alternativas
+en `PLAN.md` D26. Las tareas se numeran `C1.n` para no chocar con las fases 18 a 23 (propuestas).
+
+### Observaciones y decisiones (acordadas el 2026-10-12)
+
+| #   | Observación                                  | Decisión                                                                                                                                                                                  |
+| --- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Cliente nuevo al crear una cita              | Modal **sobre** el formulario de la cita. Cliente: nombre, apellido y teléfono. **La mascota se da de alta ahí mismo y es obligatoria** (todos sus campos, una a la vez).                  |
+| 2   | Inicio no debe cambiar de vista              | "Nueva cita" y "Llegada sin cita" abren su diálogo **encima de Inicio**; al guardar se queda en Inicio y refresca el resumen. En la Agenda no cambia nada.                                |
+| 3   | Rol en el selector de empleado               | Chip con el rol en español (Dueño, Recepción, Groomer, Veterinario) en cada opción.                                                                                                       |
+| 4   | Horarios: deshabilitar y avisar de traslape  | **Pasado: deshabilitado.** **Ocupado por otra cita del mismo empleado: se puede elegir**, con chip amarillo y advertencia (solo informa, sin tope de minutos, sin confirmación).           |
+| 5   | Clientes: sin dividir cliente/mascota        | Una tabla de clientes con las mascotas como chips; **se quita la pestaña Mascotas**. Al presionar un cliente se abre la página `/app/clientes/:id` (ver "Página de cliente").              |
+| 6   | Mascota al crear un cliente                  | Una sola, **obligatoria**, con todos sus campos, en **todos** los lugares donde se da de alta un cliente (Clientes, nueva cita y punto de venta). Más mascotas se agregan después.        |
+| 7   | Tooltips                                     | En los botones de ícono sin texto (31 hoy, inventario abajo). Solo en navegador de escritorio.                                                                                           |
+| 8   | Inventario como tabla                        | `v-data-table`: Nombre, Clave, Categoría, Precio, Existencia, Estado y Acciones; **todas las columnas de datos ordenables**; paginación igual que `/app/servicios`.                         |
+| 9   | Acciones para empleados                      | Columna "Acciones" en `/app/empleados`: editar, desactivar/activar, eliminar y restablecer contraseña. Con citas programadas no se desactiva ni se elimina (igual que una sucursal).      |
+| 10  | Búsqueda sin acentos                         | En **todos** los buscadores, sin distinguir mayúsculas ("Jose" encuentra "José" y al revés). **Lo resuelve la base**, no el navegador.                                                    |
+| 11  | Validar el correo al registrar un cliente    | Formato **y** que no esté ya registrado en el negocio. Sigue siendo opcional. En alta, edición y punto de venta. Solo se valida **cuando el correo cambia**.                              |
+| 12  | Validar fecha y hora de la cita              | Se rechaza: pasado (**sin tolerancia**), fuera del horario de la sucursal, día cerrado y fin antes del inicio. **Solo al crear y reprogramar.** En el formulario **y** en la base.       |
+
+**Página de cliente (observación 5, acordada el 2026-10-12).** Ruta `/app/clientes/:id`, solo dueño y recepción.
+Solo lectura, con un botón "Editar" que edita **cliente y mascota**. Layout en dos filas:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Cliente: nombre, teléfono, correo, notas, datos fiscales  [Editar]   │
+├────────────────────┬──────────────────────┬─────────────────────────┤
+│ Mascotas           │ Información de la    │ Cartilla de vacunación  │
+│ (tarjetas)         │ mascota elegida      │ (tabla del catálogo)    │
+│ + Agregar mascota  │ (+ gráfica de peso   │ + Registrar vacuna      │
+│                    │  y link compartir)   │                         │
+└────────────────────┴──────────────────────┴─────────────────────────┘
+```
+
+En móvil todo son tarjetas, una debajo de otra. La gráfica de peso y el link para compartir **se conservan**, dentro
+de la información de la mascota. Las acciones de editar y eliminar del cliente **se quedan en la tabla**.
+
+**Pendientes resueltos el 2026-10-12** (alternativas en `PLAN.md` D26):
+
+1. **Llegada sin cita:** el traslape **avisa** y el trabajador decide si lo acepta o no; el aviso dice que ya hay una
+   cita y que aceptar puede alterar la cronología de eventos. Pide una **confirmación** (a diferencia de agendar, donde
+   el aviso es solo visual). Su ventana de "pasado" de 10 minutos no cambia.
+2. **Reprogramar:** también permite el traslape con aviso, igual que agendar.
+3. **Horarios fuera del horario laboral:** no se muestran (como hoy). Solo los pasados y los ocupados del horario de la
+   sucursal aparecen deshabilitados o en amarillo.
+4. **Eliminar mascota:** desde su tarjeta en la página de cliente.
+5. **Botón "Editar" de la página de cliente:** abre los modales de cliente y de mascota que ya existen.
+6. **Empleados:** la fila deja de abrir el formulario al presionarla; se edita con el ícono (como Clientes, fase 14).
+7. **Restablecer contraseña de un empleado:** temporal, que se muestra una sola vez, con cambio obligatorio (como los
+   dueños, §7.6).
+
+**Avance de la ola 1 (2026-10-12).** Construida en cinco ramas desde `develop` y probada junta en
+`integration/c1-wave1` (sin push ni PR): `feat/c1-palette-and-availability` (C1.8, C1.9), `feat/c1-inventory-table`
+(C1.17), `feat/c1-employee-password-reset` (C1.7), `feat/c1-db-rules` (C1.2 a C1.6 y la reactivación de empleados,
+D26 punto 8) y `feat/c1-customer-page` (C1.15, C1.16). **Verificado en la rama combinada:** `vue-tsc -b` limpio, 619
+tests unitarios en verde, ESLint sin errores en lo tocado, `db:reset` con todas las migraciones y la semilla, y
+`test:db` con las Edge Functions sirviéndose: 822 pasan y 1 falla, el que ya fallaba en `develop`
+(`delete-customer-pet-rpc`: cuenta expediente de Rocky y crece con lo que dejan otros tests). Los tests de la función de
+reset de contraseña (11) y de reactivación (8) pasan. **Verificado en navegador** (Chromium, dueño, recepción y groomer,
+datos de la semilla): inventario en tabla, orden de las columnas de datos, paginación, búsqueda y menú de acciones;
+tabla de clientes con chips, la fila abre la página, los botones no navegan, "Cliente no encontrado", recepción sin
+"Registrar vacuna", el groomer no entra, y 390 px sin desborde de la página. **No verificado:** cliente con 0 y con 3
+mascotas (la semilla trae clientes con 1 y 2), tema oscuro, Firefox y Safari, el E2E completo (C1.21), y a 1100 px la
+tarjeta de la cartilla se desplaza unos píxeles en horizontal. Los íconos salieron como cuadros en las capturas por la
+fuente de íconos del navegador desechable, no por estos cambios.
+
+**Piezas que aún nadie usa (a propósito):** el token `overlap` de la paleta, `computeSlotStatuses` de
+`lib/availability.ts` y las RPC `create_customer_with_pet`, `search_customers`, `search_pets`, `search_products` y
+`delete_employee`; se conectan en C1.10 a C1.14, C1.18 y C1.20.
+
+### C1A. Preparación
+
+- [x] **C1.1** 📚 Revisar y aprobar `PLAN.md` D26 y resolver los pendientes de arriba. _Verificar:_ el usuario aprobó por
+  escrito; D26 sin "propuesta" ni "pendiente".
+  **Hecho 2026-10-12:** el usuario aprobó D26 por escrito. Las 12 observaciones quedaron en el backlog del proyecto
+  FullPetCare del sistema de seguimiento, sin asignación y sin etiquetas: #2309 (1, cliente nuevo en la cita), #2310
+  (2, quedarse en Inicio), #2311 (3, puesto del trabajador), #2312 (4, horarios y traslape), #2313 (5, vista de
+  cliente), #2314 (6, mascota al alta), #2315 (7, mensajes de ayuda), #2316 (8, inventario en tabla), #2317 (9,
+  empleados), #2318 (10, búsqueda sin acentos), #2319 (11, correo) y #2320 (12, fecha y hora).
+
+### C1B. Base de datos (migraciones aditivas; ninguna editada, §8.1)
+
+- [x] **C1.2** 🧪 Reglas de fecha y hora y traslape en `create_appointment()` y `reschedule_appointment()`
+  (`CREATE OR REPLACE`, migración nueva). **Se quita** el rechazo "Este empleado ya tiene una cita en ese horario" y
+  **se agregan**: inicio en el pasado (sin tolerancia, contra `now()` de la base), fin ≤ inicio, día cerrado y fuera del
+  horario de la sucursal (en su zona IANA, §8.3). Se conservan membresía, rol que atiende y snapshots. _Verificar:_ test
+  de base por cada regla y por sus bordes (empieza este mismo minuto, termina justo al cierre, empieza justo a la
+  apertura, una cita termina cuando otra empieza, Tijuana y Mérida); hoy `appointments-service.spec.ts` espera que el
+  traslape se rechace y **cambia de sentido**. Revisar que la semilla, `demo:reset` y los tests existentes no agenden en el
+  pasado por la RPC. **Ojo:** `create_walk_in_appointment()` llama a `create_appointment()`: el traslape tampoco se
+  rechaza ahí (la confirmación es de la interfaz, C1.10), pero **conserva su ventana de pasado de 10 minutos**, que no
+  debe heredar la regla "sin tolerancia"; su test de traslape cambia de sentido.
+- [x] **C1.3** 🧪 Correo único por negocio: trigger `BEFORE INSERT OR UPDATE OF email` en `customers` que rechaza un
+  correo ya usado por otro cliente **no eliminado** del mismo negocio, sin distinguir mayúsculas ni espacios, **solo si
+  el correo cambia** (los duplicados que ya existen no bloquean otras ediciones). Con índice sobre `lower(email)` para
+  que no sea una búsqueda lenta. _Verificar:_ test de base: duplicado en alta y en edición, mayúsculas, cliente eliminado
+  (se puede reusar), otro negocio (se puede), editar el teléfono de un cliente con correo ya duplicado (pasa), y un
+  correo vacío o nulo (nunca choca).
+- [x] **C1.4** 🧪 RPC `create_customer_with_pet()`: da de alta el cliente **y** su mascota en una sola transacción
+  (`SECURITY DEFINER`, revalida membresía y rol dueño o recepción, §7.3.4). _Verificar:_ test de base: si la mascota es
+  inválida **no queda el cliente**; groomer, vet y otro negocio rechazados; el correo repetido (C1.3) la hace fallar
+  completa.
+- [x] **C1.5** 🧪 Búsqueda sin acentos: `CREATE EXTENSION unaccent` (esquema `extensions`), función `app.search_norm()`
+  (`IMMUTABLE`, minúsculas y sin acentos) y RPC `search_customers()`, `search_pets()` y `search_products()` con la
+  seguridad de quien llama (RLS), que respetan el criterio de hoy de cada pantalla. _Verificar:_ test de base: "jose"
+  encuentra "José", "JOSÉ" encuentra "jose", la ñ no se confunde con la n, otro negocio no aparece, un cliente eliminado
+  no aparece y el término vacío devuelve todo.
+- [x] **C1.6** 🧪 Empleados: RPC `delete_employee()` (borrado suave de la membresía y de sus sucursales, revalida
+  `employees:edit`, no se puede eliminar a uno mismo ni al último dueño) y un trigger que **impide desactivar o eliminar**
+  a quien tiene citas programadas. _Verificar:_ test de base: con y sin citas programadas, citas completadas (no
+  bloquean), uno mismo, último dueño, recepción sin permiso y otro negocio.
+  **Pendiente acordado el 2026-10-12 (PLAN D26 punto 8):** que volver a dar de alta a un empleado eliminado
+  **reactive** su membresía en vez de rechazarla con "Esta persona ya tiene acceso" (hoy `create_employee_membership`
+  la rechaza porque `unique (tenant_id, user_id)` incluye las eliminadas). Test: alta, eliminar, alta otra vez.
+
+### C1C. Edge Function
+
+- [x] **C1.7** 🧪 Restablecer la contraseña de un empleado desde `invite-employee` (solo `employees:edit`; se revalida
+  con el JWT de quien llama **antes** de usar `service_role`, igual que el alta). _Verificar:_ test de función
+  (`*-function.spec.ts`): dueño sí; recepción sin permiso y otro negocio no; la contraseña no se guarda ni se registra
+  en ningún lado; queda en la bitácora; cierra las sesiones del empleado, y su perfil queda con cambio de contraseña obligatorio (§7.6: hoy los empleados
+  quedan fuera de ese mecanismo; se amplía solo para este restablecimiento).
+
+### C1D. Interfaz
+
+- [x] **C1.8** Paleta: un color de **aviso de traslape** (amarillo, distinto del naranja de estética y del `warning`
+  actual) con su `on-*`, en claro y oscuro, en `lib/palette.ts` y registrado en `plugins/vuetify.ts`. El usuario
+  revisará los valores después. _Verificar:_ `lib/palette.spec.ts` (contraste AA 4.5:1 en ambos temas) en verde; el color
+  nunca va solo: lleva ícono y texto (§5.6).
+- [x] **C1.9** 🧪 `lib/availability.ts`: en vez de **omitir** los huecos ocupados, devuelve **todos** con un estado
+  (`free`, `overlap` y `past`; lo que cae fuera del horario de la sucursal sigue sin mostrarse) y, para `overlap`, con
+  qué cita choca. Recibe
+  la hora actual **de la sucursal** como argumento (sigue siendo pura, sin reloj). _Verificar:_ tests unitarios: hueco
+  pasado, de hoy a media hora, traslape parcial por minutos, traslape total, citas de otro empleado (no cuentan),
+  cita que termina cuando otro empieza (no traslapa), día cerrado y duración 0.
+- [ ] **C1.10** Selector de horarios y empleado en `NewAppointmentDialog`/`TimeSlotPicker`: chips `past` deshabilitados,
+  `overlap` en amarillo con ícono y el aviso "Este horario se traslapa con la cita de las 10:00 a las 10:45" al elegirlo;
+  la fecha no permite días pasados; cada empleado con su chip de rol; el mensaje de error al guardar distingue pasado,
+  fuera de horario y día cerrado. **Llegada sin cita (`WalkInDialog`):** al elegir un hueco que se traslapa, avisa que
+  ya hay una cita y que aceptar puede alterar la cronología, y pide **confirmar** o elegir otro. _Verificar:_ en navegador, claro y oscuro, escritorio y móvil de 390 px; test del
+  componente `TimeSlotPicker` (ya existe `TimeSlotPicker.spec.ts`).
+- [ ] **C1.11** Alta de cliente con su mascota (modal): componente nuevo que usa `create_customer_with_pet()`; se abre
+  sobre la nueva cita y la deja con el cliente y la mascota ya elegidos. Se usa también en Clientes y en el punto de
+  venta (que hoy usa `CustomerFormDialog`). _Verificar:_ en navegador: sin mascota no deja guardar; correo repetido
+  avisa; tras guardar, la cita queda lista para elegir servicios.
+- [ ] **C1.12** Inicio: `NewAppointmentDialog` y `WalkInDialog` se montan en `HomePage`; al guardar se queda en Inicio y
+  recarga el resumen. Los diálogos leen sucursal y fecha de `stores/agenda`, que hoy solo inicializa la Agenda: Inicio
+  debe inicializarla (o recibirlas por props). Se retira el `?accion=` que ya nadie usa. _Verificar:_ en navegador, como
+  dueño y recepción: la URL no cambia de `/app/inicio` y el contador "por cobrar" se actualiza; groomer y vet no ven los
+  botones.
+- [ ] **C1.13** Reprogramar (`AppointmentDialog`, `AppointmentDetailPage`): fecha mínima hoy y las mismas reglas y
+  avisos que agendar. _Verificar:_ en navegador: pasado, fuera de horario y día cerrado se rechazan con mensaje claro.
+- [ ] **C1.14** Correo: `isValidEmail` y mensaje "Este correo ya está registrado" en alta, edición y punto de venta;
+  el error de la base se traduce a ese mensaje (§5.4). _Verificar:_ en navegador; el correo vacío sigue permitido.
+- [x] **C1.15** Clientes: una sola tabla (Nombre, Teléfono, Correo, **Mascotas** como chips con el ícono de su especie,
+  Acciones); se retira la pestaña Mascotas (`PetsPanel.vue` se conserva sin uso, como acordó D19) y la fila abre la
+  página del cliente. **Revierte la decisión 2 de la fase 14** ("la fila no abre nada"). _Verificar:_ en navegador
+  como dueño y recepción; groomer y vet siguen sin entrar.
+- [x] **C1.16** Página de cliente `/app/clientes/:id` con el layout de arriba, mascota elegida, cartilla y "+ Agregar
+  mascota", "Editar" que abre `CustomerEditDialog` y `PetEditDialog`, eliminar mascota desde su tarjeta (con
+  `ConfirmDeleteDialog`), reutilizando lo de `PetEditDialog` (gráfica de peso, compartir, cartilla) sin duplicarlo. _Verificar:_ en
+  navegador: cliente con 0, 1 y 3 mascotas, en claro y oscuro y en móvil sin desborde; un id de otro negocio muestra
+  "no encontrado" (RLS).
+- [x] **C1.17** Inventario en tabla: `v-data-table` con las columnas de la decisión 8, todas ordenables y paginación
+  como `/app/servicios` (10/25/50/100/Todos); el menú de acciones (compra, ajuste, editar, activar) se conserva; con
+  `TableSkeleton` en la primera carga (§5.6). _Verificar:_ en navegador: ordenar cada columna, paginar, buscar, sin
+  salto de diseño (CLS ≈ 0).
+- [ ] **C1.18** Empleados: columna "Acciones" con editar, desactivar/activar, eliminar y restablecer contraseña,
+  confirmación en las destructivas y la contraseña temporal mostrada **una sola vez** (`TemporaryPasswordDialog` ya
+  existe); la fila deja de abrir el formulario. _Verificar:_ en navegador como dueño; con citas programadas el desactivar y el eliminar explican por qué no.
+- [ ] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
+  tienen ninguno) y migración de los 31 botones de abajo. Solo con puntero (`hover: hover`), no en táctil. _Verificar:_ en
+  navegador, cada uno muestra su texto al pasar el mouse y con el teclado (foco); en móvil no estorba.
+- [ ] **C1.20** Conectar los buscadores a la base (`search_customers`, `search_pets`, `search_products`): Clientes,
+  mascotas, nueva cita, llegada sin cita, Inventario, punto de venta y empresas del superadmin. Se conserva el escáner de
+  código de barras (coincidencia exacta de `sku`). _Verificar:_ en navegador, en cada pantalla, "jose" encuentra "José";
+  los tests existentes de `lib/petSearch.ts`, `lib/productSearch.ts` y `services/customers.ts` se actualizan o se retiran
+  con su código.
+
+### C1E. Cierre
+
+- [ ] **C1.21** 🧪 Semilla y `demo:reset` (un cliente con correo repetido **no**; citas con horas válidas), E2E (agendar →
+  atender → cobrar) revisado porque ahora el pasado se rechaza: el flujo debe agendar **a una hora futura**, aunque se
+  corra tarde. Correr `lint`, `vue-tsc -b`, `test:unit`, `test:db` y `test:e2e`. _Verificar:_ todo en verde.
+- [ ] **C1.22** 📚 Actualizar `CLAUDE.md` (§1 fase construida; §5.6 tooltips y color de aviso; §6.2 Clientes y la página
+  de cliente; §6.3 el traslape ya no se rechaza; §7.6 (los empleados ahora entran en la contraseña temporal obligatoria al restablecerse); §3 la extensión
+  `unaccent`; §4 estructura) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+### Inventario de tooltips (C1.19, propuesta del 2026-10-12)
+
+31 botones con solo ícono (revisados en `src/`; los demás ya llevan texto). Texto propuesto:
+
+| Pantalla o componente            | Botones                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `AppLayout`                      | Ayuda → "Ayuda"; botón flotante de venta de mostrador → "Venta de mostrador"                                              |
+| `AgendaPage`                     | Flechas del día → "Día anterior" y "Día siguiente"                                                                         |
+| `CustomersPage`                  | Lápiz → "Editar cliente"; bote → "Eliminar cliente"                                                                        |
+| `PetsPanel`                      | Lápiz → "Editar mascota"; bote → "Eliminar mascota" (queda sin uso con C1.15; se migra por si se reutiliza)                |
+| `CatalogPage`                    | Lápiz → "Editar servicio"; bote → "Eliminar servicio"                                                                      |
+| `InventoryPage`                  | Tres puntos → "Acciones del producto"                                                                                      |
+| `ProductCategoriesDialog`        | Lápiz → "Editar categoría"                                                                                                 |
+| `AppointmentDialog` (cobro)      | Quitar pago → "Quitar pago"; agregar pago → "Agregar pago"                                                                 |
+| `CheckoutPage`                   | Quitar producto, agregar producto, quitar pago y agregar pago (4)                                                          |
+| `AppointmentProductsPanel`       | Quitar producto → "Quitar producto"; agregar → "Agregar producto"                                                          |
+| `PointOfSalePage`                | Menos → "Quitar una pieza"; más → "Agregar una pieza"; bote → "Quitar producto"; cerrar → "Quitar pago"; más → "Agregar pago" |
+| Diálogos de cliente y de mascota | Cerrar → "Cerrar" (`CustomerDetailDialog`, `CustomerEditDialog`, `PetDetailDialog`, `PetEditDialog`, `TenantDetailDialog`) |
+| Superadmin                       | `AdminsPage` → "Quitar superadmin"; `PlansPage` y `ReasonsPage` → "Renombrar"                                              |
+
 ## Fase 18 — Suscripción modular: motor de derechos (planeada)
 
 **Meta: que lo que una empresa puede usar dependa de los módulos que contrató, y que lo imponga la base y no solo la
