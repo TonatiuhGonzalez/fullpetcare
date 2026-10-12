@@ -113,6 +113,83 @@ export function computeAvailableSlots({
   return slots
 }
 
+export type SlotStatus = 'free' | 'overlap' | 'past'
+
+export interface SlotWithStatus {
+  startsAt: string
+  endsAt: string
+  status: SlotStatus
+  /** Solo con `status === 'overlap'`: la primera cita del mismo empleado con la que choca. */
+  conflict?: { startsAt: string; endsAt: string }
+}
+
+export interface ComputeSlotStatusesArgs extends ComputeAvailableSlotsArgs {
+  /** Día de los huecos, 'YYYY-MM-DD' (fecha local de la sucursal). */
+  date: string
+  /** Ahora mismo en la sucursal. Se recibe como argumento: la función no lee el reloj. */
+  now: { date: string; time: string }
+}
+
+/**
+ * Igual que `computeAvailableSlots` (misma rejilla, mismo criterio de cierre), pero
+ * NO oculta nada: devuelve todos los huecos con su estado para que la interfaz
+ * pueda mostrar los ocupados deshabilitados y explicar por qué.
+ *
+ * - `past`: el inicio es anterior a la hora actual (sin tolerancia; justo ahora
+ *   todavía es elegible). Fecha anterior a hoy: todos; posterior: ninguno. Gana
+ *   sobre `overlap`: un hueco pasado no se puede elegir de todos modos.
+ * - `overlap`: choca con una cita del MISMO empleado (extremos que se tocan, no).
+ * - `free`: el resto.
+ *
+ * Comparar 'YYYY-MM-DD' como texto funciona porque el formato ordena igual que
+ * el calendario.
+ */
+export function computeSlotStatuses({
+  branchHours,
+  existingAppointments,
+  employeeId,
+  durationMinutes,
+  stepMinutes,
+  date,
+  now,
+}: ComputeSlotStatusesArgs): SlotWithStatus[] {
+  if (!branchHours) return []
+  if (durationMinutes <= 0) return []
+  if (stepMinutes <= 0) return []
+
+  const opensAt = parseMinutes(branchHours.opensAt)
+  const closesAt = parseMinutes(branchHours.closesAt)
+
+  const busyRanges = existingAppointments
+    .filter((a) => a.employeeId === employeeId)
+    .map((a) => ({ start: parseMinutes(a.startsAt), end: parseMinutes(a.endsAt), raw: a }))
+
+  const nowMinutes = parseMinutes(now.time)
+  const slots: SlotWithStatus[] = []
+
+  for (let start = opensAt; start + durationMinutes <= closesAt; start += stepMinutes) {
+    const end = start + durationMinutes
+    const slot: SlotWithStatus = {
+      startsAt: formatMinutes(start),
+      endsAt: formatMinutes(end),
+      status: 'free',
+    }
+
+    const isPast = date < now.date || (date === now.date && start < nowMinutes)
+    const conflict = busyRanges.find((busy) => overlaps(start, end, busy.start, busy.end))
+
+    if (isPast) {
+      slot.status = 'past'
+    } else if (conflict) {
+      slot.status = 'overlap'
+      slot.conflict = { startsAt: conflict.raw.startsAt, endsAt: conflict.raw.endsAt }
+    }
+    slots.push(slot)
+  }
+
+  return slots
+}
+
 // Claves de branches.opening_hours (jsonb), una por día de la semana —
 // el mismo día que devuelve Date.getDay() en JS (0 = domingo). Cada
 // valor es un BranchHours o null (cerrado ese día).
