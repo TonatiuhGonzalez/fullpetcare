@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest'
 import {
   computeAvailableSlots,
   computeSlotStatuses,
+  findOverlap,
+  fitsWithinHours,
   hoursForDate,
   type ExistingAppointment,
 } from './availability'
@@ -348,5 +350,74 @@ describe('computeSlotStatuses', () => {
     expect(computeSlotStatuses({ ...base, branchHours: null })).toEqual([])
     expect(computeSlotStatuses({ ...base, durationMinutes: 0 })).toEqual([])
     expect(computeSlotStatuses({ ...base, stepMinutes: 0 })).toEqual([])
+  })
+})
+
+describe('findOverlap', () => {
+  const busy = (startsAt: string, endsAt: string, employeeId = EMPLOYEE): ExistingAppointment => ({
+    employeeId,
+    startsAt,
+    endsAt,
+  })
+  const args = { employeeId: EMPLOYEE, startsAt: '10:00', endsAt: '11:00' }
+
+  it('sin citas no hay traslape', () => {
+    // Un empleado sin nada ese dia: reprogramar no debe mostrar aviso alguno.
+    expect(findOverlap({ ...args, existingAppointments: [] })).toBeNull()
+  })
+
+  it('extremos que se tocan no cuentan como traslape', () => {
+    // 09:00-10:00 y 11:00-12:00 comparten solo el instante de cambio. Si contaran, el
+    // aviso saldria en citas pegadas, que son lo normal en una agenda llena.
+    const existing = [busy('09:00', '10:00'), busy('11:00', '12:00')]
+    expect(findOverlap({ ...args, existingAppointments: existing })).toBeNull()
+  })
+
+  it('un traslape parcial de pocos minutos se detecta', () => {
+    // La otra cita termina 15 min despues de que empieza la nueva: es un choque real.
+    const clash = busy('09:30', '10:15')
+    expect(findOverlap({ ...args, existingAppointments: [clash] })).toEqual(clash)
+  })
+
+  it('una cita que cubre todo el horario o queda dentro de el se detecta', () => {
+    // Contenida en un sentido y en el otro: ambas formas de encimarse.
+    const wide = busy('08:00', '12:00')
+    const inside = busy('10:15', '10:45')
+    expect(findOverlap({ ...args, existingAppointments: [wide] })).toEqual(wide)
+    expect(findOverlap({ ...args, existingAppointments: [inside] })).toEqual(inside)
+  })
+
+  it('las citas de otro empleado no cuentan', () => {
+    // Dos empleados pueden atender a la misma hora; avisar de la cita ajena seria ruido.
+    const other = busy('10:00', '11:00', OTHER_EMPLOYEE)
+    expect(findOverlap({ ...args, existingAppointments: [other] })).toBeNull()
+  })
+
+  it('con varias en conflicto devuelve la primera', () => {
+    // El aviso nombra una sola cita; debe ser estable (la primera de la lista).
+    const first = busy('09:30', '10:30')
+    const second = busy('10:30', '11:30')
+    expect(findOverlap({ ...args, existingAppointments: [first, second] })).toEqual(first)
+  })
+})
+
+describe('fitsWithinHours', () => {
+  const hours = { opensAt: '09:00', closesAt: '18:00' }
+
+  it('acepta una cita que termina justo al cierre o empieza justo a la apertura', () => {
+    // Los bordes del horario son validos; rechazarlos impediria usar la ultima hora.
+    expect(fitsWithinHours(hours, '09:00', 60)).toBe(true)
+    expect(fitsWithinHours(hours, '17:00', 60)).toBe(true)
+  })
+
+  it('rechaza una cita que empieza antes o termina despues del horario', () => {
+    // Empezar a las 8:59 o pasarse un minuto del cierre dejaria la cita fuera de servicio.
+    expect(fitsWithinHours(hours, '08:59', 30)).toBe(false)
+    expect(fitsWithinHours(hours, '17:30', 31)).toBe(false)
+  })
+
+  it('un dia cerrado nunca cabe', () => {
+    // branchHours nulo = la sucursal no abre ese dia.
+    expect(fitsWithinHours(null, '10:00', 30)).toBe(false)
   })
 })
