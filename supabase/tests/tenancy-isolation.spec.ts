@@ -105,6 +105,13 @@ describe('Membresía inactiva', () => {
     // instante, sin esperar a que caduque una sesión.
     await withTransaction(async (client) => {
       await setRole(client, 'service_role')
+      // Desde C1.6 la base impide desactivar a quien tiene citas programadas; otros tests
+      // de la suite dejan alguna confirmada, así que se cancelan antes (este test prueba
+      // el corte de acceso, no esa regla).
+      await client.query(
+        "update appointments set status = 'cancelled' where employee_user_id = $1 and status = 'scheduled'",
+        [USER_GROOMER],
+      )
       await client.query('update memberships set is_active = false where user_id = $1', [
         USER_GROOMER,
       ])

@@ -15,6 +15,7 @@ import { supabase } from '@/services/supabase'
 import { sumLineItems } from '@/lib/money'
 
 import { BRANCH_CENTRO, CUSTOMER_SOFIA, PET_ROCKY, SERVICE_BANO, TENANT_PATITAS, USER_GROOMER } from './fixtures'
+import { futureDateAtUtc, WEEKDAY } from './schedule-dates'
 
 const DUENO_EMAIL = 'dueno@patitasfelices.mx'
 const DUENO_PASSWORD = 'Demo1234!'
@@ -93,8 +94,10 @@ describe('services/checkout.ts contra Supabase local', () => {
       petId: PET_ROCKY,
       kind: 'grooming',
       employeeUserId: USER_GROOMER,
-      startsAt: new Date(`2027-04-${String(day).padStart(2, '0')}T15:00:00Z`),
-      endsAt: new Date(`2027-04-${String(day).padStart(2, '0')}T16:00:00Z`),
+      // Un miércoles distinto por prueba (semana a semana), siempre futuro y dentro
+      // del horario: desde C1.2 la base rechaza pasado y días cerrados.
+      startsAt: futureDateAtUtc(WEEKDAY.wednesday, 15, 0, 21 + 7 * day),
+      endsAt: futureDateAtUtc(WEEKDAY.wednesday, 16, 0, 21 + 7 * day),
       services: [{ serviceId: SERVICE_BANO, quantity: 2 }],
     })
     createdAppointmentIds.push(appointment.id)

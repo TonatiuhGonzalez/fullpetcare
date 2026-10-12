@@ -455,6 +455,16 @@ describe('report_staff_activity', () => {
       const appt = await seedAppointment(client, USER_GROOMER)
       await seedSale(client, [bano({ appointmentId: appt })])
       await setRole(client, 'service_role')
+      // Desde C1.6 no se puede dar de baja a quien tiene citas programadas: la cita
+      // de la venta ya se atendió (completada) y cualquier otra se cancela.
+      await client.query(
+        `update appointments set status = 'completed' where id = $1`,
+        [appt],
+      )
+      await client.query(
+        `update appointments set status = 'cancelled' where employee_user_id = $1 and status = 'scheduled'`,
+        [USER_GROOMER],
+      )
       await client.query(`update memberships set is_active = false where user_id = $1`, [
         USER_GROOMER,
       ])
