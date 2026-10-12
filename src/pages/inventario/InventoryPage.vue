@@ -316,11 +316,11 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
   min-width: 760px;
 }
 
+// El nombre puede partirse en dos líneas: en una sola, un nombre largo ensanchaba la tabla más
+// que el contenedor (con el menú lateral abierto) y dejaba la columna Acciones fuera de la vista.
 .inventory-name {
   max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .inventory-table :deep(.inventory-row--inactive td:not(.inventory-actions)) {
