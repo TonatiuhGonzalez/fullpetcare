@@ -582,14 +582,21 @@ async function handleVaccinationSaved(): Promise<void> {
   }
 }
 
+// Etiqueta arriba y valor debajo: la columna de información es de un tercio del ancho y en dos
+// columnas partía palabras ("esterilizad o(a)").
 .pet-facts {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  gap: 8px 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 
   dt {
     color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    margin-top: 12px;
+
+    &:first-of-type {
+      margin-top: 0;
+    }
   }
 
   dd {
