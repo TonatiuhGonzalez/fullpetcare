@@ -16,6 +16,7 @@ import { useSessionStore } from '@/stores/session'
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -107,7 +108,7 @@ function handlePetSaved(): void {
         >
           Editar
         </v-btn>
-        <v-btn
+        <IconButton
           icon="mdi-close"
           variant="text"
           aria-label="Cerrar"

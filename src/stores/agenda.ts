@@ -139,6 +139,20 @@ export const useAgendaStore = defineStore('agenda', () => {
     load()
   }
 
+  /**
+   * Fija sucursal y "hoy" de la sucursal SIN cargar citas. Lo usa Inicio, que monta los
+   * diálogos de agendar (leen `activeBranchId` y `activeDate`) pero no pinta la agenda.
+   * Es la misma sucursal y el mismo día que `initFromSession` le daría a la Agenda al
+   * entrar, así que no cambia nada de lo que la Agenda mostrará después.
+   */
+  function prepareForDialogs(): void {
+    const session = useSessionStore()
+    if (!session.activeBranchId) return
+    activeBranchId.value = session.activeBranchId
+    const timezone = activeBranchTimezone()
+    activeDate.value = format(toBranchTime(new Date(), timezone ?? 'UTC'), 'yyyy-MM-dd')
+  }
+
   /** Solo tiene efecto visible para dueño/recepción — ver visibleDates. */
   function setDate(dateStr: string): void {
     activeDate.value = dateStr
@@ -160,6 +174,7 @@ export const useAgendaStore = defineStore('agenda', () => {
     status,
     errorMessage,
     initFromSession,
+    prepareForDialogs,
     setDate,
     setBranch,
     load,

@@ -65,6 +65,14 @@ describe('memberships: política de INSERT', () => {
 describe('memberships: política de UPDATE — desactivar corta el acceso al instante', () => {
   it('el dueño puede desactivar (is_active = false) el acceso de un empleado', async () => {
     await withTransaction(async (client) => {
+      // Desde C1.6 la base impide desactivar a quien tiene citas programadas. Otros
+      // tests de la suite dejan citas "scheduled" confirmadas (records-service), así
+      // que aquí se cancelan primero: este test prueba el corte de acceso, no esa regla.
+      await setRole(client, 'service_role')
+      await client.query(
+        "update appointments set status = 'cancelled' where employee_user_id = $1 and status = 'scheduled'",
+        [USER_VET],
+      )
       await setRole(client, 'authenticated', USER_DUENO)
       const { rowCount } = await client.query(
         'update memberships set is_active = false where tenant_id = $1 and user_id = $2',
@@ -80,7 +88,14 @@ describe('memberships: política de UPDATE — desactivar corta el acceso al ins
     // token, basta con is_active = false — porque app.is_member_of() lo
     // revisa en cada consulta.
     await withTransaction(async (client) => {
+      // Desde C1.6 la base impide desactivar a quien tiene citas programadas. Otros
+      // tests de la suite dejan citas "scheduled" confirmadas (records-service), así
+      // que aquí se cancelan primero: este test prueba el corte de acceso, no esa regla.
       await setRole(client, 'service_role')
+      await client.query(
+        "update appointments set status = 'cancelled' where employee_user_id = $1 and status = 'scheduled'",
+        [USER_VET],
+      )
       await client.query('update memberships set is_active = false where tenant_id = $1 and user_id = $2', [
         TENANT_PATITAS,
         USER_VET,

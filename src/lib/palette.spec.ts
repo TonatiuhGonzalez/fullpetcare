@@ -24,6 +24,7 @@ const FILLS = [
   'success',
   'warning',
   'info',
+  'overlap',
   'background',
   'surface',
 ]

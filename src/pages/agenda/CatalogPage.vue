@@ -13,6 +13,7 @@ import { visitKindInfo } from '@/lib/visitKind'
 import { useSessionStore } from '@/stores/session'
 import PageHeader from '@/components/PageHeader.vue'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 
@@ -239,14 +240,14 @@ function handleSaved(): void {
       }}</template>
       <template #[`item.actions`]="{ item }">
         <div class="d-flex align-center justify-center">
-          <v-btn
-            icon="mdi-pencil"
+          <IconButton
+            icon="mdi-pencil" aria-label="Editar servicio"
             color="primary"
             variant="text"
             size="small"
             @click="openEditService(item)"
           />
-          <v-btn
+          <IconButton
             icon="mdi-delete"
             color="error"
             variant="text"

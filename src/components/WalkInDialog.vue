@@ -15,6 +15,7 @@
 import { computed, ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
@@ -27,9 +28,13 @@ import type { EmployeeSummary } from '@/services/memberships'
 import { formatMXN } from '@/lib/money'
 import { branchToday, formatTime, fromBranchTime } from '@/lib/datetime'
 import { canAttendKind } from '@/lib/roles'
-import { isValidPhone } from '@/lib/validation'
 import { speciesLabel } from '@/lib/petLabels'
-import { computeEmployeeWaits, waitLabel, type WalkInBusyRange } from '@/lib/walkIn'
+import {
+  computeEmployeeWaits,
+  findWalkInOverlap,
+  waitLabel,
+  type WalkInBusyRange,
+} from '@/lib/walkIn'
 import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
@@ -55,26 +60,14 @@ const branchTimezone = computed(
 )
 
 // --- Cliente ---------------------------------------------------------------
-// 'new': alta rápida (nombre, apellido, teléfono). 'existing': ya está
-// registrado, se busca. Dos botones independientes en vez de v-btn-toggle,
-// mismo criterio que el selector de tipo de NewAppointmentDialog.vue.
-const customerMode = ref<'new' | 'existing'>('new')
-
-const newFirstName = ref('')
-const newLastName = ref('')
-const newPhone = ref('')
+// Se busca entre los registrados o se da de alta uno nuevo CON su mascota (C1.11): el alta
+// se guarda de inmediato y deja al cliente y a su mascota elegidos.
+const showNewCustomer = ref(false)
 
 const customerSearchTerm = ref('')
 const customerResults = ref<Customer[]>([])
 const selectedCustomer = ref<Customer | null>(null)
 
-// Si el alta del cliente sale bien pero algo falla DESPUÉS (por ejemplo, el
-// empleado se ocupó en ese instante), al reintentar se reutiliza este
-// cliente en vez de crear un duplicado.
-const createdCustomer = ref<Customer | null>(null)
-const createdPet = ref<Pet | null>(null)
-
-const phoneRules = [(v: string) => isValidPhone(v) || 'Debe tener 10 dígitos']
 const requiredRules = [(v: string) => v.trim() !== '' || 'Obligatorio']
 
 function customerLabel(customer: Customer): string {
@@ -122,7 +115,7 @@ async function selectCustomer(customer: Customer | null): Promise<void> {
   }
 }
 
-const isNewPet = computed(() => customerMode.value === 'new' || petChoice.value === 'new')
+const isNewPet = computed(() => petChoice.value === 'new')
 
 // --- Tipo y servicios ------------------------------------------------------
 const kind = ref<ServiceKind>('grooming')
@@ -183,6 +176,42 @@ const selectedWait = computed(
   () => employeeWaits.value.find((w) => w.employeeId === selectedEmployeeId.value) ?? null,
 )
 
+// Por defecto, un empleado ocupado deja la visita para cuando se libere. Recepción
+// puede decidir atenderla ya aunque encime otra cita (C1.10): entonces se pide
+// confirmación antes de registrarla, porque altera la cronología de esa cita.
+const startNowAnyway = ref(false)
+watch(selectedEmployeeId, () => {
+  startNowAnyway.value = false
+})
+
+/** Con qué hueco se registraría la visita ('HH:mm' locales de la sucursal). */
+const plannedSlot = computed(() => {
+  const wait = selectedWait.value
+  if (!wait) return null
+  if (wait.waitMinutes > 0 && startNowAnyway.value) {
+    const [h, m] = nowTime.value.split(':').map(Number)
+    const end = h * 60 + m + totalDurationMinutes.value
+    const hh = String(Math.floor(end / 60) % 24).padStart(2, '0')
+    const mm = String(end % 60).padStart(2, '0')
+    return { startsAt: nowTime.value, endsAt: `${hh}:${mm}`, startsNow: true }
+  }
+  return { startsAt: wait.startsAt, endsAt: wait.endsAt, startsNow: wait.waitMinutes === 0 }
+})
+
+// La cita del mismo empleado con la que se encimaría ese hueco, si hay una.
+const plannedOverlap = computed(() => {
+  const slot = plannedSlot.value
+  if (!slot || !selectedEmployeeId.value) return null
+  return findWalkInOverlap({
+    employeeId: selectedEmployeeId.value,
+    busyRanges: busyRanges.value,
+    startsAt: slot.startsAt,
+    endsAt: slot.endsAt,
+  })
+})
+
+const confirmOverlapOpen = ref(false)
+
 // Preselecciona a quien menos espera (la lista ya viene ordenada así); si el
 // empleado elegido deja de ser opción (cambió el tipo, por ejemplo), se
 // reemplaza.
@@ -228,15 +257,9 @@ watch(
     errorMessage.value = null
     saving.value = false
 
-    customerMode.value = 'new'
-    newFirstName.value = ''
-    newLastName.value = ''
-    newPhone.value = ''
     customerSearchTerm.value = ''
     customerResults.value = []
     selectedCustomer.value = null
-    createdCustomer.value = null
-    createdPet.value = null
 
     customerPets.value = []
     petChoice.value = null
@@ -248,26 +271,25 @@ watch(
     isUrgent.value = false
     notes.value = ''
     selectedEmployeeId.value = null
+    startNowAnyway.value = false
+    confirmOverlapOpen.value = false
 
     loadEmployees()
     loadServices()
     refreshBusy()
+    searchCustomers()
   },
 )
 
-function setCustomerMode(mode: 'new' | 'existing'): void {
-  customerMode.value = mode
-  if (mode === 'existing' && customerResults.value.length === 0) searchCustomers()
+async function handleCustomerCreated(result: { customer: Customer; pet: Pet }): Promise<void> {
+  customerResults.value = [result.customer, ...customerResults.value]
+  customerSearchTerm.value = customerLabel(result.customer)
+  await selectCustomer(result.customer)
+  petChoice.value = customerPets.value.find((p) => p.id === result.pet.id) ?? null
 }
 
 // --- Envío -----------------------------------------------------------------
-const customerReady = computed(() =>
-  customerMode.value === 'new'
-    ? newFirstName.value.trim() !== '' &&
-      newLastName.value.trim() !== '' &&
-      isValidPhone(newPhone.value)
-    : selectedCustomer.value != null,
-)
+const customerReady = computed(() => selectedCustomer.value != null)
 
 const petReady = computed(() =>
   isNewPet.value ? newPetName.value.trim() !== '' : petChoice.value != null,
@@ -285,7 +307,17 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+// Si el hueco se encima con otra cita del empleado, primero se pide confirmar.
+function requestSubmit(): void {
+  if (plannedOverlap.value) {
+    confirmOverlapOpen.value = true
+    return
+  }
+  handleSubmit()
+}
+
 async function handleSubmit(): Promise<void> {
+  confirmOverlapOpen.value = false
   const tenantId = session.activeTenantId
   const wait = selectedWait.value
   if (!tenantId || !branchId.value || !selectedEmployeeId.value || !wait) return
@@ -293,32 +325,19 @@ async function handleSubmit(): Promise<void> {
   saving.value = true
   errorMessage.value = null
   try {
-    // 1) Cliente: el alta rápida solo pide lo mínimo.
-    let customer: Customer
-    if (customerMode.value === 'new') {
-      createdCustomer.value ??= await customersService.create({
-        tenant_id: tenantId,
-        first_name: newFirstName.value.trim(),
-        last_name: newLastName.value.trim(),
-        phone: newPhone.value.trim(),
-      })
-      customer = createdCustomer.value
-    } else if (selectedCustomer.value) {
-      customer = selectedCustomer.value
-    } else {
-      return
-    }
+    // 1) Cliente: siempre ya registrado (el alta nueva se hizo en su diálogo).
+    const customer = selectedCustomer.value
+    if (!customer) return
 
-    // 2) Mascota: existente, o alta rápida (nombre y especie).
+    // 2) Mascota: una de las del cliente, o el alta rápida de otra (nombre y especie).
     let pet: Pet
     if (isNewPet.value) {
-      createdPet.value ??= await petsService.create({
+      pet = await petsService.create({
         tenant_id: tenantId,
         customer_id: customer.id,
         name: newPetName.value.trim(),
         species: newPetSpecies.value,
       })
-      pet = createdPet.value
     } else if (petChoice.value && petChoice.value !== 'new') {
       pet = petChoice.value
     } else {
@@ -330,7 +349,7 @@ async function handleSubmit(): Promise<void> {
     // quede libre, y la cita queda "agendada" hasta entonces.
     const duration = totalDurationMinutes.value
     const startsAt =
-      wait.waitMinutes === 0
+      plannedSlot.value?.startsNow
         ? new Date()
         : fromBranchTime(branchToday(branchTimezone.value), wait.startsAt, branchTimezone.value)
     const endsAt = new Date(startsAt.getTime() + duration * 60_000)
@@ -376,49 +395,7 @@ async function handleSubmit(): Promise<void> {
         <v-row>
           <v-col cols="12" md="6">
             <p class="text-overline text-medium-emphasis">Cliente</p>
-            <div class="d-flex ga-2 mb-3">
-              <v-btn
-                :color="customerMode === 'new' ? 'primary' : undefined"
-                :variant="customerMode === 'new' ? 'flat' : 'outlined'"
-                @click="setCustomerMode('new')"
-              >
-                Cliente nuevo
-              </v-btn>
-              <v-btn
-                :color="customerMode === 'existing' ? 'primary' : undefined"
-                :variant="customerMode === 'existing' ? 'flat' : 'outlined'"
-                @click="setCustomerMode('existing')"
-              >
-                Ya registrado
-              </v-btn>
-            </div>
-
-            <template v-if="customerMode === 'new'">
-              <v-text-field
-                v-model="newFirstName"
-                label="Nombre"
-                density="compact"
-                variant="outlined"
-                :rules="requiredRules"
-              />
-              <v-text-field
-                v-model="newLastName"
-                label="Apellido"
-                density="compact"
-                variant="outlined"
-                :rules="requiredRules"
-              />
-              <v-text-field
-                v-model="newPhone"
-                label="Teléfono (10 dígitos)"
-                type="tel"
-                density="compact"
-                variant="outlined"
-                :rules="phoneRules"
-              />
-            </template>
-
-            <template v-else>
+            <div>
               <v-autocomplete
                 :model-value="selectedCustomer"
                 :items="customerResults"
@@ -432,6 +409,15 @@ async function handleSubmit(): Promise<void> {
                 @update:model-value="selectCustomer"
                 @update:search="customerSearchTerm = $event"
               />
+              <v-btn
+                variant="text"
+                size="small"
+                prepend-icon="mdi-account-plus"
+                class="mb-2"
+                @click="showNewCustomer = true"
+              >
+                Cliente nuevo
+              </v-btn>
               <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mb-2">
                 <span class="font-weight-bold">Mascota:</span>
                 <v-chip-group v-model="petChoice" mandatory>
@@ -447,11 +433,10 @@ async function handleSubmit(): Promise<void> {
                   <v-chip value="new" prepend-icon="mdi-plus" filter>Mascota nueva</v-chip>
                 </v-chip-group>
               </div>
-            </template>
+            </div>
 
-            <!-- Alta rápida de mascota: cliente nuevo, o cliente existente
-                 que eligió "Mascota nueva". -->
-            <template v-if="isNewPet && (customerMode === 'new' || selectedCustomer)">
+            <!-- Alta rápida de otra mascota de un cliente ya registrado. -->
+            <template v-if="isNewPet && selectedCustomer">
               <p class="text-overline text-medium-emphasis mt-2">Mascota nueva</p>
               <v-text-field
                 v-model="newPetName"
@@ -586,6 +571,13 @@ async function handleSubmit(): Promise<void> {
                   {{ selectedWait.startsAt }} ({{ waitLabel(selectedWait.waitMinutes).toLowerCase() }}).
                 </template>
               </v-alert>
+              <v-checkbox
+                v-if="selectedWait && selectedWait.waitMinutes > 0"
+                v-model="startNowAnyway"
+                label="Atender ahora de todos modos (se encima con una cita)"
+                density="compact"
+                hide-details
+              />
             </template>
           </v-col>
         </v-row>
@@ -598,10 +590,42 @@ async function handleSubmit(): Promise<void> {
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="close">Cancelar</v-btn>
-        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="handleSubmit">
+        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="requestSubmit">
           Registrar visita
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Confirmación de traslape (C1.10). El aviso va en texto normal; el
+         amarillo solo acompaña como acento. -->
+    <v-dialog v-model="confirmOverlapOpen" max-width="460">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-alert" color="overlap" class="mr-2" />
+          Ya hay una cita
+        </v-card-title>
+        <v-card-text>
+          <p v-if="plannedOverlap">
+            Este empleado ya tiene una cita de las {{ plannedOverlap.startsAt }} a las
+            {{ plannedOverlap.endsAt }}. Si registras la visita ahora, puede alterar la
+            cronología de los eventos de su agenda.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="confirmOverlapOpen = false">Elegir otro</v-btn>
+          <v-btn color="primary" :loading="saving" @click="handleSubmit">
+            Registrar de todos modos
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <CustomerWithPetDialog
+      v-model="showNewCustomer"
+      :tenant-id="session.activeTenantId ?? ''"
+      phone-required
+      @saved="handleCustomerCreated"
+    />
   </v-dialog>
 </template>

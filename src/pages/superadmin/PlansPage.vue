@@ -10,6 +10,7 @@ import { onMounted, ref } from 'vue'
 import * as platformService from '@/services/platform'
 import type { Plan } from '@/services/platform'
 import PageHeader from '@/components/PageHeader.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const plans = ref<Plan[]>([])
 const loading = ref(false)
@@ -124,7 +125,7 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
             />
           </td>
           <td class="text-right">
-            <v-btn
+            <IconButton
               icon="mdi-pencil"
               variant="text"
               size="small"

@@ -146,6 +146,21 @@ describe('useAgendaStore — dueño/recepción (un solo día, navegable)', () =>
     expect(agenda.appointments[0].id).toBe('apt-1')
   })
 
+  it('prepareForDialogs fija sucursal y hoy sin pedir citas', () => {
+    // Inicio monta los diálogos de agendar, que leen sucursal y fecha de este store. Si
+    // no se fijaran, el diálogo abriría sin sucursal; y si además cargara citas, Inicio
+    // haría una consulta de agenda que nadie ve.
+    setupSession()
+    vi.mocked(listByDateRange).mockClear()
+
+    const agenda = useAgendaStore()
+    agenda.prepareForDialogs()
+
+    expect(agenda.activeBranchId).toBe('branch-centro')
+    expect(agenda.activeDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(listByDateRange).not.toHaveBeenCalled()
+  })
+
   it('visibleDates es un arreglo de UN solo día: activeDate', async () => {
     // La vista de dueño/recepción es la línea de tiempo (un día, filas =
     // empleados) — si visibleDates devolviera más de un día, el store

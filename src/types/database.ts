@@ -2400,6 +2400,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_customer_with_pet: {
+        Args: {
+          p_cfdi_use?: string
+          p_email?: string
+          p_first_name: string
+          p_last_name: string
+          p_legal_name?: string
+          p_notes?: string
+          p_pet_birth_date?: string
+          p_pet_breed?: string
+          p_pet_grooming_notes?: string
+          p_pet_is_sterilized?: boolean
+          p_pet_medical_alerts?: string
+          p_pet_name?: string
+          p_pet_sex?: Database["public"]["Enums"]["pet_sex"]
+          p_pet_species?: Database["public"]["Enums"]["pet_species"]
+          p_phone?: string
+          p_postal_code?: string
+          p_requires_invoice?: boolean
+          p_rfc?: string
+          p_tax_regime_code?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       create_employee_membership: {
         Args: {
           p_birth_date: string
@@ -2469,6 +2494,7 @@ export type Database = {
         }
       }
       delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
+      delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
       delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
       my_tenant_notices: {
         Args: never
@@ -2837,6 +2863,85 @@ export type Database = {
         }
       }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      search_customers: {
+        Args: { p_tenant_id: string; p_term?: string }
+        Returns: {
+          cfdi_use: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          legal_name: string | null
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          requires_invoice: boolean
+          rfc: string | null
+          tax_regime_code: string | null
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      search_pets: {
+        Args: { p_tenant_id: string; p_term?: string }
+        Returns: {
+          birth_date: string | null
+          breed: string | null
+          created_at: string
+          customer_id: string
+          deleted_at: string | null
+          grooming_notes: string | null
+          id: string
+          is_sterilized: boolean
+          medical_alerts: string | null
+          name: string
+          photo_path: string | null
+          sex: Database["public"]["Enums"]["pet_sex"] | null
+          species: Database["public"]["Enums"]["pet_species"]
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "pets"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      search_products: {
+        Args: { p_tenant_id: string; p_term?: string }
+        Returns: {
+          category_id: string | null
+          cost_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          min_stock: number
+          name: string
+          price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
+          sku: string | null
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       update_tenant_fiscal_data: {
         Args: {
           p_legal_name: string

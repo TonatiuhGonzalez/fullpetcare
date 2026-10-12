@@ -7,6 +7,11 @@
 // naranja y azul de la paleta Okabe-Ito, que se distingue en los tres tipos de
 // daltonismo. Aun así el color nunca va solo: cada tipo lleva ícono y texto.
 //
+// `overlap` es el aviso de traslape de horarios (C1.9): amarillo Okabe-Ito (#F0E442),
+// que no se confunde con el naranja `grooming` ni con el ámbar `warning` ("sin esterilizar",
+// alertas de inventario). Es solo FONDO con texto oscuro encima: un amarillo no llega a 4.5:1
+// como texto sobre blanco, así que no se usa como color de texto ni de ícono suelto.
+//
 // Cada color de fondo declara su `on-*` (el color del texto encima) para que el
 // contraste sea una decisión nuestra y no del cálculo automático de Vuetify.
 
@@ -29,6 +34,8 @@ export const lightPalette: Palette = {
   'on-warning': '#FFFFFF',
   info: '#245EA6',
   'on-info': '#FFFFFF',
+  overlap: '#F0E442',
+  'on-overlap': '#3B3500',
   background: '#F4F7F8',
   'on-background': '#17262B',
   surface: '#FFFFFF',
@@ -52,6 +59,8 @@ export const darkPalette: Palette = {
   'on-warning': '#2A1A00',
   info: '#7FB0F0',
   'on-info': '#06182E',
+  overlap: '#F0E442',
+  'on-overlap': '#2A2500',
   background: '#0E1B1E',
   'on-background': '#E6EEF0',
   surface: '#14262A',

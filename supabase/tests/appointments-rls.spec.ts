@@ -9,6 +9,7 @@
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { closePool, setRole, withTransaction } from './helpers'
+import { futureDateAtUtc, WEEKDAY } from './schedule-dates'
 import {
   BRANCH_CENTRO,
   BRANCH_DEL_VALLE,
@@ -44,8 +45,11 @@ async function callCreateAppointment(
         PET_ROCKY,
         args.kind,
         args.employeeUserId,
-        new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-        new Date(Date.now() + 20 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
+        // Un miércoles a las 09:00 hora local (15:00Z, CDMX es UTC-6): desde
+        // C1.2 la base rechaza horas fuera del horario de la sucursal, así
+        // que "ahora + 20 días" a cualquier hora ya no sirve.
+        futureDateAtUtc(WEEKDAY.wednesday, 15).toISOString(),
+        futureDateAtUtc(WEEKDAY.wednesday, 15, 30).toISOString(),
         null,
         JSON.stringify([{ service_id: SERVICE_BANO, quantity: 1 }]),
       ],

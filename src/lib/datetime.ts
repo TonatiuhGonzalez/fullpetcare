@@ -136,6 +136,18 @@ export function branchToday(branchTimezone: string, now: Date = new Date()): str
   return format(toBranchTime(now, branchTimezone), 'yyyy-MM-dd')
 }
 
+/**
+ * "Ahora mismo" en la sucursal: su fecha y su hora locales ('YYYY-MM-DD' y 'HH:mm').
+ * Es lo que necesita `computeSlotStatuses` para saber qué horarios ya pasaron: la
+ * hora de la sucursal de la cita, no la del navegador de quien agenda (§8.3).
+ */
+export function branchNow(
+  branchTimezone: string,
+  now: Date = new Date(),
+): { date: string; time: string } {
+  return { date: branchToday(branchTimezone, now), time: formatTime(now, branchTimezone) }
+}
+
 /** Fecha local de la sucursal en español ("15 de julio de 2026"). */
 export function formatDate(utcInstant: Date | string, branchTimezone: string): string {
   return format(toBranchTime(utcInstant, branchTimezone), "d 'de' MMMM 'de' yyyy", {

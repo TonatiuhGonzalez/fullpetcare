@@ -9,9 +9,9 @@
 // formulario cada vez que se abre — mismo patrón que CustomerFormDialog.vue.
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
-import { format } from 'date-fns'
 
 import * as customersService from '@/services/customers'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
@@ -23,9 +23,10 @@ import * as branchesService from '@/services/branches'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { formatMXN } from '@/lib/money'
-import { formatTime, fromBranchTime } from '@/lib/datetime'
-import { computeAvailableSlots, hoursForDate, type AvailableSlot } from '@/lib/availability'
-import { canAttendKind } from '@/lib/roles'
+import { branchNow, branchToday, formatTime, fromBranchTime } from '@/lib/datetime'
+import { computeSlotStatuses, hoursForDate, type SlotWithStatus } from '@/lib/availability'
+import { appointmentRuleMessage } from '@/lib/appointmentErrors'
+import { canAttendKind, roleLabel } from '@/lib/roles'
 import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
@@ -49,6 +50,18 @@ const saving = ref(false)
 // stores/agenda.ts ni la sesión (un dueño puede agendar en otra
 // sucursal sin "moverse" de la que está viendo).
 const selectedBranchId = ref<string | null>(null)
+
+// Zona IANA de la sucursal de la cita (§8.3): de ella salen el "hoy" mínimo de la
+// fecha y la hora actual con la que se marcan los horarios pasados — nunca la del
+// navegador. `activeBranches` ya trae la zona de cada sucursal.
+const DEFAULT_TIMEZONE = 'America/Mexico_City'
+const branchTimezone = computed(
+  () =>
+    session.activeBranches.find((b) => b.id === selectedBranchId.value)?.timezone ??
+    DEFAULT_TIMEZONE,
+)
+// Primer día elegible: hoy en la sucursal.
+const minDate = computed(() => branchToday(branchTimezone.value))
 
 // --- Cliente y mascota -----------------------------------------------------
 const customerSearchTerm = ref('')
@@ -102,6 +115,17 @@ async function selectCustomer(customer: Customer | null): Promise<void> {
   }
 }
 
+// Alta de un cliente nuevo con su mascota (C1.11): al guardar, la cita queda con el
+// cliente y la mascota ya elegidos, lista para elegir servicios.
+const showNewCustomer = ref(false)
+
+async function handleCustomerCreated(result: { customer: Customer; pet: Pet }): Promise<void> {
+  customerResults.value = [result.customer, ...customerResults.value]
+  customerSearchTerm.value = customerLabel(result.customer)
+  await selectCustomer(result.customer)
+  selectedPet.value = customerPets.value.find((p) => p.id === result.pet.id) ?? null
+}
+
 // --- Tipo --------------------------------------------------------------
 const kind = ref<ServiceKind>('grooming')
 
@@ -132,9 +156,9 @@ const totalPriceCents = computed(() =>
 // --- Empleado y horario -----------------------------------------------------
 const employees = ref<EmployeeSummary[]>([])
 const selectedEmployeeId = ref<string | null>(null)
-const selectedDate = ref(format(new Date(), 'yyyy-MM-dd'))
-const availableSlots = ref<AvailableSlot[]>([])
-const selectedSlot = ref<AvailableSlot | null>(null)
+const selectedDate = ref(branchToday(DEFAULT_TIMEZONE))
+const availableSlots = ref<SlotWithStatus[]>([])
+const selectedSlot = ref<SlotWithStatus | null>(null)
 const loadingSlots = ref(false)
 const showSlotsSkeleton = useDelayedLoading(loadingSlots)
 
@@ -182,7 +206,7 @@ async function loadAvailableSlots(): Promise<void> {
       endsAt: formatTime(a.ends_at, branch.timezone),
     }))
 
-    availableSlots.value = computeAvailableSlots({
+    availableSlots.value = computeSlotStatuses({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- opening_hours es un jsonb genérico (Json) en los tipos generados; su forma real (una entrada por día de la semana) es una convención del proyecto, no algo que Postgres pueda tipar.
       branchHours: hoursForDate(branch.opening_hours as any, selectedDate.value),
       existingAppointments,
@@ -191,6 +215,9 @@ async function loadAvailableSlots(): Promise<void> {
       // Pedido en el UAT: horarios cada 30 minutos, no 15 — coincide con
       // la duración mínima real de un servicio del catálogo.
       stepMinutes: 30,
+      // Los horarios pasados y el traslape se calculan con la hora de la sucursal.
+      date: selectedDate.value,
+      now: branchNow(branch.timezone),
     })
   } finally {
     loadingSlots.value = false
@@ -229,7 +256,11 @@ watch(
     selectedServiceIds.value = []
 
     selectedEmployeeId.value = null
-    selectedDate.value = agenda.activeDate ?? format(new Date(), 'yyyy-MM-dd')
+    // Nunca antes de hoy en la sucursal: si la agenda estaba en un día pasado, se
+    // arranca en hoy.
+    const today = branchToday(branchTimezone.value)
+    selectedDate.value =
+      agenda.activeDate && agenda.activeDate > today ? agenda.activeDate : today
     availableSlots.value = []
     selectedSlot.value = null
 
@@ -288,8 +319,11 @@ async function handleSubmit(): Promise<void> {
 
     close()
     emit('created', appointment)
-  } catch {
+  } catch (error) {
+    // Pasado, fuera de horario o día cerrado traen su propio mensaje; el resto,
+    // el genérico de siempre.
     errorMessage.value =
+      appointmentRuleMessage(error) ??
       'No se pudo agendar la cita. Puede que el horario ya no esté disponible — revisa e intenta de nuevo.'
   } finally {
     saving.value = false
@@ -350,11 +384,18 @@ async function handleSubmit(): Promise<void> {
               @update:search="customerSearchTerm = $event"
             />
 
-            <!-- Solo se elige entre las mascotas ya registradas del
-                 cliente: dar de alta una mascota nueva desde este
-                 dialog quedó fuera de alcance (pedido explícito del
-                 usuario) — si no existe, se registra primero desde
-                 la ficha del cliente. -->
+            <v-btn
+              variant="text"
+              size="small"
+              prepend-icon="mdi-account-plus"
+              class="mt-1"
+              @click="showNewCustomer = true"
+            >
+              Cliente nuevo
+            </v-btn>
+
+            <!-- Solo se elige entre las mascotas ya registradas del cliente; una
+                 mascota más se agrega desde la página del cliente. -->
             <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mt-2">
               <span class="font-weight-bold">Mascota:</span>
               <v-chip-group v-model="selectedPet" mandatory>
@@ -450,13 +491,28 @@ async function handleSubmit(): Promise<void> {
               label="Empleado"
               density="compact"
               variant="outlined"
-            />
+            >
+              <!-- Cada empleado con su puesto (D26 punto 3): chip con texto,
+                   nunca solo un color. -->
+              <template #item="{ item, props: itemProps }">
+                <v-list-item v-bind="itemProps" :title="item.raw.fullName">
+                  <template #append>
+                    <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
+                  </template>
+                </v-list-item>
+              </template>
+              <template #selection="{ item }">
+                <span class="mr-2">{{ item.raw.fullName }}</span>
+                <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
+              </template>
+            </v-select>
             <p v-if="employeesForKind.length === 0" class="text-medium-emphasis text-body-2 mb-2">
               No hay nadie que pueda atender este tipo de cita en esta sucursal.
             </p>
             <v-text-field
               v-model="selectedDate"
               type="date"
+              :min="minDate"
               label="Fecha"
               density="compact"
               variant="outlined"
@@ -492,6 +548,13 @@ async function handleSubmit(): Promise<void> {
           Agendar
         </v-btn>
       </v-card-actions>
+
+      <CustomerWithPetDialog
+        v-model="showNewCustomer"
+        :tenant-id="session.activeTenantId ?? ''"
+        phone-required
+        @saved="handleCustomerCreated"
+      />
     </v-card>
   </v-dialog>
 </template>

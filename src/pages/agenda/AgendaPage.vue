@@ -12,7 +12,6 @@
 // (visibleDates) — esta página solo arma los bloques a pintar y elige
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -36,6 +35,7 @@ import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
@@ -177,28 +177,10 @@ async function loadUpcomingVaccines(): Promise<void> {
   upcomingVaccines.value = await listUpcomingVaccines(session.activeTenantId, today)
 }
 
-// Los accesos rápidos de Inicio mandan aquí con `?accion=nueva-cita` o
-// `?accion=llegada-sin-cita` para abrir el diálogo correspondiente. Se limpia la
-// URL enseguida: si no, al recargar la página el diálogo se volvería a abrir.
-const route = useRoute()
-const router = useRouter()
-
-function runRequestedAction(): void {
-  const action = route.query.accion
-  if (!action) return
-  // Solo recepción y dueño agendan; para otros roles el parámetro se ignora.
-  if (isFrontDeskView.value) {
-    if (action === 'nueva-cita') showNewAppointmentDialog.value = true
-    if (action === 'llegada-sin-cita') showWalkInDialog.value = true
-  }
-  router.replace({ query: {} })
-}
-
 onMounted(() => {
   agenda.initFromSession()
   loadEmployees()
   loadUpcomingVaccines()
-  runRequestedAction()
 })
 
 // --- Navegación: SOLO para dueño/recepción. Groomer/vet no tienen
@@ -307,7 +289,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <template v-if="isFrontDeskView">
-        <v-btn icon="mdi-chevron-left" variant="text" size="small" @click="shiftDay(-1)" />
+        <IconButton icon="mdi-chevron-left" aria-label="Día anterior" variant="text" size="small" @click="shiftDay(-1)" />
         <v-text-field
           :model-value="agenda.activeDate"
           type="date"
@@ -317,7 +299,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
           style="max-width: 170px"
           @update:model-value="handleDateInput"
         />
-        <v-btn icon="mdi-chevron-right" variant="text" size="small" @click="shiftDay(1)" />
+        <IconButton icon="mdi-chevron-right" aria-label="Día siguiente" variant="text" size="small" @click="shiftDay(1)" />
         <v-btn variant="text" size="small" @click="goToday">Hoy</v-btn>
       </template>
       <span v-else class="text-body-2 text-medium-emphasis text-capitalize">

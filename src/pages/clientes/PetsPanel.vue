@@ -18,6 +18,7 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import { isFrontDesk } from '@/lib/roles'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 
@@ -169,7 +170,7 @@ async function confirmDelete(): Promise<void> {
         <span class="font-weight-medium">{{ item.name }}</span>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-btn
+        <IconButton
           icon="mdi-pencil"
           color="primary"
           variant="text"
@@ -177,7 +178,7 @@ async function confirmDelete(): Promise<void> {
           aria-label="Editar mascota"
           @click="openEditPet(item)"
         />
-        <v-btn
+        <IconButton
           icon="mdi-delete"
           color="error"
           variant="text"
