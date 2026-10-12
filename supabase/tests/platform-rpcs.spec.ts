@@ -375,6 +375,12 @@ describe('platform_tenant_metrics()', () => {
 
       // Se desactiva al groomer: su acceso más reciente deja de contar.
       await client.query('reset role')
+      // Desde C1.6 no se puede desactivar a quien tiene citas programadas; otros tests
+      // de la suite dejan alguna confirmada, así que se cancelan antes.
+      await client.query(
+        "update appointments set status = 'cancelled' where employee_user_id = $1 and status = 'scheduled'",
+        [USER_GROOMER],
+      )
       await client.query(
         'update memberships set is_active = false where tenant_id = $1 and user_id = $2',
         [TENANT_PATITAS, USER_GROOMER],
