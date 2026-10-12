@@ -124,8 +124,10 @@ export interface NewEmployeeInput {
  * leer (p. ej. sin red, ni siquiera llegó a responder el servidor), se
  * usa el mensaje genérico de CLAUDE.md §5.4.
  */
-async function extractFunctionErrorMessage(error: unknown): Promise<string> {
-  const fallback = 'No se pudo dar de alta al empleado. Revisa tu conexión.'
+async function extractFunctionErrorMessage(
+  error: unknown,
+  fallback = 'No se pudo dar de alta al empleado. Revisa tu conexión.',
+): Promise<string> {
   if (
     error &&
     typeof error === 'object' &&
@@ -205,6 +207,42 @@ export async function inviteAndCreate(input: NewEmployeeInput): Promise<{ member
 
   if (rpcError) throw new Error(friendlyRpcMessage(rpcError))
   return { membershipId: membership.id }
+}
+
+export interface PasswordResetResult {
+  /** Correo con el que entra el empleado. */
+  employeeEmail: string
+  /** Se muestra UNA sola vez; no se guarda ni se vuelve a poder consultar. */
+  temporaryPassword: string
+}
+
+/**
+ * Restablece la contraseña de un empleado (C1.7). La Edge Function
+ * `invite-employee` (acción `reset_password`) revalida permiso y objetivo,
+ * genera la contraseña temporal en el servidor, cierra las sesiones del
+ * empleado y lo obliga a cambiarla al entrar (CLAUDE.md §7.6). Aquí solo se
+ * llama y se devuelve la contraseña para mostrarla una vez.
+ */
+export async function resetPassword(
+  tenantId: string,
+  membershipId: string,
+): Promise<PasswordResetResult> {
+  const { data, error } = await supabase.functions.invoke<{
+    employeeEmail: string
+    temporaryPassword: string
+  }>('invite-employee', {
+    body: { action: 'reset_password', tenantId, membershipId },
+  })
+
+  if (error || !data) {
+    throw new Error(
+      await extractFunctionErrorMessage(
+        error,
+        'No se pudo restablecer la contraseña. Revisa tu conexión.',
+      ),
+    )
+  }
+  return { employeeEmail: data.employeeEmail, temporaryPassword: data.temporaryPassword }
 }
 
 export interface EmployeeUpdateInput {
