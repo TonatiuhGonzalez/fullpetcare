@@ -9,6 +9,7 @@ import pg from 'pg'
 import * as appointmentsService from '@/services/appointments'
 import { supabase } from '@/services/supabase'
 
+import { futureDateAtUtc, WEEKDAY } from './schedule-dates'
 import {
   BRANCH_CENTRO,
   CUSTOMER_SOFIA,
@@ -70,8 +71,8 @@ describe('services/appointments.ts contra Supabase local', () => {
       petId: PET_ROCKY,
       kind: 'grooming',
       employeeUserId: USER_GROOMER,
-      startsAt: new Date('2027-03-10T15:00:00Z'),
-      endsAt: new Date('2027-03-10T16:00:00Z'),
+      startsAt: futureDateAtUtc(WEEKDAY.wednesday, 15),
+      endsAt: futureDateAtUtc(WEEKDAY.wednesday, 16),
       services: [{ serviceId: SERVICE_BANO }],
     })
     createdIds.push(appointment.id)
@@ -102,7 +103,10 @@ describe('services/appointments.ts contra Supabase local', () => {
     }
   })
 
-  it('no se puede crear una cita que se encime con otra del mismo empleado', async () => {
+  it('SÍ se puede crear una cita que se encime con otra del mismo empleado (D26)', async () => {
+    // Cambió de sentido en Correcciones 1: antes la base rechazaba el
+    // traslape con "ya tiene una cita". Ahora es un aviso de la interfaz; si
+    // la base siguiera rechazando, el aviso fallaría al guardar.
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: DUENO_EMAIL,
       password: DUENO_PASSWORD,
@@ -116,13 +120,38 @@ describe('services/appointments.ts contra Supabase local', () => {
       petId: PET_ROCKY,
       kind: 'grooming',
       employeeUserId: USER_GROOMER,
-      startsAt: new Date('2027-03-11T15:00:00Z'),
-      endsAt: new Date('2027-03-11T16:00:00Z'),
+      startsAt: futureDateAtUtc(WEEKDAY.thursday, 15),
+      endsAt: futureDateAtUtc(WEEKDAY.thursday, 16),
       services: [{ serviceId: SERVICE_BANO }],
     })
     createdIds.push(first.id)
 
     // Se traslapa a la mitad (15:30-16:30 se cruza con 15:00-16:00).
+    const second = await appointmentsService.create({
+      tenantId: TENANT_PATITAS,
+      branchId: BRANCH_CENTRO,
+      customerId: CUSTOMER_SOFIA,
+      petId: PET_ROCKY,
+      kind: 'grooming',
+      employeeUserId: USER_GROOMER,
+      startsAt: futureDateAtUtc(WEEKDAY.thursday, 15, 30),
+      endsAt: futureDateAtUtc(WEEKDAY.thursday, 16, 30),
+      services: [{ serviceId: SERVICE_BANO }],
+    })
+    createdIds.push(second.id)
+
+    expect(second.id).not.toBe(first.id)
+  })
+
+  it('rechaza una cita en el pasado con un mensaje en español', async () => {
+    // La base decide (no el reloj del navegador): una llamada directa a la
+    // API tampoco puede agendar en el pasado.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
     await expect(
       appointmentsService.create({
         tenantId: TENANT_PATITAS,
@@ -131,11 +160,11 @@ describe('services/appointments.ts contra Supabase local', () => {
         petId: PET_ROCKY,
         kind: 'grooming',
         employeeUserId: USER_GROOMER,
-        startsAt: new Date('2027-03-11T15:30:00Z'),
-        endsAt: new Date('2027-03-11T16:30:00Z'),
+        startsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() - 23 * 60 * 60 * 1000),
         services: [{ serviceId: SERVICE_BANO }],
       }),
-    ).rejects.toThrow(/ya tiene una cita/i)
+    ).rejects.toThrow(/ya pasó/i)
   })
 
   it('una cita que EMPIEZA justo cuando otra TERMINA sí se puede crear', async () => {
@@ -154,8 +183,8 @@ describe('services/appointments.ts contra Supabase local', () => {
       petId: PET_ROCKY,
       kind: 'grooming',
       employeeUserId: USER_GROOMER,
-      startsAt: new Date('2027-03-12T15:00:00Z'),
-      endsAt: new Date('2027-03-12T16:00:00Z'),
+      startsAt: futureDateAtUtc(WEEKDAY.friday, 15),
+      endsAt: futureDateAtUtc(WEEKDAY.friday, 16),
       services: [{ serviceId: SERVICE_BANO }],
     })
     createdIds.push(first.id)
@@ -167,8 +196,8 @@ describe('services/appointments.ts contra Supabase local', () => {
       petId: PET_ROCKY,
       kind: 'grooming',
       employeeUserId: USER_GROOMER,
-      startsAt: new Date('2027-03-12T16:00:00Z'),
-      endsAt: new Date('2027-03-12T17:00:00Z'),
+      startsAt: futureDateAtUtc(WEEKDAY.friday, 16),
+      endsAt: futureDateAtUtc(WEEKDAY.friday, 17),
       services: [{ serviceId: SERVICE_BANO }],
     })
     createdIds.push(second.id)

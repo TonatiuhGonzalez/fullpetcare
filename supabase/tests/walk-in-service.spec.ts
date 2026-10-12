@@ -11,6 +11,7 @@ import pg from 'pg'
 import * as appointmentsService from '@/services/appointments'
 import { supabase } from '@/services/supabase'
 
+import { futureDateAtUtc, WEEKDAY } from './schedule-dates'
 import {
   BRANCH_CENTRO,
   CUSTOMER_SOFIA,
@@ -117,18 +118,19 @@ describe('services/appointments.ts createWalkIn() contra Supabase local', () => 
     expect(appointment.is_urgent).toBe(true)
   })
 
-  it('respeta el traslape de horario del empleado, igual que una cita normal', async () => {
-    // La visita sin cita reutiliza create_appointment(). Si se saltara esa
-    // validación, se podrían encimar dos mascotas a la misma persona por
-    // el solo hecho de que la segunda "llegó sin cita".
+  it('NO rechaza el traslape del empleado: el aviso y la confirmación son de la interfaz (D26)', async () => {
+    // Cambió de sentido en Correcciones 1. La visita sin cita comparte el
+    // cuerpo de la cita normal, que ya no rechaza el traslape: si lo hiciera,
+    // recepción no podría registrar una urgencia mientras el empleado atiende.
     await signInAs('recepcion@patitasfelices.mx')
 
     const first = await appointmentsService.createWalkIn(walkInArgs(0))
     createdIds.push(first.id)
 
-    await expect(appointmentsService.createWalkIn(walkInArgs(10))).rejects.toThrow(
-      /ya tiene una cita/i,
-    )
+    const second = await appointmentsService.createWalkIn(walkInArgs(10))
+    createdIds.push(second.id)
+
+    expect(second.id).not.toBe(first.id)
   })
 
   it('rechaza una visita que empieza mucho antes de ahora', async () => {
@@ -168,8 +170,8 @@ describe('services/appointments.ts createWalkIn() contra Supabase local', () => 
 
     const appointment = await appointmentsService.create({
       ...walkInArgs(0),
-      startsAt: new Date('2027-04-01T15:00:00Z'),
-      endsAt: new Date('2027-04-01T16:00:00Z'),
+      startsAt: futureDateAtUtc(WEEKDAY.wednesday, 15),
+      endsAt: futureDateAtUtc(WEEKDAY.wednesday, 16),
     })
     createdIds.push(appointment.id)
 
