@@ -122,6 +122,14 @@ export const router = createRouter({
           meta: { requiresFrontDesk: true },
         },
         {
+          // Página de un cliente (C1.16): sus mascotas, la ficha de la elegida y su
+          // cartilla. Misma regla que el listado: solo dueño y recepción.
+          path: 'clientes/:id',
+          name: 'cliente',
+          component: () => import('@/pages/clientes/CustomerPage.vue'),
+          meta: { requiresFrontDesk: true },
+        },
+        {
           path: 'empleados',
           name: 'empleados',
           component: () => import('@/pages/empleados/EmployeesPage.vue'),
