@@ -25,6 +25,22 @@ export async function list(tenantId: string): Promise<Product[]> {
   return data ?? []
 }
 
+/**
+ * Productos cuyo nombre o código CONTIENE el texto, sin importar acentos ni mayúsculas
+ * (C1.20). La comparación la hace la base (`search_products`), igual que en Clientes; la
+ * ñ no se confunde con la n. No filtra `is_active`: ocultar los inactivos lo decide cada
+ * pantalla. Texto vacío devuelve todo el catálogo.
+ */
+export async function search(tenantId: string, term: string): Promise<Product[]> {
+  const { data, error } = await supabase.rpc('search_products', {
+    p_tenant_id: tenantId,
+    p_term: term,
+  })
+
+  if (error) throw error
+  return data ?? []
+}
+
 export async function create(product: NewProduct): Promise<Product> {
   const { data, error } = await supabase.from('products').insert(product).select().single()
 

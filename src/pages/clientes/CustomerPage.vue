@@ -36,6 +36,7 @@ import type { VaccinationWithName } from '@/services/records'
 import * as vaccinesService from '@/services/vaccines'
 import type { Vaccine } from '@/services/vaccines'
 import { useSessionStore } from '@/stores/session'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const route = useRoute()
@@ -361,7 +362,7 @@ async function handleVaccinationSaved(): Promise<void> {
                       }}<template v-if="pet.breed"> · {{ pet.breed }}</template>
                     </div>
                   </div>
-                  <v-btn
+                  <IconButton
                     v-if="canEdit"
                     icon="mdi-delete"
                     color="error"
@@ -411,7 +412,7 @@ async function handleVaccinationSaved(): Promise<void> {
                       {{ sexLabel(selectedPet.sex) }}
                     </div>
                   </div>
-                  <v-btn
+                  <IconButton
                     v-if="canEdit"
                     icon="mdi-pencil"
                     color="primary"

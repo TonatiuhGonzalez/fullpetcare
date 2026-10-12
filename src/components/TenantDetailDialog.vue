@@ -29,6 +29,7 @@ import {
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 import TenantPlanDialog from '@/components/TenantPlanDialog.vue'
 import TenantStatusDialog from '@/components/TenantStatusDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -348,7 +349,7 @@ function handlePasswordDialogToggle(open: boolean): void {
           {{ tenantStatusLabel(tenant.status) }}
         </v-chip>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" size="small" title="Cerrar" @click="close" />
+        <IconButton icon="mdi-close" variant="text" size="small" title="Cerrar" @click="close" />
       </v-card-title>
 
       <v-tabs v-model="tab">

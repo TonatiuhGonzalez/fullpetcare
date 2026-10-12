@@ -15,10 +15,12 @@ import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
 import { buildCustomerPayload } from '@/lib/customerForm'
+import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerErrors'
 import { speciesLabel } from '@/lib/petLabels'
-import { isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
+import { isValidEmail, isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import PetEditDialog from '@/components/PetEditDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -119,6 +121,14 @@ const title = computed(() =>
       : 'Cliente',
 )
 
+// Correo vacío se permite; si hay algo, debe tener forma de correo (C1.14).
+const emailRules = [(v: string) => v.trim() === '' || isValidEmail(v) || 'Correo con formato inválido']
+// El rechazo de la base por correo repetido se marca en el propio campo.
+const emailError = ref<string | null>(null)
+watch(email, () => {
+  emailError.value = null
+})
+
 const phoneRules = [(v: string) => v === '' || isValidPhone(v) || 'Debe tener 10 dígitos']
 const rfcRules = [(v: string) => v === '' || isValidRFC(v) || 'RFC con formato inválido']
 const postalCodeRules = [
@@ -135,13 +145,17 @@ async function handleSubmit(): Promise<void> {
     errorMessage.value = 'Faltan el nombre y el apellido.'
     return
   }
+  if (email.value.trim() !== '' && !isValidEmail(email.value)) {
+    errorMessage.value = 'El correo no tiene un formato válido.'
+    return
+  }
   saving.value = true
   try {
     const payload = buildCustomerPayload({
       firstName: firstName.value,
       lastName: lastName.value,
       phone: phone.value,
-      email: email.value,
+      email: email.value.trim(),
       notes: notes.value,
       requiresInvoice: requiresInvoice.value,
       rfc: rfc.value,
@@ -155,8 +169,9 @@ async function handleSubmit(): Promise<void> {
       : await customersService.create({ ...payload, tenant_id: props.tenantId })
     emit('saved', saved)
     close()
-  } catch {
-    errorMessage.value = 'No se pudo guardar el cliente. Revisa tu conexión.'
+  } catch (e) {
+    errorMessage.value = customerSaveErrorMessage(e)
+    if (isEmailTakenError(e)) emailError.value = errorMessage.value
   } finally {
     saving.value = false
   }
@@ -184,7 +199,7 @@ async function handlePetSaved(): Promise<void> {
       <v-card-title class="d-flex align-center">
         <span>{{ title }}</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
+        <IconButton icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
       </v-card-title>
 
       <v-card-text>
@@ -239,7 +254,13 @@ async function handlePetSaved(): Promise<void> {
             </v-row>
 
             <v-text-field v-model="phone" label="Teléfono" :rules="phoneRules" />
-            <v-text-field v-model="email" label="Correo" type="email" />
+            <v-text-field
+            v-model="email"
+            label="Correo"
+            type="email"
+            :rules="emailRules"
+            :error-messages="emailError ?? undefined"
+          />
             <v-textarea v-model="notes" label="Notas" rows="2" auto-grow />
 
             <v-checkbox

@@ -19,6 +19,7 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import EmployeeFormDialog from '@/components/EmployeeFormDialog.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 
@@ -263,7 +264,7 @@ function handleSaved(): void {
         </v-chip>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-btn
+        <IconButton
           icon="mdi-pencil"
           color="primary"
           variant="text"
@@ -272,7 +273,7 @@ function handleSaved(): void {
           :aria-label="`Editar a ${item.fullName}`"
           @click.stop="openEdit(item)"
         />
-        <v-btn
+        <IconButton
           v-if="item.actions.toggleActive === 'deactivate'"
           icon="mdi-account-off"
           variant="text"
@@ -282,7 +283,7 @@ function handleSaved(): void {
           :aria-label="`Desactivar el acceso de ${item.fullName}`"
           @click.stop="askAction('deactivate', item)"
         />
-        <v-btn
+        <IconButton
           v-else-if="item.actions.toggleActive === 'activate'"
           icon="mdi-account-check"
           color="success"
@@ -293,7 +294,7 @@ function handleSaved(): void {
           :aria-label="`Activar el acceso de ${item.fullName}`"
           @click.stop="runAction('activate', item)"
         />
-        <v-btn
+        <IconButton
           v-if="item.actions.canResetPassword"
           icon="mdi-lock-reset"
           variant="text"
@@ -303,7 +304,7 @@ function handleSaved(): void {
           :aria-label="`Restablecer la contraseña de ${item.fullName}`"
           @click.stop="askAction('reset-password', item)"
         />
-        <v-btn
+        <IconButton
           v-if="item.actions.canDelete"
           icon="mdi-delete"
           color="error"

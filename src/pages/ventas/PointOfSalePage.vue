@@ -11,6 +11,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import PaymentSummary from '@/components/PaymentSummary.vue'
 import PosProductTile from '@/components/PosProductTile.vue'
 import TicketView from '@/components/TicketView.vue'
@@ -21,7 +22,9 @@ import {
   productsInCategory,
   recentlySold,
 } from '@/lib/productCategories'
-import { filterProducts, findBySku, searchProducts } from '@/lib/productSearch'
+import { findBySku } from '@/lib/productSearch'
+import { useServerSearch } from '@/composables/useServerSearch'
+import * as productsService from '@/services/products'
 import { customerFiscalProblems } from '@/lib/validation'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import * as customersService from '@/services/customers'
@@ -30,6 +33,7 @@ import * as invoiceRequestsService from '@/services/invoiceRequests'
 import { useCartStore } from '@/stores/cart'
 import { useSessionStore } from '@/stores/session'
 import type { Database } from '@/types/database'
+import IconButton from '@/components/IconButton.vue'
 
 type PaymentMethod = Database['public']['Enums']['payment_method']
 
@@ -52,8 +56,22 @@ const entryToastKey = ref(0)
 const lastAddedId = ref<string | null>(null)
 let flashTimer: ReturnType<typeof setTimeout> | undefined
 
-/** Con texto en el campo, la fila de arriba muestra los productos que coinciden. */
-const searchResults = computed(() => filterProducts(cart.catalog, barcode.value))
+/**
+ * Con texto en el campo, la fila de arriba muestra los productos que coinciden. La
+ * coincidencia por texto la decide la base (`search_products`, sin acentos y con la ñ
+ * aparte, C1.20) y aquí solo se cruza con el catálogo VENDIBLE (con existencia). El código
+ * exacto del lector no pasa por la red: `findBySku` responde al instante.
+ */
+const nameSearch = useServerSearch(barcode, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
+const searchResults = computed(() => {
+  if (barcode.value.trim() === '') return cart.catalog
+  const found = nameSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return cart.catalog.filter((p) => ids.has(p.id))
+})
 const isSearching = computed(() => barcode.value.trim().length > 0)
 
 // Fila de arriba: categorías, o los productos de la categoría abierta.
@@ -166,7 +184,16 @@ const pieceCount = computed(() =>
 // --- Consultar precio ---------------------------------------------------------
 const showPriceCheck = ref(false)
 const priceQuery = ref('')
-const priceResults = computed(() => searchProducts(cart.catalog, priceQuery.value))
+const priceSearch = useServerSearch(priceQuery, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
+// Máximo 20 filas en el diálogo (igual que antes), siempre entre lo que se puede vender.
+const priceResults = computed(() => {
+  const found = priceSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return cart.catalog.filter((p) => ids.has(p.id)).slice(0, 20)
+})
 
 // --- Cancelar la venta ----------------------------------------------------------
 const showCancel = ref(false)
@@ -473,7 +500,7 @@ function handleNewSale(): void {
               @select="handleTileClick"
             />
             <p
-              v-if="searchResults.length === 0"
+              v-if="searchResults.length === 0 && !nameSearch.pending.value"
               class="text-body-2 text-medium-emphasis align-self-center mb-0"
             >
               Ningún producto coincide.
@@ -568,7 +595,7 @@ function handleNewSale(): void {
               <td class="text-right">{{ formatMXN(item.unitPriceCents) }}</td>
               <td class="text-center">
                 <div class="d-flex align-center justify-center ga-1">
-                  <v-btn
+                  <IconButton
                     icon="mdi-minus"
                     size="x-small"
                     variant="tonal"
@@ -587,7 +614,7 @@ function handleNewSale(): void {
                     aria-label="Cantidad"
                     @update:model-value="handleQuantity(item.productId, $event)"
                   />
-                  <v-btn
+                  <IconButton
                     icon="mdi-plus"
                     size="x-small"
                     variant="tonal"
@@ -600,7 +627,7 @@ function handleNewSale(): void {
                 {{ formatMXN(item.unitPriceCents * item.quantity) }}
               </td>
               <td class="text-right">
-                <v-btn
+                <IconButton
                   icon="mdi-delete-outline"
                   size="small"
                   variant="text"
@@ -792,7 +819,7 @@ function handleNewSale(): void {
               </template>
               <template #append>
                 <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-                <v-btn
+                <IconButton
                   icon="mdi-close"
                   size="x-small"
                   variant="text"
@@ -827,7 +854,7 @@ function handleNewSale(): void {
               hide-details
             />
             <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-            <v-btn
+            <IconButton
               icon="mdi-plus"
               color="primary"
               variant="tonal"
@@ -954,12 +981,22 @@ function handleNewSale(): void {
       </v-card>
     </v-dialog>
 
+    <!-- Cliente que ya existe: se completan sus datos fiscales. Cliente nuevo: se da de
+         alta CON su mascota (C1.11), igual que en el resto del sistema. -->
     <CustomerFormDialog
+      v-if="invoiceMode === 'registered'"
       v-model="showCustomerForm"
       :tenant-id="session.activeTenantId ?? ''"
-      :customer="invoiceMode === 'registered' ? invoiceCustomer : null"
+      :customer="invoiceCustomer"
       invoice-required
       @saved="handleCustomerSaved"
+    />
+    <CustomerWithPetDialog
+      v-else
+      v-model="showCustomerForm"
+      :tenant-id="session.activeTenantId ?? ''"
+      invoice-required
+      @saved="handleCustomerSaved($event.customer)"
     />
   </v-container>
 </template>

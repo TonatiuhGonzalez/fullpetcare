@@ -24,6 +24,7 @@ import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
 import TicketView from '@/components/TicketView.vue'
+import IconButton from '@/components/IconButton.vue'
 
 type PaymentMethod = Database['public']['Enums']['payment_method']
 
@@ -280,7 +281,7 @@ async function handleCharge(): Promise<void> {
               <span class="mr-2">{{
                 formatMXN(item.unitPriceCents * item.quantity)
               }}</span>
-              <v-btn
+              <IconButton
                 icon="mdi-close"
                 size="x-small"
                 variant="text"
@@ -320,7 +321,7 @@ async function handleCharge(): Promise<void> {
             hide-details
             style="max-width: 90px"
           />
-          <v-btn
+          <IconButton
             icon="mdi-plus"
             color="primary"
             variant="tonal"
@@ -377,8 +378,8 @@ async function handleCharge(): Promise<void> {
             </template>
             <template #append>
               <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-              <v-btn
-                icon="mdi-close"
+              <IconButton
+                icon="mdi-close" aria-label="Quitar pago"
                 size="x-small"
                 variant="text"
                 @click="cart.removePayment(index)"
@@ -411,7 +412,7 @@ async function handleCharge(): Promise<void> {
             hide-details
           />
           <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-          <v-btn
+          <IconButton
             icon="mdi-plus"
             color="primary"
             variant="tonal"

@@ -28,6 +28,7 @@ import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
 import { visitKindInfo } from '@/lib/visitKind'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -135,7 +136,7 @@ function handleSaved(): void {
       <v-card-title class="d-flex align-center">
         <span>{{ pet?.name ?? 'Mascota' }}</span>
         <v-spacer />
-        <v-btn
+        <IconButton
           icon="mdi-close"
           variant="text"
           aria-label="Cerrar"

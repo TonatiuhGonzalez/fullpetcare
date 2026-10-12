@@ -11,6 +11,7 @@ import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import { noticeSeverity, noticeText } from '@/lib/tenantNotices'
 import { isFrontDesk, roleLabel } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -152,7 +153,7 @@ function handleBranchChange(branchId: unknown): void {
          botón grande en la barra. -->
     <v-menu location="bottom end">
       <template #activator="{ props: helpProps }">
-        <v-btn
+        <IconButton
           v-bind="helpProps"
           icon="mdi-help-circle-outline"
           variant="text"
@@ -224,7 +225,7 @@ function handleBranchChange(branchId: unknown): void {
   </v-main>
 
   <!-- d-none d-md-flex: solo escritorio; en móvil se oculta (mismo corte md que el menú lateral). -->
-  <v-btn
+  <IconButton
     v-if="showPosButton"
     class="d-none d-md-flex ma-6"
     icon="mdi-cash-register"

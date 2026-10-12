@@ -72,6 +72,7 @@ import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import TicketView from '@/components/TicketView.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { visitKindInfo } from '@/lib/visitKind'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -790,7 +791,7 @@ function checkoutErrorMessage(err: unknown): string {
                 <template #title>{{ methodLabels[payment.method] }}</template>
                 <template #append>
                   <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-                  <v-btn icon="mdi-close" size="x-small" variant="text" @click="cart.removePayment(index)" />
+                  <IconButton icon="mdi-close" aria-label="Quitar pago" size="x-small" variant="text" @click="cart.removePayment(index)" />
                 </template>
               </v-list-item>
             </v-list>
@@ -819,7 +820,7 @@ function checkoutErrorMessage(err: unknown): string {
                 hide-details
               />
               <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-              <v-btn icon="mdi-plus" color="primary" variant="tonal" @click="handleAddPayment" />
+              <IconButton icon="mdi-plus" aria-label="Agregar pago" color="primary" variant="tonal" @click="handleAddPayment" />
             </div>
 
             <PaymentSummary />
