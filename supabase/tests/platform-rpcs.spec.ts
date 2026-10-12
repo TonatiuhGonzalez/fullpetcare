@@ -209,6 +209,11 @@ describe('platform_list_tenants()', () => {
     // como "el dueño" mandaría al superadmin a resetear la contraseña de
     // alguien que ya no tiene acceso a ese negocio.
     await withTransaction(async (client) => {
+      // Desde C1.18 la base impide desactivar al único dueño (trigger
+      // prevent_losing_last_owner). El panel de plataforma igual debe saber qué hacer con un
+      // negocio cuyo dueño ya no está activo (datos anteriores a la regla, o SQL directo),
+      // así que el trigger se apaga SOLO en esta transacción, que se revierte sola.
+      await client.query('alter table memberships disable trigger prevent_losing_last_owner')
       await client.query(
         'update memberships set is_active = false where tenant_id = $1 and user_id = $2',
         [TENANT_PATITAS, USER_DUENO],
