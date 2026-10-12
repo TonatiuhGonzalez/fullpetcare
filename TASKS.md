@@ -1862,7 +1862,7 @@ que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
 **Meta: que mientras llegan los datos se vea la forma de lo que viene (tablas y tarjetas), que navegar desde el menú dé
 señal de que algo está cargando, y que una pantalla que no baja tras un despliegue avise en vez de quedarse muda.**
 Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
-**Estado: aprobada el 2026-10-09, en construcción.** Decisiones y alternativas en
+**Estado: terminada (2026-10-09).** Decisiones y alternativas en
 `PLAN.md` D22. **Fuera de alcance (decidido el 2026-10-08):** la pantalla en blanco al recargar la página (F5).
 
 ### 17A. Preparación
@@ -1884,36 +1884,41 @@ Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni
 - [x] **17.2** 🧪 Composable `useDelayedLoading` (retraso de ~150 ms antes de mostrar, para que una respuesta rápida no
   parpadee). _Verificar:_ tests unitarios: respuesta más rápida que el retraso no muestra nada; más lenta sí lo
   muestra; al terminar se apaga; sin fugas si el componente se desmonta.
-- [ ] **17.3** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader`, con `prefers-reduced-motion`.
+- [x] **17.3** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader`, con `prefers-reduced-motion`.
   Documentarlos en `CLAUDE.md` §5.6 al cerrar. _Verificar:_ en navegador, claro y oscuro, sin desborde en móvil de 390 px.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** existen `TableSkeleton`, `CardSkeleton`, `PageSkeleton` (y `CalendarSkeleton`), más `useFirstLoad`. Documentados en `CLAUDE.md` §4 y §5.6.
-- [ ] **17.4** Barra de progreso global atada al router (aparece pasados ~150 ms, desaparece al terminar o fallar).
+  **Verificado en navegador (2026-10-09):** con el build de producción y Supabase local (script desechable de Playwright, no se sube), las siluetas se ven en claro y oscuro y en móvil de 390 px **sin desborde horizontal** en Clientes, Inventario, Inicio y Sucursales. El brillo se apaga con `prefers-reduced-motion` (regla en `styles/main.scss`; se revisó el CSS, no se probó con la preferencia activa en el navegador). Están documentados en `CLAUDE.md` §4 y §5.6.
+- [x] **17.4** Barra de progreso global atada al router (aparece pasados ~150 ms, desaparece al terminar o fallar).
   _Verificar:_ en navegador con la red limitada (Slow 3G) se ve al cambiar de pantalla desde el menú; con red normal no
   aparece; también en superadmin.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** `NavigationProgress` está montada en `App.vue` y atada al router (`useNavigationProgress`, con test).
-- [ ] **17.5** 🧪 Error al bajar una pantalla: función pura en `lib/` que reconoce el fallo de importación dinámica
+  **Verificado en navegador (2026-10-09):** con la descarga de pantallas retrasada (700 ms por archivo, **simulada con retraso de peticiones, no con el Slow 3G de DevTools**), la barra aparece al cambiar de pantalla desde el menú en Clientes, Empleados, Inventario, Reportes, Caja, Sucursales y Servicios, y en el superadmin (Motivos, Planes, Administradores y Reportes). Con red normal y la pantalla ya descargada **no aparece**. La barra cubre la **descarga de la pantalla**: si su archivo ya está en caché (Inicio, o la pantalla de entrada del superadmin) no sale, y de ahí en adelante manda la silueta de datos.
+- [x] **17.5** 🧪 Error al bajar una pantalla: función pura en `lib/` que reconoce el fallo de importación dinámica
   (Chrome, Firefox y Safari) y `router.onError` que muestra el aviso con botón para recargar, una sola vez por sesión
   de navegación. _Verificar:_ tests unitarios con los tres mensajes y con errores que **no** son de importación;
   en navegador, simular el fallo (bloquear el archivo de una pantalla) y ver el aviso, sin bucle de recargas.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** `lib/chunkError.ts` con su test y `router.onError` ya lo usa; los tests unitarios están. Falta simular el fallo en navegador.
+  **Verificado en navegador (2026-10-09):** al bloquear los archivos de las pantallas no descargadas, aparece **una sola vez** "Hay una versión nueva de FullPetCare. Recarga la página para continuar." con su botón "Recargar"; un segundo intento no duplica el aviso y no hubo recargas automáticas (0 navegaciones del documento). Tests unitarios en verde.
 
 ### 17C. Migración de pantallas
 
-- [ ] **17.6** Tablas: primera carga con `TableSkeleton`, recargas conservan las filas y llevan solo la barra fina
+- [x] **17.6** Tablas: primera carga con `TableSkeleton`, recargas conservan las filas y llevan solo la barra fina
   (Clientes, Mascotas, Empleados, Inventario, ventas y las demás de 17.1). _Verificar:_ en navegador, la tabla no
   parpadea al recargar y no hay salto de diseño al llegar los datos.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** las tablas de 17.1 usan `useFirstLoad` y `TableSkeleton`; Sucursales se migró hoy (silueta de tarjeta y de lista). Inventario también se migró a `useFirstLoad` y `TableSkeleton` (antes tenía un skeleton suelto, sin retraso y con un hueco antes de empezar a cargar).
-- [ ] **17.7** Tarjetas y tableros: Inicio, Reportes y Caja con skeleton de la forma real. _Verificar:_ en navegador,
+  **Verificado en navegador (2026-10-09):** con las peticiones retrasadas, Clientes, Empleados, Inventario, Servicios, Caja y Sucursales muestran la silueta **a partir de ~150 ms** (antes no hay nada, no parpadea) y la quitan al llegar los datos. Al buscar en Clientes (recarga) **no sale la silueta** y la tabla no se queda vacía. Salto de diseño al llegar los datos en Clientes, Empleados e Inventario: **CLS = 0.000**. Sucursales e Inventario se migraron en esta fase al patrón (antes: barra suelta y skeleton sin retraso).
+- [x] **17.7** Tarjetas y tableros: Inicio, Reportes y Caja con skeleton de la forma real. _Verificar:_ en navegador,
   claro y oscuro.
-- [ ] **17.8** Pantallas de detalle: cobro, atención, venta, cita y los diálogos de cliente y mascota dejan de mostrar
+  **Verificado en navegador (2026-10-09):** Inicio (en claro, oscuro y móvil, con las 2 columnas de la pantalla real), Reportes y Caja muestran su silueta mientras cargan y la quitan al llegar los datos.
+- [x] **17.8** Pantallas de detalle: cobro, atención, venta, cita y los diálogos de cliente y mascota dejan de mostrar
   un círculo solo. _Verificar:_ en navegador, ninguna se ve vacía mientras carga.
-- [ ] **17.9** Superadmin y vista pública. _Verificar:_ en navegador; la vista pública en móvil.
-  **Avance 2026-10-09 (revisado en el código; falta la verificación en navegador, por eso queda sin marcar):** Planes, Motivos, Administradores, Empresas y la vista pública ya usan las siluetas.
+  **Verificado en navegador (2026-10-09):** cita, atención, cobro y venta muestran su silueta y la quitan al terminar; los diálogos de edición de cliente y de mascota muestran silueta mientras cargan.
+- [x] **17.9** Superadmin y vista pública. _Verificar:_ en navegador; la vista pública en móvil.
+  **Verificado en navegador (2026-10-09):** silueta de datos en Motivos, Planes, Administradores, Reportes y Empresas del superadmin, y en la vista pública con móvil de 390 px (sin desborde).
 
 ### 17D. Cierre
 
-- [ ] **17.10** 📚 Correr `lint`, `test:unit` y el E2E; actualizar `CLAUDE.md` (§4 estructura y §5.6 piezas
+- [x] **17.10** 📚 Correr `lint`, `test:unit` y el E2E; actualizar `CLAUDE.md` (§4 estructura y §5.6 piezas
   compartidas) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-09:** `lint`, `vue-tsc -b` y los 585 tests unitarios en verde; el E2E (agendar → atender → cobrar) pasa. `CLAUDE.md` §4, §5.6 y §1 y `PLAN.md` D22 ("aprobada") quedaron al día.
+  **Qué se puede demostrar:** navegar con la red lenta y ver siluetas en lugar de pantallas vacías, la barra de arriba al cambiar de pantalla, y el aviso de versión nueva si una pantalla no baja tras un despliegue.
+  **Sin cubrir:** Firefox y Safari (solo Chromium), el Slow 3G real de DevTools y la pantalla en blanco al recargar con F5 (fuera de alcance de la fase).
 
 ## Fase 18 — Suscripción modular: motor de derechos (planeada)
 
