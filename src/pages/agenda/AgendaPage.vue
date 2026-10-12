@@ -35,6 +35,7 @@ import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
@@ -288,7 +289,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <template v-if="isFrontDeskView">
-        <v-btn icon="mdi-chevron-left" variant="text" size="small" @click="shiftDay(-1)" />
+        <IconButton icon="mdi-chevron-left" aria-label="Día anterior" variant="text" size="small" @click="shiftDay(-1)" />
         <v-text-field
           :model-value="agenda.activeDate"
           type="date"
@@ -298,7 +299,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
           style="max-width: 170px"
           @update:model-value="handleDateInput"
         />
-        <v-btn icon="mdi-chevron-right" variant="text" size="small" @click="shiftDay(1)" />
+        <IconButton icon="mdi-chevron-right" aria-label="Día siguiente" variant="text" size="small" @click="shiftDay(1)" />
         <v-btn variant="text" size="small" @click="goToday">Hoy</v-btn>
       </template>
       <span v-else class="text-body-2 text-medium-emphasis text-capitalize">

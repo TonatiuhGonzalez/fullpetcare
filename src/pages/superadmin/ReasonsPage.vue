@@ -11,6 +11,7 @@ import { onMounted, ref } from 'vue'
 import * as platformService from '@/services/platform'
 import type { CancellationReason } from '@/services/platform'
 import PageHeader from '@/components/PageHeader.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const reasons = ref<CancellationReason[]>([])
 const loading = ref(false)
@@ -154,7 +155,7 @@ async function update(
             />
           </td>
           <td class="text-right">
-            <v-btn
+            <IconButton
               icon="mdi-pencil"
               variant="text"
               size="small"

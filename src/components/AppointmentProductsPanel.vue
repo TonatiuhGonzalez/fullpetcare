@@ -7,6 +7,7 @@ import { onMounted, ref } from 'vue'
 
 import * as appointmentProductsService from '@/services/appointmentProducts'
 import type { AppointmentProduct, AvailableProduct } from '@/services/appointmentProducts'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   tenantId: string
@@ -106,7 +107,7 @@ defineExpose({ reload: load })
           line.is_billable ? 'Se cobra al cliente' : 'Uso interno'
         }}</template>
         <template #append>
-          <v-btn
+          <IconButton
             icon="mdi-close"
             size="x-small"
             variant="text"
@@ -147,7 +148,7 @@ defineExpose({ reload: load })
         hide-details
         style="max-width: 90px"
       />
-      <v-btn
+      <IconButton
         icon="mdi-plus"
         color="primary"
         variant="tonal"

@@ -23,6 +23,7 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { isFrontDesk } from '@/lib/roles'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -250,7 +251,7 @@ function openCustomerPage(customerId: string): void {
         </div>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-btn
+        <IconButton
           icon="mdi-pencil"
           color="primary"
           variant="text"
@@ -258,7 +259,7 @@ function openCustomerPage(customerId: string): void {
           aria-label="Editar cliente"
           @click.stop="openEditCustomer(item)"
         />
-        <v-btn
+        <IconButton
           icon="mdi-delete"
           color="error"
           variant="text"

@@ -27,6 +27,7 @@ import StockMovementDialog from '@/components/StockMovementDialog.vue'
 import TableSkeleton from '@/components/TableSkeleton.vue'
 import { useFirstLoad } from '@/composables/useFirstLoad'
 import { useServerSearch } from '@/composables/useServerSearch'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const inventory = useInventoryStore()
@@ -269,7 +270,7 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       <template #[`item.actions`]="{ item }">
         <v-menu>
           <template #activator="{ props: menuProps }">
-            <v-btn
+            <IconButton
               v-bind="menuProps"
               icon="mdi-dots-vertical"
               variant="text"

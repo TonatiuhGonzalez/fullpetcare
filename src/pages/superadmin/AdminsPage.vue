@@ -12,6 +12,7 @@ import { useSessionStore } from '@/stores/session'
 import AdminFormDialog from '@/components/AdminFormDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 
@@ -133,7 +134,7 @@ async function confirmRemove(): Promise<void> {
         <v-chip v-if="item.isMe" size="x-small" class="ml-2" variant="tonal">Tú</v-chip>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-btn
+        <IconButton
           icon="mdi-account-remove-outline"
           variant="text"
           size="small"

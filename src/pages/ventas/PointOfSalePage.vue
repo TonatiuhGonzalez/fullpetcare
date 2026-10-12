@@ -33,6 +33,7 @@ import * as invoiceRequestsService from '@/services/invoiceRequests'
 import { useCartStore } from '@/stores/cart'
 import { useSessionStore } from '@/stores/session'
 import type { Database } from '@/types/database'
+import IconButton from '@/components/IconButton.vue'
 
 type PaymentMethod = Database['public']['Enums']['payment_method']
 
@@ -594,7 +595,7 @@ function handleNewSale(): void {
               <td class="text-right">{{ formatMXN(item.unitPriceCents) }}</td>
               <td class="text-center">
                 <div class="d-flex align-center justify-center ga-1">
-                  <v-btn
+                  <IconButton
                     icon="mdi-minus"
                     size="x-small"
                     variant="tonal"
@@ -613,7 +614,7 @@ function handleNewSale(): void {
                     aria-label="Cantidad"
                     @update:model-value="handleQuantity(item.productId, $event)"
                   />
-                  <v-btn
+                  <IconButton
                     icon="mdi-plus"
                     size="x-small"
                     variant="tonal"
@@ -626,7 +627,7 @@ function handleNewSale(): void {
                 {{ formatMXN(item.unitPriceCents * item.quantity) }}
               </td>
               <td class="text-right">
-                <v-btn
+                <IconButton
                   icon="mdi-delete-outline"
                   size="small"
                   variant="text"
@@ -818,7 +819,7 @@ function handleNewSale(): void {
               </template>
               <template #append>
                 <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-                <v-btn
+                <IconButton
                   icon="mdi-close"
                   size="x-small"
                   variant="text"
@@ -853,7 +854,7 @@ function handleNewSale(): void {
               hide-details
             />
             <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-            <v-btn
+            <IconButton
               icon="mdi-plus"
               color="primary"
               variant="tonal"

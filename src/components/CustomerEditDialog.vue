@@ -20,6 +20,7 @@ import { speciesLabel } from '@/lib/petLabels'
 import { isValidEmail, isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import PetEditDialog from '@/components/PetEditDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -198,7 +199,7 @@ async function handlePetSaved(): Promise<void> {
       <v-card-title class="d-flex align-center">
         <span>{{ title }}</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
+        <IconButton icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
       </v-card-title>
 
       <v-card-text>

@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '@/lib/productCategories'
 import type { ProductCategory } from '@/services/productCategories'
 import { useInventoryStore } from '@/stores/inventory'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
@@ -111,7 +112,7 @@ async function handleToggle(category: ProductCategory): Promise<void> {
             divided
             class="icon-picker mb-3"
           >
-            <v-btn
+            <IconButton
               v-for="option in CATEGORY_ICONS"
               :key="option.icon"
               :value="option.icon"
@@ -168,14 +169,14 @@ async function handleToggle(category: ProductCategory): Promise<void> {
               {{ (productCounts.get(category.id) ?? 0) === 1 ? 'producto' : 'productos' }}
             </template>
             <template #append>
-              <v-btn
+              <IconButton
                 icon="mdi-pencil"
                 variant="text"
                 size="small"
                 :aria-label="`Editar ${category.name}`"
                 @click="startEdit(category)"
               />
-              <v-btn
+              <IconButton
                 :icon="category.is_active ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
                 variant="text"
                 size="small"
