@@ -49,7 +49,7 @@ function slotTitle(slot: PickerSlot): string | undefined {
         :key="slot.startsAt"
         :value="slot"
         :disabled="slot.status === 'past'"
-        :color="slot.status === 'overlap' ? 'overlap' : undefined"
+        :class="{ 'slot-chip--overlap': slot.status === 'overlap' }"
         :variant="slot.status === 'overlap' ? 'flat' : undefined"
         :prepend-icon="slot.status === 'overlap' ? 'mdi-alert' : undefined"
         :title="slotTitle(slot)"
@@ -73,6 +73,21 @@ function slotTitle(slot: PickerSlot): string | undefined {
 <style scoped lang="scss">
 // El amarillo no tiene contraste como texto sobre fondo claro: va solo como
 // acento de borde; el texto conserva el color normal.
+// Vuetify ignora la prop `color` de un chip que está dentro de un grupo mientras no esté
+// seleccionado (solo la aplica a la selección), así que el amarillo se pone por clase y el
+// chip se ve amarillo SIEMPRE, no solo al elegirlo. El borde lo separa de una tarjeta blanca
+// (el amarillo solo contrasta ≈1.3:1 con el blanco) y el ícono y el texto del aviso hacen
+// que el color nunca vaya solo (§5.6).
+.slot-chip--overlap.v-chip {
+  background: rgb(var(--v-theme-overlap));
+  color: rgb(var(--v-theme-on-overlap));
+  border: 1px solid rgba(var(--v-theme-on-overlap), 0.55);
+}
+
+.slot-chip--overlap.v-chip--selected {
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-on-overlap));
+}
+
 .overlap-notice {
   border-left: 4px solid rgb(var(--v-theme-overlap));
   padding-left: 8px;
