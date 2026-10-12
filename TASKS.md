@@ -2124,7 +2124,7 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
 - [ ] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
   tienen ninguno) y migración de los 31 botones de abajo. Solo con puntero (`hover: hover`), no en táctil. _Verificar:_ en
   navegador, cada uno muestra su texto al pasar el mouse y con el teclado (foco); en móvil no estorba.
-- [ ] **C1.20** Conectar los buscadores a la base (`search_customers`, `search_pets`, `search_products`): Clientes,
+- [x] **C1.20** Conectar los buscadores a la base (`search_customers`, `search_pets`, `search_products`): Clientes,
   mascotas, nueva cita, llegada sin cita, Inventario, punto de venta y empresas del superadmin. Se conserva el escáner de
   código de barras (coincidencia exacta de `sku`). _Verificar:_ en navegador, en cada pantalla, "jose" encuentra "José";
   los tests existentes de `lib/petSearch.ts`, `lib/productSearch.ts` y `services/customers.ts` se actualizan o se retiran
