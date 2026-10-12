@@ -1119,6 +1119,31 @@ fuera de UTC, y todo `SECURITY DEFINER` revalida membresía.
 10. **La llegada sin cita no valida horario de sucursal ni traslape** (solo su ventana de 10 minutos de pasado): una
     urgencia fuera de horario se puede registrar. El aviso y la confirmación del traslape son de la interfaz.
 
+### D27 — Ancho del contenido: dos anchos, el de listados crece con la ventana hasta 1440 px
+
+**Estado:** aprobada el 2026-10-12 (el usuario eligió `clamp` y tope de 1440 px). Construida en la fase 24.
+
+**Problema.** `VContainer` tiene un solo `maxWidth: 860` en `plugins/vuetify.ts`. En un monitor de 1920 px quedan
+unos 500 px vacíos a cada lado, y a las tablas y a la página del cliente (tres columnas) les falta espacio. Para
+formularios y detalle de una columna, en cambio, 860 px es lo correcto.
+
+**Decisión.**
+1. **Ancho de listados y tableros:** `clamp(860px, 75vw, 1440px)`. Nunca baja de 860 (como hoy), crece con la
+   ventana y no pasa de 1440. Es el nuevo default de `VContainer`.
+2. **Ancho de formularios y detalle:** 860 px fijos, pasados por una constante compartida (`lib/contentWidth.ts`);
+   las páginas no escriben números sueltos.
+3. **Sin cambio:** Agenda y Punto de venta (ya sin tope), vista pública (480 px) y las pantallas de autenticación.
+
+**Alternativas descartadas.** (a) Subir el tope global a un número fijo: estira los formularios. (b) Sin tope
+(`fluid`) en todo: las tablas se vuelven ilegibles en monitores ultraanchos. (c) Preferencia del usuario "centrado o
+completo" en el menú: más piezas (preferencia, control, probar dos modos por pantalla) para un problema que se
+resuelve con dos anchos; queda como mejora posterior si alguien la pide.
+
+**Contras y riesgos.** `75vw` incluye el menú lateral, así que el contenido real queda un poco más angosto de lo que
+dice la fórmula; se ajusta a ojo en 1366, 1440, 1920 y 2560 px. `SettingsPage` ubica su riel lateral en el margen libre
+del contenedor (`settings-container`): **debe quedarse en 860 explícito**, o el riel se mueve. Sin dependencias nuevas
+(§3), sin tocar la base ni §7 y §8.
+
 ---
 
 ## Parte 4 — Riesgos conocidos

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Detalle de una venta cobrada (tarea 11.19): el ticket y su factura. Aquí se
 // factura "cuando el cliente la pide", aunque haya pasado tiempo desde el cobro.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
@@ -147,7 +148,7 @@ async function handleOpen(kind: 'xml' | 'pdf'): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-4">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-4">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"

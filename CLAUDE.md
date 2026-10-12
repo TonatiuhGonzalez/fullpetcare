@@ -228,6 +228,7 @@ FullPetCare/
     │   ├── appointmentErrors.ts #   mensajes de las reglas de fecha y hora de una cita y aviso de traslape (§6.3)
     │   ├── customerErrors.ts    #   correo repetido y otros rechazos al guardar un cliente (§6.2)
     │   ├── visitKind.ts         #   tipo de visita → nombre, ícono y color (§5.6)
+    │   ├── contentWidth.ts      #   ancho del contenido: ancho (listados) y angosto (formularios), §5.6
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
@@ -332,6 +333,12 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   el calendario como franja + ícono (`components/calendarEvents.ts`). No se repiten
   "Estética"/"Veterinaria" a mano. Para no confundirlos, el azul y el naranja **no se usan para
   otra cosa**: "Agendada" y el peso en el historial son gris pizarra (`secondary`), no `info`.
+- **Ancho del contenido (fase 24, PLAN.md D27):** hay dos anchos, definidos en `lib/contentWidth.ts`. El default de
+  `VContainer` (`plugins/vuetify.ts`) es el **ancho** `clamp(860px, 75vw, 1440px)`, para listados y tableros. Las
+  pantallas de formulario o detalle (cobro, atender cita, detalle de cita y de venta, Configuración) piden
+  `:max-width="CONTENT_WIDTH.narrow"` (860 px). Las páginas no escriben números sueltos. Agenda y punto de venta
+  (sin tope) y la vista pública (480 px) conservan el suyo. `SettingsPage` debe quedarse en `narrow`: su riel lateral
+  se ubica en el margen libre del contenedor.
 - **Modo claro, oscuro o del sistema:** `useThemeMode` (se elige en el menú de usuario; la
   preferencia es una comodidad del navegador, `fpc.themeMode`, nunca un dato de negocio).
 - **Piezas compartidas** (úsalas en lugar de rehacerlas): `BrandLogo`, `PageHeader` (todo

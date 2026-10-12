@@ -5,6 +5,7 @@
 // marca `completed` (tarea 4.16). El estado en sí lo valida
 // services/appointments.ts#changeStatus() con lib/appointmentStatus.ts
 // (tareas 4.8-4.9); esta página solo decide CUÁNDO llamarlo.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { onMounted, ref } from 'vue'
@@ -149,7 +150,7 @@ async function handleVaccinationSaved(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-6">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"
