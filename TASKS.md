@@ -2135,7 +2135,7 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
 - [ ] **C1.21** 🧪 Semilla y `demo:reset` (un cliente con correo repetido **no**; citas con horas válidas), E2E (agendar →
   atender → cobrar) revisado porque ahora el pasado se rechaza: el flujo debe agendar **a una hora futura**, aunque se
   corra tarde. Correr `lint`, `vue-tsc -b`, `test:unit`, `test:db` y `test:e2e`. _Verificar:_ todo en verde.
-- [ ] **C1.22** 📚 Actualizar `CLAUDE.md` (§1 fase construida; §5.6 tooltips y color de aviso; §6.2 Clientes y la página
+- [x] **C1.22** 📚 Actualizar `CLAUDE.md` (§1 fase construida; §5.6 tooltips y color de aviso; §6.2 Clientes y la página
   de cliente; §6.3 el traslape ya no se rechaza; §7.6 (los empleados ahora entran en la contraseña temporal obligatoria al restablecerse); §3 la extensión
   `unaccent`; §4 estructura) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
 
