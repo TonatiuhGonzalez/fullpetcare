@@ -1024,6 +1024,103 @@ librería, y el máximo de filas.
 
 ---
 
+### D26 — Correcciones 1: el traslape avisa en vez de bloquear, cliente y mascota juntos, y búsqueda sin acentos en la base
+
+**Estado:** aprobada el 2026-10-12 (decisiones de producto y pendientes resueltos por el usuario; tabla de `TASKS.md`
+"Correcciones 1"). Aún no se construye.
+
+**Problema.** Doce observaciones de uso. La mayoría son de interfaz, pero tres tocan reglas que hoy vive la base (el
+traslape de citas, el correo del cliente y la búsqueda), y esas no se arreglan solo en Vue.
+
+**1. El traslape deja de rechazarse.** Hoy `create_appointment()` y `reschedule_appointment()` lanzan "Este empleado ya
+tiene una cita en ese horario" y `computeAvailableSlots` **oculta** los huecos ocupados. El usuario pidió lo contrario:
+elegirlos y solo avisar con un chip amarillo. Si solo cambiara la interfaz, la base lo rechazaría al guardar, así que
+**cambia la regla en la base**. Alternativas: (a) quitar el rechazo (elegida); (b) conservarlo y que el aviso sea "esto
+va a fallar" (contradice lo pedido); (c) un parámetro `p_allow_overlap` (una regla que depende de quien llama no
+protege nada). **Costo aceptado:** un empleado puede quedar con dos citas encimadas; "ocupado" pasa a ser un aviso, no una
+garantía, y los tests que hoy esperan el rechazo cambian de sentido.
+
+**2. Fecha y hora, validadas también en la base.** Pasado (sin tolerancia), fin ≤ inicio, día cerrado y fuera de
+horario, solo al crear y reprogramar. El "ahora" es el `now()` **de la base**, no el reloj del navegador (mismo motivo
+que ya usa `create_walk_in_appointment`), y el horario se calcula en la zona IANA de la sucursal (§8.3). **Alternativa
+descartada:** validar solo en el formulario (cualquier llamada directa a la API se salta la regla).
+
+**3. Correo único por negocio, con un trigger y no con un índice único.** Un índice único parcial
+(`where deleted_at is null`) **fallaría al aplicarse** si hoy hay duplicados, y no puede expresar "solo cuando el correo
+cambia", que es lo que se pidió para no bloquear a nadie por un dato que ya estaba así. El trigger toma un candado por
+(negocio, correo) para que dos altas simultáneas no pasen las dos. **Costo aceptado:** es una regla nuestra, no una
+garantía del motor. **Efecto en D25 (importador, propuesta):** una fila con correo repetido se reporta como error de
+esa fila.
+
+**4. Cliente y mascota se dan de alta en una sola transacción** (`create_customer_with_pet()`), por el mismo
+argumento que el borrado en cascada de D19: dos inserts desde el navegador pueden dejar un cliente sin mascota si el
+segundo falla, justo lo que la regla "mascota obligatoria" quiere evitar. **Alcance:** es una regla del **alta**, no un
+invariante de la tabla (un cliente puede quedarse sin mascotas si se eliminan después). **No definido:** si aplica al
+importador de D25.
+
+**5. Búsqueda sin acentos resuelta en la base.** Extensión `unaccent` (contrib de Postgres, disponible en Supabase) con
+una función `app.search_norm()` `IMMUTABLE` que la envuelve (la original es `STABLE` y no sirve para índices), y RPC
+`search_*` con la seguridad de **quien llama** (RLS aplica, §7.3). Se conserva el criterio de cada pantalla: clientes
+"empieza con" (ver el comentario de `customers.sql`), mascotas y productos "contiene". **Alternativas:** (b) columna
+generada `search_text` con índice trigram, más rápida con miles de filas pero con más piezas (se reconsidera si algún
+negocio crece); (c) normalizar en el navegador, que es lo que ya hacen `lib/petSearch.ts` y `lib/productSearch.ts` y lo
+que el usuario descartó ("lo debe procesar el back"). **Riesgo:** hoy mascotas, inventario y punto de venta filtran en
+memoria y una consulta por tecla agrega latencia; se mide en el punto de venta y, si estorba, se agrega espera al
+teclear. **Dependencia:** una extensión de Postgres, justificada aquí (§3, §11).
+
+**6. Página de cliente con ruta propia** (`/app/clientes/:id`) y no un diálogo a pantalla completa (lo eligió el
+usuario): se puede abrir con un enlace y el botón de atrás funciona. Reutiliza la gráfica de peso, el link para
+compartir y la cartilla de `PetEditDialog`, sin duplicarlos. **Revierte** la decisión 2 de la fase 14 ("la fila no abre
+nada"). `PetsPanel.vue` y los diálogos viejos se conservan sin uso (regla de D19).
+
+**7. Tooltips con `v-tooltip` de Vuetify en una pieza compartida.** Alternativa descartada: el atributo `title` del
+navegador (tarda, no se puede dar estilo y no aparece con el teclado; hoy solo 3 botones lo usan). El texto del tooltip
+es también el `aria-label`, así que los 6 botones que hoy no tienen ninguno quedan cubiertos. Solo con puntero.
+
+**8. Empleados.** "Eliminar" es borrado suave de la **membresía** (no de `auth.users` ni de `profiles`: la persona es
+global y podría trabajar en otro negocio, §6.1). Desactivar y eliminar se **bloquean con citas programadas**, como las
+sucursales, con un trigger (la regla vive en la base, §7.3).
+
+**9. Color de aviso de traslape: un token nuevo.** El `warning` actual (`#9A5B00` claro, `#F0B24A` oscuro) ya significa
+"sin esterilizar" y alertas de inventario, y en claro es casi el naranja de estética (`#C25400`), que §5.6 reserva.
+Reutilizarlo mezclaría significados. El usuario pidió "un amarillo distinto" y revisará la paleta después; el test de
+contraste AA valida cualquier valor.
+
+**10. Sin dependencias npm nuevas** (§3). No relaja §7 ni §8: la migración es aditiva (§8.1), no hay dinero ni fechas
+fuera de UTC, y todo `SECURITY DEFINER` revalida membresía.
+
+**Decisiones que cerraron los pendientes (2026-10-12):**
+
+1. **Llegada sin cita:** el traslape **avisa y el trabajador decide** si lo acepta (el aviso dice que ya hay una cita y
+   que puede alterar la cronología). A diferencia de agendar, pide **confirmación**. `create_walk_in_appointment()`
+   deja de heredar el rechazo, pero **conserva su ventana de pasado de 10 minutos**: no hereda la regla "sin tolerancia".
+2. **Reprogramar** permite el traslape con aviso, igual que agendar (misma regla en las dos RPC).
+3. **Fuera del horario laboral no se muestran huecos**, como hoy; solo se deshabilitan los pasados y se marcan los
+   ocupados.
+4. **Eliminar mascota** desde su tarjeta en la página de cliente.
+5. **"Editar" abre los modales** `CustomerEditDialog` y `PetEditDialog` ya existentes (menos código nuevo que un modo
+   edición dentro de la página).
+6. **Empleados:** la fila deja de abrir el formulario; se edita con el ícono.
+7. **Contraseña de empleado:** temporal, mostrada una sola vez y con cambio obligatorio. Esto **amplía §7.6**, que hoy
+   deja fuera a los empleados invitados; solo aplica al restablecimiento, no a la invitación. **Alternativa
+   descartada:** enlace de recuperación al correo.
+
+**Sin pendientes de producto.** Aprobada por escrito el 2026-10-12 (C1.1).
+
+**Decisiones surgidas al construir la ola 1 (2026-10-12):**
+
+8. **Re-alta de un empleado eliminado: se reactiva su fila.** `memberships` tiene `unique (tenant_id, user_id)` y el alta
+   rechaza si la fila existe aunque esté eliminada ("Esta persona ya tiene acceso"). El alta debe **reactivar** la
+   membresía eliminada (quitar `deleted_at`, `is_active = true`, nuevo rol y sucursales) en lugar de rechazarla.
+   Pendiente de construir (migración nueva sobre `create_employee_membership`).
+9. **La ñ no se confunde con la n** en la búsqueda de la base (`app.search_norm()` la conserva). Hoy el navegador
+   (`lib/petSearch.ts`, `lib/productSearch.ts`) las iguala; al conectar los buscadores (C1.20) ese comportamiento cambia
+   y es lo deseado.
+10. **La llegada sin cita no valida horario de sucursal ni traslape** (solo su ventana de 10 minutos de pasado): una
+    urgencia fuera de horario se puede registrar. El aviso y la confirmación del traslape son de la interfaz.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
@@ -1039,3 +1136,4 @@ librería, y el máximo de filas.
 | Migración mala en producción                       | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main`             |
 | Fila faltante/mal sembrada en `role_permissions`   | `owner` nunca depende de la tabla (bypass en `app.has_permission()`); test que confirma que cambiar una fila cambia el resultado sin tocar código |
 | `invite-employee` mal validada = invitación indebida | Revalida permiso con el JWT de quien llama ANTES de tocar `service_role`; el RPC vuelve a revalidar aunque la Edge Function fallara |
+| Dos citas encimadas del mismo empleado (desde Correcciones 1, D26) | Es un aviso y no un bloqueo, a propósito; la base sigue rechazando pasado, fuera de horario y día cerrado |
