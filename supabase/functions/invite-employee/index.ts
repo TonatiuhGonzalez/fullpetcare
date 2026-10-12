@@ -40,9 +40,14 @@
 // contra el secreto compartido del proyecto. Por eso un request sin sesión
 // válida ni siquiera llega a ejecutar el código de abajo.
 import "@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { handleCors } from "../_shared/cors.ts";
+// Mismo generador que usa platform-admin (aleatoriedad criptográfica,
+// alfabeto sin caracteres ambiguos): una sola implementación de "contraseña
+// temporal" en todo el proyecto.
+import { generateTemporaryPassword } from "../platform-admin/password.ts";
+import { parseEmployeeRequest, resetBlockReason, RESET_BLOCK_MESSAGES } from "./request.ts";
 
 // Mismo criterio que INVALID_TOKEN_RESPONSE en public-pet-view: un solo
 // mensaje genérico para "no tienes permiso", sin importar si la razón es
@@ -53,19 +58,122 @@ const FORBIDDEN_RESPONSE = { message: "No tienes permiso para dar de alta emplea
 const BAD_REQUEST_RESPONSE = { message: "Solicitud inválida." };
 const INVITE_FAILED_RESPONSE = { message: "No se pudo invitar a este correo. Intenta de nuevo." };
 
-interface InviteEmployeeBody {
-  tenantId: string;
-  email: string;
-  fullName: string;
-}
+const RESET_FORBIDDEN_RESPONSE = {
+  message: "No tienes permiso para restablecer contraseñas de empleados.",
+};
+const RESET_NOT_FOUND_RESPONSE = { message: "No se encontró a este empleado." };
+const RESET_FAILED_RESPONSE = {
+  message: "No se pudo restablecer la contraseña. Intenta de nuevo.",
+};
 
-function parseBody(value: unknown): InviteEmployeeBody | null {
-  if (typeof value !== "object" || value === null) return null;
-  const { tenantId, email, fullName } = value as Record<string, unknown>;
-  if (typeof tenantId !== "string" || tenantId.length === 0) return null;
-  if (typeof email !== "string" || email.trim().length === 0) return null;
-  if (typeof fullName !== "string" || fullName.trim().length === 0) return null;
-  return { tenantId, email: email.trim().toLowerCase(), fullName: fullName.trim() };
+// =============================================================================
+// Restablecer la contraseña de un empleado (Correcciones 1, C1.7)
+// =============================================================================
+// Se llama DESPUÉS del paso 1 (quien llama ya demostró ser miembro con
+// employees:edit). Aquí se revalida al OBJETIVO y recién entonces se usa
+// service_role. El patrón es el de platform-admin/reset_password (§7.5):
+// bitácora primero, contraseña, cerrar sesiones, marcar cambio obligatorio.
+//
+// La contraseña temporal se genera aquí, viaja en la respuesta UNA vez y no
+// se escribe en ningún log ni en la bitácora.
+async function resetEmployeePassword(args: {
+  supabaseUrl: string;
+  secretKey: string;
+  callerClient: SupabaseClient;
+  callerUserId: string;
+  tenantId: string;
+  membershipId: string;
+}): Promise<Response> {
+  const { callerClient, callerUserId, tenantId, membershipId } = args;
+
+  // El objetivo se lee con RLS de quien llama Y filtrando por el negocio: una
+  // membresía de otro negocio simplemente "no existe" para esta función.
+  const { data: target, error: targetError } = await callerClient
+    .from("memberships")
+    .select("id, user_id, role, is_active, deleted_at")
+    .eq("id", membershipId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (targetError) {
+    return Response.json(RESET_FAILED_RESPONSE, { status: 502 });
+  }
+  if (!target) {
+    return Response.json(RESET_NOT_FOUND_RESPONSE, { status: 404 });
+  }
+
+  const blocked = resetBlockReason(callerUserId, {
+    userId: target.user_id as string,
+    role: target.role as string,
+    isActive: target.is_active as boolean,
+    isDeleted: target.deleted_at !== null,
+  });
+  if (blocked) {
+    return Response.json({ message: RESET_BLOCK_MESSAGES[blocked] }, { status: 409 });
+  }
+
+  const targetUserId = target.user_id as string;
+  const adminClient = createClient(args.supabaseUrl, args.secretKey, {
+    auth: { persistSession: false },
+  });
+
+  const { data: targetUser, error: getUserError } =
+    await adminClient.auth.admin.getUserById(targetUserId);
+  if (getUserError || !targetUser.user) {
+    return Response.json(RESET_FAILED_RESPONSE, { status: 502 });
+  }
+  const employeeEmail = targetUser.user.email ?? "";
+
+  // Bitácora PRIMERO (mismo principio que §7.5): si no se puede registrar, no
+  // se cambia la contraseña. Va en audit_log (la bitácora del negocio, que lee
+  // el dueño), con `actor_user_id` = quien restablece. La columna `action` es
+  // un enum INSERT/UPDATE/DELETE: se usa UPDATE sobre la membresía y el hecho
+  // real va en new_data.event. Nunca lleva la contraseña.
+  const writeAudit = (event: string) =>
+    adminClient.from("audit_log").insert({
+      tenant_id: tenantId,
+      table_name: "memberships",
+      record_id: membershipId,
+      action: "UPDATE",
+      actor_user_id: callerUserId,
+      new_data: { event, target_user_id: targetUserId, target_email: employeeEmail },
+    });
+
+  const { error: logError } = await writeAudit("password_reset");
+  if (logError) {
+    return Response.json(RESET_FAILED_RESPONSE, { status: 502 });
+  }
+
+  const password = generateTemporaryPassword();
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    password,
+  });
+  if (updateError) {
+    await writeAudit("password_reset_failed");
+    return Response.json(RESET_FAILED_RESPONSE, { status: 502 });
+  }
+
+  // DESPUÉS de cambiar la contraseña: cerrar sesiones (cinturón, ver
+  // platform-admin) y marcar el cambio obligatorio (§7.6: un trigger apaga la
+  // marca con cualquier cambio de hash, así que va al final). Si alguno falla
+  // la contraseña YA cambió: se responde 200 avisando, para no perderla.
+  const { error: revokeError } = await adminClient.rpc("revoke_user_sessions", {
+    p_user_id: targetUserId,
+  });
+  const { error: markError } = await adminClient
+    .from("profiles")
+    .update({ must_change_password: true })
+    .eq("id", targetUserId);
+  if (markError) {
+    console.error("invite-employee: no se pudo marcar el cambio obligatorio", targetUserId);
+  }
+
+  return Response.json({
+    employeeEmail,
+    temporaryPassword: password,
+    sessionsRevoked: !revokeError,
+    mustChangeEnforced: !markError,
+  });
 }
 
 Deno.serve(handleCors(async (req) => {
@@ -90,10 +198,12 @@ Deno.serve(handleCors(async (req) => {
     return Response.json(BAD_REQUEST_RESPONSE, { status: 400 });
   }
 
-  const body = parseBody(rawBody);
+  const body = parseEmployeeRequest(rawBody);
   if (!body) {
     return Response.json(BAD_REQUEST_RESPONSE, { status: 400 });
   }
+  // Mismo criterio de mensaje único, uno por acción.
+  const forbidden = body.action === "reset_password" ? RESET_FORBIDDEN_RESPONSE : FORBIDDEN_RESPONSE;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   // La llave pública normal (la misma que usa el navegador) — aquí solo
@@ -142,7 +252,7 @@ Deno.serve(handleCors(async (req) => {
     .maybeSingle();
 
   if (!membership) {
-    return Response.json(FORBIDDEN_RESPONSE, { status: 403 });
+    return Response.json(forbidden, { status: 403 });
   }
 
   let canInvite = membership.role === "owner";
@@ -158,7 +268,18 @@ Deno.serve(handleCors(async (req) => {
   }
 
   if (!canInvite) {
-    return Response.json(FORBIDDEN_RESPONSE, { status: 403 });
+    return Response.json(forbidden, { status: 403 });
+  }
+
+  if (body.action === "reset_password") {
+    return await resetEmployeePassword({
+      supabaseUrl,
+      secretKey,
+      callerClient,
+      callerUserId,
+      tenantId: body.tenantId,
+      membershipId: body.membershipId,
+    });
   }
 
   // =============================================================================
