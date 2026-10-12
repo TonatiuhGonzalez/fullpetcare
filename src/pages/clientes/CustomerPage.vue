@@ -565,6 +565,11 @@ async function handleVaccinationSaved(): Promise<void> {
   font-size: 0.8125rem;
 }
 
+.vaccine-table :deep(th) {
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .pet-card {
   cursor: pointer;
 
