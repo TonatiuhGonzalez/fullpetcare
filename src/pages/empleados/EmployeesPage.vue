@@ -45,7 +45,10 @@ const headers = computed(() => [
           key: 'actions',
           sortable: false,
           align: 'center' as const,
-          width: 190,
+          // Cuatro íconos de 40 px más el relleno de la celda: con menos ancho (o sin
+          // `text-no-wrap`) el último ícono bajaba a una segunda fila.
+          width: 220,
+          cellProps: { class: 'text-no-wrap' },
           headerProps,
         },
       ]
