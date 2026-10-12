@@ -2121,7 +2121,7 @@ empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falt
 - [x] **C1.18** Empleados: columna "Acciones" con editar, desactivar/activar, eliminar y restablecer contraseña,
   confirmación en las destructivas y la contraseña temporal mostrada **una sola vez** (`TemporaryPasswordDialog` ya
   existe); la fila deja de abrir el formulario. _Verificar:_ en navegador como dueño; con citas programadas el desactivar y el eliminar explican por qué no.
-- [ ] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
+- [x] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
   tienen ninguno) y migración de los 31 botones de abajo. Solo con puntero (`hover: hover`), no en táctil. _Verificar:_ en
   navegador, cada uno muestra su texto al pasar el mouse y con el teclado (foco); en móvil no estorba.
 - [x] **C1.20** Conectar los buscadores a la base (`search_customers`, `search_pets`, `search_products`): Clientes,
