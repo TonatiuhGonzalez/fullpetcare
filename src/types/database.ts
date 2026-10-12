@@ -2494,6 +2494,7 @@ export type Database = {
         }
       }
       delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
+      delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
       delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
       my_tenant_notices: {
         Args: never
