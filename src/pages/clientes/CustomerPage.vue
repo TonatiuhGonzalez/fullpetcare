@@ -303,7 +303,7 @@ async function handleVaccinationSaved(): Promise<void> {
         <v-row>
           <!-- Columna 1: tarjetas de mascotas. -->
           <v-col cols="12" md="4" lg="3">
-            <div class="d-flex align-center mb-2">
+            <div class="d-flex align-center flex-wrap ga-2 mb-2">
               <h2 class="text-subtitle-1 font-weight-bold">Mascotas</h2>
               <v-spacer />
               <v-btn
@@ -378,7 +378,7 @@ async function handleVaccinationSaved(): Promise<void> {
           </v-col>
 
           <!-- Columna 2: información de la mascota elegida. -->
-          <v-col cols="12" md="4" lg="5">
+          <v-col cols="12" md="4" lg="4">
             <h2 class="text-subtitle-1 font-weight-bold mb-2">
               Información de la mascota
             </h2>
@@ -465,8 +465,8 @@ async function handleVaccinationSaved(): Promise<void> {
           </v-col>
 
           <!-- Columna 3: cartilla de vacunación. -->
-          <v-col cols="12" md="4">
-            <div class="d-flex align-center mb-2">
+          <v-col cols="12" md="4" lg="5">
+            <div class="d-flex align-center flex-wrap ga-2 mb-2">
               <h2 class="text-subtitle-1 font-weight-bold">Cartilla de vacunación</h2>
               <v-spacer />
               <v-btn
@@ -484,7 +484,7 @@ async function handleVaccinationSaved(): Promise<void> {
               <p v-if="!selectedPet" class="pa-4 text-medium-emphasis">
                 Elige una mascota para ver su cartilla.
               </p>
-              <v-table v-else density="compact">
+              <v-table v-else density="compact" class="vaccine-table">
                 <thead>
                   <tr>
                     <th class="font-weight-bold">Vacuna</th>
@@ -555,6 +555,14 @@ async function handleVaccinationSaved(): Promise<void> {
 <style scoped lang="scss">
 .customer-info {
   min-width: 0;
+}
+
+// La cartilla comparte la fila con otras dos columnas: menos relleno por celda y el encabezado
+// puede partirse en dos líneas, para que "Próxima dosis" y "Lote" no queden fuera de la tarjeta.
+.vaccine-table :deep(th),
+.vaccine-table :deep(td) {
+  padding-inline: 8px;
+  font-size: 0.8125rem;
 }
 
 .pet-card {
