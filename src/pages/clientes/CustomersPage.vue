@@ -18,6 +18,7 @@ import type { Pet } from '@/services/pets'
 import { groupPetsByCustomer, speciesIcon, splitVisiblePets } from '@/lib/customerPets'
 import { useSessionStore } from '@/stores/session'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -107,9 +108,17 @@ async function load(withPets = true): Promise<void> {
 watch(searchTerm, () => load(false))
 onMounted(() => load())
 
+// Alta: siempre con su primera mascota (C1.11). Al guardar se abre la página del cliente
+// para completar lo demás (más mascotas, cartilla).
+const showNewCustomerDialog = ref(false)
+
 function openNewCustomer(): void {
-  editingCustomerId.value = null
-  showFormDialog.value = true
+  showNewCustomerDialog.value = true
+}
+
+function handleCustomerCreated(result: { customer: Customer }): void {
+  load()
+  router.push({ name: 'cliente', params: { id: result.customer.id } })
 }
 
 function openEditCustomer(customer: Customer): void {
@@ -266,6 +275,11 @@ function openCustomerPage(customerId: string): void {
       :customer-id="editingCustomerId"
       @saved="handleSaved"
       @changed="handleSaved"
+    />
+    <CustomerWithPetDialog
+      v-model="showNewCustomerDialog"
+      :tenant-id="session.activeTenantId ?? ''"
+      @saved="handleCustomerCreated"
     />
     <ConfirmDeleteDialog
       v-model="showDeleteConfirm"

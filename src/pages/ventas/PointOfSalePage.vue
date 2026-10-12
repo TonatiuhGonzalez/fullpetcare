@@ -11,6 +11,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import PaymentSummary from '@/components/PaymentSummary.vue'
 import PosProductTile from '@/components/PosProductTile.vue'
 import TicketView from '@/components/TicketView.vue'
@@ -954,12 +955,22 @@ function handleNewSale(): void {
       </v-card>
     </v-dialog>
 
+    <!-- Cliente que ya existe: se completan sus datos fiscales. Cliente nuevo: se da de
+         alta CON su mascota (C1.11), igual que en el resto del sistema. -->
     <CustomerFormDialog
+      v-if="invoiceMode === 'registered'"
       v-model="showCustomerForm"
       :tenant-id="session.activeTenantId ?? ''"
-      :customer="invoiceMode === 'registered' ? invoiceCustomer : null"
+      :customer="invoiceCustomer"
       invoice-required
       @saved="handleCustomerSaved"
+    />
+    <CustomerWithPetDialog
+      v-else
+      v-model="showCustomerForm"
+      :tenant-id="session.activeTenantId ?? ''"
+      invoice-required
+      @saved="handleCustomerSaved($event.customer)"
     />
   </v-container>
 </template>

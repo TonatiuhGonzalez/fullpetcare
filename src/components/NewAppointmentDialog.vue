@@ -11,6 +11,7 @@ import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
+import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
@@ -112,6 +113,17 @@ async function selectCustomer(customer: Customer | null): Promise<void> {
     customerSearchTerm.value = ''
     await searchCustomers()
   }
+}
+
+// Alta de un cliente nuevo con su mascota (C1.11): al guardar, la cita queda con el
+// cliente y la mascota ya elegidos, lista para elegir servicios.
+const showNewCustomer = ref(false)
+
+async function handleCustomerCreated(result: { customer: Customer; pet: Pet }): Promise<void> {
+  customerResults.value = [result.customer, ...customerResults.value]
+  customerSearchTerm.value = customerLabel(result.customer)
+  await selectCustomer(result.customer)
+  selectedPet.value = customerPets.value.find((p) => p.id === result.pet.id) ?? null
 }
 
 // --- Tipo --------------------------------------------------------------
@@ -372,11 +384,18 @@ async function handleSubmit(): Promise<void> {
               @update:search="customerSearchTerm = $event"
             />
 
-            <!-- Solo se elige entre las mascotas ya registradas del
-                 cliente: dar de alta una mascota nueva desde este
-                 dialog quedó fuera de alcance (pedido explícito del
-                 usuario) — si no existe, se registra primero desde
-                 la ficha del cliente. -->
+            <v-btn
+              variant="text"
+              size="small"
+              prepend-icon="mdi-account-plus"
+              class="mt-1"
+              @click="showNewCustomer = true"
+            >
+              Cliente nuevo
+            </v-btn>
+
+            <!-- Solo se elige entre las mascotas ya registradas del cliente; una
+                 mascota más se agrega desde la página del cliente. -->
             <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mt-2">
               <span class="font-weight-bold">Mascota:</span>
               <v-chip-group v-model="selectedPet" mandatory>
@@ -529,6 +548,13 @@ async function handleSubmit(): Promise<void> {
           Agendar
         </v-btn>
       </v-card-actions>
+
+      <CustomerWithPetDialog
+        v-model="showNewCustomer"
+        :tenant-id="session.activeTenantId ?? ''"
+        phone-required
+        @saved="handleCustomerCreated"
+      />
     </v-card>
   </v-dialog>
 </template>
