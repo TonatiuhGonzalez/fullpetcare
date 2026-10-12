@@ -15,6 +15,7 @@ import {
   type StockStatus,
 } from '@/lib/inventory'
 import { formatMXN } from '@/lib/money'
+import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
@@ -25,6 +26,7 @@ import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
 import TableSkeleton from '@/components/TableSkeleton.vue'
 import { useFirstLoad } from '@/composables/useFirstLoad'
+import { useServerSearch } from '@/composables/useServerSearch'
 
 const session = useSessionStore()
 const inventory = useInventoryStore()
@@ -44,14 +46,17 @@ const statusColor: Record<StockStatus, string> = {
   out: 'error',
 }
 
+// La coincidencia (sin acentos, ñ aparte) la decide la base con `search_products` (C1.20);
+// aquí solo se cruza con las filas ya cargadas, que traen la existencia y la categoría.
+const productSearch = useServerSearch(search, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
 const visibleRows = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return inventory.rows
-  return inventory.rows.filter(
-    (r) =>
-      r.product.name.toLowerCase().includes(term) ||
-      r.product.sku?.toLowerCase().includes(term),
-  )
+  if (search.value.trim() === '') return inventory.rows
+  const found = productSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return inventory.rows.filter((r) => ids.has(r.product.id))
 })
 
 // Filas planas de la tabla (cada columna ordenable es un campo propio, lib/inventory.ts).
@@ -219,7 +224,7 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="tableRows"
-      :loading="loading"
+      :loading="loading || productSearch.pending.value"
       :row-props="rowProps"
       class="inventory-table"
       :items-per-page="10"

@@ -26,30 +26,17 @@ export async function list(tenantId: string): Promise<Customer[]> {
 }
 
 /**
- * Busca clientes cuyo nombre, apellido, teléfono O correo EMPIEZA con `term` (no
- * "contiene en cualquier parte" — ver el comentario del índice en la
- * migración `customers.sql` para el porqué). Cadena vacía o solo
- * espacios devuelve la lista completa, igual que `list()` — así el
- * cuadro de búsqueda de la UI (tarea 2.16) puede llamar siempre a
- * `search()` sin tener que decidir cuándo usar `list()` en su lugar.
+ * Busca clientes cuyo nombre, apellido, teléfono O correo EMPIEZA con `term`, sin importar
+ * acentos ni mayúsculas ("jose" encuentra "José"; la ñ no se confunde con la n). La
+ * comparación la hace la base (`search_customers`, C1.20), así todas las pantallas dicen lo
+ * mismo. Cadena vacía o solo espacios devuelve la lista completa, igual que `list()` — así el
+ * cuadro de búsqueda puede llamar siempre a `search()`. SECURITY INVOKER: RLS sigue aplicando.
  */
 export async function search(tenantId: string, term: string): Promise<Customer[]> {
-  const trimmed = term.trim()
-  if (trimmed === '') return list(tenantId)
-
-  // .or() arma un WHERE con OR entre las condiciones — "empieza con
-  // el término, ya sea en el nombre, apellido, teléfono o correo". El
-  // "%" al final es el comodín de SQL para "lo que sea después".
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .is('deleted_at', null)
-    .or(
-      `first_name.ilike.${trimmed}%,last_name.ilike.${trimmed}%,phone.ilike.${trimmed}%,email.ilike.${trimmed}%`,
-    )
-    .order('last_name')
-    .order('first_name')
+  const { data, error } = await supabase.rpc('search_customers', {
+    p_tenant_id: tenantId,
+    p_term: term.trim(),
+  })
 
   if (error) throw error
   return data ?? []

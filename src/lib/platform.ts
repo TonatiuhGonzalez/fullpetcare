@@ -7,6 +7,7 @@
 // Son compatibles por estructura, así que la pantalla pasa los objetos del
 // servicio directo.
 import { formatDate, formatTime } from './datetime'
+import { normalizeSearchText } from './searchText'
 
 export type TenantStatus = 'active' | 'suspended' | 'closed'
 export type BillingPeriod = 'monthly' | 'yearly' | 'indefinite'
@@ -78,18 +79,9 @@ interface FilterableTenant {
   status: TenantStatus
 }
 
-/**
- * Minúsculas y sin acentos: quien busca "estetica" debe encontrar
- * "Estética Canina". `normalize('NFD')` separa cada letra acentuada en
- * letra + marca de acento, y la expresión regular quita solo las marcas.
- */
-function normalize(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .trim()
-}
+// Minúsculas y sin acentos (la ñ se conserva): quien busca "estetica" debe encontrar
+// "Estética Canina". Es la misma regla que usa la base (lib/searchText.ts).
+const normalize = normalizeSearchText
 
 /**
  * Filtra la lista por texto (nombre de la empresa o del dueño) y por estado.

@@ -22,7 +22,9 @@ import {
   productsInCategory,
   recentlySold,
 } from '@/lib/productCategories'
-import { filterProducts, findBySku, searchProducts } from '@/lib/productSearch'
+import { findBySku } from '@/lib/productSearch'
+import { useServerSearch } from '@/composables/useServerSearch'
+import * as productsService from '@/services/products'
 import { customerFiscalProblems } from '@/lib/validation'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import * as customersService from '@/services/customers'
@@ -53,8 +55,22 @@ const entryToastKey = ref(0)
 const lastAddedId = ref<string | null>(null)
 let flashTimer: ReturnType<typeof setTimeout> | undefined
 
-/** Con texto en el campo, la fila de arriba muestra los productos que coinciden. */
-const searchResults = computed(() => filterProducts(cart.catalog, barcode.value))
+/**
+ * Con texto en el campo, la fila de arriba muestra los productos que coinciden. La
+ * coincidencia por texto la decide la base (`search_products`, sin acentos y con la ñ
+ * aparte, C1.20) y aquí solo se cruza con el catálogo VENDIBLE (con existencia). El código
+ * exacto del lector no pasa por la red: `findBySku` responde al instante.
+ */
+const nameSearch = useServerSearch(barcode, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
+const searchResults = computed(() => {
+  if (barcode.value.trim() === '') return cart.catalog
+  const found = nameSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return cart.catalog.filter((p) => ids.has(p.id))
+})
 const isSearching = computed(() => barcode.value.trim().length > 0)
 
 // Fila de arriba: categorías, o los productos de la categoría abierta.
@@ -167,7 +183,16 @@ const pieceCount = computed(() =>
 // --- Consultar precio ---------------------------------------------------------
 const showPriceCheck = ref(false)
 const priceQuery = ref('')
-const priceResults = computed(() => searchProducts(cart.catalog, priceQuery.value))
+const priceSearch = useServerSearch(priceQuery, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
+// Máximo 20 filas en el diálogo (igual que antes), siempre entre lo que se puede vender.
+const priceResults = computed(() => {
+  const found = priceSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return cart.catalog.filter((p) => ids.has(p.id)).slice(0, 20)
+})
 
 // --- Cancelar la venta ----------------------------------------------------------
 const showCancel = ref(false)
@@ -474,7 +499,7 @@ function handleNewSale(): void {
               @select="handleTileClick"
             />
             <p
-              v-if="searchResults.length === 0"
+              v-if="searchResults.length === 0 && !nameSearch.pending.value"
               class="text-body-2 text-medium-emphasis align-self-center mb-0"
             >
               Ningún producto coincide.
