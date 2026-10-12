@@ -559,13 +559,15 @@ async function handleVaccinationSaved(): Promise<void> {
 
 // La cartilla comparte la fila con otras dos columnas: menos relleno por celda y el encabezado
 // puede partirse en dos líneas, para que "Próxima dosis" y "Lote" no queden fuera de la tarjeta.
-.vaccine-table :deep(th),
-.vaccine-table :deep(td) {
+// El selector repite la ruta completa de Vuetify (`.v-table__wrapper > table > ...`) porque la
+// regla de la librería es más específica que `th`/`td` a secas y ganaría.
+.vaccine-table :deep(.v-table__wrapper > table > thead > tr > th),
+.vaccine-table :deep(.v-table__wrapper > table > tbody > tr > td) {
   padding-inline: 8px;
   font-size: 0.8125rem;
 }
 
-.vaccine-table :deep(th) {
+.vaccine-table :deep(.v-table__wrapper > table > thead > tr > th) {
   white-space: normal;
   line-height: 1.2;
 }
