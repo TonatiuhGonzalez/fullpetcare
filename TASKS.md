@@ -1994,6 +1994,29 @@ mascotas (la semilla trae clientes con 1 y 2), tema oscuro, Firefox y Safari, el
 tarjeta de la cartilla se desplaza unos píxeles en horizontal. Los íconos salieron como cuadros en las capturas por la
 fuente de íconos del navegador desechable, no por estos cambios.
 
+**Avance de la ola 2 (2026-10-12).** Tres flujos desde `develop` sobre un módulo compartido
+(`lib/appointmentErrors.ts`: mensajes de las reglas de horario y texto del aviso de traslape), integrados en
+`feat/corrections-1-wave-2`: C1.10 y C1.12 (formulario de cita, llegada sin cita e Inicio), C1.13 (reprogramar) y
+C1.18 (acciones de empleados). **Verificado en la rama combinada:** `vue-tsc -b` limpio, 666 tests unitarios y ESLint
+en verde; con la base reseteada y las funciones sirviéndose, `test:db` 823 de 823 y el E2E pasa. **Verificado en
+navegador** (Chromium, dueño; 22 comprobaciones): Inicio abre "Nueva cita" y "Llegada sin cita" sin cambiar de vista;
+chip de rol en cada empleado; hoy los horarios pasados salen deshabilitados y la fecha no deja elegir días pasados;
+un horario que se traslapa sale en amarillo, es elegible, avisa con las horas de la otra cita y la base lo acepta;
+reagendar rechaza ayer, 23:00 y un domingo con su mensaje y deshabilita Guardar; empleados: columna Acciones, la fila
+ya no abre el formulario, el dueño no ofrece eliminar ni restablecer, eliminar y restablecer piden confirmación, y
+desactivar a quien tiene una cita programada se bloquea y explica por qué. **Defectos que solo se vieron en el
+navegador y ya se corrigieron:** el chip amarillo salía gris hasta elegirlo (Vuetify ignora `color` en un chip de un
+grupo no seleccionado; ahora va por clase propia, con test de regresión) y los cuatro íconos de Acciones se partían en
+dos filas. **No verificado:** el resultado de eliminar o restablecer contraseña hasta el final desde la pantalla (solo
+la confirmación; la función y la RPC tienen sus propios tests), la casilla de llegada sin cita con espera real,
+reagendar con traslape visto en pantalla, tema oscuro, móvil, Firefox y Safari.
+
+**Decisión abierta (llegada sin cita):** la lógica de espera siempre elige un hueco libre, así que no había un
+traslape que confirmar. El flujo agregó la casilla "Atender ahora de todos modos (se encima con una cita)" para el
+empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falta que el usuario la valide.
+
+**Hueco conocido en la base:** desactivar al último dueño activo no lo rechaza ninguna regla (solo la interfaz).
+
 **Piezas que aún nadie usa (a propósito):** el token `overlap` de la paleta, `computeSlotStatuses` de
 `lib/availability.ts` y las RPC `create_customer_with_pet`, `search_customers`, `search_pets`, `search_products` y
 `delete_employee`; se conectan en C1.10 a C1.14, C1.18 y C1.20.
@@ -2063,7 +2086,7 @@ fuente de íconos del navegador desechable, no por estos cambios.
   la hora actual **de la sucursal** como argumento (sigue siendo pura, sin reloj). _Verificar:_ tests unitarios: hueco
   pasado, de hoy a media hora, traslape parcial por minutos, traslape total, citas de otro empleado (no cuentan),
   cita que termina cuando otro empieza (no traslapa), día cerrado y duración 0.
-- [ ] **C1.10** Selector de horarios y empleado en `NewAppointmentDialog`/`TimeSlotPicker`: chips `past` deshabilitados,
+- [x] **C1.10** Selector de horarios y empleado en `NewAppointmentDialog`/`TimeSlotPicker`: chips `past` deshabilitados,
   `overlap` en amarillo con ícono y el aviso "Este horario se traslapa con la cita de las 10:00 a las 10:45" al elegirlo;
   la fecha no permite días pasados; cada empleado con su chip de rol; el mensaje de error al guardar distingue pasado,
   fuera de horario y día cerrado. **Llegada sin cita (`WalkInDialog`):** al elegir un hueco que se traslapa, avisa que
@@ -2073,12 +2096,12 @@ fuente de íconos del navegador desechable, no por estos cambios.
   sobre la nueva cita y la deja con el cliente y la mascota ya elegidos. Se usa también en Clientes y en el punto de
   venta (que hoy usa `CustomerFormDialog`). _Verificar:_ en navegador: sin mascota no deja guardar; correo repetido
   avisa; tras guardar, la cita queda lista para elegir servicios.
-- [ ] **C1.12** Inicio: `NewAppointmentDialog` y `WalkInDialog` se montan en `HomePage`; al guardar se queda en Inicio y
+- [x] **C1.12** Inicio: `NewAppointmentDialog` y `WalkInDialog` se montan en `HomePage`; al guardar se queda en Inicio y
   recarga el resumen. Los diálogos leen sucursal y fecha de `stores/agenda`, que hoy solo inicializa la Agenda: Inicio
   debe inicializarla (o recibirlas por props). Se retira el `?accion=` que ya nadie usa. _Verificar:_ en navegador, como
   dueño y recepción: la URL no cambia de `/app/inicio` y el contador "por cobrar" se actualiza; groomer y vet no ven los
   botones.
-- [ ] **C1.13** Reprogramar (`AppointmentDialog`, `AppointmentDetailPage`): fecha mínima hoy y las mismas reglas y
+- [x] **C1.13** Reprogramar (`AppointmentDialog`, `AppointmentDetailPage`): fecha mínima hoy y las mismas reglas y
   avisos que agendar. _Verificar:_ en navegador: pasado, fuera de horario y día cerrado se rechazan con mensaje claro.
 - [ ] **C1.14** Correo: `isValidEmail` y mensaje "Este correo ya está registrado" en alta, edición y punto de venta;
   el error de la base se traduce a ese mensaje (§5.4). _Verificar:_ en navegador; el correo vacío sigue permitido.
@@ -2095,7 +2118,7 @@ fuente de íconos del navegador desechable, no por estos cambios.
   como `/app/servicios` (10/25/50/100/Todos); el menú de acciones (compra, ajuste, editar, activar) se conserva; con
   `TableSkeleton` en la primera carga (§5.6). _Verificar:_ en navegador: ordenar cada columna, paginar, buscar, sin
   salto de diseño (CLS ≈ 0).
-- [ ] **C1.18** Empleados: columna "Acciones" con editar, desactivar/activar, eliminar y restablecer contraseña,
+- [x] **C1.18** Empleados: columna "Acciones" con editar, desactivar/activar, eliminar y restablecer contraseña,
   confirmación en las destructivas y la contraseña temporal mostrada **una sola vez** (`TemporaryPasswordDialog` ya
   existe); la fila deja de abrir el formulario. _Verificar:_ en navegador como dueño; con citas programadas el desactivar y el eliminar explican por qué no.
 - [ ] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
