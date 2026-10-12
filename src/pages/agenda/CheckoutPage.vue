@@ -7,6 +7,7 @@
 //
 // Tarea 11.11: el ticket de una cita también puede llevar productos extra. La venta de
 // mostrador (sin cita) tiene su propia pantalla desde la fase 13: pages/ventas/PointOfSalePage.vue.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import PaymentSummary from '@/components/PaymentSummary.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
@@ -187,7 +188,7 @@ async function handleCharge(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-6">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"

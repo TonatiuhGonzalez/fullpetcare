@@ -2345,3 +2345,44 @@ de CSV se escribe a mano). Trabaja mejor después de la fase 22 (usa su columna 
 > También sin fase, por decidir según el primer cliente piloto: pagos reales, paquetes y membresías, comisiones por
 > empleado y la "clínica a fondo" (receta y cartilla imprimibles, desparasitación, lotes y caducidades, fotos antes y
 > después).
+
+## Fase 24 — Ancho del contenido: dos anchos y márgenes que se adaptan al monitor
+
+**Meta: que en pantallas anchas el contenido de listados y tableros aproveche el espacio en vez de dejar cientos de
+píxeles vacíos a los lados, sin estirar los formularios.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1).
+**Estado: construida (2026-10-12), pendiente de PR.** Decisiones y alternativas en `PLAN.md` D27.
+Sin servicio externo ni dependencia nueva; solo interfaz.
+
+### 24A. Preparación
+
+- [x] **24.1** 📚 Confirmar la clasificación de pantallas. **Anchas** (default, `clamp(860px, 75vw, 1440px)`): Inicio,
+  Clientes, página del cliente, Inventario, Empleados, Caja, Reportes, Servicios (catálogo) y las pantallas del
+  superadmin (Empresas, Planes, Motivos, Administradores, Reportes). **Angostas** (860 px): Cobro, Atender cita, Detalle
+  de cita, Detalle de venta y Configuración (`SettingsPage`, que aloja Sucursales, Facturación y Cuenta). **Sin cambio:**
+  Agenda, Punto de venta, vista pública y autenticación. _Verificar:_ el usuario confirma la lista.
+  **Confirmada por el usuario (2026-10-12).**
+
+### 24B. Construcción
+
+- [x] **24.2** `lib/contentWidth.ts` con las dos constantes (`wide` y `narrow`) y su comentario del porqué.
+  _Verificar:_ test unitario de que `wide` empieza en el mismo valor que `narrow` y termina en 1440.
+- [x] **24.3** `plugins/vuetify.ts`: `VContainer.maxWidth` pasa a `wide`. Comprobar que Vuetify acepta `clamp(...)` en
+  esa propiedad; si no, aplicarlo con una clase global en `styles/main.scss`. _Verificar:_ en navegador, el estilo
+  calculado del contenedor en una página ancha.
+  **Verificado (2026-10-12):** `VContainer` acepta `clamp(...)` tal cual; no hizo falta la clase global.
+- [x] **24.4** Pantallas angostas de 24.1 pasan `narrow`. `SettingsPage` conserva su riel en el margen libre.
+  _Verificar:_ en navegador, el riel de Configuración no se mueve respecto a hoy.
+
+### 24C. Cierre
+
+- [x] **24.5** Revisión visual en 1366, 1440, 1920 y 2560 px y en móvil de 390 px, en claro y oscuro: sin desborde
+  horizontal, tablas y tarjetas de Inicio bien repartidas, formularios sin estirarse. _Verificar:_ capturas o
+  anotación aquí de lo observado.
+  **Verificado en navegador (2026-10-12, claro, dueño de Patitas Felices, medido con Playwright desechable):** ancho del
+  contenedor en Inicio, Clientes, Inventario, Empleados, Caja y Reportes = **1025 px a 1366**, **1440 px a 1920** y
+  **1440 px a 2560**; Configuración (Cuenta) = 860 px en los tres. Sin desborde horizontal. **Sin cubrir:** móvil de 390 px
+  y tema oscuro (no cambian: a ese ancho gana el piso de 860 y `100%`), y las pantallas del superadmin.
+- [x] **24.6** 📚 Correr `lint` y `test:unit`; actualizar `CLAUDE.md` (§3 la nota de `VContainer`, §4 `lib/` y §5.6) y
+  marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-12:** `lint`, `vue-tsc -b` y 680 tests unitarios en verde. **Qué se puede demostrar:** abrir Clientes en un
+  monitor de 1920 px y ver la tabla a 1440 px, y abrir Cuenta o un cobro y ver que siguen en 860 px.

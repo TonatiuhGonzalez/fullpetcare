@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Detalle de una cita: reagendar, cancelar (tarea 3.19).
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -240,7 +241,7 @@ async function handleReschedule(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-6">
     <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" to="/app/agenda">
       Volver a la agenda
     </v-btn>
