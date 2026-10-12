@@ -102,14 +102,17 @@ describe('create_employee_membership(): reactivación', () => {
       await client.query(HIRE, [TENANT_PATITAS, USER_GROOMER, 'groomer', [BRANCH_CENTRO]])
       await setRole(client, 'service_role')
       const { rows } = await client.query(
-        `select old_data->>'deleted_at' as old_deleted, new_data->>'deleted_at' as new_deleted
+        // (No se ordena por fecha: dentro de una transacción now() es igual para
+        // todas las filas y el orden sería azaroso.)
+        `select count(*)::int as n
            from audit_log
           where table_name = 'memberships' and record_id = $1 and action = 'UPDATE'
-          order by changed_at desc, id desc limit 1`,
+            and old_data->>'deleted_at' is not null
+            and new_data->>'deleted_at' is null
+            and new_data->>'is_active' = 'true'`,
         [id],
       )
-      expect(rows[0].old_deleted).not.toBeNull()
-      expect(rows[0].new_deleted).toBeNull()
+      expect(rows[0].n).toBe(1)
     })
   })
 
