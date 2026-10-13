@@ -5,6 +5,7 @@ import { showAppUpdateNotice } from '@/composables/useAppUpdateNotice'
 import { isChunkLoadError } from '@/lib/chunkError'
 import { isFrontDesk } from '@/lib/roles'
 import type { PermissionModule } from '@/lib/permissions'
+import type { MemberRole } from '@/services/memberships'
 import { useSessionStore } from '@/stores/session'
 
 // Vue Router deja "meta" tipado vacío por defecto — esto le agrega las
@@ -20,6 +21,8 @@ declare module 'vue-router' {
     requiresPlatformAdmin?: boolean
     /** true si solo el dueño del negocio entra (configuración de empresa y sucursales, tarea #1959). */
     requiresOwner?: boolean
+    /** Roles que entran a la ruta (catálogo de vacunas, fase 26: dueño y veterinario). */
+    requiresRoles?: MemberRole[]
   }
 }
 
@@ -171,10 +174,12 @@ export const router = createRouter({
             {
               path: '',
               // Cada quien aterriza en la primera sección que puede ver.
-              redirect: () =>
-                useSessionStore().role === 'owner'
-                  ? '/app/configuracion/sucursales'
-                  : '/app/configuracion/cuenta',
+              redirect: () => {
+                const role = useSessionStore().role
+                if (role === 'owner') return '/app/configuracion/sucursales'
+                if (role === 'vet') return '/app/configuracion/vacunas'
+                return '/app/configuracion/cuenta'
+              },
             },
             {
               path: 'sucursales',
@@ -187,6 +192,12 @@ export const router = createRouter({
               name: 'configuracion-facturacion',
               component: () => import('@/pages/configuracion/FiscalSettingsPage.vue'),
               meta: { requiresOwner: true },
+            },
+            {
+              path: 'vacunas',
+              name: 'configuracion-vacunas',
+              component: () => import('@/pages/configuracion/VaccinesSettingsPage.vue'),
+              meta: { requiresRoles: ['owner', 'vet'] },
             },
             {
               path: 'cuenta',
@@ -363,6 +374,16 @@ router.beforeEach(async (to) => {
   // poder ver nada en ella.
   if (to.meta.requiresPermission && !session.canView(to.meta.requiresPermission)) {
     return { path: '/app/inicio' }
+  }
+
+  // Secciones por rol (catálogo de vacunas: dueño y veterinario). Mismo criterio que la de
+  // abajo: la política RLS ya rechazaría la escritura, esto evita una pantalla inútil.
+  if (
+    to.matched.some(
+      (record) => record.meta.requiresRoles && !record.meta.requiresRoles.includes(session.role!),
+    )
+  ) {
+    return { path: '/app/configuracion/cuenta' }
   }
 
   // Secciones solo del dueño (configuración de sucursales): quien no lo es

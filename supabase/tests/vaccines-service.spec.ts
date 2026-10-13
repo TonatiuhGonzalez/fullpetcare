@@ -55,3 +55,62 @@ describe('services/vaccines.ts contra Supabase local', () => {
     await supabase.auth.signOut()
   })
 })
+
+describe('services/vaccines.ts: editar el catálogo (fase 26)', () => {
+  const VET_EMAIL = 'vet@patitasfelices.mx'
+  const GROOMER_EMAIL = 'groomer@patitasfelices.mx'
+
+  async function signIn(email: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: DUENO_PASSWORD })
+    if (error) throw error
+  }
+
+  it('el veterinario crea, edita y oculta una vacuna; al ocultarla sale de las listas', async () => {
+    // Recorre el ciclo completo con sesión real. Qué se rompería: la pantalla de Vacunas
+    // guardaría pero la vacuna seguiría ofreciéndose al registrar una dosis (o al revés).
+    await signIn(VET_EMAIL)
+
+    const created = await vaccinesService.create(TENANT_PATITAS, {
+      name: '  Vacuna de prueba 26  ',
+      species: 'cat',
+      default_interval_days: 365,
+    })
+    expect(created.name).toBe('Vacuna de prueba 26') // sin espacios sobrantes
+
+    const updated = await vaccinesService.update(created.id, {
+      name: 'Vacuna de prueba 26',
+      species: null,
+      default_interval_days: null,
+    })
+    expect(updated.species).toBeNull()
+    expect(updated.default_interval_days).toBeNull()
+
+    expect((await vaccinesService.listAll(TENANT_PATITAS)).map((v) => v.id)).toContain(created.id)
+
+    await vaccinesService.hide(created.id)
+
+    expect((await vaccinesService.listAll(TENANT_PATITAS)).map((v) => v.id)).not.toContain(
+      created.id,
+    )
+    expect(
+      (await vaccinesService.listForSpecies(TENANT_PATITAS, 'cat')).map((v) => v.id),
+    ).not.toContain(created.id)
+
+    await supabase.auth.signOut()
+  })
+
+  it('un groomer no puede crear una vacuna: la base lo rechaza', async () => {
+    // La pantalla no le ofrece el botón, pero la regla real es la política RLS.
+    await signIn(GROOMER_EMAIL)
+
+    await expect(
+      vaccinesService.create(TENANT_PATITAS, {
+        name: 'No debería existir',
+        species: null,
+        default_interval_days: null,
+      }),
+    ).rejects.toMatchObject({ code: '42501' })
+
+    await supabase.auth.signOut()
+  })
+})
