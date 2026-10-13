@@ -1179,6 +1179,35 @@ Vuetify 3.13. Sin dependencias nuevas (§3), sin tocar la base ni §7 y §8.
 
 ---
 
+### D29 — Correcciones 2: imagen de empresa, catálogo de vacunas editable y vista responsiva
+
+**Estado:** propuesta del 2026-10-13, pendiente de aprobación. Se construiría en la fase 26.
+
+**Decisiones del usuario (2026-10-13).**
+1. **Imagen de empresa:** se muestra **en el lugar de las iniciales** del selector de negocio ("PF" en
+   Patitas Felices). No se pidió en la vista pública ni en el ticket: quedan fuera hasta que se pida.
+2. **Catálogo de vacunas:** lo editan **dueño y veterinario**.
+3. **Tablas en pantallas chicas:** cards en todas (Clientes, Servicios, Inventario, Empleados, Sucursales, Reportes).
+4. **Agenda en celular:** lista del día por hora.
+
+**Supuestos a confirmar.**
+- Las vacunas viven en una sección "Vacunas" de Configuración (no se eligió ubicación). Alternativa: pestaña junto a
+  Servicios, pero Servicios es de dueño y recepción, y ahí el vet no entra.
+- El permiso de vacunas sigue por **rol** (como hoy), no por `role_permissions`: abrirlo a `vet` es una migración
+  pequeña. Alternativa: un módulo de permisos nuevo, más flexible pero desproporcionado para esto.
+- La imagen va en bucket **privado** con URL firmada, igual que `pet-photos`; no hace falta bucket público.
+- Reportes: sus tablas son numéricas; las cards de Reportes se limitan a resúmenes legibles, y el CSV sigue igual.
+
+**Alternativas descartadas.** (a) Solo scroll horizontal en las tablas: es lo que hay hoy y es lo que se observó.
+(b) Una librería de tablas responsivas: no se agregan dependencias (§3).
+
+**Contras y riesgos.** Abrir `vaccines` al vet es la primera vez que un catálogo lo escribe alguien que no es dueño:
+un vet puede ocultar una vacuna que otro usa; mitiga el borrado suave y la bitácora. La imagen de empresa es la primera
+columna que el usuario sube fuera del expediente: tamaño y tipo se limitan en el bucket. Respeta §7 y §8 (RLS, migraciones
+aditivas, borrado suave).
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
