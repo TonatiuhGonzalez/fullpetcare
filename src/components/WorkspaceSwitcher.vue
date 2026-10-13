@@ -3,7 +3,7 @@
 // trabajando. Si el negocio tiene más de una sucursal accesible, al presionarla se
 // elige otra; con una sola es solo informativa. En el menú "riel" (angosto) solo
 // queda la ficha con las iniciales del negocio.
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { initialsOf } from '@/lib/initials'
 
@@ -14,6 +14,8 @@ interface BranchOption {
 
 const props = defineProps<{
   tenantName: string
+  // URL firmada de la imagen de la empresa (fase 26); sin ella se muestran las iniciales.
+  logoUrl?: string | null
   branches: BranchOption[]
   activeBranchId: string | null
   // true cuando el menú está colapsado a íconos.
@@ -26,6 +28,15 @@ const activeBranchName = computed(
   () => props.branches.find((b) => b.id === props.activeBranchId)?.name ?? '',
 )
 const canSwitch = computed(() => props.branches.length > 1)
+// Si la imagen no carga (URL caducada, archivo borrado) se vuelve a las iniciales.
+const logoFailed = ref(false)
+watch(
+  () => props.logoUrl,
+  () => {
+    logoFailed.value = false
+  },
+)
+const showLogo = computed(() => !!props.logoUrl && !logoFailed.value)
 const initials = computed(() => initialsOf(props.tenantName))
 const tooltip = computed(() =>
   [props.tenantName, activeBranchName.value].filter(Boolean).join(' · '),
@@ -47,7 +58,10 @@ const tooltip = computed(() =>
         :title="tooltip"
         :aria-label="`Negocio y sucursal: ${tooltip}`"
       >
-        <span class="workspace__tile">{{ initials }}</span>
+        <span :class="['workspace__tile', { 'workspace__tile--image': showLogo }]">
+          <img v-if="showLogo" :src="logoUrl ?? ''" alt="" @error="logoFailed = true" />
+          <template v-else>{{ initials }}</template>
+        </span>
         <span v-if="!rail" class="workspace__text">
           <span class="workspace__tenant">{{ tenantName }}</span>
           <span class="workspace__branch">{{ activeBranchName }}</span>
@@ -111,6 +125,20 @@ const tooltip = computed(() =>
     font-weight: 700;
     background: rgb(var(--v-theme-primary));
     color: rgb(var(--v-theme-on-primary));
+  }
+
+  // Con imagen, el fondo de marca y el texto sobran: la imagen llena la ficha y el borde fino
+  // la separa del menú aunque el logotipo tenga fondo blanco.
+  &__tile--image {
+    overflow: hidden;
+    background: rgb(var(--v-theme-surface));
+    border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
 
   &--rail &__tile {

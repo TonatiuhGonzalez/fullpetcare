@@ -55,6 +55,7 @@ function setSession(role: MemberRole, views: ('cash_register' | 'reports')[] = [
       tenantId: 'tenant-a',
       tenantName: 'Patitas',
       tenantTimezone: 'America/Mexico_City',
+      logoPath: null,
       role,
       branches: [{ id: 'branch-1', name: 'Centro', timezone: 'America/Mexico_City' }],
     },

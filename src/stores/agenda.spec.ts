@@ -70,6 +70,7 @@ const OWNER_MEMBERSHIP: MembershipSummary = {
   tenantId: 'tenant-1',
   tenantName: 'Patitas Felices',
   tenantTimezone: 'America/Mexico_City',
+  logoPath: null,
   role: 'owner',
   branches: [
     { id: 'branch-centro', name: 'Centro', timezone: 'America/Mexico_City' },

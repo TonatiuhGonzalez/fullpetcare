@@ -1,7 +1,7 @@
 // Estado de "quién soy, en qué negocio y en qué sucursal estoy trabajando
 // ahora". Es el único store que sabe de sesión — pages y componentes lo
 // consultan, nunca hablan con services/auth.ts directo (CLAUDE.md §4).
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import {
@@ -19,6 +19,8 @@ import {
   type TenantNotice,
 } from '@/services/tenantAccess'
 import { noticeRestrictsAccess } from '@/lib/tenantNotices'
+import { logoExtension, logoPath } from '@/lib/tenantLogo'
+import * as tenantLogoService from '@/services/tenantLogo'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin as fetchIsPlatformAdmin } from '@/services/platform'
 import {
@@ -112,6 +114,62 @@ export const useSessionStore = defineStore('session', () => {
     () => tenantNotices.value.find((n) => n.tenantId === activeTenantId.value) ?? null,
   )
   const activeBranches = computed(() => activeMembership.value?.branches ?? [])
+
+  // Imagen de la empresa activa (fase 26). El bucket es privado: de la ruta guardada se pide una
+  // URL firmada cada vez que cambia el negocio o la imagen. `logoRequest` descarta respuestas
+  // viejas si la persona cambia de negocio antes de que llegue la anterior.
+  const activeLogoUrl = ref<string | null>(null)
+  let logoRequest = 0
+  watch(
+    () => activeMembership.value?.logoPath ?? null,
+    async (path) => {
+      const request = ++logoRequest
+      if (!path) {
+        activeLogoUrl.value = null
+        return
+      }
+      const url = await tenantLogoService.getUrl(path).catch(() => null)
+      if (request === logoRequest) activeLogoUrl.value = url
+    },
+    { immediate: true },
+  )
+
+  function setActiveLogoPath(path: string | null): void {
+    memberships.value = memberships.value.map((m) =>
+      m.tenantId === activeTenantId.value ? { ...m, logoPath: path } : m,
+    )
+  }
+
+  /**
+   * Sube (o reemplaza) la imagen del negocio activo. Orden: archivo, luego la ruta en el
+   * negocio y al final se borra el archivo viejo si cambió la extensión (png → jpg), para no
+   * dejar huérfanos. Si falla a medias, lo que ya estaba guardado sigue válido.
+   */
+  async function changeLogo(file: File): Promise<void> {
+    const tenantId = activeTenantId.value
+    const extension = logoExtension(file.type)
+    if (!tenantId || !extension) throw new Error('Imagen no válida.')
+    const previous = activeMembership.value?.logoPath ?? null
+
+    const path = await tenantLogoService.upload(logoPath(tenantId, extension), file)
+    await tenantLogoService.setPath(tenantId, path)
+    setActiveLogoPath(path)
+    // Mismo archivo con el mismo nombre: la ruta no cambia y el watch no se entera.
+    if (previous === path) activeLogoUrl.value = await tenantLogoService.getUrl(path)
+    if (previous && previous !== path) {
+      await tenantLogoService.removeFile(previous).catch(() => undefined)
+    }
+  }
+
+  /** Quita la imagen del negocio activo (vuelven las iniciales). */
+  async function removeLogo(): Promise<void> {
+    const tenantId = activeTenantId.value
+    const previous = activeMembership.value?.logoPath ?? null
+    if (!tenantId || !previous) return
+    await tenantLogoService.setPath(tenantId, null)
+    setActiveLogoPath(null)
+    await tenantLogoService.removeFile(previous).catch(() => undefined)
+  }
   const activeBranch = computed(
     () => activeBranches.value.find((b) => b.id === activeBranchId.value) ?? null,
   )
@@ -377,6 +435,9 @@ export const useSessionStore = defineStore('session', () => {
     role,
     activeBranches,
     activeBranch,
+    activeLogoUrl,
+    changeLogo,
+    removeLogo,
     needsBusinessSelection,
     canView,
     canEdit,
