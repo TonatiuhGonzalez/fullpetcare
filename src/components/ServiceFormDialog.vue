@@ -8,7 +8,8 @@ import { computed, ref, watch } from 'vue'
 import * as servicesService from '@/services/services'
 import type { Service, ServiceKind } from '@/services/services'
 import { pesosToCents } from '@/lib/money'
-import { isValidSatProductCode, isValidSatUnitCode } from '@/lib/validation'
+import { isFormValid, isValidSatProductCode, isValidSatUnitCode, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -91,7 +92,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   if (durationMinutes.value == null || priceInPesos.value == null) return
   if (
     !isValidSatProductCode(satProductCode.value) ||
@@ -155,27 +159,27 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>{{ isEditing ? 'Editar servicio' : 'Nuevo servicio' }}</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
-          <v-text-field v-model="name" label="Nombre" required />
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
+          <v-text-field v-model="name" label="Nombre*" :rules="[required]" />
 
           <v-row dense>
             <v-col cols="6">
               <v-text-field
                 v-model.number="durationMinutes"
-                label="Duración (minutos)"
+                label="Duración (minutos)*"
                 type="number"
                 min="1"
-                required
+                :rules="[required]"
               />
             </v-col>
             <v-col cols="6">
               <v-text-field
                 v-model.number="priceInPesos"
-                label="Precio (MXN, con IVA)"
+                label="Precio (MXN, con IVA)*"
                 type="number"
                 min="0"
                 step="0.01"
-                required
+                :rules="[required]"
               />
             </v-col>
           </v-row>
@@ -184,7 +188,7 @@ async function handleSubmit(): Promise<void> {
             <v-col cols="6">
               <v-text-field
                 v-model="satProductCode"
-                label="Clave de producto (SAT)"
+                label="Clave de producto (SAT)*"
                 :rules="satProductRules"
                 maxlength="8"
                 inputmode="numeric"
@@ -195,7 +199,7 @@ async function handleSubmit(): Promise<void> {
             <v-col cols="6">
               <v-text-field
                 v-model="satUnitCode"
-                label="Clave de unidad (SAT)"
+                label="Clave de unidad (SAT)*"
                 :rules="satUnitRules"
                 maxlength="3"
                 hint="E48 = unidad de servicio."

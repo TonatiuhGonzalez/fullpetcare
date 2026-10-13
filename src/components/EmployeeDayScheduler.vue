@@ -179,6 +179,15 @@ onBeforeUnmount(() => {
   font-family: inherit;
 }
 
+// En pantallas angostas (tablet) las horas no caben: `.ec-main` es el que desplaza, pero su ancho
+// mínimo era el de su contenido, así que crecía más que la tarjeta y quedaba CENTRADO, con el
+// borde izquierdo (la columna de empleados) fuera de la vista. Con `min-width: 0` se limita al
+// ancho disponible y el scroll horizontal queda adentro, con la columna de empleados fija.
+.ec-host :deep(.ec-main) {
+  min-width: 0;
+  max-width: 100%;
+}
+
 // La hora de inicio ya la da la posición en la cuadrícula; en un bloque de una hora (~95 px)
 // ocuparía el lugar de la mascota. El tooltip lleva el resto.
 .ec-host :deep(.ec-event-time) {

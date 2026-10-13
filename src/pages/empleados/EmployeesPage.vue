@@ -20,6 +20,7 @@ import EmployeeFormDialog from '@/components/EmployeeFormDialog.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import IconButton from '@/components/IconButton.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 
 const session = useSessionStore()
 
@@ -38,7 +39,6 @@ const headers = computed(() => [
   { title: 'Nombre', key: 'fullName', headerProps },
   { title: 'Rol', key: 'roleLabel', headerProps },
   { title: 'Sucursales', key: 'branchNames', headerProps },
-  { title: 'Acceso', key: 'statusLabel', headerProps },
   ...(session.canEdit('employees')
     ? [
         {
@@ -46,7 +46,7 @@ const headers = computed(() => [
           key: 'actions',
           sortable: false,
           align: 'center' as const,
-          // Cuatro íconos de 40 px más el relleno de la celda: con menos ancho (o sin
+          // Tres íconos de 40 px y el switch, más el relleno de la celda: con menos ancho (o sin
           // `text-no-wrap`) el último ícono bajaba a una segunda fila.
           width: 220,
           cellProps: { class: 'text-no-wrap' },
@@ -67,12 +67,11 @@ const branchNameById = computed<Map<string, string>>(() => {
 interface EmployeeRow extends Employee {
   roleLabel: string
   branchNames: string
-  statusLabel: string
   actions: EmployeeActionSet
 }
 
 // Anotar el tipo de retorno a mano evita que TypeScript intente inferir
-// el tipo combinado (spread de Employee + tres campos nuevos) desde cero
+// el tipo combinado (spread de Employee + campos nuevos) desde cero
 // en cada uso — sin esto, `vue-tsc` truena con "Type instantiation is
 // excessively deep" al combinarlo con los tipos genéricos de v-data-table.
 const rows = computed<EmployeeRow[]>(() =>
@@ -83,7 +82,6 @@ const rows = computed<EmployeeRow[]>(() =>
       employee.role === 'owner'
         ? 'Todas'
         : employee.branchIds.map((id) => branchNameById.value.get(id) ?? '').join(', '),
-    statusLabel: employee.isActive ? 'Activo' : 'Desactivado',
     actions: employeeActionsFor(employee, employees.value, session.user?.id ?? null),
   })),
 )
@@ -250,7 +248,7 @@ function handleSaved(): void {
     </v-alert>
 
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
@@ -258,65 +256,75 @@ function handleSaved(): void {
       no-data-text="Todavía no hay empleados registrados."
       loading-text="Cargando empleados…"
 >
-      <template #[`item.statusLabel`]="{ item }">
-        <v-chip :color="item.isActive ? 'success' : 'default'" size="small" variant="tonal">
-          {{ item.statusLabel }}
-        </v-chip>
-      </template>
       <template #[`item.actions`]="{ item }">
-        <IconButton
-          icon="mdi-pencil"
-          color="primary"
-          variant="text"
-          size="small"
-          :disabled="busyId !== null"
-          :aria-label="`Editar a ${item.fullName}`"
-          @click.stop="openEdit(item)"
-        />
-        <IconButton
-          v-if="item.actions.toggleActive === 'deactivate'"
-          icon="mdi-account-off"
-          variant="text"
-          size="small"
-          :loading="busyId === item.membershipId && busyKind === 'deactivate'"
-          :disabled="busyId !== null"
-          :aria-label="`Desactivar el acceso de ${item.fullName}`"
-          @click.stop="askAction('deactivate', item)"
-        />
-        <IconButton
-          v-else-if="item.actions.toggleActive === 'activate'"
-          icon="mdi-account-check"
-          color="success"
-          variant="text"
-          size="small"
-          :loading="busyId === item.membershipId && busyKind === 'activate'"
-          :disabled="busyId !== null"
-          :aria-label="`Activar el acceso de ${item.fullName}`"
-          @click.stop="runAction('activate', item)"
-        />
-        <IconButton
-          v-if="item.actions.canResetPassword"
-          icon="mdi-lock-reset"
-          variant="text"
-          size="small"
-          :loading="busyId === item.membershipId && busyKind === 'reset-password'"
-          :disabled="busyId !== null"
-          :aria-label="`Restablecer la contraseña de ${item.fullName}`"
-          @click.stop="askAction('reset-password', item)"
-        />
-        <IconButton
-          v-if="item.actions.canDelete"
-          icon="mdi-delete"
-          color="error"
-          variant="text"
-          size="small"
-          :loading="busyId === item.membershipId && busyKind === 'delete'"
-          :disabled="busyId !== null"
-          :aria-label="`Eliminar a ${item.fullName}`"
-          @click.stop="askAction('delete', item)"
-        />
+        <div class="d-flex align-center justify-center">
+          <IconButton
+            v-if="item.actions.canResetPassword"
+            icon="mdi-lock-reset"
+            variant="text"
+            size="small"
+            :loading="busyId === item.membershipId && busyKind === 'reset-password'"
+            :disabled="busyId !== null"
+            :aria-label="`Restablecer la contraseña de ${item.fullName}`"
+            @click.stop="askAction('reset-password', item)"
+          />
+          <IconButton
+            icon="mdi-pencil"
+            color="primary"
+            variant="text"
+            size="small"
+            :disabled="busyId !== null"
+            :aria-label="`Editar a ${item.fullName}`"
+            @click.stop="openEdit(item)"
+          />
+          <IconButton
+            v-if="item.actions.canDelete"
+            icon="mdi-delete"
+            color="error"
+            variant="text"
+            size="small"
+            :loading="busyId === item.membershipId && busyKind === 'delete'"
+            :disabled="busyId !== null"
+            :aria-label="`Eliminar a ${item.fullName}`"
+            @click.stop="askAction('delete', item)"
+          />
+          <v-tooltip
+            v-if="item.actions.toggleActive"
+            :text="
+              item.isActive
+                ? `Desactivar el acceso de ${item.fullName}`
+                : `Activar el acceso de ${item.fullName}`
+            "
+            location="top"
+          >
+            <template #activator="{ props: tooltipProps }">
+              <v-switch
+                v-bind="tooltipProps"
+                class="ml-1"
+                :model-value="item.isActive"
+                :loading="
+                  busyId === item.membershipId &&
+                  (busyKind === 'deactivate' || busyKind === 'activate')
+                "
+                :disabled="busyId !== null"
+                :aria-label="
+                  item.isActive
+                    ? `Desactivar el acceso de ${item.fullName}`
+                    : `Activar el acceso de ${item.fullName}`
+                "
+                color="primary"
+                density="compact"
+                hide-details
+                @click.stop
+                @update:model-value="
+                  item.isActive ? askAction('deactivate', item) : runAction('activate', item)
+                "
+              />
+            </template>
+          </v-tooltip>
+        </div>
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <ConfirmDeleteDialog
       v-model="showConfirm"

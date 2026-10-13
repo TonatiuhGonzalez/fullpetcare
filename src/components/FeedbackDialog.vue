@@ -86,7 +86,7 @@ async function handleSubmit(): Promise<void> {
         <v-form @submit.prevent="handleSubmit">
           <v-textarea
             v-model="message"
-            label="Tu comentario"
+            label="Tu comentario*"
             rows="5"
             auto-grow
             :counter="MAX_MESSAGE_LENGTH"

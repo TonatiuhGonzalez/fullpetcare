@@ -29,7 +29,7 @@ describe('vaccines: catálogo', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('un groomer no puede dar de alta una vacuna nueva (config del negocio, solo owner)', async () => {
+  it('un groomer no puede dar de alta una vacuna nueva (solo owner y vet)', async () => {
     await withTransaction(async (client) => {
       await setRole(client, 'authenticated', USER_GROOMER)
       await expect(
@@ -38,6 +38,102 @@ describe('vaccines: catálogo', () => {
           [TENANT_PATITAS],
         ),
       ).rejects.toThrow(/row-level security/i)
+    })
+  })
+
+  it('el veterinario SÍ puede dar de alta una vacuna', async () => {
+    // Fase 26: quien conoce el esquema de vacunación de la clínica es el vet. Qué se
+    // rompería: el vet tendría que pedirle al dueño cada vacuna nueva del catálogo.
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_VET)
+      const { rows } = await client.query(
+        "insert into vaccines (tenant_id, name, species, default_interval_days) values ($1, 'Vacuna de prueba', 'dog', 365) returning id",
+        [TENANT_PATITAS],
+      )
+      expect(rows).toHaveLength(1)
+    })
+  })
+
+  it('el veterinario puede editar y ocultar una vacuna (borrado suave)', async () => {
+    // El borrado suave es un UPDATE de deleted_at: necesita la política de UPDATE, y la
+    // política de SELECT no debe filtrar deleted_at (CLAUDE.md §7.2).
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_VET)
+      const renamed = await client.query(
+        "update vaccines set name = 'Rabia (refuerzo)', default_interval_days = 180 where id = $1 returning id",
+        [VACCINE_RABIA],
+      )
+      expect(renamed.rows).toHaveLength(1)
+
+      const hidden = await client.query(
+        'update vaccines set deleted_at = now() where id = $1 returning id',
+        [VACCINE_RABIA],
+      )
+      expect(hidden.rows).toHaveLength(1)
+    })
+  })
+
+  it('recepción no puede escribir el catálogo', async () => {
+    // Qué se rompería: cualquiera de recepción podría cambiar los intervalos de refuerzo
+    // y con eso los recordatorios de todas las cartillas.
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      await expect(
+        client.query("insert into vaccines (tenant_id, name) values ($1, 'No debería')", [
+          TENANT_PATITAS,
+        ]),
+      ).rejects.toThrow(/row-level security/i)
+    })
+
+    // Un INSERT rechazado aborta la transacción: el UPDATE va en otra. Sin permiso, un
+    // UPDATE no lanza error: simplemente no toca ninguna fila.
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      const { rowCount } = await client.query(
+        "update vaccines set name = 'Cambiada' where id = $1",
+        [VACCINE_RABIA],
+      )
+      expect(rowCount).toBe(0)
+    })
+  })
+
+  it('un veterinario de OTRO negocio no puede escribir en este catálogo', async () => {
+    // El rol solo no basta: la política también exige ser miembro de ESE negocio.
+    await withTransaction(async (client) => {
+      await setRole(client, 'service_role')
+      await client.query('update memberships set tenant_id = $1 where user_id = $2', [
+        TENANT_HUELLITAS,
+        USER_VET,
+      ])
+
+      await setRole(client, 'authenticated', USER_VET)
+      await expect(
+        client.query("insert into vaccines (tenant_id, name) values ($1, 'Ajena')", [
+          TENANT_PATITAS,
+        ]),
+      ).rejects.toThrow(/row-level security/i)
+    })
+  })
+
+  it('un cambio al catálogo queda en la bitácora con quién lo hizo', async () => {
+    // §8.6: sin esto, nadie sabría quién cambió el refuerzo de una vacuna.
+    await withTransaction(async (client) => {
+      await setRole(client, 'authenticated', USER_VET)
+      await client.query('update vaccines set default_interval_days = 90 where id = $1', [
+        VACCINE_RABIA,
+      ])
+
+      await setRole(client, 'service_role')
+      const { rows } = await client.query(
+        `select actor_user_id, (old_data->>'default_interval_days') as before,
+                (new_data->>'default_interval_days') as after
+           from audit_log
+          where table_name = 'vaccines' and record_id = $1
+          order by changed_at desc limit 1`,
+        [VACCINE_RABIA],
+      )
+      expect(rows[0].actor_user_id).toBe(USER_VET)
+      expect(rows[0].after).toBe('90')
     })
   })
 

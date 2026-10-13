@@ -31,6 +31,8 @@ import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
 import TimeSlotPicker from '@/components/TimeSlotPicker.vue'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{ modelValue: boolean }>()
 
@@ -43,6 +45,8 @@ const session = useSessionStore()
 const agenda = useAgendaStore()
 
 const errorMessage = ref<string | null>(null)
+// Aviso junto al selector de mascota: es un campo que Vuetify no valida solo (chips).
+const petError = ref<string | null>(null)
 const saving = ref(false)
 
 // Sucursal DE LA CITA: arranca en la misma que se estaba viendo en la
@@ -102,6 +106,7 @@ watch(customerSearchTerm, (term) => {
 async function selectCustomer(customer: Customer | null): Promise<void> {
   selectedCustomer.value = customer
   selectedPet.value = null
+  petError.value = null
   customerPets.value = customer
     ? await petsService.listByCustomer(session.activeTenantId ?? '', customer.id)
     : []
@@ -242,6 +247,7 @@ watch(
     if (!open) return
 
     errorMessage.value = null
+    petError.value = null
     saving.value = false
 
     selectedBranchId.value = agenda.activeBranchId
@@ -271,20 +277,26 @@ watch(
 )
 
 // --- Envío -----------------------------------------------------------------
-const canSubmit = computed(
-  () =>
-    selectedCustomer.value != null &&
-    selectedPet.value != null &&
-    selectedServiceIds.value.length > 0 &&
-    selectedEmployeeId.value != null &&
-    selectedSlot.value != null,
-)
+// Los campos obligatorios se marcan con * y los revisa el formulario al agendar (no se
+// desactiva el botón: la persona vería "Agendar" apagado sin saber qué falta).
+const formRef = ref<FormHandle | null>(null)
 
 function close(): void {
   emit('update:modelValue', false)
 }
 
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
+  if (!selectedPet.value) {
+    petError.value = customerPets.value.length
+      ? 'Elige la mascota de la cita.'
+      : 'Este cliente aún no tiene mascotas. Agrégala desde su página y vuelve a agendar.'
+    return
+  }
+  if (!selectedSlot.value) {
+    errorMessage.value = 'Elige un horario disponible.'
+    return
+  }
   if (
     !session.activeTenantId ||
     !selectedBranchId.value ||
@@ -342,209 +354,221 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>Nueva cita</v-card-title>
 
       <v-card-text>
-        <!-- Sucursal DE LA CITA. Con una sola sucursal no hay nada que
-             elegir — mismo criterio que el resto de los selectores de
-             sucursal de la app. -->
-        <v-select
-          v-if="session.activeBranches.length > 1"
-          v-model="selectedBranchId"
-          :items="session.activeBranches"
-          item-title="name"
-          item-value="id"
-          label="Sucursal de la cita"
-          density="compact"
-          variant="outlined"
-          class="mb-2"
-          style="max-width: 280px"
-        />
+        <!-- Sin manejador de envío: Enter dentro de la búsqueda de clientes no debe agendar. -->
+        <v-form ref="formRef" @submit.prevent>
+          <!-- Sucursal DE LA CITA. Con una sola sucursal no hay nada que
+               elegir — mismo criterio que el resto de los selectores de
+               sucursal de la app. -->
+          <v-select
+            v-if="session.activeBranches.length > 1"
+            v-model="selectedBranchId"
+            :items="session.activeBranches"
+            item-title="name"
+            item-value="id"
+            label="Sucursal de la cita*"
+            :rules="[required]"
+            density="compact"
+            variant="outlined"
+            class="mb-2"
+            style="max-width: 280px"
+          />
 
-        <v-row>
-          <v-col cols="12" md="6">
-            <!-- Cliente y mascota -->
-            <p class="text-overline text-medium-emphasis">Cliente y mascota</p>
+          <v-row>
+            <v-col cols="12" md="6">
+              <!-- Cliente y mascota -->
+              <p class="text-overline text-medium-emphasis">Cliente y mascota</p>
 
-            <!-- El autocomplete se queda montado siempre, seleccionado o
-                 no (pedido explícito del usuario: nada de cambiar a un
-                 texto + botón "Cambiar"). Con no-filter, Vuetify no
-                 filtra del lado del cliente, así que aunque el cuadro
-                 muestre el nombre ya elegido, el menú sigue ofreciendo
-                 toda customerResults — elegir otro cliente es un solo
-                 clic, directo. -->
-            <v-autocomplete
-              :model-value="selectedCustomer"
-              :items="customerResults"
-              :item-title="customerLabel"
-              no-filter
-              return-object
-              label="Buscar cliente por nombre o apellido"
-              prepend-inner-icon="mdi-magnify"
-              density="compact"
-              variant="outlined"
-              @update:model-value="selectCustomer"
-              @update:search="customerSearchTerm = $event"
-            />
+              <!-- El autocomplete se queda montado siempre, seleccionado o
+                   no (pedido explícito del usuario: nada de cambiar a un
+                   texto + botón "Cambiar"). Con no-filter, Vuetify no
+                   filtra del lado del cliente, así que aunque el cuadro
+                   muestre el nombre ya elegido, el menú sigue ofreciendo
+                   toda customerResults — elegir otro cliente es un solo
+                   clic, directo. -->
+              <v-autocomplete
+                :model-value="selectedCustomer"
+                :items="customerResults"
+                :item-title="customerLabel"
+                no-filter
+                return-object
+                label="Buscar cliente por nombre o apellido*"
+                :rules="[required]"
+                prepend-inner-icon="mdi-magnify"
+                density="compact"
+                variant="outlined"
+                @update:model-value="selectCustomer"
+                @update:search="customerSearchTerm = $event"
+              />
 
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-account-plus"
-              class="mt-1"
-              @click="showNewCustomer = true"
-            >
-              Cliente nuevo
-            </v-btn>
+              <v-btn
+                variant="text"
+                size="small"
+                prepend-icon="mdi-account-plus"
+                class="mt-1"
+                @click="showNewCustomer = true"
+              >
+                Cliente nuevo
+              </v-btn>
 
-            <!-- Solo se elige entre las mascotas ya registradas del cliente; una
-                 mascota más se agrega desde la página del cliente. -->
-            <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mt-2">
-              <span class="font-weight-bold">Mascota:</span>
-              <v-chip-group v-model="selectedPet" mandatory>
-                <v-chip
-                  v-for="pet in customerPets"
-                  :key="pet.id"
-                  :value="pet"
-                  :prepend-icon="pet.species === 'cat' ? 'mdi-cat' : 'mdi-dog'"
-                  filter
+              <!-- Solo se elige entre las mascotas ya registradas del cliente; una
+                   mascota más se agrega desde la página del cliente. -->
+              <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mt-2">
+                <span class="font-weight-bold">Mascota:</span>
+                <v-chip-group v-model="selectedPet" mandatory>
+                  <v-chip
+                    v-for="pet in customerPets"
+                    :key="pet.id"
+                    :value="pet"
+                    :prepend-icon="pet.species === 'cat' ? 'mdi-cat' : 'mdi-dog'"
+                    filter
+                  >
+                    {{ pet.name }}
+                  </v-chip>
+                </v-chip-group>
+              </div>
+              <p v-if="petError && !selectedPet" class="text-caption text-error mt-1" role="alert">
+                {{ petError }}
+              </p>
+
+              <v-divider class="my-4" />
+
+              <!-- Tipo: dos botones independientes, no v-btn-toggle (pedido
+                   explícito del usuario). El resaltado del elegido se hace
+                   a mano con :color/:variant, pero el comportamiento sigue
+                   siendo "uno u otro": kind siempre tiene un valor, y
+                   hacer clic en un botón solo lo reemplaza por el otro. -->
+              <p class="text-overline text-medium-emphasis">Tipo de cita</p>
+              <div class="d-flex ga-2 mb-2">
+                <v-btn
+                  :color="visitKindInfo('grooming').color"
+                  :prepend-icon="visitKindInfo('grooming').icon"
+                  :variant="kind === 'grooming' ? 'flat' : 'outlined'"
+                  @click="kind = 'grooming'"
                 >
-                  {{ pet.name }}
-                </v-chip>
-              </v-chip-group>
-            </div>
+                  Estética
+                </v-btn>
+                <v-btn
+                  :color="visitKindInfo('veterinary').color"
+                  :prepend-icon="visitKindInfo('veterinary').icon"
+                  :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
+                  @click="kind = 'veterinary'"
+                >
+                  Veterinaria
+                </v-btn>
+              </div>
 
-            <v-divider class="my-4" />
+              <v-divider class="my-4" />
 
-            <!-- Tipo: dos botones independientes, no v-btn-toggle (pedido
-                 explícito del usuario). El resaltado del elegido se hace
-                 a mano con :color/:variant, pero el comportamiento sigue
-                 siendo "uno u otro": kind siempre tiene un valor, y
-                 hacer clic en un botón solo lo reemplaza por el otro. -->
-            <p class="text-overline text-medium-emphasis">Tipo de cita</p>
-            <div class="d-flex ga-2 mb-2">
-              <v-btn
-                :color="visitKindInfo('grooming').color"
-                :prepend-icon="visitKindInfo('grooming').icon"
-                :variant="kind === 'grooming' ? 'flat' : 'outlined'"
-                @click="kind = 'grooming'"
+              <!-- Servicios -->
+              <p class="text-overline text-medium-emphasis">Servicios</p>
+              <v-select
+                v-model="selectedServiceIds"
+                :items="availableServices"
+                item-title="name"
+                item-value="id"
+                multiple
+                chips
+                label="Servicios*"
+                :rules="[required]"
+                density="compact"
+                variant="outlined"
               >
-                Estética
-              </v-btn>
-              <v-btn
-                :color="visitKindInfo('veterinary').color"
-                :prepend-icon="visitKindInfo('veterinary').icon"
-                :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
-                @click="kind = 'veterinary'"
+                <!-- En la lista desplegada, la info completa (nombre,
+                     duración, precio) — pedido explícito del usuario. -->
+                <template #item="{ item, props: itemProps }">
+                  <v-list-item
+                    v-bind="itemProps"
+                    :title="item.raw.name"
+                    :subtitle="`${item.raw.duration_minutes} min — ${formatMXN(item.raw.price_cents)}`"
+                  />
+                </template>
+                <!-- En el chip ya elegido, solo el nombre. -->
+                <template #chip="{ item, props: chipProps }">
+                  <v-chip v-bind="chipProps" :text="item.raw.name" />
+                </template>
+              </v-select>
+              <p v-if="availableServices.length === 0" class="text-medium-emphasis">
+                No hay servicios activos en esta categoría.
+              </p>
+              <p class="mt-2 text-body-2">
+                Total: {{ totalDurationMinutes }} min · {{ formatMXN(totalPriceCents) }}
+              </p>
+            </v-col>
+
+            <v-col cols="12" md="6">
+              <!-- Empleado y horario -->
+              <p class="text-overline text-medium-emphasis">Empleado y horario</p>
+
+              <!-- Solo empleados que pueden ATENDER este tipo de cita
+                   (employeesForKind: su rol, u owner) — el backend igual lo
+                   revalida (create_appointment()), esto solo evita ofrecer
+                   una opción que se va a rechazar. -->
+              <v-select
+                v-model="selectedEmployeeId"
+                :items="employeesForKind"
+                item-title="fullName"
+                item-value="userId"
+                label="Empleado*"
+                :rules="[required]"
+                density="compact"
+                variant="outlined"
               >
-                Veterinaria
-              </v-btn>
-            </div>
+                <!-- Cada empleado con su puesto (D26 punto 3): chip con texto,
+                     nunca solo un color. -->
+                <template #item="{ item, props: itemProps }">
+                  <v-list-item v-bind="itemProps" :title="item.raw.fullName">
+                    <template #append>
+                      <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
+                    </template>
+                  </v-list-item>
+                </template>
+                <template #selection="{ item }">
+                  <span class="mr-2">{{ item.raw.fullName }}</span>
+                  <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
+                </template>
+              </v-select>
+              <p v-if="employeesForKind.length === 0" class="text-medium-emphasis text-body-2 mb-2">
+                No hay nadie que pueda atender este tipo de cita en esta sucursal.
+              </p>
+              <v-text-field
+                v-model="selectedDate"
+                type="date"
+                :min="minDate"
+                label="Fecha*"
+                :rules="[required]"
+                density="compact"
+                variant="outlined"
+              />
 
-            <v-divider class="my-4" />
+              <!-- El picker solo se pinta una vez que ya hay con qué buscar
+                   huecos (empleado + al menos un servicio). Antes de eso
+                   no hay una búsqueda real que haya fallado, así que no
+                   corresponde mostrar "no hay huecos disponibles". -->
+              <p class="text-body-2 mb-1">Horario*</p>
+              <div v-if="loadingSlots" style="min-height: 48px">
+                <v-skeleton-loader v-if="showSlotsSkeleton" type="chip@6" />
+              </div>
+              <TimeSlotPicker
+                v-else-if="selectedEmployeeId && totalDurationMinutes > 0"
+                v-model="selectedSlot"
+                :slots="availableSlots"
+              />
+              <p v-else class="text-medium-emphasis text-body-2">
+                Elige empleado y al menos un servicio para ver los horarios disponibles.
+              </p>
+            </v-col>
+          </v-row>
 
-            <!-- Servicios -->
-            <p class="text-overline text-medium-emphasis">Servicios</p>
-            <v-select
-              v-model="selectedServiceIds"
-              :items="availableServices"
-              item-title="name"
-              item-value="id"
-              multiple
-              chips
-              label="Servicios"
-              density="compact"
-              variant="outlined"
-            >
-              <!-- En la lista desplegada, la info completa (nombre,
-                   duración, precio) — pedido explícito del usuario. -->
-              <template #item="{ item, props: itemProps }">
-                <v-list-item
-                  v-bind="itemProps"
-                  :title="item.raw.name"
-                  :subtitle="`${item.raw.duration_minutes} min — ${formatMXN(item.raw.price_cents)}`"
-                />
-              </template>
-              <!-- En el chip ya elegido, solo el nombre. -->
-              <template #chip="{ item, props: chipProps }">
-                <v-chip v-bind="chipProps" :text="item.raw.name" />
-              </template>
-            </v-select>
-            <p v-if="availableServices.length === 0" class="text-medium-emphasis">
-              No hay servicios activos en esta categoría.
-            </p>
-            <p class="mt-2 text-body-2">
-              Total: {{ totalDurationMinutes }} min · {{ formatMXN(totalPriceCents) }}
-            </p>
-          </v-col>
-
-          <v-col cols="12" md="6">
-            <!-- Empleado y horario -->
-            <p class="text-overline text-medium-emphasis">Empleado y horario</p>
-
-            <!-- Solo empleados que pueden ATENDER este tipo de cita
-                 (employeesForKind: su rol, u owner) — el backend igual lo
-                 revalida (create_appointment()), esto solo evita ofrecer
-                 una opción que se va a rechazar. -->
-            <v-select
-              v-model="selectedEmployeeId"
-              :items="employeesForKind"
-              item-title="fullName"
-              item-value="userId"
-              label="Empleado"
-              density="compact"
-              variant="outlined"
-            >
-              <!-- Cada empleado con su puesto (D26 punto 3): chip con texto,
-                   nunca solo un color. -->
-              <template #item="{ item, props: itemProps }">
-                <v-list-item v-bind="itemProps" :title="item.raw.fullName">
-                  <template #append>
-                    <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
-                  </template>
-                </v-list-item>
-              </template>
-              <template #selection="{ item }">
-                <span class="mr-2">{{ item.raw.fullName }}</span>
-                <v-chip size="small" variant="tonal">{{ roleLabel(item.raw.role) }}</v-chip>
-              </template>
-            </v-select>
-            <p v-if="employeesForKind.length === 0" class="text-medium-emphasis text-body-2 mb-2">
-              No hay nadie que pueda atender este tipo de cita en esta sucursal.
-            </p>
-            <v-text-field
-              v-model="selectedDate"
-              type="date"
-              :min="minDate"
-              label="Fecha"
-              density="compact"
-              variant="outlined"
-            />
-
-            <!-- El picker solo se pinta una vez que ya hay con qué buscar
-                 huecos (empleado + al menos un servicio). Antes de eso
-                 no hay una búsqueda real que haya fallado, así que no
-                 corresponde mostrar "no hay huecos disponibles". -->
-            <div v-if="loadingSlots" style="min-height: 48px">
-              <v-skeleton-loader v-if="showSlotsSkeleton" type="chip@6" />
-            </div>
-            <TimeSlotPicker
-              v-else-if="selectedEmployeeId && totalDurationMinutes > 0"
-              v-model="selectedSlot"
-              :slots="availableSlots"
-            />
-            <p v-else class="text-medium-emphasis text-body-2">
-              Elige empleado y al menos un servicio para ver los horarios disponibles.
-            </p>
-          </v-col>
-        </v-row>
-
-        <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-4">
-          {{ errorMessage }}
-        </v-alert>
+          <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-4">
+            {{ errorMessage }}
+          </v-alert>
+        </v-form>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="close">Cancelar</v-btn>
-        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="handleSubmit">
+        <v-btn color="primary" :loading="saving" @click="handleSubmit">
           Agendar
         </v-btn>
       </v-card-actions>

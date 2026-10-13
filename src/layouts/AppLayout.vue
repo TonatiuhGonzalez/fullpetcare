@@ -183,6 +183,7 @@ function handleBranchChange(branchId: unknown): void {
     <template #header="{ rail }">
       <WorkspaceSwitcher
         :tenant-name="businessName"
+        :logo-url="session.activeLogoUrl"
         :branches="session.activeBranches"
         :active-branch-id="session.activeBranchId"
         :rail="rail"

@@ -2458,3 +2458,105 @@ interfaz. Alcance elegido por el usuario: propuestas **A** (reskin con tokens) y
   se ajustó: ya no hay `input[type=date]` en la Agenda (avanza con "Día siguiente") y ubica el bloque por su clase
   `ec-status-*` en lugar del color en línea. **Qué se puede demostrar:** abrir la Agenda como dueño, ver cada cita
   como bloque tonal con ícono de estado, elegir el día desde el selector y alternar tema claro y oscuro.
+
+---
+
+## Fase 26 — Correcciones 2: observaciones de uso, imagen de empresa, vacunas y vista responsiva
+
+**Meta: cerrar las 8 observaciones de uso del 2026-10-13 sin cambiar el flujo del producto.** Fase de la **etapa de
+mejoras** (`CLAUDE.md` §1). Tarea de seguimiento: por asignar. **Estado: construida (2026-10-13), pendiente de PR.**
+Decisiones y alternativas en `PLAN.md` D29. Sin dependencia nueva ni servicio externo. Tocan la base: la imagen de
+empresa (columna y bucket nuevos) y el permiso de escritura del catálogo de vacunas; todo lo demás es interfaz.
+
+### 26A. Preparación
+
+- [x] **26.1** 📚 Confirmar el alcance y las decisiones de `PLAN.md` D29. _Verificar:_ el usuario aprueba. **Aprobada por el usuario (2026-10-13).**
+
+### 26B. Ajustes de interfaz
+
+- [x] **26.2** Los tooltips esperan 300 ms antes de aparecer: `openDelay` por defecto de `VTooltip` en
+  `plugins/vuetify.ts` (lo heredan `IconButton` y los `v-tooltip` sueltos). _Verificar:_ en navegador, el globo no sale
+  al pasar rápido por encima y sí al detenerse. **Hecho:** `VTooltip: { openDelay: 300 }` en los defaults.
+- [x] **26.3** `/app/servicios`: el switch de activar/desactivar lleva tooltip, igual que el de Empleados.
+  _Verificar:_ en navegador; revisar de paso que el switch de Inventario diga lo mismo. **Hecho:** el de Inventario ya tenía tooltip.
+- [x] **26.4** `/app/empleados`: el orden de las acciones pasa a [restablecer contraseña, editar, eliminar, switch].
+  _Verificar:_ en navegador.
+- [x] **26.5** Nueva cita: si falta la mascota, "Agendar" lo indica junto al selector de mascota (hoy retorna sin
+  avisar). Cubre también el cliente sin mascotas registradas. _Verificar:_ revisión en navegador (es un campo de
+  chips dentro de un diálogo; no lleva test de componente, §9). **Hecho en código; falta verla en navegador.**
+- [x] **26.6** `/app/clientes`: el buscador también encuentra por nombre de mascota (la fila que sale es la del
+  dueño, con su chip). Usa `search_pets()` existente, sin acentos y con ñ aparte. _Verificar:_ test de servicio y de
+  la mezcla de resultados sin duplicar clientes. **Hecho sin tocar la base:** la página ya carga todas las
+  mascotas; `lib/customerPets.ts#customerIdsByPetName` compara el nombre (sin acentos, ñ aparte) y
+  `customers.listByIds` trae a los dueños que la búsqueda de clientes no había encontrado. Test unitario en
+  `customerPets.spec.ts`. Solo coincide el NOMBRE de la mascota, no su especie.
+
+### 26C. Imagen de empresa
+
+- [x] **26.7** Migración aditiva: `tenants.logo_path text null` y bucket privado `tenant-logos` (ruta
+  `{tenant_id}/logo.{ext}`, solo imágenes, tope de tamaño), con políticas de Storage: leer cualquier miembro del
+  negocio, escribir/reemplazar/borrar solo el dueño. _Verificar:_ test de RLS (otro negocio, groomer, anon).
+  **Hecho:** `20261015100000_tenant_logo.sql` (columna, `set_tenant_logo()` y bucket con políticas de INSERT, UPDATE y
+  DELETE solo para el dueño). 9 tests en `tenant-logo-rls.spec.ts`. Se decidió que la ruta debe empezar con el id del
+  negocio y terminar en `logo.{jpg,jpeg,png,webp}`; quitar la imagen manda texto vacío.
+- [x] **26.8** `services/` y store de sesión: subir, reemplazar y quitar la imagen; URL firmada para mostrarla.
+  _Verificar:_ test de servicio.
+  **Hecho:** `services/tenantLogo.ts`; `lib/tenantLogo.ts` (tipos admitidos y tope de 2 MB, con test) y en
+  `stores/session.ts` `activeLogoUrl`, `changeLogo()` y `removeLogo()` (5 tests: orden archivo → ruta, borra el
+  archivo anterior si cambia la extensión, quitar limpia todo).
+- [x] **26.9** `/app/configuracion/cuenta`: bloque "Imagen de la empresa" (solo dueño) con subir, cambiar y quitar.
+  `WorkspaceSwitcher` muestra la imagen en lugar de las iniciales ("PF") y vuelve a las iniciales si no hay.
+  _Verificar:_ en navegador, claro y oscuro.
+  **Verificado en navegador (2026-10-13, Playwright desechable, dueño de Patitas Felices, tema claro):** un archivo de
+  más de 2 MB avisa y no se guarda; subir, cambiar y recargar conserva la imagen en el menú y en Cuenta; quitar
+  vuelve a "PF". **Sin cubrir:** tema oscuro, menú colapsado (riel) y un negocio con una sola sucursal.
+
+### 26D. Catálogo de vacunas
+
+- [x] **26.10** Migración aditiva: `vaccines` insert/update permitido también al rol `vet` (hoy solo `owner`).
+  _Verificar:_ test de RLS: vet escribe; recepción y groomer no; otro negocio no.
+  **Hecho:** `20261015110000_vaccines_vet_write.sql` (`alter policy` de insert y update a `owner` y `vet`). Se agregó
+  además la bitácora (`vaccines_audit`, `app.log_change()`): el catálogo ya no lo escribe una sola persona y un cambio
+  de refuerzo cambia los recordatorios de todas las cartillas. 5 tests nuevos en `vaccines-rls.spec.ts`.
+- [x] **26.11** `services/vaccines.ts`: listar todo el catálogo, crear, editar y ocultar (borrado suave).
+  _Verificar:_ test de servicio.
+  **Hecho:** `listAll`, `create`, `update` y `hide` en `services/vaccines.ts`; reglas puras en `lib/vaccineCatalog.ts`
+  (refuerzo entero de 1 a 3650 o vacío, nombre repetido por especie sin acentos). 2 tests de servicio con sesión real
+  (vet crea, edita y oculta; groomer rechazado) y 6 unitarios.
+- [x] **26.12** Pantalla "Vacunas" en Configuración (dueño y veterinario): nombre, especie y días de refuerzo; las
+  validaciones y asteriscos siguen §5.6. Una vacuna ya aplicada no se borra, se oculta. _Verificar:_ en navegador.
+  **Verificado en navegador (2026-10-13, Playwright desechable, tema claro):** el veterinario ve "Vacunas" y "Cuenta"
+  (no "Empresa y sucursales"), el formulario vacío marca el nombre, "rábia" avisa que ya existe, refuerzo 0 avisa,
+  crea con 180 días, lo ve en la lista y lo oculta; el groomer que abre la ruta cae en Cuenta. Rutas nuevas:
+  `meta.requiresRoles` en el router. **Sin cubrir:** tema oscuro y pantalla angosta (es la 26.14).
+  **Observación (ya existía, no se tocó):** al recargar el navegador en `/app/configuracion` la redirección de la
+  ruta vacía se evalúa antes de cargar la sesión y cae en Cuenta; dentro de la app (sin recargar) va a la primera
+  sección que el rol puede ver.
+
+### 26E. Vista responsiva
+
+- [x] **26.13** Pieza compartida de lista que en < 960 px muestra cards con sus acciones y en pantallas grandes
+  conserva la tabla. _Verificar:_ test de la pieza y revisión a 390, 768 y 1366 px.
+  **Hecho:** `components/ResponsiveTable.vue` (envuelve `v-data-table`; en < 960 px usa `v-data-iterator`). La tarjeta
+  se arma sola de los `headers` y **reutiliza las ranuras `item.<columna>`** de la tabla (primera columna = título,
+  resto = "etiqueta: valor", `actions` abajo), así tarjeta y tabla no pueden decir cosas distintas; `cardHidden` en un
+  header la oculta. 6 tests. El test atrapó un fallo real: `v-data-iterator` no pinta la ranura por defecto sin
+  filas, el estado vacío va en `#no-data`.
+- [x] **26.14** Clientes, Servicios, Inventario, Empleados, Sucursales y Reportes usan la pieza; Cuenta se acomoda sin
+  desbordar. _Verificar:_ en navegador, sin desborde horizontal a 390 px, claro y oscuro.
+  **Hecho:** Clientes, Servicios, Inventario, Empleados y Vacunas usan `ResponsiveTable` (el inactivo de Inventario
+  sigue atenuado, menos sus acciones; tocar una tarjeta de cliente abre su página). Sucursales: tarjeta por sucursal
+  con sus botones debajo. Reportes: la tabla de Empleados (5 columnas) pasa a tarjetas en celular, las demás se
+  quedan como tabla compacta y las pestañas llevan flechas. Cuenta: el texto ya no se corta con "…".
+- [x] **26.15** Agenda: en < 600 px, lista del día por hora (tocable, mismo detalle y mismo tooltip de datos); en
+  tablet, calendario adaptado. _Verificar:_ en navegador a 390 y 768 px, con dueño y con groomer.
+
+### 26F. Cierre
+
+- [x] **26.16** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§5.6, §6.1, §6.2 y §6.4) y marcar
+  la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-13:** `lint`, `vue-tsc`, 738 tests unitarios, `test:db` (848 en verde y los 5 de siempre en rojo, de
+  datos acumulados en la base local y ajenos a esta fase) y el E2E en verde. `CLAUDE.md` actualizado (§1, §4, §5.6, §6.1,
+  §6.2 y §6.4). **Qué se puede demostrar:** como dueño, subir la imagen de la empresa y verla en el menú; como
+  veterinario, agregar una vacuna y ocultarla; buscar un cliente por el nombre de su mascota; y abrir el sistema en un
+  celular: tarjetas en lugar de tablas y la agenda como lista del día.

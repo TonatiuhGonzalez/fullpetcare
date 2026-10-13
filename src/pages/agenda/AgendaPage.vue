@@ -13,6 +13,7 @@
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
 import { format } from 'date-fns'
+import { useDisplay } from 'vuetify'
 import { es } from 'date-fns/locale'
 
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
@@ -28,6 +29,7 @@ import type { Appointment } from '@/services/appointments'
 import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
+import AgendaDayList from '@/components/AgendaDayList.vue'
 import CalendarSkeleton from '@/components/CalendarSkeleton.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
@@ -41,6 +43,10 @@ import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
+
+// Celular (< 600 px): lista del día en lugar del calendario de horas (fase 26, PLAN.md D29).
+// La tablet conserva el calendario.
+const { xs } = useDisplay()
 
 const isFrontDeskView = computed(() => isFrontDesk(session.role))
 // 'idle' cuenta como cargando (ver el comentario sobre el calendario en el template).
@@ -349,7 +355,7 @@ function handleAppointmentCreated(appointment: Appointment): void {
            /login pero la pantalla congelada hasta hacer F5. -->
       <template v-else-if="agenda.status === 'ready' && agenda.visibleDates.length > 0">
         <!-- Leyenda en una sola fila: estados (ícono + texto) y tipos de visita. -->
-        <div class="agenda-legend" aria-label="Significado de colores e íconos">
+        <div v-if="!xs" class="agenda-legend" aria-label="Significado de colores e íconos">
           <v-chip
             v-for="item in statusLegend"
             :key="item.status"
@@ -364,8 +370,15 @@ function handleAppointmentCreated(appointment: Appointment): void {
           <VisitKindChip v-for="info in kindLegend" :key="info.kind" :kind="info.kind" size="x-small" />
         </div>
 
+        <!-- En celular el estado y el tipo van en texto dentro de cada tarjeta: sin leyenda. -->
+        <AgendaDayList
+          v-if="xs"
+          :blocks="calendarBlocks"
+          :employee-name="isFrontDeskView ? employeeName : undefined"
+          @select="openAppointmentDialog"
+        />
         <EmployeeDayScheduler
-          v-if="isFrontDeskView"
+          v-else-if="isFrontDeskView"
           :date="agenda.activeDate ?? ''"
           :hour-range="agenda.hourRange"
           :rows="schedulerRows"
@@ -419,8 +432,11 @@ function handleAppointmentCreated(appointment: Appointment): void {
 
 <style scoped lang="scss">
 // El calendario pinta su propio DOM con esquinas rectas: la tarjeta las recorta.
+// `clip` y no `hidden`: `hidden` vuelve a la tarjeta un contenedor con scroll, y al abrir la
+// línea de tiempo la librería la desplazaba hacia la hora actual (en tablet dejaba la columna
+// de empleados medio fuera de la vista). `clip` recorta igual pero no se puede desplazar.
 .agenda-card {
-  overflow: hidden;
+  overflow: clip;
 }
 
 .agenda-toolbar {

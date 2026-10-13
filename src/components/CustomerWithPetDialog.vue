@@ -18,12 +18,15 @@ import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerError
 import { speciesLabel } from '@/lib/petLabels'
 import {
   fiscalReceiverProblems,
+  isFormValid,
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
+  required,
 } from '@/lib/validation'
 import type { Database } from '@/types/database'
+import type { FormHandle } from '@/lib/validation'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 type PetSex = Database['public']['Enums']['pet_sex']
@@ -111,10 +114,13 @@ watch(email, () => {
   emailError.value = null
 })
 
-const requiredRules = [(v: string) => v.trim() !== '' || 'Obligatorio']
+// Con factura obligatoria (punto de venta) los datos fiscales son obligatorios; si no, opcionales.
+const fiscalRequired = (v: unknown) => !props.invoiceRequired || required(v)
 const phoneRules = [
   (v: string) =>
-    v === '' ? !props.phoneRequired || 'Obligatorio' : isValidPhone(v) || 'Debe tener 10 dígitos',
+    v === ''
+      ? !props.phoneRequired || 'Campo obligatorio'
+      : isValidPhone(v) || 'Debe tener 10 dígitos',
 ]
 // Vacío se permite (muchos clientes no dan correo); si hay algo, debe tener forma de correo.
 const emailRules = [(v: string) => v.trim() === '' || isValidEmail(v) || 'Correo con formato inválido']
@@ -145,7 +151,10 @@ function firstProblem(): string | null {
   return null
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   errorMessage.value = null
   const problem = firstProblem()
   if (problem) {
@@ -205,19 +214,19 @@ async function handleSubmit(): Promise<void> {
       }}</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
           <p class="text-overline text-medium-emphasis">Cliente</p>
           <v-row dense>
             <v-col cols="6">
-              <v-text-field v-model="firstName" label="Nombre" :rules="requiredRules" />
+              <v-text-field v-model="firstName" label="Nombre*" :rules="[required]" />
             </v-col>
             <v-col cols="6">
-              <v-text-field v-model="lastName" label="Apellido" :rules="requiredRules" />
+              <v-text-field v-model="lastName" label="Apellido*" :rules="[required]" />
             </v-col>
           </v-row>
           <v-text-field
             v-model="phone"
-            :label="phoneRequired ? 'Teléfono (10 dígitos)' : 'Teléfono'"
+            :label="phoneRequired ? 'Teléfono* (10 dígitos)' : 'Teléfono'"
             type="tel"
             :rules="phoneRules"
           />
@@ -238,30 +247,51 @@ async function handleSubmit(): Promise<void> {
           />
           <v-expand-transition>
             <div v-if="requiresInvoice">
-              <v-text-field v-model="rfc" label="RFC" :rules="rfcRules" />
-              <v-text-field v-model="legalName" label="Razón social" />
+              <v-text-field
+                v-model="rfc"
+                :label="invoiceRequired ? 'RFC*' : 'RFC'"
+                :rules="[fiscalRequired, ...rfcRules]"
+              />
+              <v-text-field
+                v-model="legalName"
+                :label="invoiceRequired ? 'Razón social*' : 'Razón social'"
+                :rules="[fiscalRequired]"
+              />
               <v-row dense>
                 <v-col cols="6">
-                  <v-text-field v-model="taxRegimeCode" label="Régimen fiscal (código SAT)" />
+                  <v-text-field
+                    v-model="taxRegimeCode"
+                    :label="invoiceRequired ? 'Régimen fiscal* (código SAT)' : 'Régimen fiscal (código SAT)'"
+                    :rules="[fiscalRequired]"
+                  />
                 </v-col>
                 <v-col cols="6">
-                  <v-text-field v-model="cfdiUse" label="Uso de CFDI (código SAT)" />
+                  <v-text-field
+                    v-model="cfdiUse"
+                    :label="invoiceRequired ? 'Uso de CFDI* (código SAT)' : 'Uso de CFDI (código SAT)'"
+                    :rules="[fiscalRequired]"
+                  />
                 </v-col>
               </v-row>
               <v-text-field
                 v-model="postalCode"
-                label="Código postal fiscal"
-                :rules="postalCodeRules"
+                :label="invoiceRequired ? 'Código postal fiscal*' : 'Código postal fiscal'"
+                :rules="[fiscalRequired, ...postalCodeRules]"
               />
             </div>
           </v-expand-transition>
 
           <v-divider class="my-3" />
           <p class="text-overline text-medium-emphasis">Mascota</p>
-          <v-text-field v-model="petName" label="Nombre de la mascota" :rules="requiredRules" />
+          <v-text-field v-model="petName" label="Nombre de la mascota*" :rules="[required]" />
           <v-row dense>
             <v-col cols="6">
-              <v-select v-model="petSpecies" :items="speciesOptions" label="Especie" />
+              <v-select
+                v-model="petSpecies"
+                :items="speciesOptions"
+                label="Especie*"
+                :rules="[required]"
+              />
             </v-col>
             <v-col cols="6">
               <v-text-field v-model="petBreed" label="Raza" />

@@ -30,6 +30,7 @@ import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { useSessionStore } from '@/stores/session'
+import { required } from '@/lib/validation'
 
 const props = defineProps<{ id: string }>()
 
@@ -342,11 +343,18 @@ async function handleReschedule(): Promise<void> {
           <v-text-field
             v-model="rescheduleDate"
             type="date"
-            label="Fecha"
+            label="Fecha*"
             density="compact"
             :min="rescheduleMinDate"
+            :rules="[required]"
           />
-          <v-text-field v-model="rescheduleTime" type="time" label="Hora" density="compact" />
+          <v-text-field
+            v-model="rescheduleTime"
+            type="time"
+            label="Hora*"
+            density="compact"
+            :rules="[required]"
+          />
           <v-alert v-if="rescheduleIssue" type="error" variant="tonal" density="compact" class="mb-2">
             {{ rescheduleIssue }}
           </v-alert>

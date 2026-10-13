@@ -10,6 +10,8 @@ import type { FiscalData, InvoicingStatus } from '@/lib/fiscalSetup'
 import * as invoicing from '@/services/invoicingSettings'
 import { useSessionStore } from '@/stores/session'
 import PageHeader from '@/components/PageHeader.vue'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const session = useSessionStore()
 const tenantId = computed(() => session.activeTenantId ?? '')
@@ -87,7 +89,10 @@ async function load(): Promise<void> {
 
 onMounted(load)
 
+const formRef = ref<FormHandle | null>(null)
+
 async function saveData(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   saving.value = true
   try {
     await invoicing.saveFiscalData(tenantId.value, {
@@ -170,12 +175,13 @@ async function uploadCertificate(): Promise<void> {
         <p class="text-body-2 text-medium-emphasis mb-4">
           Cópialos tal como aparecen en tu constancia de situación fiscal del SAT.
         </p>
-        <v-form @submit.prevent="saveData">
+        <v-form ref="formRef" @submit.prevent="saveData">
           <v-row dense>
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.rfc"
-                label="RFC"
+                label="RFC*"
+                :rules="[required]"
                 maxlength="13"
                 :disabled="loading"
               />
@@ -183,7 +189,8 @@ async function uploadCertificate(): Promise<void> {
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.postal_code"
-                label="Código postal del domicilio fiscal"
+                label="Código postal del domicilio fiscal*"
+                :rules="[required]"
                 maxlength="5"
                 :disabled="loading"
               />
@@ -191,7 +198,8 @@ async function uploadCertificate(): Promise<void> {
             <v-col cols="12">
               <v-text-field
                 v-model="form.legal_name"
-                label="Razón social"
+                label="Razón social*"
+                :rules="[required]"
                 :disabled="loading"
               />
             </v-col>
@@ -199,7 +207,8 @@ async function uploadCertificate(): Promise<void> {
               <v-select
                 v-model="form.tax_regime_code"
                 :items="regimeItems"
-                label="Régimen fiscal"
+                label="Régimen fiscal*"
+                :rules="[required]"
                 :disabled="loading"
               />
             </v-col>
@@ -234,21 +243,21 @@ async function uploadCertificate(): Promise<void> {
         </v-alert>
         <v-file-input
           v-model="cerFile"
-          label="Archivo .cer"
+          label="Archivo .cer*"
           accept=".cer"
           prepend-icon=""
           prepend-inner-icon="mdi-paperclip"
         />
         <v-file-input
           v-model="keyFile"
-          label="Archivo .key"
+          label="Archivo .key*"
           accept=".key"
           prepend-icon=""
           prepend-inner-icon="mdi-paperclip"
         />
         <v-text-field
           v-model="password"
-          label="Contraseña de la llave privada"
+          label="Contraseña de la llave privada*"
           type="password"
           autocomplete="off"
         />

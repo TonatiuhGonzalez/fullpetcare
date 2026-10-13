@@ -7,7 +7,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import {
   buildInventoryTableRows,
-  compareBoolean,
   compareOptionalText,
   NO_CATEGORY_LABEL,
   STOCK_STATUS_LABEL,
@@ -21,6 +20,7 @@ import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import ProductCategoriesDialog from '@/components/ProductCategoriesDialog.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
@@ -76,7 +76,6 @@ const headers = computed(() => [
   { title: 'Categoría', key: 'categoryName', sort: compareOptionalText, headerProps },
   { title: 'Precio', key: 'priceCents', headerProps },
   { title: 'Existencia', key: 'stock', headerProps },
-  { title: 'Estado', key: 'isActive', sort: compareBoolean, headerProps },
   ...(canEdit.value
     ? [
         {
@@ -84,7 +83,7 @@ const headers = computed(() => [
           key: 'actions',
           sortable: false,
           align: 'center' as const,
-          width: 100,
+          width: 130,
           cellProps: { class: 'inventory-actions' },
           headerProps,
         },
@@ -144,11 +143,11 @@ function openMovement(row: InventoryRow, type: 'purchase' | 'adjustment'): void 
 
 const togglingIds = ref<Set<string>>(new Set())
 
-async function handleToggleActive(row: InventoryRow): Promise<void> {
+async function handleToggleActive(row: InventoryRow, value: boolean | null): Promise<void> {
   const id = row.product.id
   togglingIds.value.add(id)
   errorMessage.value = null
-  const error = await inventory.setProductActive(id, !row.product.is_active)
+  const error = await inventory.setProductActive(id, value === true)
   if (error) errorMessage.value = error
   togglingIds.value.delete(id)
 }
@@ -221,7 +220,7 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
     <!-- Primera carga: silueta con las mismas columnas que la tabla. En recargas la
          tabla conserva sus filas y solo lleva la barra fina (`loading`). -->
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="tableRows"
@@ -258,52 +257,58 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
           {{ stockLabel(item) }}
         </v-chip>
       </template>
-      <template #[`item.isActive`]="{ item }">
-        <v-chip
-          size="small"
-          variant="tonal"
-          :color="item.isActive ? 'success' : undefined"
-        >
-          {{ item.isActive ? 'Activo' : 'Inactivo' }}
-        </v-chip>
-      </template>
       <template #[`item.actions`]="{ item }">
-        <v-menu>
-          <template #activator="{ props: menuProps }">
-            <IconButton
-              v-bind="menuProps"
-              icon="mdi-dots-vertical"
-              variant="text"
-              size="small"
-              :aria-label="`Acciones de ${item.name}`"
-            />
-          </template>
-          <v-list density="compact">
-            <v-list-item
-              prepend-icon="mdi-package-down"
-              title="Entrada de compra"
-              @click="openMovement(item.source, 'purchase')"
-            />
-            <v-list-item
-              prepend-icon="mdi-tune-vertical"
-              title="Ajustar inventario"
-              @click="openMovement(item.source, 'adjustment')"
-            />
-            <v-list-item
-              prepend-icon="mdi-pencil"
-              title="Editar producto"
-              @click="openEditProduct(item.source.product)"
-            />
-            <v-list-item
-              :prepend-icon="item.isActive ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-              :title="item.isActive ? 'Desactivar' : 'Activar'"
-              :disabled="togglingIds.has(item.id)"
-              @click="handleToggleActive(item.source)"
-            />
-          </v-list>
-        </v-menu>
+        <div class="d-flex align-center justify-center">
+          <v-menu>
+            <template #activator="{ props: menuProps }">
+              <IconButton
+                v-bind="menuProps"
+                icon="mdi-dots-vertical"
+                variant="text"
+                size="small"
+                :aria-label="`Acciones de ${item.name}`"
+              />
+            </template>
+            <v-list density="compact">
+              <v-list-item
+                prepend-icon="mdi-package-down"
+                title="Entrada de compra"
+                @click="openMovement(item.source, 'purchase')"
+              />
+              <v-list-item
+                prepend-icon="mdi-tune-vertical"
+                title="Ajustar inventario"
+                @click="openMovement(item.source, 'adjustment')"
+              />
+              <v-list-item
+                prepend-icon="mdi-pencil"
+                title="Editar producto"
+                @click="openEditProduct(item.source.product)"
+              />
+            </v-list>
+          </v-menu>
+          <v-tooltip
+            :text="item.isActive ? 'Desactivar producto' : 'Activar producto'"
+            location="top"
+          >
+            <template #activator="{ props: tooltipProps }">
+              <v-switch
+                v-bind="tooltipProps"
+                class="inventory-switch"
+                :model-value="item.isActive"
+                :loading="togglingIds.has(item.id)"
+                :disabled="togglingIds.has(item.id)"
+                :aria-label="item.isActive ? 'Desactivar producto' : 'Activar producto'"
+                color="primary"
+                density="compact"
+                hide-details
+                @update:model-value="handleToggleActive(item.source, $event)"
+              />
+            </template>
+          </v-tooltip>
+        </div>
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <ProductCategoriesDialog v-model="showCategoriesDialog" />
     <ProductFormDialog v-model="showProductDialog" :product="editingProduct" />
@@ -329,7 +334,16 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
   overflow-wrap: anywhere;
 }
 
+.inventory-switch {
+  margin-left: 5px;
+}
+
 .inventory-table :deep(.inventory-row--inactive td:not(.inventory-actions)) {
+  opacity: 0.5;
+}
+
+// Igual en la tarjeta de pantallas chicas: todo atenuado menos las acciones.
+:deep(.responsive-table__card.inventory-row--inactive > :not(.responsive-table__actions)) {
   opacity: 0.5;
 }
 </style>

@@ -8,6 +8,8 @@ import { ref, watch } from 'vue'
 
 import type { ManualMovementType } from '@/lib/inventory'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -42,7 +44,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   if (!props.row) return
   saving.value = true
   errorMessage.value = null
@@ -76,7 +81,7 @@ async function handleSubmit(): Promise<void> {
       <v-card-subtitle>{{ row.product.name }} · hay {{ row.stock }}</v-card-subtitle>
 
       <v-card-text class="pt-4">
-        <v-form @submit.prevent="handleSubmit">
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
           <v-btn-toggle
             v-if="type === 'adjustment'"
             v-model="direction"
@@ -92,7 +97,8 @@ async function handleSubmit(): Promise<void> {
 
           <v-text-field
             v-model.number="quantity"
-            label="Cantidad (piezas)"
+            label="Cantidad (piezas)*"
+            :rules="[required]"
             type="number"
             min="1"
             step="1"
@@ -103,7 +109,8 @@ async function handleSubmit(): Promise<void> {
           <v-text-field
             v-if="type === 'adjustment'"
             v-model="reason"
-            label="Motivo"
+            label="Motivo*"
+            :rules="[required]"
             hint="Por ejemplo: conteo físico, producto dañado."
             persistent-hint
           />

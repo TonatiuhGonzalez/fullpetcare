@@ -128,7 +128,7 @@ defineExpose({ reload: load })
         :items="available"
         item-title="name"
         return-object
-        label="Producto"
+        label="Producto*"
         density="compact"
         hide-details
         :loading="loading"
@@ -140,7 +140,7 @@ defineExpose({ reload: load })
       </v-autocomplete>
       <v-text-field
         v-model.number="quantity"
-        label="Cant."
+        label="Cant.*"
         type="number"
         min="1"
         step="1"

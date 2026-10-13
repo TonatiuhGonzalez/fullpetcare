@@ -123,4 +123,42 @@ describe('Aislamiento entre tenants: Storage (pet-photos)', () => {
     expect(error).toBeNull()
     expect(data).not.toBeNull()
   })
+
+  it('el dueño puede reemplazar una foto que ya existe (upsert sobre la misma ruta)', async () => {
+    // Es lo que hace el formulario de mascota al cambiar la foto: sube a la
+    // misma ruta con `upsert: true`, lo que en Postgres es un UPDATE. Sin
+    // política de UPDATE en storage.objects, guardar una mascota con foto
+    // previa fallaba con "violates row-level security policy". El archivo
+    // de prueba ya existe porque beforeAll lo subió.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: DUENO_EMAIL,
+      password: DUENO_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const newImage = new Blob([new Uint8Array([9, 9, 9, 9, 9])], { type: 'image/jpeg' })
+    const { error } = await supabase.storage
+      .from('pet-photos')
+      .upload(TEST_PATH, newImage, { upsert: true })
+
+    expect(error).toBeNull()
+  })
+
+  it('un groomer no puede reemplazar la foto, aunque sí pueda verla', async () => {
+    // La política de UPDATE copia la de INSERT: solo dueño y recepción.
+    // Si se abriera de más, un groomer podría sustituir la foto de
+    // cualquier mascota del negocio.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: GROOMER_EMAIL,
+      password: GROOMER_PASSWORD,
+    })
+    if (signInError) throw signInError
+
+    const newImage = new Blob([new Uint8Array([7, 7, 7])], { type: 'image/jpeg' })
+    const { error } = await supabase.storage
+      .from('pet-photos')
+      .upload(TEST_PATH, newImage, { upsert: true })
+
+    expect(error).not.toBeNull()
+  })
 })

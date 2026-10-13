@@ -5,6 +5,7 @@
 // solo el dueño). Todo se calcula en la base; aquí solo se dibuja. Las barras son
 // de CSS (sin librería de gráficas, D11).
 import { computed, onMounted, ref, watch } from 'vue'
+import { useDisplay } from 'vuetify'
 
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { formatMXN } from '@/lib/money'
@@ -25,6 +26,8 @@ import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 
 const session = useSessionStore()
+// Pantallas chicas (< 600 px): la tabla de empleados, de cinco columnas, pasa a tarjetas.
+const { xs } = useDisplay()
 const reports = useReportsStore()
 
 const tab = ref<'summary' | 'items' | 'staff'>('summary')
@@ -210,7 +213,7 @@ function exportStaff(): void {
         <v-text-field
           v-model="reports.customRange.from"
           type="date"
-          label="Desde"
+          label="Desde*"
           density="compact"
           hide-details
         />
@@ -219,7 +222,7 @@ function exportStaff(): void {
         <v-text-field
           v-model="reports.customRange.to"
           type="date"
-          label="Hasta"
+          label="Hasta*"
           density="compact"
           hide-details
         />
@@ -246,7 +249,7 @@ function exportStaff(): void {
     />
     <CardSkeleton v-if="isFirstLoad && showSkeleton" :count="4" :lines="1" />
 
-    <v-tabs v-model="tab" class="mb-4">
+    <v-tabs v-model="tab" class="mb-4" show-arrows>
       <v-tab value="summary">Resumen de ventas</v-tab>
       <v-tab value="items">Lo más vendido</v-tab>
       <v-tab value="staff">Empleados</v-tab>
@@ -291,7 +294,7 @@ function exportStaff(): void {
       </p>
 
       <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="d-flex align-center mb-2">
+        <div class="d-flex flex-wrap align-center ga-2 mb-2">
           <h2 class="text-subtitle-1">Ventas por día</h2>
           <v-spacer />
           <v-btn
@@ -327,7 +330,7 @@ function exportStaff(): void {
       </v-card>
 
       <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="d-flex align-center mb-2">
+        <div class="d-flex flex-wrap align-center ga-2 mb-2">
           <h2 class="text-subtitle-1">Cobrado por método de pago</h2>
           <v-spacer />
           <v-btn
@@ -357,7 +360,7 @@ function exportStaff(): void {
       </v-card>
 
       <v-card v-if="summary.byBranch.length > 1" variant="outlined" class="pa-4 mb-4">
-        <div class="d-flex align-center mb-2">
+        <div class="d-flex flex-wrap align-center ga-2 mb-2">
           <h2 class="text-subtitle-1">Por sucursal</h2>
           <v-spacer />
           <v-btn
@@ -389,7 +392,7 @@ function exportStaff(): void {
 
     <!-- Lo más vendido -->
     <template v-if="tab === 'items' && reports.topItems">
-      <div class="d-flex align-center mb-2">
+      <div class="d-flex flex-wrap align-center ga-2 mb-2">
         <p class="text-caption text-medium-emphasis">
           El importe es con IVA y <strong>antes del descuento</strong> de la venta, así
           que si hubo descuentos la suma puede ser mayor al total vendido. Un insumo
@@ -441,7 +444,7 @@ function exportStaff(): void {
 
     <!-- Empleados -->
     <template v-if="tab === 'staff' && reports.status !== 'idle'">
-      <div class="d-flex align-center mb-2">
+      <div class="d-flex flex-wrap align-center ga-2 mb-2">
         <p class="text-caption text-medium-emphasis">
           Cada partida se atribuye así: un servicio, al empleado de su cita; un producto
           vendido junto con un servicio, al empleado de la primera cita del ticket; una
@@ -461,6 +464,18 @@ function exportStaff(): void {
         <p v-if="reports.staff.length === 0" class="text-body-2 text-medium-emphasis">
           Sin actividad en este periodo.
         </p>
+        <!-- Celular: una tarjeta por empleado en lugar de cinco columnas apretadas. -->
+        <div v-else-if="xs">
+          <div v-for="row in reports.staff" :key="row.userId ?? 'none'" class="staff-card">
+            <div class="font-weight-medium">{{ row.fullName }}</div>
+            <dl class="staff-card__details">
+              <div><dt>Citas</dt><dd>{{ row.appointmentsCompleted }}</dd></div>
+              <div><dt>Servicios</dt><dd>{{ formatMXN(row.servicesCents) }}</dd></div>
+              <div><dt>Productos</dt><dd>{{ formatMXN(row.productsCents) }}</dd></div>
+              <div><dt>Total</dt><dd class="font-weight-bold">{{ formatMXN(row.totalCents) }}</dd></div>
+            </dl>
+          </div>
+        </div>
         <v-table v-else density="compact">
           <thead>
             <tr>
@@ -487,6 +502,38 @@ function exportStaff(): void {
 </template>
 
 <style scoped lang="scss">
+// Tarjeta de empleado en celular (tabla de "Empleados" del reporte).
+.staff-card {
+  padding: 8px 0;
+
+  & + & {
+    border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  }
+
+  &__details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+    margin: 6px 0 0;
+
+    div {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    dt {
+      font-size: 0.75rem;
+      color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+    }
+
+    dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
 // Barras por día: una columna flexible por día; la altura sale del porcentaje.
 .bars {
   display: flex;

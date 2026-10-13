@@ -15,6 +15,8 @@ import type { Vaccine } from '@/services/vaccines'
 import { computeNextDueDate } from '@/lib/vaccination'
 import { toBranchTime } from '@/lib/datetime'
 import type { Database } from '@/types/database'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 
@@ -101,7 +103,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   if (!selectedVaccineId.value) return
 
   saving.value = true
@@ -164,22 +169,23 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>Aplicar vacuna</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
           <v-select
             v-model="selectedVaccineId"
             :items="vaccines"
             item-title="name"
             item-value="id"
-            label="Vacuna"
+            label="Vacuna*"
             :loading="loading"
-            required
+            :rules="[required]"
           />
 
           <v-text-field
             v-model="appliedAtDate"
-            label="Fecha de aplicación"
+            label="Fecha de aplicación*"
             type="date"
             density="compact"
+            :rules="[required]"
           />
           <v-text-field v-model="batchNumber" label="Número de lote" density="compact" />
           <template v-if="canPickProduct">

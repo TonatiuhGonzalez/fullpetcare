@@ -2,6 +2,8 @@
 // Funciones puras: la tabla trae TODAS las mascotas en una sola consulta y aquí se
 // reparten por cliente; la página de cliente decide qué mascota queda elegida.
 
+import { normalizeSearchText } from './searchText'
+
 /** Máximo de chips de mascota que caben en una fila de la tabla antes de poner "+K más". */
 export const MAX_PET_CHIPS = 3
 
@@ -51,4 +53,24 @@ export function pickSelectedPetId(
 ): string | null {
   if (currentId && pets.some((pet) => pet.id === currentId)) return currentId
   return pets[0]?.id ?? null
+}
+
+/**
+ * Ids de los clientes que tienen una mascota cuyo NOMBRE contiene `term` (sin acentos ni
+ * mayúsculas; la ñ aparte de la n, igual que la búsqueda de clientes). Se omiten los que ya
+ * están en `excludeIds` para no repetir al cliente que la búsqueda normal ya encontró.
+ */
+export function customerIdsByPetName(
+  petsByCustomer: Map<string, { name: string }[]>,
+  term: string,
+  excludeIds: Set<string> = new Set(),
+): string[] {
+  const needle = normalizeSearchText(term)
+  if (needle === '') return []
+  const ids: string[] = []
+  for (const [customerId, pets] of petsByCustomer) {
+    if (excludeIds.has(customerId)) continue
+    if (pets.some((pet) => normalizeSearchText(pet.name).includes(needle))) ids.push(customerId)
+  }
+  return ids
 }

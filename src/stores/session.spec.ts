@@ -53,6 +53,12 @@ vi.mock('@/services/permissions', () => ({
 vi.mock('@/services/platform', () => ({
   isPlatformAdmin: vi.fn(),
 }))
+vi.mock('@/services/tenantLogo', () => ({
+  upload: vi.fn(),
+  removeFile: vi.fn(),
+  setPath: vi.fn(),
+  getUrl: vi.fn(),
+}))
 
 // Se importan DESPUÉS de los vi.mock() de arriba — en este punto ya no
 // son las funciones reales, son las versiones falsas (vi.fn()) que se
@@ -63,6 +69,7 @@ import { listMyMemberships } from '@/services/memberships'
 import { cancelMyTenant, listMyTenantNotices } from '@/services/tenantAccess'
 import { listForTenant } from '@/services/permissions'
 import { isPlatformAdmin } from '@/services/platform'
+import * as tenantLogo from '@/services/tenantLogo'
 import type { RolePermissionRow } from '@/lib/permissions'
 
 // Dos membresías de prueba, en tenants distintos — a propósito más de
@@ -74,6 +81,7 @@ const MEMBERSHIP_A: MembershipSummary = {
   tenantId: 'tenant-a',
   tenantName: 'Patitas Felices',
   tenantTimezone: 'America/Mexico_City',
+  logoPath: null,
   role: 'owner',
   branches: [
     { id: 'branch-a1', name: 'Centro', timezone: 'America/Mexico_City' },
@@ -85,6 +93,7 @@ const MEMBERSHIP_B: MembershipSummary = {
   tenantId: 'tenant-b',
   tenantName: 'Huellitas Spa',
   tenantTimezone: 'America/Tijuana',
+  logoPath: null,
   role: 'vet',
   branches: [{ id: 'branch-b1', name: 'Zona Río', timezone: 'America/Tijuana' }],
 }
@@ -714,5 +723,95 @@ describe('avisos de acceso (#1905)', () => {
     await store.cancelActiveTenant('Cierro el local')
     expect(cancelMyTenant).toHaveBeenCalledWith('tenant-a', 'Cierro el local')
     expect(store.isAuthenticated).toBe(false)
+  })
+})
+
+describe('imagen de la empresa (fase 26)', () => {
+  const png = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
+  const jpg = new File([new Uint8Array([1, 2, 3])], 'logo.jpg', { type: 'image/jpeg' })
+
+  beforeEach(() => {
+    vi.mocked(tenantLogo.getUrl).mockResolvedValue('https://signed.example/logo')
+  })
+
+  // Mismo arranque que usan los demás bloques: iniciar sesión con las membresías dadas.
+  async function loginWith(memberships: MembershipSummary[], notices: TenantNotice[] = []) {
+    vi.mocked(signIn).mockResolvedValue({ id: 'user-1', email: 'x@y.mx' })
+    vi.mocked(getProfile).mockResolvedValue({
+      fullName: 'Ana',
+      avatarPath: null,
+      mustChangePassword: false,
+    })
+    vi.mocked(listMyMemberships).mockResolvedValue(memberships)
+    vi.mocked(listMyTenantNotices).mockResolvedValue(notices)
+    const store = useSessionStore()
+    await store.login('x@y.mx', 'Demo1234!')
+    return store
+  }
+
+  it('con una imagen guardada, pide su URL firmada', async () => {
+    // Qué se rompería: el menú seguiría mostrando las iniciales aunque el negocio ya tenga
+    // imagen, porque el bucket es privado y la ruta sola no sirve en un <img>.
+    const store = await loginWith([{ ...MEMBERSHIP_A, logoPath: 'tenant-a/logo.png' }], [])
+    await vi.waitFor(() => expect(store.activeLogoUrl).toBe('https://signed.example/logo'))
+    expect(tenantLogo.getUrl).toHaveBeenCalledWith('tenant-a/logo.png')
+  })
+
+  it('sin imagen no pide nada y queda en nulo', async () => {
+    // Sin ruta, la interfaz debe volver a las iniciales sin llamar a Storage.
+    const store = await loginWith([MEMBERSHIP_A], [])
+    expect(store.activeLogoUrl).toBeNull()
+    expect(tenantLogo.getUrl).not.toHaveBeenCalled()
+  })
+
+  it('subir una imagen: primero el archivo, luego la ruta en el negocio', async () => {
+    // El orden importa: si se guardara la ruta antes de que exista el archivo, una falla de
+    // subida dejaría al negocio apuntando a una imagen que no está.
+    const calls: string[] = []
+    vi.mocked(tenantLogo.upload).mockImplementation(async (path) => {
+      calls.push('upload')
+      return path
+    })
+    vi.mocked(tenantLogo.setPath).mockImplementation(async () => {
+      calls.push('setPath')
+    })
+    const store = await loginWith([MEMBERSHIP_A], [])
+    store.selectTenant('tenant-a')
+
+    await store.changeLogo(png)
+
+    expect(calls).toEqual(['upload', 'setPath'])
+    expect(tenantLogo.setPath).toHaveBeenCalledWith('tenant-a', 'tenant-a/logo.png')
+    expect(store.activeMembership?.logoPath).toBe('tenant-a/logo.png')
+  })
+
+  it('al cambiar de extensión borra el archivo anterior', async () => {
+    // Qué se rompería: png → jpg dejaría un logo.png huérfano en el bucket por cada cambio.
+    vi.mocked(tenantLogo.upload).mockImplementation(async (path) => path)
+    vi.mocked(tenantLogo.setPath).mockResolvedValue(undefined)
+    vi.mocked(tenantLogo.removeFile).mockResolvedValue(undefined)
+    const store = await loginWith([{ ...MEMBERSHIP_A, logoPath: 'tenant-a/logo.png' }], [])
+    store.selectTenant('tenant-a')
+
+    await store.changeLogo(jpg)
+
+    expect(tenantLogo.removeFile).toHaveBeenCalledWith('tenant-a/logo.png')
+    expect(store.activeMembership?.logoPath).toBe('tenant-a/logo.jpg')
+  })
+
+  it('quitar la imagen limpia la ruta y borra el archivo', async () => {
+    // Qué se rompería: el menú conservaría la imagen vieja tras quitarla, o el archivo
+    // quedaría en el bucket sin que nada lo use.
+    vi.mocked(tenantLogo.setPath).mockResolvedValue(undefined)
+    vi.mocked(tenantLogo.removeFile).mockResolvedValue(undefined)
+    const store = await loginWith([{ ...MEMBERSHIP_A, logoPath: 'tenant-a/logo.png' }], [])
+    store.selectTenant('tenant-a')
+
+    await store.removeLogo()
+
+    expect(tenantLogo.setPath).toHaveBeenCalledWith('tenant-a', null)
+    expect(tenantLogo.removeFile).toHaveBeenCalledWith('tenant-a/logo.png')
+    expect(store.activeMembership?.logoPath).toBeNull()
+    await vi.waitFor(() => expect(store.activeLogoUrl).toBeNull())
   })
 })
