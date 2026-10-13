@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   customerFiscalProblems,
   fiscalReceiverProblems,
+  isFilled,
+  isFormValid,
   isValidCURP,
   isValidEmail,
   isValidPhone,
@@ -13,6 +15,7 @@ import {
   MIN_PASSWORD_LENGTH,
   passwordChangeProblems,
   passwordResetProblems,
+  required,
 } from './validation'
 
 describe('isValidEmail', () => {
@@ -371,5 +374,50 @@ describe('customerFiscalProblems', () => {
         postal_code: null,
       }),
     ).toHaveLength(5)
+  })
+})
+
+describe('isFilled y required', () => {
+  it('un texto vacío o solo con espacios cuenta como vacío', () => {
+    // Qué se rompería: "   " pasaría como nombre válido, la base lo recorta y rechaza el
+    // guardado con un error técnico en vez de marcar el campo en rojo.
+    expect(isFilled('')).toBe(false)
+    expect(isFilled('   ')).toBe(false)
+    expect(isFilled('Firulais')).toBe(true)
+  })
+
+  it('el cero es un dato, no un campo vacío', () => {
+    // Qué se rompería: un servicio de cortesía (precio 0) o un producto sin existencia
+    // inicial no se podrían guardar porque 0 es "falsy" en JavaScript.
+    expect(isFilled(0)).toBe(true)
+    expect(isFilled(Number.NaN)).toBe(false)
+  })
+
+  it('null, undefined y lista vacía cuentan como vacíos', () => {
+    // Qué se rompería: un selector sin elegir (null) o una cita sin servicios ([])
+    // llegaría a la base y fallaría ahí.
+    expect(isFilled(null)).toBe(false)
+    expect(isFilled(undefined)).toBe(false)
+    expect(isFilled([])).toBe(false)
+    expect(isFilled(['servicio-1'])).toBe(true)
+  })
+
+  it('required devuelve true si hay dato y el mensaje si falta', () => {
+    // Vuetify espera "true" (válido) o un texto (el error que se muestra en el campo).
+    expect(required('Ana')).toBe(true)
+    expect(required('')).toBe('Campo obligatorio')
+  })
+})
+
+describe('isFormValid', () => {
+  it('deja guardar solo si Vuetify reporta el formulario válido', async () => {
+    // Qué se rompería: el botón "Guardar" mandaría a la base un formulario con campos
+    // obligatorios vacíos y la persona vería un error técnico en vez del campo en rojo.
+    expect(await isFormValid({ validate: async () => ({ valid: true }) })).toBe(true)
+    expect(await isFormValid({ validate: async () => ({ valid: false }) })).toBe(false)
+  })
+
+  it('sin formulario montado no bloquea el guardado', async () => {
+    expect(await isFormValid(null)).toBe(true)
   })
 })

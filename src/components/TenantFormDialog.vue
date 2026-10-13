@@ -119,24 +119,24 @@ async function handleSubmit(): Promise<void> {
         <v-form @submit.prevent="handleSubmit">
           <v-text-field
             v-model="tenantName"
-            label="Nombre de la empresa *"
+            label="Nombre de la empresa*"
             :error-messages="errorsFor('tenantName')"
           />
           <v-text-field
             v-model="branchName"
-            label="Nombre de la primera sucursal *"
+            label="Nombre de la primera sucursal*"
             :error-messages="errorsFor('branchName')"
           />
 
           <div class="text-subtitle-2 mt-2 mb-2">Dueño</div>
           <v-text-field
             v-model="ownerFullName"
-            label="Nombre completo *"
+            label="Nombre completo*"
             :error-messages="errorsFor('ownerFullName')"
           />
           <v-text-field
             v-model="ownerEmail"
-            label="Correo *"
+            label="Correo*"
             type="email"
             :error-messages="errorsFor('ownerEmail')"
             hint="Con este correo iniciará sesión. Se le generará una contraseña temporal."

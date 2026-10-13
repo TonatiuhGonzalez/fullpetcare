@@ -52,7 +52,7 @@ const canConfirm = computed(() => typedName.value.trim() === props.tenantName.tr
 
         <v-text-field
           v-model="typedName"
-          :label="`Escribe «${tenantName}» para confirmar`"
+          :label="`Escribe «${tenantName}» para confirmar*`"
           autocomplete="off"
         />
         <v-textarea

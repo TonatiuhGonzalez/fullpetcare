@@ -79,7 +79,7 @@ function handleConfirm(): void {
           :items="reasons"
           item-title="label"
           item-value="id"
-          label="Motivo que verá el cliente *"
+          label="Motivo que verá el cliente*"
           :error-messages="showValidation && !reasonId ? ['Elige el motivo.'] : []"
         />
 

@@ -13,6 +13,8 @@ import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
 import { speciesLabel } from '@/lib/petLabels'
 import type { Database } from '@/types/database'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 type PetSex = Database['public']['Enums']['pet_sex']
@@ -93,7 +95,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   const owner = props.customerId ?? ownerId.value
   if (!props.pet && !owner) {
     errorMessage.value = 'Elige al dueño de la mascota.'
@@ -154,20 +159,26 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>{{ isEditing ? 'Editar mascota' : 'Nueva mascota' }}</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
-          <v-text-field v-model="name" label="Nombre" required />
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
+          <v-text-field v-model="name" label="Nombre*" :rules="[required]" />
 
           <v-autocomplete
             v-if="needsOwnerPicker && !isEditing"
             v-model="ownerId"
             :items="ownerOptions"
-            label="Dueño"
+            label="Dueño*"
+            :rules="[required]"
             no-data-text="No hay clientes. Primero da de alta al dueño en la pestaña Clientes."
           />
 
           <v-row dense>
             <v-col cols="6">
-              <v-select v-model="species" :items="speciesOptions" label="Especie" />
+              <v-select
+                v-model="species"
+                :items="speciesOptions"
+                label="Especie*"
+                :rules="[required]"
+              />
             </v-col>
             <v-col cols="6">
               <v-text-field v-model="breed" label="Raza" />

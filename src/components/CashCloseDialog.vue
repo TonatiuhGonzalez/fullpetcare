@@ -9,6 +9,8 @@ import CashClosingReceipt from '@/components/CashClosingReceipt.vue'
 import { checkCountedCash } from '@/lib/cashRegister'
 import type { CashOverview } from '@/services/cashRegister'
 import { useCashRegisterStore, type ClosedResult } from '@/stores/cashRegister'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -41,7 +43,10 @@ watch(
   },
 )
 
-function handleContinue(): void {
+const formRef = ref<FormHandle | null>(null)
+
+async function handleContinue(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   errorMessage.value = checkCountedCash(counted.value).error
   confirming.value = errorMessage.value === null
 }
@@ -110,21 +115,24 @@ async function handleClose(): Promise<void> {
             Cuenta el efectivo que hay en la caja (billetes y monedas) y escribe el total.
             El sistema te dirá si cuadra <strong>después</strong> de cerrar.
           </p>
-          <v-text-field
-            v-model="counted"
-            label="Efectivo contado"
-            prefix="$"
-            inputmode="decimal"
-            autofocus
-            :disabled="confirming || saving"
-          />
-          <v-textarea
-            v-model="note"
-            label="Nota (opcional)"
-            rows="2"
-            auto-grow
-            :disabled="confirming || saving"
-          />
+          <v-form ref="formRef" @submit.prevent>
+            <v-text-field
+              v-model="counted"
+              label="Efectivo contado*"
+              :rules="[required]"
+              prefix="$"
+              inputmode="decimal"
+              autofocus
+              :disabled="confirming || saving"
+            />
+            <v-textarea
+              v-model="note"
+              label="Nota (opcional)"
+              rows="2"
+              auto-grow
+              :disabled="confirming || saving"
+            />
+          </v-form>
           <v-alert v-if="confirming" type="warning" variant="tonal" density="compact">
             Vas a cerrar la caja con el efectivo contado que escribiste. Un corte cerrado
             no se puede modificar. ¿Confirmas?

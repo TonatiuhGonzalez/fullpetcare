@@ -6,9 +6,10 @@
 import { computed, ref, watch } from 'vue'
 
 import { pesosToCents } from '@/lib/money'
-import { isValidSatProductCode, isValidSatUnitCode } from '@/lib/validation'
+import { isFormValid, isValidSatProductCode, isValidSatUnitCode, required } from '@/lib/validation'
 import type { Product } from '@/services/products'
 import { useInventoryStore } from '@/stores/inventory'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -72,7 +73,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   saving.value = true
   errorMessage.value = null
   // Un campo vacío de v-text-field type=number llega como '' o null: se trata
@@ -109,8 +113,8 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>{{ product ? 'Editar producto' : 'Nuevo producto' }}</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
-          <v-text-field v-model="name" label="Nombre" required />
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
+          <v-text-field v-model="name" label="Nombre*" :rules="[required]" />
 
           <v-select
             v-model="categoryId"
@@ -126,12 +130,12 @@ async function handleSubmit(): Promise<void> {
             <v-col cols="6">
               <v-text-field
                 v-model.number="priceInPesos"
-                label="Precio (MXN, con IVA)"
+                label="Precio (MXN, con IVA)*"
                 type="number"
                 min="0"
                 step="0.01"
                 inputmode="decimal"
-                required
+                :rules="[required]"
               />
             </v-col>
             <v-col cols="6">
@@ -148,7 +152,8 @@ async function handleSubmit(): Promise<void> {
 
           <v-text-field
             v-model.number="minStock"
-            label="Avisar cuando queden"
+            label="Avisar cuando queden*"
+            :rules="[required]"
             type="number"
             min="0"
             step="1"
@@ -163,7 +168,7 @@ async function handleSubmit(): Promise<void> {
             <v-col cols="6">
               <v-text-field
                 v-model="satProductCode"
-                label="Clave de producto (SAT)"
+                label="Clave de producto (SAT)*"
                 :rules="satProductRules"
                 maxlength="8"
                 inputmode="numeric"
@@ -174,7 +179,7 @@ async function handleSubmit(): Promise<void> {
             <v-col cols="6">
               <v-text-field
                 v-model="satUnitCode"
-                label="Clave de unidad (SAT)"
+                label="Clave de unidad (SAT)*"
                 :rules="satUnitRules"
                 maxlength="3"
                 hint="H87 = pieza."

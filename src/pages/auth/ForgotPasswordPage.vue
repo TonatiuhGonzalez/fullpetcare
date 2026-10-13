@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { isValidEmail } from '@/lib/validation'
+import { isFormValid, isValidEmail, required } from '@/lib/validation'
 import { requestPasswordReset } from '@/services/auth'
+import type { FormHandle } from '@/lib/validation'
 
 const email = ref('')
 const submitting = ref(false)
 const sent = ref(false)
 const errorMessage = ref<string | null>(null)
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   errorMessage.value = null
   if (!isValidEmail(email.value)) {
     errorMessage.value = 'Escribe un correo válido.'
@@ -46,13 +50,13 @@ async function handleSubmit(): Promise<void> {
         </v-alert>
       </template>
 
-      <v-form v-else @submit.prevent="handleSubmit">
+      <v-form ref="formRef" v-else @submit.prevent="handleSubmit">
         <v-text-field
           v-model="email"
-          label="Correo"
+          label="Correo*"
           type="email"
           autocomplete="username"
-          required
+          :rules="[required]"
           class="mb-2"
         />
         <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mb-4">

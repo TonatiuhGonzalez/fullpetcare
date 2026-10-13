@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import AuthPanelLayout from '@/components/AuthPanelLayout.vue'
 import BlockedTenantDialog from '@/components/BlockedTenantDialog.vue'
 import { useSessionStore } from '@/stores/session'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -42,7 +44,10 @@ async function closeBlocked(): Promise<void> {
   await goHome()
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   submitting.value = true
   try {
     await session.login(email.value, password.value)
@@ -69,24 +74,24 @@ async function handleSubmit(): Promise<void> {
         Ingresa con tu correo y contraseña.
       </p>
 
-      <v-form @submit.prevent="handleSubmit">
+      <v-form ref="formRef" @submit.prevent="handleSubmit">
         <v-text-field
           v-model="email"
-          label="Correo"
+          label="Correo*"
           type="email"
           autocomplete="username"
-          required
+          :rules="[required]"
           class="mb-2"
         />
         <v-text-field
           v-model="password"
-          label="Contraseña"
+          label="Contraseña*"
           :type="showPassword ? 'text' : 'password'"
           :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
           :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
           autocomplete="current-password"
+          :rules="[required]"
           @click:append-inner="showPassword = !showPassword"
-          required
           class="mb-2"
         />
 

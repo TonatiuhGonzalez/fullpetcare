@@ -342,7 +342,11 @@ function applyDiscount(): void {
 }
 
 function handleAddPayment(): void {
-  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) return
+  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) {
+    chargeError.value = 'Captura el monto del pago.'
+    return
+  }
+  chargeError.value = null
   if (cardTypeMissing.value) return
   cart.addPayment({
     method: newPaymentMethod.value,
@@ -840,13 +844,13 @@ function handleNewSale(): void {
                 { title: 'Transferencia', value: 'transfer_spei' },
                 { title: 'Openpay', value: 'openpay' },
               ]"
-              label="Método"
+              label="Método*"
               density="compact"
               hide-details
             />
             <v-text-field
               v-model.number="newPaymentAmountInPesos"
-              label="Monto (MXN)"
+              label="Monto (MXN)*"
               type="number"
               min="0"
               step="0.01"
@@ -871,7 +875,7 @@ function handleNewSale(): void {
               { title: 'Tarjeta de crédito', value: '04' },
               { title: 'Tarjeta de débito', value: '28' },
             ]"
-            label="Tipo de tarjeta"
+            label="Tipo de tarjeta*"
             density="compact"
             :error="cardTypeMissing && newPaymentAmountInPesos != null"
             hint="Elige crédito o débito para poder registrar el pago."
@@ -901,7 +905,7 @@ function handleNewSale(): void {
                 :items="customers"
                 :item-title="(c: Customer) => `${c.first_name} ${c.last_name}`"
                 return-object
-                label="Cliente"
+                label="Cliente*"
                 density="compact"
                 hide-details
                 class="mt-2"

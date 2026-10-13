@@ -130,7 +130,7 @@ async function handleSubmit(): Promise<void> {
 
       <v-card-text>
         <v-form @submit.prevent="handleSubmit">
-          <v-text-field v-model="name" label="Nombre" :error-messages="messageFor('name')" />
+          <v-text-field v-model="name" label="Nombre*" :error-messages="messageFor('name')" />
           <v-text-field v-model="address" label="Dirección (opcional)" />
 
           <v-row dense>
@@ -155,7 +155,7 @@ async function handleSubmit(): Promise<void> {
           <v-select
             v-model="timezone"
             :items="[...BRANCH_TIMEZONES]"
-            label="Zona horaria"
+            label="Zona horaria*"
             hint="Las citas se muestran con la hora de esta zona."
             persistent-hint
             :error-messages="messageFor('timezone')"
@@ -178,7 +178,7 @@ async function handleSubmit(): Promise<void> {
                 <v-text-field
                   v-model="hours[day.key].opensAt"
                   type="time"
-                  label="Abre"
+                  label="Abre*"
                   density="compact"
                   hide-details
                 />
@@ -187,7 +187,7 @@ async function handleSubmit(): Promise<void> {
                 <v-text-field
                   v-model="hours[day.key].closesAt"
                   type="time"
-                  label="Cierra"
+                  label="Cierra*"
                   density="compact"
                   hide-details
                 />

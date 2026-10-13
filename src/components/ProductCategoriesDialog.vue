@@ -9,6 +9,8 @@ import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '@/lib/productCategories'
 import type { ProductCategory } from '@/services/productCategories'
 import { useInventoryStore } from '@/stores/inventory'
 import IconButton from '@/components/IconButton.vue'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
@@ -53,7 +55,10 @@ function startEdit(category: ProductCategory): void {
   errorMessage.value = null
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   saving.value = true
   errorMessage.value = null
   const error = await inventory.saveCategory(
@@ -93,13 +98,14 @@ async function handleToggle(category: ProductCategory): Promise<void> {
           productos pasan a «Sin categoría»; no se borran.
         </p>
 
-        <v-form class="mb-4" @submit.prevent="handleSubmit">
+        <v-form ref="formRef" class="mb-4" @submit.prevent="handleSubmit">
           <v-text-field
             v-model="name"
-            :label="editingId ? 'Nombre de la categoría' : 'Nueva categoría'"
+            :label="editingId ? 'Nombre de la categoría*' : 'Nueva categoría*'"
+            :rules="[required]"
             maxlength="40"
             density="compact"
-            hide-details
+            hide-details="auto"
             class="mb-3"
           />
 
