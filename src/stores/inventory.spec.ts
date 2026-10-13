@@ -11,6 +11,14 @@ import { useSessionStore } from './session'
 // services/supabase.ts, que lanza error si no hay VITE_SUPABASE_URL. En tu Mac
 // existe .env.local y pasa; en el CI no, y el archivo entero fallaba al
 // importar. Se mockean igual que en session.spec.ts para no tocar Supabase.
+// El store de sesión importa el servicio de la imagen de la empresa (fase 26); sin este mock se
+// cargaría el cliente real de Supabase, que en CI (sin .env.local) lanza al importarse.
+vi.mock('@/services/tenantLogo', () => ({
+  upload: vi.fn(),
+  removeFile: vi.fn(),
+  setPath: vi.fn(),
+  getUrl: vi.fn(),
+}))
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),

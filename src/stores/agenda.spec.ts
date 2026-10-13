@@ -32,6 +32,14 @@ vi.mock('@/services/branches', () => ({
 vi.mock('@/services/checkout', () => ({
   listPaidAppointmentIds: vi.fn(),
 }))
+// El store de sesión importa el servicio de la imagen de la empresa (fase 26); sin este mock se
+// cargaría el cliente real de Supabase, que en CI (sin .env.local) lanza al importarse.
+vi.mock('@/services/tenantLogo', () => ({
+  upload: vi.fn(),
+  removeFile: vi.fn(),
+  setPath: vi.fn(),
+  getUrl: vi.fn(),
+}))
 vi.mock('@/services/auth', () => ({
   signIn: vi.fn(),
   signOut: vi.fn(),
