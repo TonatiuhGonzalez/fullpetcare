@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   buildInventoryTableRows,
   canRemove,
-  compareBoolean,
   compareOptionalText,
   computeStock,
   isValidQuantity,
@@ -271,13 +270,5 @@ describe('compareOptionalText', () => {
   it('dos vacíos son iguales', () => {
     // null y "" significan lo mismo ("sin valor"); si no fueran iguales, el orden sería inestable.
     expect(compareOptionalText(null, '  ')).toBe(0)
-  })
-})
-
-describe('compareBoolean', () => {
-  it('pone inactivos antes que activos al ascender', () => {
-    // Define el orden de la columna Estado; sin esto dependería del texto "true"/"false".
-    expect(compareBoolean(false, true)).toBeLessThan(0)
-    expect(compareBoolean(true, true)).toBe(0)
   })
 })

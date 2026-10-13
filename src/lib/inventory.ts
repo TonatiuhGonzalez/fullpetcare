@@ -205,7 +205,3 @@ export function compareOptionalText(a: string | null, b: string | null): number 
   return left.localeCompare(right, 'es', { sensitivity: 'base' })
 }
 
-/** Activo/inactivo para ordenar: los inactivos primero al ascender (false < true). */
-export function compareBoolean(a: boolean, b: boolean): number {
-  return Number(a) - Number(b)
-}
