@@ -87,10 +87,10 @@ async function handleSubmit(): Promise<void> {
           contraseña temporal.
         </p>
         <v-form @submit.prevent="handleSubmit">
-          <v-text-field v-model="fullName" label="Nombre completo *" :error-messages="nameError" />
+          <v-text-field v-model="fullName" label="Nombre completo*" :error-messages="nameError" />
           <v-text-field
             v-model="email"
-            label="Correo *"
+            label="Correo*"
             type="email"
             :error-messages="emailError"
           />

@@ -108,14 +108,14 @@ async function handleSubmit(): Promise<void> {
         <v-form @submit.prevent="handleSubmit">
           <v-text-field
             v-model="current"
-            label="Contraseña actual *"
+            label="Contraseña actual*"
             :type="showPasswords ? 'text' : 'password'"
             autocomplete="current-password"
             :error-messages="errorsFor('current')"
           />
           <v-text-field
             v-model="next"
-            label="Contraseña nueva *"
+            label="Contraseña nueva*"
             :type="showPasswords ? 'text' : 'password'"
             autocomplete="new-password"
             hint="Al menos 8 caracteres."
@@ -125,7 +125,7 @@ async function handleSubmit(): Promise<void> {
           />
           <v-text-field
             v-model="confirm"
-            label="Repite la contraseña nueva *"
+            label="Repite la contraseña nueva*"
             :type="showPasswords ? 'text' : 'password'"
             autocomplete="new-password"
             :error-messages="errorsFor('confirm')"

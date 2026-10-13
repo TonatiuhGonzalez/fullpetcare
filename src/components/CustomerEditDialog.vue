@@ -17,7 +17,15 @@ import type { Pet } from '@/services/pets'
 import { buildCustomerPayload } from '@/lib/customerForm'
 import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerErrors'
 import { speciesLabel } from '@/lib/petLabels'
-import { isValidEmail, isValidPhone, isValidPostalCode, isValidRFC } from '@/lib/validation'
+import {
+  isFormValid,
+  isValidEmail,
+  isValidPhone,
+  isValidPostalCode,
+  isValidRFC,
+  required,
+} from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import PetEditDialog from '@/components/PetEditDialog.vue'
 import IconButton from '@/components/IconButton.vue'
@@ -44,6 +52,7 @@ const pets = ref<Pet[]>([])
 const loading = ref(false)
 const showSkeleton = useDelayedLoading(loading)
 const saving = ref(false)
+const formRef = ref<FormHandle | null>(null)
 const errorMessage = ref<string | null>(null)
 
 const firstName = ref('')
@@ -141,10 +150,7 @@ function close(): void {
 
 async function handleSubmit(): Promise<void> {
   errorMessage.value = null
-  if (!firstName.value.trim() || !lastName.value.trim()) {
-    errorMessage.value = 'Faltan el nombre y el apellido.'
-    return
-  }
+  if (!(await isFormValid(formRef.value))) return
   if (email.value.trim() !== '' && !isValidEmail(email.value)) {
     errorMessage.value = 'El correo no tiene un formato válido.'
     return
@@ -243,13 +249,13 @@ async function handlePetSaved(): Promise<void> {
             </p>
           </template>
 
-          <v-form class="mt-4" @submit.prevent="handleSubmit">
+          <v-form ref="formRef" class="mt-4" @submit.prevent="handleSubmit">
             <v-row dense>
               <v-col cols="6">
-                <v-text-field v-model="firstName" label="Nombre" required />
+                <v-text-field v-model="firstName" label="Nombre*" :rules="[required]" />
               </v-col>
               <v-col cols="6">
-                <v-text-field v-model="lastName" label="Apellido" required />
+                <v-text-field v-model="lastName" label="Apellido*" :rules="[required]" />
               </v-col>
             </v-row>
 

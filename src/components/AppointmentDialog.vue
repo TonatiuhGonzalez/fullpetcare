@@ -73,6 +73,7 @@ import TicketView from '@/components/TicketView.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { visitKindInfo } from '@/lib/visitKind'
 import IconButton from '@/components/IconButton.vue'
+import { required } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -510,7 +511,11 @@ function applyDiscount(): void {
 }
 
 function handleAddPayment(): void {
-  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) return
+  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) {
+    chargeError.value = 'Captura el monto del pago.'
+    return
+  }
+  chargeError.value = null
   cart.addPayment({
     method: newPaymentMethod.value,
     amountCents: pesosToCents(newPaymentAmountInPesos.value),
@@ -806,13 +811,13 @@ function checkoutErrorMessage(err: unknown): string {
                   { title: 'Transferencia', value: 'transfer_spei' },
                   { title: 'Openpay', value: 'openpay' },
                 ]"
-                label="Método"
+                label="Método*"
                 density="compact"
                 hide-details
               />
               <v-text-field
                 v-model.number="newPaymentAmountInPesos"
-                label="Monto (MXN)"
+                label="Monto (MXN)*"
                 type="number"
                 min="0"
                 step="0.01"
@@ -904,11 +909,18 @@ function checkoutErrorMessage(err: unknown): string {
           <v-text-field
             v-model="rescheduleDate"
             type="date"
-            label="Fecha"
+            label="Fecha*"
             density="compact"
             :min="rescheduleMinDate"
+            :rules="[required]"
           />
-          <v-text-field v-model="rescheduleTime" type="time" label="Hora" density="compact" />
+          <v-text-field
+            v-model="rescheduleTime"
+            type="time"
+            label="Hora*"
+            density="compact"
+            :rules="[required]"
+          />
           <v-alert v-if="rescheduleIssue" type="error" variant="tonal" density="compact" class="mb-2">
             {{ rescheduleIssue }}
           </v-alert>

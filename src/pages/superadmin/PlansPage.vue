@@ -91,7 +91,7 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
     <v-form class="d-flex ga-2 mb-4" @submit.prevent="addPlan">
       <v-text-field
         v-model="newName"
-        label="Nuevo plan"
+        label="Nuevo plan*"
         density="compact"
         hide-details
         placeholder="Ej. Pro"
@@ -145,7 +145,7 @@ async function update(plan: Plan, name: string, isActive: boolean): Promise<void
       <v-card>
         <v-card-title>Renombrar plan</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editName" label="Nombre del plan" />
+          <v-text-field v-model="editName" label="Nombre del plan*" />
           <p class="text-caption text-medium-emphasis">
             Las empresas que ya tienen este plan conservan el nombre con el que se les
             asignó.

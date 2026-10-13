@@ -136,7 +136,11 @@ const cardTypeMissing = computed(
 )
 
 function handleAddPayment(): void {
-  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) return
+  if (newPaymentAmountInPesos.value == null || newPaymentAmountInPesos.value <= 0) {
+    chargeError.value = 'Captura el monto del pago.'
+    return
+  }
+  chargeError.value = null
   if (cardTypeMissing.value) return
   cart.addPayment({
     method: newPaymentMethod.value,
@@ -300,7 +304,7 @@ async function handleCharge(): Promise<void> {
             :items="cart.catalog"
             item-title="name"
             return-object
-            label="Producto"
+            label="Producto*"
             density="compact"
             hide-details
             no-data-text="No hay productos con existencia"
@@ -314,7 +318,7 @@ async function handleCharge(): Promise<void> {
           </v-autocomplete>
           <v-text-field
             v-model.number="productQuantity"
-            label="Cant."
+            label="Cant.*"
             type="number"
             min="1"
             step="1"
@@ -399,13 +403,13 @@ async function handleCharge(): Promise<void> {
               { title: 'Transferencia', value: 'transfer_spei' },
               { title: 'Openpay', value: 'openpay' },
             ]"
-            label="Método"
+            label="Método*"
             density="compact"
             hide-details
           />
           <v-text-field
             v-model.number="newPaymentAmountInPesos"
-            label="Monto (MXN)"
+            label="Monto (MXN)*"
             type="number"
             min="0"
             step="0.01"
@@ -430,7 +434,7 @@ async function handleCharge(): Promise<void> {
             { title: 'Tarjeta de crédito', value: '04' },
             { title: 'Tarjeta de débito', value: '28' },
           ]"
-          label="Tipo de tarjeta"
+          label="Tipo de tarjeta*"
           density="compact"
           :error="cardTypeMissing && newPaymentAmountInPesos != null"
           hint="Elige crédito o débito para poder registrar el pago."

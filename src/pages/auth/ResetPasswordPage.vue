@@ -70,7 +70,7 @@ async function handleSubmit(): Promise<void> {
       <v-form v-else @submit.prevent="handleSubmit">
         <v-text-field
           v-model="next"
-          label="Contraseña nueva"
+          label="Contraseña nueva*"
           :type="showPasswords ? 'text' : 'password'"
           :append-inner-icon="showPasswords ? 'mdi-eye-off' : 'mdi-eye'"
           :aria-label="showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'"
@@ -81,7 +81,7 @@ async function handleSubmit(): Promise<void> {
         />
         <v-text-field
           v-model="confirm"
-          label="Confirma la contraseña"
+          label="Confirma la contraseña*"
           :type="showPasswords ? 'text' : 'password'"
           autocomplete="new-password"
           :error-messages="showValidation && problems.confirm ? [problems.confirm] : []"

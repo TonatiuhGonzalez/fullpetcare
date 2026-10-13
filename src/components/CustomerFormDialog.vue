@@ -11,11 +11,14 @@ import type { Customer } from '@/services/customers'
 import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerErrors'
 import {
   fiscalReceiverProblems,
+  isFormValid,
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
+  required,
 } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -83,6 +86,8 @@ watch(email, () => {
   emailError.value = null
 })
 
+// Con factura obligatoria (punto de venta) los datos fiscales son obligatorios; si no, opcionales.
+const fiscalRequired = (v: unknown) => !props.invoiceRequired || required(v)
 const phoneRules = [(v: string) => v === '' || isValidPhone(v) || 'Debe tener 10 dígitos']
 const rfcRules = [(v: string) => v === '' || isValidRFC(v) || 'RFC con formato inválido']
 const postalCodeRules = [
@@ -93,7 +98,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   errorMessage.value = null
   if (email.value.trim() !== '' && !isValidEmail(email.value)) {
     errorMessage.value = 'El correo no tiene un formato válido.'
@@ -162,13 +170,13 @@ async function handleSubmit(): Promise<void> {
       }}</v-card-title>
 
       <v-card-text>
-        <v-form @submit.prevent="handleSubmit">
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
           <v-row dense>
             <v-col cols="6">
-              <v-text-field v-model="firstName" label="Nombre" required />
+              <v-text-field v-model="firstName" label="Nombre*" :rules="[required]" />
             </v-col>
             <v-col cols="6">
-              <v-text-field v-model="lastName" label="Apellido" required />
+              <v-text-field v-model="lastName" label="Apellido*" :rules="[required]" />
             </v-col>
           </v-row>
 
@@ -194,23 +202,36 @@ async function handleSubmit(): Promise<void> {
                facturar (CLAUDE.md §8.4). -->
           <v-expand-transition>
             <div v-if="requiresInvoice">
-              <v-text-field v-model="rfc" label="RFC" :rules="rfcRules" />
-              <v-text-field v-model="legalName" label="Razón social" />
+              <v-text-field
+                v-model="rfc"
+                :label="invoiceRequired ? 'RFC*' : 'RFC'"
+                :rules="[fiscalRequired, ...rfcRules]"
+              />
+              <v-text-field
+                v-model="legalName"
+                :label="invoiceRequired ? 'Razón social*' : 'Razón social'"
+                :rules="[fiscalRequired]"
+              />
               <v-row dense>
                 <v-col cols="6">
                   <v-text-field
                     v-model="taxRegimeCode"
-                    label="Régimen fiscal (código SAT)"
+                    :label="invoiceRequired ? 'Régimen fiscal* (código SAT)' : 'Régimen fiscal (código SAT)'"
+                    :rules="[fiscalRequired]"
                   />
                 </v-col>
                 <v-col cols="6">
-                  <v-text-field v-model="cfdiUse" label="Uso de CFDI (código SAT)" />
+                  <v-text-field
+                    v-model="cfdiUse"
+                    :label="invoiceRequired ? 'Uso de CFDI* (código SAT)' : 'Uso de CFDI (código SAT)'"
+                    :rules="[fiscalRequired]"
+                  />
                 </v-col>
               </v-row>
               <v-text-field
                 v-model="postalCode"
-                label="Código postal fiscal"
-                :rules="postalCodeRules"
+                :label="invoiceRequired ? 'Código postal fiscal*' : 'Código postal fiscal'"
+                :rules="[fiscalRequired, ...postalCodeRules]"
               />
             </div>
           </v-expand-transition>

@@ -6,6 +6,8 @@ import { ref, watch } from 'vue'
 
 import { MOVEMENT_LABELS, type CashMovementKind } from '@/lib/cashRegister'
 import { useCashRegisterStore } from '@/stores/cashRegister'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -32,7 +34,10 @@ watch(
   },
 )
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   saving.value = true
   errorMessage.value = null
   const error = await cashRegister.addMovement(type.value, amount.value, reason.value)
@@ -55,47 +60,51 @@ async function handleSubmit(): Promise<void> {
     <v-card>
       <v-card-title>Registrar movimiento de efectivo</v-card-title>
       <v-card-text>
-        <v-alert
-          v-if="errorMessage"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mb-3"
-        >
-          {{ errorMessage }}
-        </v-alert>
-        <v-btn-toggle
-          v-model="type"
-          mandatory
-          color="primary"
-          variant="outlined"
-          divided
-          class="mb-2"
-        >
-          <v-btn v-for="(label, key) in MOVEMENT_LABELS" :key="key" :value="key">{{
-            label.title
-          }}</v-btn>
-        </v-btn-toggle>
-        <p class="text-body-2 text-medium-emphasis mb-4">
-          {{ MOVEMENT_LABELS[type].help }}
-        </p>
-        <v-text-field
-          v-model="amount"
-          label="Monto"
-          prefix="$"
-          inputmode="decimal"
-          autofocus
-        />
-        <v-text-field
-          v-model="reason"
-          label="Motivo"
-          hint="Por qué entra o sale el dinero"
-          persistent-hint
-        />
-        <p class="text-caption text-medium-emphasis mt-3">
-          Un movimiento no se puede editar ni borrar. Si te equivocas, registra otro que
-          lo corrija.
-        </p>
+        <v-form ref="formRef" @submit.prevent="handleSubmit">
+          <v-alert
+            v-if="errorMessage"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ errorMessage }}
+          </v-alert>
+          <v-btn-toggle
+            v-model="type"
+            mandatory
+            color="primary"
+            variant="outlined"
+            divided
+            class="mb-2"
+          >
+            <v-btn v-for="(label, key) in MOVEMENT_LABELS" :key="key" :value="key">{{
+              label.title
+            }}</v-btn>
+          </v-btn-toggle>
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            {{ MOVEMENT_LABELS[type].help }}
+          </p>
+          <v-text-field
+            v-model="amount"
+            label="Monto*"
+            :rules="[required]"
+            prefix="$"
+            inputmode="decimal"
+            autofocus
+          />
+          <v-text-field
+            v-model="reason"
+            label="Motivo*"
+            :rules="[required]"
+            hint="Por qué entra o sale el dinero"
+            persistent-hint
+          />
+          <p class="text-caption text-medium-emphasis mt-3">
+            Un movimiento no se puede editar ni borrar. Si te equivocas, registra otro que
+            lo corrija.
+          </p>
+        </v-form>
       </v-card-text>
       <v-card-actions>
         <v-spacer />

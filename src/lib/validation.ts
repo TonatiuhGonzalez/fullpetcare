@@ -239,3 +239,51 @@ export function customerFiscalProblems(customer: CustomerFiscalFields): string[]
     postalCode: customer.postal_code ?? '',
   })
 }
+
+// ---------------------------------------------------------------------------
+// Campos obligatorios de los formularios
+// ---------------------------------------------------------------------------
+
+/**
+ * ¿El campo trae algo? Un texto solo con espacios cuenta como vacío (la base lo
+ * rechazaría igual al recortarlo). `0` SÍ cuenta como lleno: un precio de 0 o una
+ * existencia de 0 son datos, no ausencia de dato. Una lista vacía (varios
+ * servicios elegidos, por ejemplo) cuenta como vacía.
+ */
+export function isFilled(value: unknown): boolean {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'string') return value.trim() !== ''
+  if (typeof value === 'number') return !Number.isNaN(value)
+  if (Array.isArray(value)) return value.length > 0
+  return true
+}
+
+/**
+ * Regla `required` para el `:rules` de cualquier campo de Vuetify. Se combina con las de
+ * formato: `:rules="[required, ...phoneRules]"`. En la etiqueta del campo va el asterisco
+ * pegado al nombre (`label="Nombre*"`): el asterisco es solo la marca visual, esta regla
+ * es la que de verdad impide guardar.
+ */
+export function required(value: unknown): true | string {
+  return isFilled(value) || 'Campo obligatorio'
+}
+
+/**
+ * Lo único que se usa de un `<v-form>` de Vuetify: su método `validate()`, que revisa las
+ * reglas de TODOS los campos a la vez y los marca en rojo. Se obtiene con `ref="formRef"`.
+ */
+export interface FormHandle {
+  validate: () => Promise<{ valid: boolean }>
+}
+
+/**
+ * ¿Se puede guardar? Se llama al inicio de `handleSubmit`. No basta con `@submit.prevent`:
+ * Vuetify 3 ejecuta ese manejador aunque haya campos inválidos, y el botón "Guardar" de los
+ * diálogos está fuera del `<v-form>` y llama a `handleSubmit` con un clic. Validar por
+ * referencia cubre las dos entradas (Enter y clic). Sin formulario (aún no montado) no
+ * bloquea: la revisión manual y la base siguen siendo la red de seguridad.
+ */
+export async function isFormValid(form: FormHandle | null | undefined): Promise<boolean> {
+  if (!form) return true
+  return (await form.validate()).valid
+}

@@ -210,7 +210,7 @@ function exportStaff(): void {
         <v-text-field
           v-model="reports.customRange.from"
           type="date"
-          label="Desde"
+          label="Desde*"
           density="compact"
           hide-details
         />
@@ -219,7 +219,7 @@ function exportStaff(): void {
         <v-text-field
           v-model="reports.customRange.to"
           type="date"
-          label="Hasta"
+          label="Hasta*"
           density="compact"
           hide-details
         />

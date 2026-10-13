@@ -112,7 +112,7 @@ async function update(
     <v-form class="d-flex ga-2 mb-4" @submit.prevent="addReason">
       <v-text-field
         v-model="newLabel"
-        label="Nuevo motivo"
+        label="Nuevo motivo*"
         density="compact"
         hide-details
         placeholder="Ej. Cierre temporal por remodelación"
@@ -175,7 +175,7 @@ async function update(
       <v-card>
         <v-card-title>Renombrar motivo</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editLabel" label="Texto del motivo" />
+          <v-text-field v-model="editLabel" label="Texto del motivo*" />
           <p class="text-caption text-medium-emphasis">
             Las empresas que ya tienen este motivo conservan el texto con el que se les
             avisó.

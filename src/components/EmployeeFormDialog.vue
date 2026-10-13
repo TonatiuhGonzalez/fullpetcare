@@ -279,7 +279,7 @@ async function handleSubmit(): Promise<void> {
             <v-window-item value="personal">
               <v-text-field
                 v-model="fullName"
-                label="Nombre completo *"
+                label="Nombre completo*"
                 :error-messages="fieldErrors('fullName')"
               />
               <v-text-field v-model="birthDate" label="Fecha de nacimiento" type="date" />
@@ -296,7 +296,7 @@ async function handleSubmit(): Promise<void> {
               <v-text-field
                 v-if="!isEditing"
                 v-model="email"
-                label="Correo *"
+                label="Correo*"
                 type="email"
                 :error-messages="fieldErrors('email')"
                 hint="Se le mandará una invitación a este correo para que cree su contraseña."
@@ -304,7 +304,7 @@ async function handleSubmit(): Promise<void> {
                 class="mb-4"
               />
 
-              <v-select v-model="role" :items="roleOptions" label="Rol" class="mb-2" />
+              <v-select v-model="role" :items="roleOptions" label="Rol*" class="mb-2" />
 
               <v-select
                 v-if="role !== 'owner'"

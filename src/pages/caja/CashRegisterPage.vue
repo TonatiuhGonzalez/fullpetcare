@@ -20,6 +20,7 @@ import { formatMXN } from '@/lib/money'
 import type { CashOverview, CashSession } from '@/services/cashRegister'
 import { useCashRegisterStore } from '@/stores/cashRegister'
 import { useSessionStore } from '@/stores/session'
+import { required } from '@/lib/validation'
 
 const session = useSessionStore()
 const cashRegister = useCashRegisterStore()
@@ -147,7 +148,8 @@ const methodRows = computed(() => {
           <v-col cols="12" sm="4">
             <v-text-field
               v-model="floatText"
-              label="Fondo inicial"
+              label="Fondo inicial*"
+              :rules="[required]"
               prefix="$"
               inputmode="decimal"
               density="compact"

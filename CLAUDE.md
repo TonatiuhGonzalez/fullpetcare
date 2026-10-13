@@ -381,6 +381,14 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   texto del tooltip es el mismo `aria-label` (o el `title`, que pasa a ser `aria-label`); un
   botón de ícono **sin** `aria-label` no muestra nada y es un defecto de accesibilidad. Solo con
   puntero (`hover: hover`) y con foco de teclado; en pantallas táctiles no hay tooltip.
+- **Campos obligatorios (2026-10-13):** se marcan con un asterisco **pegado al nombre** (`label="Nombre*"`,
+  sin espacio) y llevan `:rules="[required]"` (`lib/validation.ts`). "Obligatorio" es lo que **la base ya
+  exige** (columnas `not null` sin valor por defecto y las RPC), no lo que "parece" importante. El botón Guardar no se
+  desactiva por campos vacíos (la persona no sabría qué falta): `handleSubmit` empieza con
+  `if (!(await isFormValid(formRef.value))) return`, con `ref="formRef"` en el `<v-form>`, y Vuetify marca todos
+  los vacíos a la vez. `@submit.prevent` **no** basta: Vuetify 3 ejecuta el manejador aunque el formulario sea
+  inválido. Un formulario nuevo sigue este patrón; los que ya validan por su cuenta (`problems` por pestaña,
+  `branchFormProblems`) solo llevan el asterisco.
 
 ---
 

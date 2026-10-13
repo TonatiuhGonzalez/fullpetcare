@@ -13,6 +13,8 @@ import {
 import type { InvoiceStatus } from '@/lib/invoiceStatus'
 import type { InvoiceReceiver } from '@/services/invoicing'
 import type { InvoiceRequest } from '@/services/invoicing'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
   invoice: InvoiceRequest | null
@@ -65,7 +67,10 @@ const cancelledAtLabel = computed(() =>
 )
 const hasFiles = computed(() => !!props.invoice?.xml_path && !!props.invoice?.pdf_path)
 
-function handleStamp(): void {
+const formRef = ref<FormHandle | null>(null)
+
+async function handleStamp(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   emit(
     'stamp',
     { ...form.value, rfc: form.value.rfc.trim().toUpperCase() },
@@ -175,39 +180,53 @@ function handleCancel(): void {
     </p>
 
     <!-- Por facturar (o reintento / nueva tras cancelar). -->
-    <v-form v-if="canIssue && canEdit" @submit.prevent="handleStamp">
+    <v-form ref="formRef" v-if="canIssue && canEdit" @submit.prevent="handleStamp">
       <p class="text-body-2 text-medium-emphasis mb-3">
         Revisa los datos fiscales del cliente. Los importes son los mismos del ticket.
       </p>
       <v-row dense>
         <v-col cols="12" sm="6">
-          <v-text-field v-model="form.rfc" label="RFC" maxlength="13" density="compact" />
+          <v-text-field
+            v-model="form.rfc"
+            label="RFC*"
+            maxlength="13"
+            density="compact"
+            :rules="[required]"
+          />
         </v-col>
         <v-col cols="12" sm="6">
           <v-text-field
             v-model="form.postalCode"
-            label="Código postal fiscal"
+            label="Código postal fiscal*"
             maxlength="5"
             density="compact"
+            :rules="[required]"
           />
         </v-col>
         <v-col cols="12">
-          <v-text-field v-model="form.legalName" label="Razón social" density="compact" />
+          <v-text-field
+            v-model="form.legalName"
+            label="Razón social*"
+            density="compact"
+            :rules="[required]"
+          />
         </v-col>
         <v-col cols="6" sm="4">
           <v-text-field
             v-model="form.taxRegimeCode"
-            label="Régimen fiscal"
+            label="Régimen fiscal*"
             maxlength="3"
             density="compact"
+            :rules="[required]"
           />
         </v-col>
         <v-col cols="6" sm="4">
           <v-text-field
             v-model="form.cfdiUse"
-            label="Uso de CFDI"
+            label="Uso de CFDI*"
             maxlength="3"
             density="compact"
+            :rules="[required]"
           />
         </v-col>
         <v-col cols="12" sm="4">
@@ -219,8 +238,9 @@ function handleCancel(): void {
                 title: `${f.code} · ${f.title}`,
               }))
             "
-            label="Forma de pago"
+            label="Forma de pago*"
             density="compact"
+            :rules="[required]"
           />
         </v-col>
       </v-row>

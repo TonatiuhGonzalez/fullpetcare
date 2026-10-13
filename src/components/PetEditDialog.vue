@@ -34,6 +34,8 @@ import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
 import IconButton from '@/components/IconButton.vue'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 type PetSex = Database['public']['Enums']['pet_sex']
@@ -214,7 +216,10 @@ function close(): void {
   emit('update:modelValue', false)
 }
 
+const formRef = ref<FormHandle | null>(null)
+
 async function handleSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   if (!pet.value || !canEdit.value) return
   if (!name.value.trim()) {
     errorMessage.value = 'Falta el nombre de la mascota.'
@@ -303,11 +308,11 @@ async function handleVaccinationSaved(): Promise<void> {
             />
           </div>
 
-          <v-form :disabled="!canEdit" @submit.prevent="handleSubmit">
+          <v-form ref="formRef" :disabled="!canEdit" @submit.prevent="handleSubmit">
             <!-- Nombre · raza · sexo · ícono de esterilización (provisional). -->
             <v-row dense align="center">
               <v-col cols="12" sm="4">
-                <v-text-field v-model="name" label="Nombre" />
+                <v-text-field v-model="name" label="Nombre*" :rules="[required]" />
               </v-col>
               <v-col cols="12" sm="3">
                 <v-text-field v-model="breed" label="Raza" />
@@ -330,7 +335,12 @@ async function handleVaccinationSaved(): Promise<void> {
 
             <v-row dense>
               <v-col cols="12" sm="6">
-                <v-select v-model="species" :items="speciesOptions" label="Especie" />
+                <v-select
+                  v-model="species"
+                  :items="speciesOptions"
+                  label="Especie*"
+                  :rules="[required]"
+                />
               </v-col>
               <v-col cols="12" sm="6">
                 <v-text-field :model-value="ownerName" label="Dueño" readonly />

@@ -87,7 +87,7 @@ function handleConfirm(): void {
           :items="plans"
           item-title="name"
           item-value="id"
-          label="Plan *"
+          label="Plan*"
           :error-messages="showValidation && !planId ? ['Elige el plan.'] : []"
         />
 
@@ -96,7 +96,7 @@ function handleConfirm(): void {
           :items="BILLING_PERIOD_OPTIONS"
           item-title="title"
           item-value="value"
-          label="Forma de pago *"
+          label="Forma de pago*"
         />
         <p class="text-caption text-medium-emphasis mt-1">
           {{ BILLING_PERIOD_OPTIONS.find((o) => o.value === billingPeriod)?.hint }}

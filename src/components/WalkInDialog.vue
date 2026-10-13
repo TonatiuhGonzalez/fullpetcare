@@ -38,6 +38,8 @@ import {
 import { visitKindInfo } from '@/lib/visitKind'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
+import { isFormValid, required } from '@/lib/validation'
+import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{ modelValue: boolean }>()
 
@@ -68,7 +70,6 @@ const customerSearchTerm = ref('')
 const customerResults = ref<Customer[]>([])
 const selectedCustomer = ref<Customer | null>(null)
 
-const requiredRules = [(v: string) => v.trim() !== '' || 'Obligatorio']
 
 function customerLabel(customer: Customer): string {
   return `${customer.first_name} ${customer.last_name}`
@@ -289,26 +290,17 @@ async function handleCustomerCreated(result: { customer: Customer; pet: Pet }): 
 }
 
 // --- Envío -----------------------------------------------------------------
-const customerReady = computed(() => selectedCustomer.value != null)
-
-const petReady = computed(() =>
-  isNewPet.value ? newPetName.value.trim() !== '' : petChoice.value != null,
-)
-
-const canSubmit = computed(
-  () =>
-    customerReady.value &&
-    petReady.value &&
-    selectedServiceIds.value.length > 0 &&
-    selectedWait.value != null,
-)
+// Los campos obligatorios se marcan con * y los revisa el formulario al registrar (no se
+// desactiva el botón: la persona vería "Registrar visita" apagado sin saber qué falta).
+const formRef = ref<FormHandle | null>(null)
 
 function close(): void {
   emit('update:modelValue', false)
 }
 
 // Si el hueco se encima con otra cita del empleado, primero se pide confirmar.
-function requestSubmit(): void {
+async function requestSubmit(): Promise<void> {
+  if (!(await isFormValid(formRef.value))) return
   if (plannedOverlap.value) {
     confirmOverlapOpen.value = true
     return
@@ -392,157 +384,108 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>Llegada sin cita</v-card-title>
 
       <v-card-text>
-        <v-row>
-          <v-col cols="12" md="6">
-            <p class="text-overline text-medium-emphasis">Cliente</p>
-            <div>
-              <v-autocomplete
-                :model-value="selectedCustomer"
-                :items="customerResults"
-                :item-title="customerLabel"
-                no-filter
-                return-object
-                label="Buscar por nombre, apellido o teléfono"
-                prepend-inner-icon="mdi-magnify"
-                density="compact"
-                variant="outlined"
-                @update:model-value="selectCustomer"
-                @update:search="customerSearchTerm = $event"
-              />
-              <v-btn
-                variant="text"
-                size="small"
-                prepend-icon="mdi-account-plus"
-                class="mb-2"
-                @click="showNewCustomer = true"
-              >
-                Cliente nuevo
-              </v-btn>
-              <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mb-2">
-                <span class="font-weight-bold">Mascota:</span>
-                <v-chip-group v-model="petChoice" mandatory>
-                  <v-chip
-                    v-for="pet in customerPets"
-                    :key="pet.id"
-                    :value="pet"
-                    :prepend-icon="pet.species === 'cat' ? 'mdi-cat' : 'mdi-dog'"
-                    filter
-                  >
-                    {{ pet.name }}
-                  </v-chip>
-                  <v-chip value="new" prepend-icon="mdi-plus" filter>Mascota nueva</v-chip>
-                </v-chip-group>
+        <!-- Sin manejador de envío: Enter dentro de la búsqueda de clientes no debe registrar. -->
+        <v-form ref="formRef" @submit.prevent>
+          <v-row>
+            <v-col cols="12" md="6">
+              <p class="text-overline text-medium-emphasis">Cliente</p>
+              <div>
+                <v-autocomplete
+                  :model-value="selectedCustomer"
+                  :items="customerResults"
+                  :item-title="customerLabel"
+                  no-filter
+                  return-object
+                  label="Buscar por nombre, apellido o teléfono*"
+                  :rules="[required]"
+                  prepend-inner-icon="mdi-magnify"
+                  density="compact"
+                  variant="outlined"
+                  @update:model-value="selectCustomer"
+                  @update:search="customerSearchTerm = $event"
+                />
+                <v-btn
+                  variant="text"
+                  size="small"
+                  prepend-icon="mdi-account-plus"
+                  class="mb-2"
+                  @click="showNewCustomer = true"
+                >
+                  Cliente nuevo
+                </v-btn>
+                <div v-if="selectedCustomer" class="d-flex align-center flex-wrap ga-2 mb-2">
+                  <span class="font-weight-bold">Mascota:</span>
+                  <v-chip-group v-model="petChoice" mandatory>
+                    <v-chip
+                      v-for="pet in customerPets"
+                      :key="pet.id"
+                      :value="pet"
+                      :prepend-icon="pet.species === 'cat' ? 'mdi-cat' : 'mdi-dog'"
+                      filter
+                    >
+                      {{ pet.name }}
+                    </v-chip>
+                    <v-chip value="new" prepend-icon="mdi-plus" filter>Mascota nueva</v-chip>
+                  </v-chip-group>
+                </div>
               </div>
-            </div>
 
-            <!-- Alta rápida de otra mascota de un cliente ya registrado. -->
-            <template v-if="isNewPet && selectedCustomer">
-              <p class="text-overline text-medium-emphasis mt-2">Mascota nueva</p>
-              <v-text-field
-                v-model="newPetName"
-                label="Nombre de la mascota"
-                density="compact"
-                variant="outlined"
-                :rules="requiredRules"
-              />
-              <v-select
-                v-model="newPetSpecies"
-                :items="speciesOptions"
-                item-title="title"
-                item-value="value"
-                label="Especie"
-                density="compact"
-                variant="outlined"
-              />
-            </template>
-
-            <v-divider class="my-4" />
-
-            <p class="text-overline text-medium-emphasis">Tipo de visita</p>
-            <div class="d-flex ga-2 mb-2">
-              <v-btn
-                :color="visitKindInfo('grooming').color"
-                :prepend-icon="visitKindInfo('grooming').icon"
-                :variant="kind === 'grooming' ? 'flat' : 'outlined'"
-                @click="kind = 'grooming'"
-              >
-                Estética
-              </v-btn>
-              <v-btn
-                :color="visitKindInfo('veterinary').color"
-                :prepend-icon="visitKindInfo('veterinary').icon"
-                :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
-                @click="kind = 'veterinary'"
-              >
-                Veterinaria
-              </v-btn>
-            </div>
-          </v-col>
-
-          <v-col cols="12" md="6">
-            <p class="text-overline text-medium-emphasis">Servicios</p>
-            <v-select
-              v-model="selectedServiceIds"
-              :items="availableServices"
-              item-title="name"
-              item-value="id"
-              multiple
-              chips
-              label="Servicios"
-              density="compact"
-              variant="outlined"
-            >
-              <template #item="{ item, props: itemProps }">
-                <v-list-item
-                  v-bind="itemProps"
-                  :title="item.raw.name"
-                  :subtitle="`${item.raw.duration_minutes} min — ${formatMXN(item.raw.price_cents)}`"
+              <!-- Alta rápida de otra mascota de un cliente ya registrado. -->
+              <template v-if="isNewPet && selectedCustomer">
+                <p class="text-overline text-medium-emphasis mt-2">Mascota nueva</p>
+                <v-text-field
+                  v-model="newPetName"
+                  label="Nombre de la mascota*"
+                  density="compact"
+                  variant="outlined"
+                  :rules="[required]"
+                />
+                <v-select
+                  v-model="newPetSpecies"
+                  :items="speciesOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Especie*"
+                  :rules="[required]"
+                  density="compact"
+                  variant="outlined"
                 />
               </template>
-              <template #chip="{ item, props: chipProps }">
-                <v-chip v-bind="chipProps" :text="item.raw.name" />
-              </template>
-            </v-select>
-            <p v-if="availableServices.length === 0" class="text-medium-emphasis">
-              No hay servicios activos en esta categoría.
-            </p>
-            <p class="mb-2 text-body-2">
-              Total: {{ totalDurationMinutes }} min · {{ formatMXN(totalPriceCents) }}
-            </p>
 
-            <v-switch
-              v-model="isUrgent"
-              color="error"
-              label="Urgente (emergencia)"
-              density="compact"
-              hide-details
-            />
-            <v-textarea
-              v-model="notes"
-              label="Motivo o notas (opcional)"
-              rows="2"
-              auto-grow
-              density="compact"
-              variant="outlined"
-              class="mt-2"
-            />
+              <v-divider class="my-4" />
 
-            <v-divider class="my-4" />
+              <p class="text-overline text-medium-emphasis">Tipo de visita</p>
+              <div class="d-flex ga-2 mb-2">
+                <v-btn
+                  :color="visitKindInfo('grooming').color"
+                  :prepend-icon="visitKindInfo('grooming').icon"
+                  :variant="kind === 'grooming' ? 'flat' : 'outlined'"
+                  @click="kind = 'grooming'"
+                >
+                  Estética
+                </v-btn>
+                <v-btn
+                  :color="visitKindInfo('veterinary').color"
+                  :prepend-icon="visitKindInfo('veterinary').icon"
+                  :variant="kind === 'veterinary' ? 'flat' : 'outlined'"
+                  @click="kind = 'veterinary'"
+                >
+                  Veterinaria
+                </v-btn>
+              </div>
+            </v-col>
 
-            <p class="text-overline text-medium-emphasis">Quién la atiende</p>
-            <p
-              v-if="totalDurationMinutes === 0"
-              class="text-medium-emphasis text-body-2"
-            >
-              Elige al menos un servicio para ver quién está libre.
-            </p>
-            <template v-else>
+            <v-col cols="12" md="6">
+              <p class="text-overline text-medium-emphasis">Servicios</p>
               <v-select
-                v-model="selectedEmployeeId"
-                :items="employeeOptions"
+                v-model="selectedServiceIds"
+                :items="availableServices"
                 item-title="name"
-                item-value="userId"
-                label="Empleado"
+                item-value="id"
+                multiple
+                chips
+                label="Servicios*"
+                :rules="[required]"
                 density="compact"
                 variant="outlined"
               >
@@ -550,47 +493,103 @@ async function handleSubmit(): Promise<void> {
                   <v-list-item
                     v-bind="itemProps"
                     :title="item.raw.name"
-                    :subtitle="item.raw.label"
+                    :subtitle="`${item.raw.duration_minutes} min — ${formatMXN(item.raw.price_cents)}`"
                   />
                 </template>
+                <template #chip="{ item, props: chipProps }">
+                  <v-chip v-bind="chipProps" :text="item.raw.name" />
+                </template>
               </v-select>
-              <p v-if="employeeOptions.length === 0" class="text-medium-emphasis text-body-2">
-                No hay nadie que pueda atender este tipo de visita hoy en esta sucursal.
+              <p v-if="availableServices.length === 0" class="text-medium-emphasis">
+                No hay servicios activos en esta categoría.
               </p>
-              <v-alert
-                v-else-if="selectedWait"
-                :type="selectedWait.waitMinutes === 0 ? 'success' : 'warning'"
-                density="compact"
-                variant="tonal"
-              >
-                <template v-if="selectedWait.waitMinutes === 0">
-                  Puede pasar ahora mismo.
-                </template>
-                <template v-else>
-                  Este empleado está ocupado. La visita quedaría para las
-                  {{ selectedWait.startsAt }} ({{ waitLabel(selectedWait.waitMinutes).toLowerCase() }}).
-                </template>
-              </v-alert>
-              <v-checkbox
-                v-if="selectedWait && selectedWait.waitMinutes > 0"
-                v-model="startNowAnyway"
-                label="Atender ahora de todos modos (se encima con una cita)"
+              <p class="mb-2 text-body-2">
+                Total: {{ totalDurationMinutes }} min · {{ formatMXN(totalPriceCents) }}
+              </p>
+
+              <v-switch
+                v-model="isUrgent"
+                color="error"
+                label="Urgente (emergencia)"
                 density="compact"
                 hide-details
               />
-            </template>
-          </v-col>
-        </v-row>
+              <v-textarea
+                v-model="notes"
+                label="Motivo o notas (opcional)"
+                rows="2"
+                auto-grow
+                density="compact"
+                variant="outlined"
+                class="mt-2"
+              />
 
-        <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-4">
-          {{ errorMessage }}
-        </v-alert>
+              <v-divider class="my-4" />
+
+              <p class="text-overline text-medium-emphasis">Quién la atiende</p>
+              <p
+                v-if="totalDurationMinutes === 0"
+                class="text-medium-emphasis text-body-2"
+              >
+                Elige al menos un servicio para ver quién está libre.
+              </p>
+              <template v-else>
+                <v-select
+                  v-model="selectedEmployeeId"
+                  :items="employeeOptions"
+                  item-title="name"
+                  item-value="userId"
+                  label="Empleado*"
+                  :rules="[required]"
+                  density="compact"
+                  variant="outlined"
+                >
+                  <template #item="{ item, props: itemProps }">
+                    <v-list-item
+                      v-bind="itemProps"
+                      :title="item.raw.name"
+                      :subtitle="item.raw.label"
+                    />
+                  </template>
+                </v-select>
+                <p v-if="employeeOptions.length === 0" class="text-medium-emphasis text-body-2">
+                  No hay nadie que pueda atender este tipo de visita hoy en esta sucursal.
+                </p>
+                <v-alert
+                  v-else-if="selectedWait"
+                  :type="selectedWait.waitMinutes === 0 ? 'success' : 'warning'"
+                  density="compact"
+                  variant="tonal"
+                >
+                  <template v-if="selectedWait.waitMinutes === 0">
+                    Puede pasar ahora mismo.
+                  </template>
+                  <template v-else>
+                    Este empleado está ocupado. La visita quedaría para las
+                    {{ selectedWait.startsAt }} ({{ waitLabel(selectedWait.waitMinutes).toLowerCase() }}).
+                  </template>
+                </v-alert>
+                <v-checkbox
+                  v-if="selectedWait && selectedWait.waitMinutes > 0"
+                  v-model="startNowAnyway"
+                  label="Atender ahora de todos modos (se encima con una cita)"
+                  density="compact"
+                  hide-details
+                />
+              </template>
+            </v-col>
+          </v-row>
+
+          <v-alert v-if="errorMessage" type="error" density="compact" variant="tonal" class="mt-4">
+            {{ errorMessage }}
+          </v-alert>
+        </v-form>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="close">Cancelar</v-btn>
-        <v-btn color="primary" :loading="saving" :disabled="!canSubmit" @click="requestSubmit">
+        <v-btn color="primary" :loading="saving" @click="requestSubmit">
           Registrar visita
         </v-btn>
       </v-card-actions>
