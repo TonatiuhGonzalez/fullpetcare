@@ -63,5 +63,8 @@ export const vuetify = createVuetify({
     // que crece con la ventana hasta 1440 px. Las pantallas de formulario o detalle piden
     // `CONTENT_WIDTH.narrow`; las páginas no escriben su propio número (lib/contentWidth.ts).
     VContainer: { maxWidth: CONTENT_WIDTH.wide },
+    // Los tooltips esperan 300 ms: no saltan al cruzar el cursor de paso (IconButton y los
+    // `v-tooltip` sueltos lo heredan de aquí).
+    VTooltip: { openDelay: 300 },
   },
 })

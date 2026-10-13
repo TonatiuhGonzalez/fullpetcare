@@ -15,7 +15,12 @@ import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
-import { groupPetsByCustomer, speciesIcon, splitVisiblePets } from '@/lib/customerPets'
+import {
+  customerIdsByPetName,
+  groupPetsByCustomer,
+  speciesIcon,
+  splitVisiblePets,
+} from '@/lib/customerPets'
 import { useSessionStore } from '@/stores/session'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import CustomerWithPetDialog from '@/components/CustomerWithPetDialog.vue'
@@ -24,6 +29,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { isFrontDesk } from '@/lib/roles'
 import IconButton from '@/components/IconButton.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -93,8 +99,14 @@ async function load(withPets = true): Promise<void> {
       customersRequest,
       withPets ? petsService.list(tenantId) : Promise.resolve(null),
     ])
-    customers.value = found
     if (pets) petsByCustomer.value = groupPetsByCustomer(pets)
+    // Buscar por el nombre de la mascota: se suman los dueños de las mascotas que coinciden
+    // y que la búsqueda de clientes no había encontrado (sin repetir a nadie).
+    const term = searchTerm.value.trim()
+    const petOwnerIds = term
+      ? customerIdsByPetName(petsByCustomer.value, term, new Set(found.map((c) => c.id)))
+      : []
+    customers.value = [...found, ...(await customersService.listByIds(tenantId, petOwnerIds))]
   } catch {
     errorMessage.value = 'No se pudo cargar la lista de clientes. Revisa tu conexión.'
   } finally {
@@ -171,7 +183,7 @@ function openCustomerPage(customerId: string): void {
 
     <v-text-field
       v-model="searchTerm"
-      label="Buscar por nombre, teléfono o correo"
+      label="Buscar por cliente, teléfono, correo o mascota"
       prepend-inner-icon="mdi-magnify"
       density="compact"
       variant="outlined"
@@ -191,15 +203,17 @@ function openCustomerPage(customerId: string): void {
     </v-alert>
 
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
       :loading="loading"
       loading-text="Cargando clientes…"
       hover
+      clickable
       :row-props="{ class: 'customer-row' }"
       @click:row="(_event: Event, { item }: { item: { id: string } }) => openCustomerPage(item.id)"
+      @click:item="(item: { id: string }) => openCustomerPage(item.id)"
     >
       <template #no-data>
         <EmptyState
@@ -268,7 +282,7 @@ function openCustomerPage(customerId: string): void {
           @click.stop="askDelete(item)"
         />
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <CustomerEditDialog
       v-model="showFormDialog"

@@ -2106,6 +2106,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           legal_name: string | null
+          logo_path: string | null
           name: string
           postal_code: string | null
           rfc: string | null
@@ -2119,6 +2120,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           legal_name?: string | null
+          logo_path?: string | null
           name: string
           postal_code?: string | null
           rfc?: string | null
@@ -2132,6 +2134,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           legal_name?: string | null
+          logo_path?: string | null
           name?: string
           postal_code?: string | null
           rfc?: string | null
@@ -2582,6 +2585,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           legal_name: string | null
+          logo_path: string | null
           name: string
           postal_code: string | null
           rfc: string | null
@@ -2941,6 +2945,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_tenant_logo: {
+        Args: { p_logo_path: string; p_tenant_id: string }
+        Returns: undefined
       }
       update_tenant_fiscal_data: {
         Args: {

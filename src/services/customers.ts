@@ -42,6 +42,22 @@ export async function search(tenantId: string, term: string): Promise<Customer[]
   return data ?? []
 }
 
+/** Los clientes activos con esos ids (vacío si no se pasa ninguno), por apellido y nombre. */
+export async function listByIds(tenantId: string, ids: string[]): Promise<Customer[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .in('id', ids)
+    .is('deleted_at', null)
+    .order('last_name')
+    .order('first_name')
+
+  if (error) throw error
+  return data ?? []
+}
+
 /**
  * Un cliente por id, o `null` si no existe o no es de este tenant (RLS
  * lo hace invisible, no lanza error — ver CLAUDE.md §7.1).

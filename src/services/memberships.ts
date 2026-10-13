@@ -14,6 +14,8 @@ export interface MembershipSummary {
   tenantId: string
   tenantName: string
   tenantTimezone: string
+  /** Ruta de la imagen de la empresa en Storage; nulo si no tiene (fase 26). */
+  logoPath: string | null
   role: MemberRole
   branches: BranchSummary[]
 }
@@ -39,7 +41,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
       id,
       role,
       tenant_id,
-      tenants ( name, timezone ),
+      tenants ( name, timezone, logo_path ),
       membership_branches ( branches ( id, name, timezone, is_active ) )
     `,
     )
@@ -77,6 +79,7 @@ export async function listMyMemberships(userId: string): Promise<MembershipSumma
       tenantId: row.tenant_id,
       tenantName: row.tenants.name,
       tenantTimezone: row.tenants.timezone,
+      logoPath: row.tenants.logo_path,
       role: row.role,
       branches,
     })

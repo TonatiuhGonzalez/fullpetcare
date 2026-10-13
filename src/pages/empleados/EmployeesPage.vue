@@ -20,6 +20,7 @@ import EmployeeFormDialog from '@/components/EmployeeFormDialog.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import IconButton from '@/components/IconButton.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 
 const session = useSessionStore()
 
@@ -247,7 +248,7 @@ function handleSaved(): void {
     </v-alert>
 
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
@@ -258,15 +259,6 @@ function handleSaved(): void {
       <template #[`item.actions`]="{ item }">
         <div class="d-flex align-center justify-center">
           <IconButton
-            icon="mdi-pencil"
-            color="primary"
-            variant="text"
-            size="small"
-            :disabled="busyId !== null"
-            :aria-label="`Editar a ${item.fullName}`"
-            @click.stop="openEdit(item)"
-          />
-          <IconButton
             v-if="item.actions.canResetPassword"
             icon="mdi-lock-reset"
             variant="text"
@@ -275,6 +267,15 @@ function handleSaved(): void {
             :disabled="busyId !== null"
             :aria-label="`Restablecer la contraseña de ${item.fullName}`"
             @click.stop="askAction('reset-password', item)"
+          />
+          <IconButton
+            icon="mdi-pencil"
+            color="primary"
+            variant="text"
+            size="small"
+            :disabled="busyId !== null"
+            :aria-label="`Editar a ${item.fullName}`"
+            @click.stop="openEdit(item)"
           />
           <IconButton
             v-if="item.actions.canDelete"
@@ -323,7 +324,7 @@ function handleSaved(): void {
           </v-tooltip>
         </div>
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <ConfirmDeleteDialog
       v-model="showConfirm"

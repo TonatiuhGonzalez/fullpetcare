@@ -14,6 +14,7 @@ import { useSessionStore } from '@/stores/session'
 import PageHeader from '@/components/PageHeader.vue'
 import ServiceFormDialog from '@/components/ServiceFormDialog.vue'
 import IconButton from '@/components/IconButton.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 
 const session = useSessionStore()
 
@@ -205,7 +206,7 @@ function handleSaved(): void {
     <!-- Tabla paginada. Sin `items-per-page` explícito arranca en 10; "Todos"
          es -1 en Vuetify. La columna de acciones solo existe para el dueño. -->
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="services"
@@ -255,20 +256,28 @@ function handleSaved(): void {
             aria-label="Eliminar servicio"
             @click="askDelete(item)"
           />
-          <v-switch
-            class="service-switch"
-            :model-value="item.is_active"
-            :loading="togglingIds.has(item.id)"
-            :disabled="togglingIds.has(item.id)"
-            :aria-label="item.is_active ? 'Desactivar servicio' : 'Activar servicio'"
-            color="primary"
-            density="compact"
-            hide-details
-            @update:model-value="handleToggleActive(item, $event)"
-          />
+          <v-tooltip
+            :text="item.is_active ? 'Desactivar servicio' : 'Activar servicio'"
+            location="top"
+          >
+            <template #activator="{ props: tooltipProps }">
+              <v-switch
+                v-bind="tooltipProps"
+                class="service-switch"
+                :model-value="item.is_active"
+                :loading="togglingIds.has(item.id)"
+                :disabled="togglingIds.has(item.id)"
+                :aria-label="item.is_active ? 'Desactivar servicio' : 'Activar servicio'"
+                color="primary"
+                density="compact"
+                hide-details
+                @update:model-value="handleToggleActive(item, $event)"
+              />
+            </template>
+          </v-tooltip>
         </div>
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <v-dialog v-model="showDeleteConfirm" max-width="420">
       <v-card>

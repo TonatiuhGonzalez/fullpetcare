@@ -39,7 +39,10 @@ visita) **y la pantalla de Inicio** (§5.6). **Ya construido (fase 17): estados 
 mascota desde la cita, horarios que avisan el traslape, página de cliente, búsquedas sin
 acentos, validaciones de correo y de fecha, acciones de empleados y tooltips (§5.6, §6.2,
 §6.3, §7.6). **Ya construido (fase 25, PLAN.md D28): el calendario de la Agenda con la
-identidad visual** (bloques tonales, marco de tarjeta, barra de fecha única, §5.6).
+identidad visual** (bloques tonales, marco de tarjeta, barra de fecha única, §5.6). **Ya construido
+(fase 26, PLAN.md D29): Correcciones 2** — imagen de la empresa, catálogo de vacunas editable por dueño y
+veterinario, búsqueda de clientes por nombre de mascota, tooltips con retraso y vista responsiva (tarjetas en
+pantallas chicas y agenda en lista en celular; §5.6, §6.1, §6.2, §6.4).
 
 Reglas de esta etapa:
 
@@ -231,10 +234,14 @@ FullPetCare/
     │   ├── visitKind.ts         #   tipo de visita → nombre, ícono y color (§5.6)
     │   ├── agendaStatus.ts      #   estado que muestra la agenda → nombre, ícono y color (§5.6)
     │   ├── contentWidth.ts      #   ancho del contenido: ancho (listados) y angosto (formularios), §5.6
+    │   ├── tenantLogo.ts        #   imagen de la empresa: tipos admitidos, tope de 2 MB y ruta (§6.1)
+    │   ├── vaccineCatalog.ts    #   reglas del catálogo de vacunas: refuerzo, duplicados y etiquetas (§6.4)
+    │   ├── agendaList.ts        #   citas por día y por hora para la lista de la agenda en celular (§5.6)
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
+    │   ├── tenantLogo.ts  vaccines.ts   #   imagen de la empresa (bucket `tenant-logos`) y catálogo de vacunas
     ├── stores/                  # Pinia: session, tenant, agenda, cart
     ├── types/database.ts        # GENERADO. No editar a mano.
     ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas)
@@ -380,7 +387,19 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   `IconButton` (envuelve `v-btn` y es un `v-btn` para todo lo demás), no con `<v-btn icon=…>`. El
   texto del tooltip es el mismo `aria-label` (o el `title`, que pasa a ser `aria-label`); un
   botón de ícono **sin** `aria-label` no muestra nada y es un defecto de accesibilidad. Solo con
-  puntero (`hover: hover`) y con foco de teclado; en pantallas táctiles no hay tooltip.
+  puntero (`hover: hover`) y con foco de teclado; en pantallas táctiles no hay tooltip. **Todos los
+  tooltips esperan 300 ms** antes de aparecer (fase 26): lo fija `VTooltip: { openDelay: 300 }` en
+  `plugins/vuetify.ts`; un `v-tooltip` suelto no repite el número. Un `v-switch` de activar o desactivar
+  lleva tooltip con su acción ("Desactivar servicio").
+- **Vista responsiva (fase 26, PLAN.md D29):** el corte es **960 px** (`smAndDown` de Vuetify). Una tabla de
+  listado se escribe con `ResponsiveTable` en lugar de `v-data-table`: en pantallas chicas es una lista de
+  tarjetas que se arma sola de los `headers` y **reutiliza las ranuras `item.<columna>`** (primera columna =
+  título, resto = "etiqueta: valor", `actions` abajo; un header con `cardHidden: true` no sale en la tarjeta).
+  `clickable` + `@click:item` hacen el papel de `@click:row`. Reportes conserva tablas compactas (son
+  numéricas); la de Empleados pasa a tarjetas en celular. La Agenda, en **< 600 px**, es una lista por hora
+  (`AgendaDayList`, `lib/agendaList.ts`) sin leyenda, con estado y tipo en texto; en tablet conserva el
+  calendario. `.agenda-card` usa `overflow: clip` (no `hidden`): con `hidden` la librería del calendario
+  podía desplazar la tarjeta. Una pantalla nueva se revisa a 390 y 768 px y no debe desbordar a lo ancho.
 - **Campos obligatorios (2026-10-13):** se marcan con un asterisco **pegado al nombre** (`label="Nombre*"`,
   sin espacio) y llevan `:rules="[required]"` (`lib/validation.ts`). "Obligatorio" es lo que **la base ya
   exige** (columnas `not null` sin valor por defecto y las RPC), no lo que "parece" importante. El botón Guardar no se
@@ -408,7 +427,7 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 
 | Tabla                 | Campos clave                                                                                  | Notas                                                                                            |
 | --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone` | El negocio. Campos CFDI desde el día uno (§8.4)                                                  |
+| `tenants`             | `name`, `legal_name`, `rfc`, `tax_regime_code`, `postal_code`, `default_cfdi_use`, `timezone`, `logo_path` | El negocio. Campos CFDI desde el día uno (§8.4). `logo_path` es la ruta de su imagen (abajo)      |
 | `branches`            | `tenant_id`, `name`, `address`, `postal_code`, `phone`, `timezone`, `opening_hours jsonb`, `is_active` | Sucursal. **Su propia zona horaria** (§8.3). Solo el dueño la crea y edita; `is_active` la deshabilita (nunca si tiene citas pendientes, empleados asignados o es la última activa: trigger en la base) |
 | `profiles`            | `id` = `auth.users.id`, `full_name`, `phone`, `avatar_path`, `must_change_password`           | Identidad global de la persona. **Sin `tenant_id`**: una persona podría trabajar en dos negocios. La marca `must_change_password` se explica en §7.6 |
 | `memberships`         | `tenant_id`, `user_id`, `role`, `is_active`                                                   | Une persona ↔ negocio ↔ rol. **Es la fuente de verdad de los permisos** (§7)                     |
@@ -425,6 +444,14 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 
 Que un `groomer` no pueda leer `medical_records` es una política RLS probada, no una
 condición en un `v-if`.
+
+**Imagen de la empresa (fase 26, PLAN.md D29):** `tenants.logo_path` guarda la **ruta** (no una URL) del archivo
+`{tenant_id}/logo.{jpg,jpeg,png,webp}` en el bucket **privado** `tenant-logos` (2 MB, solo imágenes). La leen todos
+los miembros; **solo el dueño** la sube, reemplaza (UPDATE en Storage) o quita (DELETE), y la ruta se guarda con la
+RPC `set_tenant_logo()` (`SECURITY DEFINER`, revalida rol dueño y que la ruta sea de su propia carpeta; texto vacío =
+sin imagen). Se muestra en `WorkspaceSwitcher` en lugar de las iniciales, con una URL firmada de una hora
+(`stores/session.ts`: `activeLogoUrl`, `changeLogo()`, `removeLogo()`); si no hay o no carga, vuelven las
+iniciales. Se edita en `/app/configuracion/cuenta`. Aún no sale en la vista pública ni en el ticket.
 
 **Un negocio nunca se queda sin dueño activo** (Correcciones 1): el trigger
 `app.prevent_losing_last_owner` rechaza (hint `last_active_owner`) desactivar, eliminar o cambiar
@@ -464,6 +491,10 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   `search_products()` (CONTIENE), `SECURITY INVOKER` (RLS aplica), con `app.search_norm()`: sin acentos ni
   mayúsculas, y la **ñ no es la n**. El navegador no repite la regla salvo `lib/searchText.ts` (copia, para el
   escáner de código exacto y la lista de empresas del superadmin).
+- **Buscar por mascota (fase 26):** el buscador de Clientes también encuentra por el **nombre de la mascota**
+  (solo el nombre, no la especie). Se resuelve en el navegador con las mascotas que la pantalla ya carga
+  (`lib/customerPets.ts#customerIdsByPetName`, misma normalización que `lib/searchText.ts`) y se suman los dueños
+  con `customers.listByIds()`; no hay función nueva en la base.
 - **Eliminar es borrado suave en cascada, en la base:** las RPC `delete_customer()` y `delete_pet()` (`SECURITY
   DEFINER`, revalidan membresía y rol dueño o recepción) ocultan al cliente, a sus mascotas y **solo sus citas
   `scheduled`**. Las demás citas, las ventas y el expediente no se tocan (§8.5). Se llaman desde `softDelete()` de
@@ -508,6 +539,14 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 `grooming_records` y `medical_records` son **expediente**: nunca se borran físicamente
 (§8.5) y todo cambio queda en la bitácora (§8.6).
+
+**Catálogo de vacunas (fase 26, PLAN.md D29):** `vaccines` es configuración, no expediente. Lo **leen** todos los
+miembros y lo **editan dueño y veterinario** (políticas `vaccines_insert` y `vaccines_update`; recepción y groomer
+no). Desde esa fase sus cambios quedan en la bitácora (`vaccines_audit`). Se administra en
+`/app/configuracion/vacunas` (ruta con `meta.requiresRoles: ['owner','vet']`). Una vacuna **no se borra, se oculta**
+(`deleted_at`): deja de ofrecerse en `listForSpecies()`, pero las dosis ya aplicadas conservan su nombre. El refuerzo
+(`default_interval_days`) es un entero de 1 a 3650 o vacío ("sin refuerzo"), y no puede haber dos vacunas con el
+mismo nombre y especie (`lib/vaccineCatalog.ts`).
 
 ### 6.5 Cobro
 

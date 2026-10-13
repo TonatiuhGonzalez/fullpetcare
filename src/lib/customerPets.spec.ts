@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  customerIdsByPetName,
   groupPetsByCustomer,
   MAX_PET_CHIPS,
   pickSelectedPetId,
@@ -85,5 +86,41 @@ describe('pickSelectedPetId', () => {
 
   it('devuelve null sin mascotas', () => {
     expect(pickSelectedPetId([], 'p1')).toBeNull()
+  })
+})
+
+describe('customerIdsByPetName', () => {
+  const pets = new Map([
+    ['c1', [{ name: 'Max' }, { name: 'Maxine' }]],
+    ['c2', [{ name: 'Peña' }]],
+    ['c3', [{ name: 'Luna' }]],
+  ])
+
+  // Qué prueba: que el nombre de la mascota se compara sin acentos ni mayúsculas.
+  // Qué se rompería: la recepción escribe "MAX" y no encuentra al dueño de "Max".
+  it('encuentra al dueño por el nombre de su mascota sin importar mayúsculas', () => {
+    expect(customerIdsByPetName(pets, 'MAX')).toEqual(['c1'])
+  })
+
+  // Qué prueba: la ñ no es la n (misma regla que la búsqueda de clientes en la base).
+  // Qué se rompería: "pena" mostraría al dueño de "Peña" y la pantalla diría cosas
+  // distintas a la base.
+  it('no confunde la ñ con la n', () => {
+    expect(customerIdsByPetName(pets, 'pena')).toEqual([])
+    expect(customerIdsByPetName(pets, 'peña')).toEqual(['c2'])
+  })
+
+  // Qué prueba: un cliente con dos mascotas que coinciden aparece una sola vez, y los que
+  // ya encontró la búsqueda normal se omiten.
+  // Qué se rompería: la fila del cliente saldría repetida en la tabla.
+  it('no repite clientes ni los que ya estaban en los resultados', () => {
+    expect(customerIdsByPetName(pets, 'max')).toEqual(['c1'])
+    expect(customerIdsByPetName(pets, 'max', new Set(['c1']))).toEqual([])
+  })
+
+  // Qué prueba: texto vacío o solo espacios no marca a todos los clientes.
+  // Qué se rompería: al borrar la búsqueda se sumarían clientes duplicados a la lista.
+  it('devuelve vacío con un término vacío', () => {
+    expect(customerIdsByPetName(pets, '   ')).toEqual([])
   })
 })
