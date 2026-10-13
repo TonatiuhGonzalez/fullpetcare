@@ -45,6 +45,8 @@ const session = useSessionStore()
 const agenda = useAgendaStore()
 
 const errorMessage = ref<string | null>(null)
+// Aviso junto al selector de mascota: es un campo que Vuetify no valida solo (chips).
+const petError = ref<string | null>(null)
 const saving = ref(false)
 
 // Sucursal DE LA CITA: arranca en la misma que se estaba viendo en la
@@ -104,6 +106,7 @@ watch(customerSearchTerm, (term) => {
 async function selectCustomer(customer: Customer | null): Promise<void> {
   selectedCustomer.value = customer
   selectedPet.value = null
+  petError.value = null
   customerPets.value = customer
     ? await petsService.listByCustomer(session.activeTenantId ?? '', customer.id)
     : []
@@ -244,6 +247,7 @@ watch(
     if (!open) return
 
     errorMessage.value = null
+    petError.value = null
     saving.value = false
 
     selectedBranchId.value = agenda.activeBranchId
@@ -283,6 +287,12 @@ function close(): void {
 
 async function handleSubmit(): Promise<void> {
   if (!(await isFormValid(formRef.value))) return
+  if (!selectedPet.value) {
+    petError.value = customerPets.value.length
+      ? 'Elige la mascota de la cita.'
+      : 'Este cliente aún no tiene mascotas. Agrégala desde su página y vuelve a agendar.'
+    return
+  }
   if (!selectedSlot.value) {
     errorMessage.value = 'Elige un horario disponible.'
     return
@@ -416,6 +426,9 @@ async function handleSubmit(): Promise<void> {
                   </v-chip>
                 </v-chip-group>
               </div>
+              <p v-if="petError && !selectedPet" class="text-caption text-error mt-1" role="alert">
+                {{ petError }}
+              </p>
 
               <v-divider class="my-4" />
 

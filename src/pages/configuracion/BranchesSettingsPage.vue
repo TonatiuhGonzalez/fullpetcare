@@ -4,6 +4,7 @@
 // empresa (solo lectura) y administra las sucursales: alta, edición y
 // habilitar/deshabilitar.
 import { computed, onMounted, ref } from 'vue'
+import { useDisplay } from 'vuetify'
 
 import BranchFormDialog from '@/components/BranchFormDialog.vue'
 import CardSkeleton from '@/components/CardSkeleton.vue'
@@ -18,6 +19,8 @@ import type { Company } from '@/services/company'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
+// En pantallas chicas (< 960 px) cada sucursal es una tarjeta con sus botones debajo (fase 26).
+const { smAndDown } = useDisplay()
 
 const company = ref<Company | null>(null)
 const branches = ref<Branch[]>([])
@@ -147,7 +150,51 @@ async function toggleActive(branch: Branch): Promise<void> {
 
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="3" :rows="3" />
     <v-progress-linear v-else-if="!isFirstLoad && loading" indeterminate />
-    <v-list v-if="!isFirstLoad" lines="two" class="border rounded">
+    <!-- Pantallas chicas: una tarjeta por sucursal, con los botones debajo. -->
+    <div v-if="!isFirstLoad && smAndDown">
+      <v-card
+        v-for="branch in branches"
+        :key="branch.id"
+        variant="outlined"
+        class="pa-4 mb-3"
+      >
+        <div class="d-flex align-start justify-space-between ga-2">
+          <div class="font-weight-medium" style="overflow-wrap: anywhere">{{ branch.name }}</div>
+          <v-chip
+            size="x-small"
+            :color="branch.is_active ? 'success' : undefined"
+            variant="tonal"
+          >
+            {{ branch.is_active ? 'Habilitada' : 'Deshabilitada' }}
+          </v-chip>
+        </div>
+        <div class="text-body-2 text-medium-emphasis mt-1">
+          {{ branch.address || 'Sin dirección' }}
+        </div>
+        <div class="d-flex flex-wrap justify-end ga-1 mt-3">
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-pencil-outline"
+            :disabled="togglingId === branch.id"
+            @click="openEdit(branch)"
+          >
+            Editar
+          </v-btn>
+          <v-btn
+            variant="text"
+            :prepend-icon="branch.is_active ? 'mdi-cancel' : 'mdi-check-circle-outline'"
+            :loading="togglingId === branch.id"
+            @click="toggleActive(branch)"
+          >
+            {{ branch.is_active ? 'Deshabilitar' : 'Habilitar' }}
+          </v-btn>
+        </div>
+      </v-card>
+      <p v-if="!loading && branches.length === 0" class="text-medium-emphasis">
+        Aún no hay sucursales.
+      </p>
+    </div>
+    <v-list v-else-if="!isFirstLoad" lines="two" class="border rounded">
       <v-list-item v-for="branch in branches" :key="branch.id">
         <v-list-item-title>
           {{ branch.name }}

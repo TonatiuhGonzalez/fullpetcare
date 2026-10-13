@@ -20,6 +20,7 @@ import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import ProductCategoriesDialog from '@/components/ProductCategoriesDialog.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
@@ -219,7 +220,7 @@ async function handleToggleActive(row: InventoryRow, value: boolean | null): Pro
     <!-- Primera carga: silueta con las mismas columnas que la tabla. En recargas la
          tabla conserva sus filas y solo lleva la barra fina (`loading`). -->
     <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
-    <v-data-table
+    <ResponsiveTable
       v-else-if="!isFirstLoad"
       :headers="headers"
       :items="tableRows"
@@ -307,7 +308,7 @@ async function handleToggleActive(row: InventoryRow, value: boolean | null): Pro
           </v-tooltip>
         </div>
       </template>
-    </v-data-table>
+    </ResponsiveTable>
 
     <ProductCategoriesDialog v-model="showCategoriesDialog" />
     <ProductFormDialog v-model="showProductDialog" :product="editingProduct" />
@@ -338,6 +339,11 @@ async function handleToggleActive(row: InventoryRow, value: boolean | null): Pro
 }
 
 .inventory-table :deep(.inventory-row--inactive td:not(.inventory-actions)) {
+  opacity: 0.5;
+}
+
+// Igual en la tarjeta de pantallas chicas: todo atenuado menos las acciones.
+:deep(.responsive-table__card.inventory-row--inactive > :not(.responsive-table__actions)) {
   opacity: 0.5;
 }
 </style>
