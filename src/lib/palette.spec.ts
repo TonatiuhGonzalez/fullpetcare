@@ -6,7 +6,9 @@
 // pantalla de la recepción) no puede leer la cita.
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, meetsAA } from './contrast'
+import { blend, contrastRatio, meetsAA } from './contrast'
+import { AGENDA_STATUSES } from './agendaStatus'
+import { TONAL_WEIGHT } from './calendarGrid'
 import { darkPalette, lightPalette, type Palette } from './palette'
 
 const THEMES: [string, Palette][] = [
@@ -60,6 +62,19 @@ describe.each(THEMES)('paleta del modo %s', (_name, palette) => {
   // texto o ícono sobre una tarjeta (p. ej. un enlace en primary, un chip tonal).
   it.each(AS_TEXT_ON_SURFACE)('"%s" se lee como texto sobre la tarjeta', (color) => {
     const ratio = contrastRatio(palette[color], palette.surface)
+    expect(ratio, `${color}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+// Qué prueba: el bloque tonal de la agenda (PLAN.md D28). Su fondo es el color del estado
+// mezclado con `surface`, con texto `on-surface`. Si alguien sube el peso o cambia un color
+// de estado, el nombre de la mascota deja de leerse en un bloque de la agenda.
+describe.each(THEMES)('bloque tonal de la agenda en modo %s', (_name, palette) => {
+  const colors = [...new Set(Object.values(AGENDA_STATUSES).map((info) => info.color))]
+
+  it.each(colors)('el texto se lee sobre el fondo tonal de "%s"', (color) => {
+    const background = blend(palette[color], palette.surface, TONAL_WEIGHT)
+    const ratio = contrastRatio(palette['on-surface'], background)
     expect(ratio, `${color}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
   })
 })

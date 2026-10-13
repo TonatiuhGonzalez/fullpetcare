@@ -55,32 +55,70 @@ a:not([class*='v-']) {
   color: rgb(var(--v-theme-primary));
 }
 
-// Franja del tipo de visita en los bloques de la agenda (EventCalendar pinta su propio
-// DOM, por eso va aquí y no en un componente). El bloque conserva su color de estado;
-// la franja de color a la izquierda, con un filete claro, marca estética o veterinaria.
-// Va junto con un ícono dentro del bloque (components/calendarEvents.ts).
+// Bloques de la agenda (PLAN.md D28). EventCalendar pinta su propio DOM, por eso va aquí y
+// no en un componente. Cada cita es un bloque TONAL: fondo = el color de su estado mezclado
+// al 16 % con la tarjeta (TONAL_WEIGHT en lib/calendarGrid.ts, y palette.spec.ts mide su
+// contraste), borde fino del color del estado y texto normal. Así el bloque pesa lo mismo
+// que una tarjeta del sistema y cambia solo entre claro y oscuro. Los estados negativos
+// llevan borde punteado; el nombre del estado va en el tooltip.
+.ec-event {
+  --ec-status: var(--v-theme-secondary);
+  border-radius: 6px;
+}
+
+.ec-event[class*='ec-status-'] {
+  background-color: color-mix(
+    in srgb,
+    rgb(var(--ec-status)) 16%,
+    rgb(var(--v-theme-surface))
+  );
+  border: 1px solid rgb(var(--ec-status));
+  color: rgb(var(--v-theme-on-surface));
+}
+
+// Los colores son los de lib/agendaStatus.ts (la prueba de palette.spec.ts los recorre).
+.ec-event.ec-status-scheduled {
+  --ec-status: var(--v-theme-secondary);
+}
+.ec-event.ec-status-in_progress {
+  --ec-status: var(--v-theme-warning);
+}
+.ec-event.ec-status-completed {
+  --ec-status: var(--v-theme-success);
+}
+.ec-event.ec-status-paid {
+  --ec-status: var(--v-theme-primary);
+}
+.ec-event.ec-status-cancelled,
+.ec-event.ec-status-no_show {
+  --ec-status: var(--v-theme-error);
+  border-style: dashed;
+}
+
+// Franja del tipo de visita: solo color; el nombre va en el tooltip (D28). El filete claro de la derecha separa la
+// franja del fondo tonal; usa la tarjeta del tema, no un blanco fijo (en oscuro se vería duro).
 .ec-event.ec-kind-grooming {
   box-shadow:
     inset 6px 0 0 rgb(var(--v-theme-grooming)),
-    inset 8px 0 0 rgba(255, 255, 255, 0.9);
+    inset 8px 0 0 rgb(var(--v-theme-surface));
 }
 
 .ec-event.ec-kind-veterinary {
   box-shadow:
     inset 6px 0 0 rgb(var(--v-theme-veterinary)),
-    inset 8px 0 0 rgba(255, 255, 255, 0.9);
+    inset 8px 0 0 rgb(var(--v-theme-surface));
 }
 
-// El bloque trae solo 2px de relleno: sin esto la franja (8px) tapa el inicio del texto.
+// El bloque trae poco relleno: sin esto la franja (8px) tapa el inicio del texto.
 .ec-event.ec-kind-grooming .ec-event-body,
 .ec-event.ec-kind-veterinary .ec-event-body {
   padding-inline-start: 8px;
 }
 
-.ec-event .ec-event-kind-icon {
-  margin-right: 4px;
-  font-size: 0.95em;
-  vertical-align: -1px;
+.ec-event .ec-event-time {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 // Estados de carga (PLAN.md D22): el brillo que recorre las siluetas se apaga si la

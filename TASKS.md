@@ -2386,3 +2386,75 @@ Sin servicio externo ni dependencia nueva; solo interfaz.
   marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
   **Hecho 2026-10-12:** `lint`, `vue-tsc -b` y 680 tests unitarios en verde. **Qué se puede demostrar:** abrir Clientes en un
   monitor de 1920 px y ver la tabla a 1440 px, y abrir Cuenta o un cobro y ver que siguen en 860 px.
+
+---
+
+## Fase 25 — Calendario de la agenda con la identidad visual del sistema
+
+**Meta: que el calendario de `/app/agenda` se vea como el resto de las pantallas (tarjetas con borde fino, bloques
+ligeros, tipografía de marca, íconos en lugar de emojis) en tema claro y oscuro, sin cambiar lo que hace.** Fase de la
+**etapa de mejoras** (`CLAUDE.md` §1). Tarea de seguimiento: #2325. **Estado: construida (2026-10-12), pendiente de PR.**
+Decisiones y alternativas en `PLAN.md` D28. Sin servicio externo, sin dependencia nueva, sin tocar la base: solo
+interfaz. Alcance elegido por el usuario: propuestas **A** (reskin con tokens) y **B** (marco y barra); la **C**
+(tarjeta que cambia según su alto, tooltip propio, línea de "ahora") queda fuera.
+
+### 25A. Preparación
+
+- [x] **25.1** 📚 Confirmar el alcance: A + B, sin C. _Verificar:_ el usuario lo confirma.
+  **Confirmado por el usuario (2026-10-12).**
+
+### 25B. Piezas puras (`lib/`)
+
+- [x] **25.2** `lib/agendaStatus.ts`: el estado a MOSTRAR de una cita (`scheduled`, `in_progress`, `completed`,
+  `paid`, `cancelled`, `no_show`) con su nombre, su ícono y el color del tema que le toca. Sale de `AgendaPage.vue`,
+  donde hoy vive como tabla de estilos. _Verificar:_ test unitario de que cada estado tiene nombre, ícono y color, y
+  de que dos estados no comparten ícono (el color nunca va solo, §5.6).
+- [x] **25.3** `lib/contrast.ts#blend` (mezcla de dos colores por porcentaje) y un test en `palette.spec.ts`: el texto
+  `on-surface` sobre cada color de estado mezclado al 16 % con `surface` llega a 4.5:1, en claro y en oscuro.
+  _Verificar:_ el test, y el control negativo de siempre (un par que no cumple, falla).
+- [x] **25.4** `CalendarBlock` (`lib/calendarGrid.ts`) cambia de `color`/`textColor` a `status`, `customer`, `pet` y
+  `origin` (`walk_in` | `urgent` | nulo); `text` queda como texto completo para el tooltip. _Verificar:_ `vue-tsc`
+  sin errores.
+
+### 25C. Bloques y encabezados
+
+- [x] **25.5** `calendarEvents.ts`: el bloque lleva la clase de su estado (`ec-status-*`) y se arma con hora, mascota en
+  negritas y cliente, siempre como texto del DOM. **Sin íconos** (decisión del usuario, 2026-10-12: estado, tipo y
+  origen van en el tooltip). _Verificar:_ tests de que el nombre con HTML sigue siendo texto y de que el título no
+  lleva ningún ícono ni emoji.
+- [x] **25.6** `styles/main.scss`: bloque tonal (fondo mezclado con `surface`, borde del color del estado, radio `md`);
+  la franja de tipo conserva su ancho y su filete pasa a usar `surface` en lugar de blanco fijo. _Verificar:_ en
+  navegador, claro y oscuro: la franja y el texto se leen en los seis estados.
+- [x] **25.7** Encabezados: en la línea de tiempo, empleado con avatar de iniciales, nombre y "N citas" del día
+  (`resourceLabelContent`); en la semana, día con tipografía de marca y el "hoy" resaltado. Las variables `--ec-*` se
+  completan en los dos componentes. _Verificar:_ en navegador, el contador cambia al cambiar de día.
+
+### 25D. Marco y barra
+
+- [x] **25.8** `AgendaPage.vue`: calendario, barra y leyenda dentro de una `v-card` con borde (`overflow: hidden`).
+  La barra pasa a un solo bloque: `‹`, `Hoy`, `›` y la fecha escrita ("lunes 12 de octubre"), que abre un selector de
+  fecha (`v-date-picker`) en un menú; el `<input type="date">` nativo desaparece. Groomer y vet conservan solo la
+  etiqueta del rango. _Verificar:_ en navegador, cambiar de día con flechas, con "Hoy" y con el selector.
+- [x] **25.9** Leyenda compacta de una sola fila (estados con su ícono y tipos con `VisitKindChip`); desaparecen
+  `status-dot` y `kind-swatch`. _Verificar:_ en navegador, a 390 px la leyenda hace salto de línea sin desbordar.
+- [x] **25.10** ~~Estado vacío: si el rango no trae citas, un `EmptyState` compacto sobre la cuadrícula.~~
+  **Descartada por el usuario (2026-10-12):** se construyó y se quitó por redundante, la cuadrícula vacía ya lo dice.
+  La Agenda no lleva estado vacío.
+
+### 25E. Cierre
+
+- [x] **25.11** Revisión visual en 1366, 1920 y 390 px, en claro y oscuro, con dueño (línea de tiempo) y con groomer
+  (semana). _Verificar:_ anotación aquí de lo observado.
+  **Verificado en navegador (2026-10-12, Playwright desechable, Patitas Felices):** dueño en línea de tiempo y
+  groomer en semana, en claro y oscuro a 1366 px, y dueño a 390 px sin desborde horizontal. Se ve el bloque tonal con
+  su borde, los íconos de estado, tipo y origen, el encabezado de empleado con su contador, el estado vacío y el
+  selector de fecha (elegir el 20 deja "Martes 20 de octubre"). El estado vacío de 25.10 se vio y se quitó. Se ajustó sobre la marcha: la hora se oculta en la línea
+  de tiempo (no cabía junto a la mascota), el ícono de estado pasó al título, se ocultó la barra vacía de la librería y
+  el selector usa el color de marca. **Sin cubrir:** un bloque `walk_in`/`urgent` y uno cancelado en pantalla (la
+  semilla no los trae; los cubre el test unitario), y las pantallas con varias sucursales.
+- [x] **25.12** 📚 Correr `lint` y `test:unit`; actualizar `CLAUDE.md` (§1, §4 `lib/` y §5.6) y marcar la fase.
+  _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-12:** `lint`, `vue-tsc -b`, 705 tests unitarios y el E2E (agendar → atender → cobrar) en verde. El E2E
+  se ajustó: ya no hay `input[type=date]` en la Agenda (avanza con "Día siguiente") y ubica el bloque por su clase
+  `ec-status-*` en lugar del color en línea. **Qué se puede demostrar:** abrir la Agenda como dueño, ver cada cita
+  como bloque tonal con ícono de estado, elegir el día desde el selector y alternar tema claro y oscuro.

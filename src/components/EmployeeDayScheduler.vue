@@ -20,13 +20,17 @@
 // pared del navegador y las pinta igual: correcto para el requisito de
 // §8.3 (ver la hora de la sucursal, no la del navegador). Por eso NO se
 // activa `nowIndicator`: usaría el reloj del navegador.
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createCalendar, destroyCalendar, ResourceTimeline } from '@event-calendar/core'
 import '@event-calendar/core/index.css'
 
 import { minutesToSlotTime } from '@/lib/calendarGrid'
 import type { CalendarBlock, HourRange } from '@/lib/calendarGrid'
-import { renderEventContent, toCalendarEvents } from './calendarEvents'
+import {
+  renderEventContent,
+  renderResourceLabel,
+  toCalendarEvents,
+} from './calendarEvents'
 
 export interface SchedulerRow {
   id: string
@@ -43,6 +47,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ select: [id: string] }>()
+
+// Citas del día por empleado (sin las canceladas ni las que no se presentaron), para el
+// contador del encabezado de cada fila (PLAN.md D28).
+const activeCounts = computed(() => {
+  const counts = new Map<string, number>()
+  for (const block of props.blocks) {
+    if (!block.resource || block.status === 'cancelled' || block.status === 'no_show')
+      continue
+    counts.set(block.resource, (counts.get(block.resource) ?? 0) + 1)
+  }
+  return counts
+})
+
+function resourcesOption() {
+  return props.rows.map((row) => ({ id: row.id, title: row.name }))
+}
 
 const host = ref<HTMLElement | null>(null)
 let calendar: ReturnType<typeof createCalendar> | null = null
@@ -83,7 +103,12 @@ onMounted(() => {
     slotMaxTime: minutesToSlotTime(props.hourRange.endMinutes),
     slotDuration: '01:00',
     slotWidth: computeSlotWidth(),
-    resources: props.rows.map((row) => ({ id: row.id, title: row.name })),
+    resources: resourcesOption(),
+    resourceLabelContent: (info) =>
+      renderResourceLabel(
+        String(info.resource.title),
+        activeCounts.value.get(String(info.resource.id)) ?? 0,
+      ),
     events: toCalendarEvents(props.blocks),
     editable: false,
     eventContent: renderEventContent,
@@ -115,15 +140,15 @@ watch(
 )
 watch(
   () => props.rows,
-  (rows) =>
-    calendar?.setOption(
-      'resources',
-      rows.map((row) => ({ id: row.id, title: row.name })),
-    ),
+  () => calendar?.setOption('resources', resourcesOption()),
 )
 watch(
   () => props.blocks,
-  (blocks) => calendar?.setOption('events', toCalendarEvents(blocks)),
+  (blocks) => {
+    calendar?.setOption('events', toCalendarEvents(blocks))
+    // El contador de cada fila depende de las citas: se vuelve a pintar el encabezado.
+    calendar?.setOption('resources', resourcesOption())
+  },
 )
 
 onBeforeUnmount(() => {
@@ -145,13 +170,68 @@ onBeforeUnmount(() => {
 // no repetir colores a mano.
 .ec-host :deep(.ec) {
   --ec-sidebar-width: 170px;
-  --ec-border-color: rgba(var(--v-border-color), 0.3);
+  --ec-border-color: rgba(var(--v-border-color), var(--v-border-opacity));
   --ec-bg-color: rgb(var(--v-theme-surface));
   --ec-text-color: rgb(var(--v-theme-on-surface));
   // Un solo día visible: pintarlo como "hoy" tiñe toda la grilla.
   --ec-today-bg-color: transparent;
   --ec-highlight-color: rgba(var(--v-theme-primary), 0.08);
   font-family: inherit;
+}
+
+// La hora de inicio ya la da la posición en la cuadrícula; en un bloque de una hora (~95 px)
+// ocuparía el lugar de la mascota. El tooltip lleva el resto.
+.ec-host :deep(.ec-event-time) {
+  display: none;
+}
+
+// La barra de la librería va vacía (la navegación es la de la página): sin esto deja una
+// franja en blanco sobre la cuadrícula.
+.ec-host :deep(.ec-toolbar) {
+  display: none;
+}
+
+// Encabezado de la fila de cada empleado (components/calendarEvents.ts#renderResourceLabel).
+.ec-host :deep(.ec-resource) {
+  display: flex;
+  text-align: start;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 2px;
+}
+
+.ec-host :deep(.ec-resource-avatar) {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+}
+
+.ec-host :deep(.ec-resource-text) {
+  min-width: 0;
+}
+
+.ec-host :deep(.ec-resource-name) {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ec-host :deep(.ec-resource-count) {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 // Una sola línea con "…": si el texto envolviera, una cita de una hora

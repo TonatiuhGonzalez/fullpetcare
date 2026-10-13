@@ -48,6 +48,7 @@ function mountCalendar() {
     locale: 'es-MX',
     slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+    dayHeaderFormat: { weekday: 'short', day: 'numeric' },
     allDaySlot: false,
     slotMinTime: minutesToSlotTime(props.hourRange.startMinutes),
     slotMaxTime: minutesToSlotTime(props.hourRange.endMinutes),
@@ -102,15 +103,32 @@ watch(
 </template>
 
 <style scoped lang="scss">
-// Mismo enlace con la paleta de Vuetify que EventCalendarScheduler.vue
+// Mismo enlace con la paleta de Vuetify que EmployeeDayScheduler.vue
 // (el DOM de EventCalendar no es Vue, por eso :deep()).
 .ec-host :deep(.ec) {
-  --ec-border-color: rgba(var(--v-border-color), 0.3);
+  --ec-border-color: rgba(var(--v-border-color), var(--v-border-opacity));
   --ec-bg-color: rgb(var(--v-theme-surface));
   --ec-text-color: rgb(var(--v-theme-on-surface));
   --ec-today-bg-color: rgba(var(--v-theme-primary), 0.08);
   --ec-highlight-color: rgba(var(--v-theme-primary), 0.08);
   font-family: inherit;
+}
+
+// Sin la barra vacía de la librería (la navegación es la de la página).
+.ec-host :deep(.ec-toolbar) {
+  display: none;
+}
+
+// Encabezado de cada día: la tipografía del sistema, en mayúscula inicial y con el día de hoy
+// en el color de marca (el fondo tenue de la columna ya viene de --ec-today-bg-color).
+.ec-host :deep(.ec-col-head) {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.ec-host :deep(.ec-col-head.ec-today) {
+  color: rgb(var(--v-theme-primary));
 }
 
 // Máximo 2 líneas con "…" (no media línea cortada); texto completo en el

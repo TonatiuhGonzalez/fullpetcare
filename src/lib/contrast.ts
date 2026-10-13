@@ -45,3 +45,13 @@ export function contrastRatio(a: string, b: string): number {
 export function meetsAA(fg: string, bg: string): boolean {
   return contrastRatio(fg, bg) >= AA_NORMAL_TEXT
 }
+
+// Mezcla `fg` sobre `bg`: `weight` es cuánto pesa `fg` (0 = solo `bg`, 1 = solo `fg`).
+// Es lo que hace `color-mix(in srgb, fg W%, bg)` en el navegador; se repite aquí para que
+// el test de la paleta mida el contraste del texto sobre un fondo tonal (PLAN.md D28).
+export function blend(fg: string, bg: string, weight: number): string {
+  const f = parseHex(fg)
+  const b = parseHex(bg)
+  const mixed = f.map((channel, i) => Math.round(channel * weight + b[i] * (1 - weight)))
+  return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
