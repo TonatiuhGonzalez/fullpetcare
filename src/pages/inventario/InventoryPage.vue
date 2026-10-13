@@ -5,15 +5,29 @@
 // reales los aplica RLS; esto solo evita mostrar botones que fallarían.
 import { computed, onMounted, ref, watch } from 'vue'
 
-import { STOCK_STATUS_LABEL, type StockStatus } from '@/lib/inventory'
+import {
+  buildInventoryTableRows,
+  compareBoolean,
+  compareOptionalText,
+  NO_CATEGORY_LABEL,
+  STOCK_STATUS_LABEL,
+  type InventoryTableRow,
+  type StockStatus,
+} from '@/lib/inventory'
 import { formatMXN } from '@/lib/money'
+import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { useSessionStore } from '@/stores/session'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ProductCategoriesDialog from '@/components/ProductCategoriesDialog.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
 import StockMovementDialog from '@/components/StockMovementDialog.vue'
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
+import { useServerSearch } from '@/composables/useServerSearch'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const inventory = useInventoryStore()
@@ -22,24 +36,78 @@ const canEdit = computed(() => session.canEdit('inventory'))
 const search = ref('')
 const errorMessage = ref<string | null>(null)
 
+// Primera carga = silueta con retraso; recargas (guardar un movimiento, cambiar de sucursal) =
+// filas conservadas y barra fina (PLAN.md D22).
+const loading = computed(() => inventory.status === 'loading')
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
+
 const statusColor: Record<StockStatus, string> = {
   ok: 'success',
   low: 'warning',
   out: 'error',
 }
 
+// La coincidencia (sin acentos, ñ aparte) la decide la base con `search_products` (C1.20);
+// aquí solo se cruza con las filas ya cargadas, que traen la existencia y la categoría.
+const productSearch = useServerSearch(search, (term) =>
+  productsService.search(session.activeTenantId ?? '', term),
+)
 const visibleRows = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return inventory.rows
-  return inventory.rows.filter(
-    (r) =>
-      r.product.name.toLowerCase().includes(term) ||
-      r.product.sku?.toLowerCase().includes(term),
-  )
+  if (search.value.trim() === '') return inventory.rows
+  const found = productSearch.result.value
+  if (!found) return []
+  const ids = new Set(found.map((p) => p.id))
+  return inventory.rows.filter((r) => ids.has(r.product.id))
 })
 
+// Filas planas de la tabla (cada columna ordenable es un campo propio, lib/inventory.ts).
+const tableRows = computed(() =>
+  buildInventoryTableRows(visibleRows.value, inventory.categories),
+)
+
+// Headers en negritas (`headerProps`, como Clientes). Todas las columnas de datos se
+// ordenan; el orden de texto ignora acentos y manda los vacíos al final (sin clave /
+// sin categoría). Precio y existencia ordenan por su número, no por el texto
+// formateado. Acciones solo existe con permiso de edición, igual que el menú de la fila.
+const headerProps = { class: 'font-weight-bold' }
+const headers = computed(() => [
+  { title: 'Nombre', key: 'name', sort: compareOptionalText, headerProps },
+  { title: 'Clave', key: 'sku', sort: compareOptionalText, headerProps },
+  { title: 'Categoría', key: 'categoryName', sort: compareOptionalText, headerProps },
+  { title: 'Precio', key: 'priceCents', headerProps },
+  { title: 'Existencia', key: 'stock', headerProps },
+  { title: 'Estado', key: 'isActive', sort: compareBoolean, headerProps },
+  ...(canEdit.value
+    ? [
+        {
+          title: 'Acciones',
+          key: 'actions',
+          sortable: false,
+          align: 'center' as const,
+          width: 100,
+          cellProps: { class: 'inventory-actions' },
+          headerProps,
+        },
+      ]
+    : []),
+])
+
+// -1 es "Todos" para v-data-table (mismo patrón que el catálogo de servicios).
+const itemsPerPageOptions = [
+  { value: 10, title: '10' },
+  { value: 25, title: '25' },
+  { value: 50, title: '50' },
+  { value: 100, title: '100' },
+  { value: -1, title: 'Todos' },
+]
+
+// Un producto inactivo se atenúa completo, menos sus acciones.
+function rowProps({ item }: { item: InventoryTableRow<InventoryRow> }): Record<string, unknown> {
+  return item.isActive ? {} : { class: 'inventory-row--inactive' }
+}
+
 // "Sin inventario" cuando hay 0 (lo pide la tarea); si no, el número de piezas.
-function stockLabel(row: InventoryRow): string {
+function stockLabel(row: { status: StockStatus; stock: number }): string {
   return row.status === 'out' ? STOCK_STATUS_LABEL.out : `${row.stock} en existencia`
 }
 
@@ -50,6 +118,7 @@ watch(
   () => inventory.load(),
 )
 
+const showCategoriesDialog = ref(false)
 const showProductDialog = ref(false)
 const editingProduct = ref<Product | null>(null)
 
@@ -89,6 +158,15 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
   <v-container class="py-6">
     <PageHeader title="Inventario">
       <template #actions>
+        <v-btn
+          v-if="canEdit"
+          variant="outlined"
+          prepend-icon="mdi-shape-outline"
+          class="mr-2"
+          @click="showCategoriesDialog = true"
+        >
+          Categorías
+        </v-btn>
         <v-btn
           v-if="canEdit"
           color="primary"
@@ -140,80 +218,24 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
       class="mb-4"
     />
 
-    <v-skeleton-loader
-      v-if="inventory.status === 'loading' && inventory.rows.length === 0"
-      type="list-item-two-line, list-item-two-line, list-item-two-line, list-item-two-line"
-    />
-
-    <v-list v-else lines="two">
-      <v-list-item v-for="row in visibleRows" :key="row.product.id">
-        <template #title>
-          <span :class="{ 'text-medium-emphasis': !row.product.is_active }">
-            {{ row.product.name }}
-            <v-chip
-              v-if="!row.product.is_active"
-              size="x-small"
-              class="ml-2"
-              variant="tonal"
-            >
-              inactivo
-            </v-chip>
-          </span>
-        </template>
-        <template #subtitle>
-          {{ formatMXN(row.product.price_cents) }}
-          <template v-if="row.product.sku"> · {{ row.product.sku }}</template>
-        </template>
-        <template #append>
-          <v-chip
-            :color="statusColor[row.status]"
-            size="small"
-            variant="tonal"
-            class="mr-1"
-          >
-            {{ stockLabel(row) }}
-          </v-chip>
-          <v-menu v-if="canEdit">
-            <template #activator="{ props: menuProps }">
-              <v-btn
-                v-bind="menuProps"
-                icon="mdi-dots-vertical"
-                variant="text"
-                size="small"
-                :aria-label="`Acciones de ${row.product.name}`"
-              />
-            </template>
-            <v-list density="compact">
-              <v-list-item
-                prepend-icon="mdi-package-down"
-                title="Entrada de compra"
-                @click="openMovement(row, 'purchase')"
-              />
-              <v-list-item
-                prepend-icon="mdi-tune-vertical"
-                title="Ajustar inventario"
-                @click="openMovement(row, 'adjustment')"
-              />
-              <v-list-item
-                prepend-icon="mdi-pencil"
-                title="Editar producto"
-                @click="openEditProduct(row.product)"
-              />
-              <v-list-item
-                :prepend-icon="
-                  row.product.is_active ? 'mdi-eye-off-outline' : 'mdi-eye-outline'
-                "
-                :title="row.product.is_active ? 'Desactivar' : 'Activar'"
-                :disabled="togglingIds.has(row.product.id)"
-                @click="handleToggleActive(row)"
-              />
-            </v-list>
-          </v-menu>
-        </template>
-      </v-list-item>
-
-      <v-list-item v-if="visibleRows.length === 0">
+    <!-- Primera carga: silueta con las mismas columnas que la tabla. En recargas la
+         tabla conserva sus filas y solo lleva la barra fina (`loading`). -->
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
+    <v-data-table
+      v-else-if="!isFirstLoad"
+      :headers="headers"
+      :items="tableRows"
+      :loading="loading || productSearch.pending.value"
+      :row-props="rowProps"
+      class="inventory-table"
+      :items-per-page="10"
+      :items-per-page-options="itemsPerPageOptions"
+      items-per-page-text="Elementos por página"
+      loading-text="Cargando inventario…"
+    >
+      <template #no-data>
         <EmptyState
+          compact
           illustration="products"
           :title="search ? 'Sin resultados' : 'Todavía no hay productos'"
           :message="
@@ -222,9 +244,68 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
               : 'Los productos que des de alta aparecerán aquí.'
           "
         />
-      </v-list-item>
-    </v-list>
+      </template>
+      <template #[`item.name`]="{ item }">
+        <div class="inventory-name" :title="item.name">{{ item.name }}</div>
+      </template>
+      <template #[`item.sku`]="{ item }">{{ item.sku ?? '—' }}</template>
+      <template #[`item.categoryName`]="{ item }">{{
+        item.categoryName ?? NO_CATEGORY_LABEL
+      }}</template>
+      <template #[`item.priceCents`]="{ item }">{{ formatMXN(item.priceCents) }}</template>
+      <template #[`item.stock`]="{ item }">
+        <v-chip :color="statusColor[item.status]" size="small" variant="tonal">
+          {{ stockLabel(item) }}
+        </v-chip>
+      </template>
+      <template #[`item.isActive`]="{ item }">
+        <v-chip
+          size="small"
+          variant="tonal"
+          :color="item.isActive ? 'success' : undefined"
+        >
+          {{ item.isActive ? 'Activo' : 'Inactivo' }}
+        </v-chip>
+      </template>
+      <template #[`item.actions`]="{ item }">
+        <v-menu>
+          <template #activator="{ props: menuProps }">
+            <IconButton
+              v-bind="menuProps"
+              icon="mdi-dots-vertical"
+              variant="text"
+              size="small"
+              :aria-label="`Acciones de ${item.name}`"
+            />
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              prepend-icon="mdi-package-down"
+              title="Entrada de compra"
+              @click="openMovement(item.source, 'purchase')"
+            />
+            <v-list-item
+              prepend-icon="mdi-tune-vertical"
+              title="Ajustar inventario"
+              @click="openMovement(item.source, 'adjustment')"
+            />
+            <v-list-item
+              prepend-icon="mdi-pencil"
+              title="Editar producto"
+              @click="openEditProduct(item.source.product)"
+            />
+            <v-list-item
+              :prepend-icon="item.isActive ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              :title="item.isActive ? 'Desactivar' : 'Activar'"
+              :disabled="togglingIds.has(item.id)"
+              @click="handleToggleActive(item.source)"
+            />
+          </v-list>
+        </v-menu>
+      </template>
+    </v-data-table>
 
+    <ProductCategoriesDialog v-model="showCategoriesDialog" />
     <ProductFormDialog v-model="showProductDialog" :product="editingProduct" />
     <StockMovementDialog
       v-model="showMovementDialog"
@@ -233,3 +314,22 @@ async function handleToggleActive(row: InventoryRow): Promise<void> {
     />
   </v-container>
 </template>
+
+<style scoped lang="scss">
+// En móvil la tabla se desplaza en horizontal (el contenedor de v-data-table ya tiene
+// overflow) en vez de aplastar las columnas.
+.inventory-table :deep(table) {
+  min-width: 760px;
+}
+
+// El nombre puede partirse en dos líneas: en una sola, un nombre largo ensanchaba la tabla más
+// que el contenedor (con el menú lateral abierto) y dejaba la columna Acciones fuera de la vista.
+.inventory-name {
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+
+.inventory-table :deep(.inventory-row--inactive td:not(.inventory-actions)) {
+  opacity: 0.5;
+}
+</style>

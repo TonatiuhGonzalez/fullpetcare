@@ -5,21 +5,25 @@
 //   - Todos: citas de hoy (groomer y vet solo ven las suyas, lo decide la base).
 //   - Dueño y recepción: accesos rápidos y "por cobrar".
 //   - Con permiso Caja: estado de la caja. Con permiso Reportes: ventas de hoy.
-import { computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
 
+import CardSkeleton from '@/components/CardSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
+import WalkInDialog from '@/components/WalkInDialog.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { formatTime, formatWeekdayDate } from '@/lib/datetime'
 import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
+import { useAgendaStore } from '@/stores/agenda'
 import { useHomeStore } from '@/stores/home'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
 const home = useHomeStore()
-const router = useRouter()
+const agenda = useAgendaStore()
 
 const timezone = computed(() => session.activeBranch?.timezone ?? 'America/Mexico_City')
 const frontDesk = computed(() => isFrontDesk(session.role))
@@ -33,17 +37,29 @@ const subtitle = computed(() => {
 })
 
 const loading = computed(() => home.status === 'idle' || home.status === 'loading')
+const showSkeleton = useDelayedLoading(loading)
 
-onMounted(() => home.load())
+onMounted(() => {
+  agenda.prepareForDialogs()
+  home.load()
+})
 // Cambiar de sucursal desde el menú lateral cambia de qué sucursal es el resumen.
 watch(
   () => session.activeBranchId,
-  () => home.load(),
+  () => {
+    agenda.prepareForDialogs()
+    home.load()
+  },
 )
 
-// Los diálogos de agendar viven en la Agenda: se va allí pidiéndole que abra el que toca.
-function goToAgenda(action: 'nueva-cita' | 'llegada-sin-cita'): void {
-  router.push({ name: 'agenda', query: { accion: action } })
+// Los diálogos de agendar se montan aquí (C1.12): se abren y guardan sin salir de Inicio.
+// Leen sucursal y fecha de `stores/agenda`, que `prepareForDialogs` deja listas.
+const showNewAppointmentDialog = ref(false)
+const showWalkInDialog = ref(false)
+
+// Al guardar se queda en Inicio y se recarga el resumen (citas de hoy y por cobrar).
+function handleCreated(): void {
+  home.load()
 }
 
 // "Cobrar" y "Atender" sirven al mismo rol que ya podía hacerlo desde la Agenda.
@@ -54,14 +70,14 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
   <v-container class="py-6">
     <PageHeader title="Inicio" :subtitle="subtitle">
       <template v-if="frontDesk" #actions>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="goToAgenda('nueva-cita')">
+        <v-btn color="primary" prepend-icon="mdi-plus" @click="showNewAppointmentDialog = true">
           Nueva cita
         </v-btn>
         <v-btn
           variant="outlined"
           color="primary"
           prepend-icon="mdi-walk"
-          @click="goToAgenda('llegada-sin-cita')"
+          @click="showWalkInDialog = true"
         >
           Llegada sin cita
         </v-btn>
@@ -86,7 +102,7 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
       {{ home.errorMessage }}
     </v-alert>
 
-    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <CardSkeleton v-if="loading && showSkeleton" :count="4" :columns="2" :lines="3" />
 
     <v-row v-else-if="home.status === 'ready'">
       <!-- Citas de hoy: para todos los roles. -->
@@ -314,5 +330,12 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
         </v-card>
       </v-col>
     </v-row>
+
+    <!-- Solo dueño y recepción agendan (los botones de arriba ya se ocultan para los
+         demás roles); la base igual lo revalida. -->
+    <template v-if="frontDesk">
+      <NewAppointmentDialog v-model="showNewAppointmentDialog" @created="handleCreated" />
+      <WalkInDialog v-model="showWalkInDialog" @created="handleCreated" />
+    </template>
   </v-container>
 </template>

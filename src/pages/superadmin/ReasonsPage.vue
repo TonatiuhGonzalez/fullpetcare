@@ -4,14 +4,18 @@
 // lee al iniciar sesión. Un motivo ya usado no se borra: se desactiva y deja de
 // ofrecerse. Los dos motivos que usan las automatizaciones (falta de pago,
 // cancelación del cliente) se pueden renombrar pero llevan su etiqueta de tipo.
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
 import type { CancellationReason } from '@/services/platform'
 import PageHeader from '@/components/PageHeader.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const reasons = ref<CancellationReason[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 const KIND_LABEL: Record<CancellationReason['kind'], string> = {
@@ -123,9 +127,10 @@ async function update(
       </v-btn>
     </v-form>
 
-    <v-progress-linear v-if="loading" indeterminate class="mb-2" />
+    <v-progress-linear v-if="loading && !isFirstLoad" indeterminate class="mb-2" />
 
-    <v-table density="comfortable">
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="4" />
+    <v-table v-else-if="!isFirstLoad" density="comfortable">
       <thead>
         <tr>
           <th>Motivo</th>
@@ -150,7 +155,7 @@ async function update(
             />
           </td>
           <td class="text-right">
-            <v-btn
+            <IconButton
               icon="mdi-pencil"
               variant="text"
               size="small"

@@ -4,6 +4,7 @@
 // clientes se abre encima, sin cambiar de ruta. Al presionar una mascota
 // se apila encima el diálogo de la mascota (PetDetailDialog); al cerrarlo
 // se regresa a esta ficha.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
@@ -15,6 +16,7 @@ import { useSessionStore } from '@/stores/session'
 import CustomerFormDialog from '@/components/CustomerFormDialog.vue'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -33,6 +35,7 @@ const session = useSessionStore()
 const customer = ref<Customer | null>(null)
 const pets = ref<Pet[]>([])
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 
 const showEditCustomer = ref(false)
@@ -105,7 +108,7 @@ function handlePetSaved(): void {
         >
           Editar
         </v-btn>
-        <v-btn
+        <IconButton
           icon="mdi-close"
           variant="text"
           aria-label="Cerrar"
@@ -118,7 +121,10 @@ function handlePetSaved(): void {
           {{ errorMessage }}
         </v-alert>
 
-        <v-progress-circular v-if="loading && !customer" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton && !customer"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <template v-else-if="customer">
           <p v-if="customer.phone" class="mb-1">

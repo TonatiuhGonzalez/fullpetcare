@@ -444,3 +444,99 @@ describe('forma de pago con tarjeta (decisión #5)', () => {
     })
   })
 })
+
+describe('cambio: solo el efectivo puede pagar de más (fase 13, extensión 13H)', () => {
+  // Prepara una venta de un shampoo y devuelve su total, con existencia sembrada.
+  async function shampooTotal(client: PoolClient): Promise<number> {
+    await seedStock(client, PRODUCT_SHAMPOO, 5)
+    const shampoo = await productPrice(client, PRODUCT_SHAMPOO)
+    return sumLineItems([{ quantity: 1, ...shampoo }]).totalCents
+  }
+  const ONE_SHAMPOO = [{ product_id: PRODUCT_SHAMPOO, quantity: 1 }]
+
+  it('cobra con efectivo de más (hay cambio que devolver)', async () => {
+    // Qué se rompería: el caso normal del mostrador (pagar con un billete grande) dejaría de
+    // poder cobrarse.
+    await withTransaction(async (client) => {
+      const total = await shampooTotal(client)
+      await setRole(client, 'authenticated', USER_RECEPCION)
+
+      const saleId = await counterSale(client, ONE_SHAMPOO, [
+        { method: 'cash', amount_cents: total + 5000 },
+      ])
+
+      const { rows } = await client.query('select status from sales where id = $1', [
+        saleId,
+      ])
+      expect(rows[0].status).toBe('paid')
+    })
+  })
+
+  it('rechaza una tarjeta por más del total: no hay cambio que dar de una tarjeta', async () => {
+    // Qué se rompería: una llamada directa a la API (saltándose la pantalla) cobraría de más a
+    // una tarjeta, y en Caja no habría efectivo de dónde devolver la diferencia.
+    await withTransaction(async (client) => {
+      const total = await shampooTotal(client)
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      await expect(
+        counterSale(client, ONE_SHAMPOO, [
+          { method: 'card', amount_cents: total + 5000, payment_form_code: '04' },
+        ]),
+      ).rejects.toThrow(/solo se puede pagar de más en efectivo/i)
+    })
+  })
+
+  it('rechaza una transferencia por más del total', async () => {
+    // Mismo caso con otro método simulado: la regla es "solo efectivo", no "solo tarjeta".
+    await withTransaction(async (client) => {
+      const total = await shampooTotal(client)
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      await expect(
+        counterSale(client, ONE_SHAMPOO, [
+          { method: 'transfer_spei', amount_cents: total + 1 },
+        ]),
+      ).rejects.toThrow(/solo se puede pagar de más en efectivo/i)
+    })
+  })
+
+  it('acepta tarjeta por el total más efectivo extra, pero no más efectivo del que sobra', async () => {
+    // El borde: el excedente puede cubrirse con el efectivo recibido, no con otro método.
+    await withTransaction(async (client) => {
+      const total = await shampooTotal(client)
+      await setRole(client, 'authenticated', USER_RECEPCION)
+
+      // Tarjeta exacta + $50 en efectivo: sobran $50 y hay $50 en efectivo → válido.
+      const ok = await counterSale(client, ONE_SHAMPOO, [
+        { method: 'card', amount_cents: total, payment_form_code: '28' },
+        { method: 'cash', amount_cents: 5000 },
+      ])
+      expect(ok).toBeTruthy()
+
+      // Tarjeta por $100 de más con solo $50 en efectivo: $50 no se pueden devolver.
+      await client.query('savepoint s')
+      await expect(
+        counterSale(client, ONE_SHAMPOO, [
+          { method: 'card', amount_cents: total + 10000, payment_form_code: '28' },
+          { method: 'cash', amount_cents: 5000 },
+        ]),
+      ).rejects.toThrow(/solo se puede pagar de más en efectivo/i)
+    })
+  })
+
+  it('también aplica al cobro de una cita', async () => {
+    // Qué se rompería: la regla valdría en el mostrador pero no al cobrar una cita, que usa
+    // la misma función de cierre pero otra puerta de entrada.
+    await withTransaction(async (client) => {
+      const appointmentId = await seedCompletedAppointment(client)
+      await setRole(client, 'authenticated', USER_RECEPCION)
+      await expect(
+        checkoutAppointment(
+          client,
+          appointmentId,
+          [{ method: 'card', amount_cents: 999999, payment_form_code: '04' }],
+          [],
+        ),
+      ).rejects.toThrow(/solo se puede pagar de más en efectivo/i)
+    })
+  })
+})

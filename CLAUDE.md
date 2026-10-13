@@ -33,7 +33,13 @@ clientes. **Ya construido (fase 12): corte de caja y reportes de ventas** (§6.5
 (fase 13): la venta de mostrador como punto de venta** (§6.5). **Ya construido
 (fase 14): acciones y edición directa en Clientes** (§6.2). **Ya construido
 (fase 15): identidad visual** (tema claro y oscuro, logo, tipografía, color por tipo de
-visita) **y la pantalla de Inicio** (§5.6).
+visita) **y la pantalla de Inicio** (§5.6). **Ya construido (fase 17): estados de carga**
+(siluetas, barra al cambiar de pantalla y aviso de versión nueva, §5.6). **Ya construido
+(Correcciones 1, 2026-10-12, PLAN.md D26): 12 observaciones de uso** — cliente nuevo con su
+mascota desde la cita, horarios que avisan el traslape, página de cliente, búsquedas sin
+acentos, validaciones de correo y de fecha, acciones de empleados y tooltips (§5.6, §6.2,
+§6.3, §7.6). **Ya construido (fase 25, PLAN.md D28): el calendario de la Agenda con la
+identidad visual** (bloques tonales, marco de tarjeta, barra de fecha única, §5.6).
 
 Reglas de esta etapa:
 
@@ -167,6 +173,11 @@ Las aprobadas hasta ahora:
   nuestro propio dominio: sin pedir nada a Google Fonts ni mandarle la IP del usuario.
   Se carga en `main.ts`; el reemplazo de Roboto vive en `styles/main.scss` (Vuetify la fija
   en `html` y en cada `.text-*`).
+- Extensión de Postgres **`unaccent`** (2026-10-12, Correcciones 1; no es un paquete de npm). Vive
+  en el esquema `extensions` y la usa `app.search_norm()`, que alimenta `search_customers()`,
+  `search_pets()` y `search_products()`: búsqueda sin acentos ni mayúsculas, con la **ñ aparte** de
+  la n. Hay que crearla (`create extension unaccent with schema extensions`) en staging y
+  producción; la migración lo hace, pero conviene verificarlo tras desplegar.
 - `eslint`, `prettier`, `eslint-plugin-vue`, `vitest`, `@vue/test-utils`,
   `@playwright/test`, `vite-plugin-vuetify` — herramientas.
 
@@ -214,14 +225,19 @@ FullPetCare/
     │   ├── availability.ts      #   cálculo de huecos en la agenda
     │   ├── validation.ts        #   RFC, teléfono, CP
     │   ├── palette.ts           #   colores del tema como datos; contrast.ts mide su contraste (§5.6)
+    │   ├── searchText.ts        #   texto sin acentos (copia de app.search_norm; la ñ se conserva, §3)
+    │   ├── appointmentErrors.ts #   mensajes de las reglas de fecha y hora de una cita y aviso de traslape (§6.3)
+    │   ├── customerErrors.ts    #   correo repetido y otros rechazos al guardar un cliente (§6.2)
     │   ├── visitKind.ts         #   tipo de visita → nombre, ícono y color (§5.6)
+    │   ├── agendaStatus.ts      #   estado que muestra la agenda → nombre, ícono y color (§5.6)
+    │   ├── contentWidth.ts      #   ancho del contenido: ancho (listados) y angosto (formularios), §5.6
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     ├── stores/                  # Pinia: session, tenant, agenda, cart
     ├── types/database.ts        # GENERADO. No editar a mano.
-    ├── composables/             # useThemeMode (modo de color, §5.6)
+    ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas)
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
     ├── pages/                   # una carpeta por área: auth, inicio, agenda, clientes, atencion, cobro, ventas, publico, superadmin
@@ -315,20 +331,56 @@ tarjetas con borde fino y sin sombra. Reglas que no se rompen:
   un color nuevo que no cumpla rompe el test. No se agrega un color sin su `on-*`.
 - **Tipo de visita = color + ícono + texto.** Estética es `grooming` (naranja) y veterinaria
   es `veterinary` (azul), de la paleta Okabe-Ito (se distingue con daltonismo). **El color
-  nunca va solo.** La fuente única es `lib/visitKind.ts`; se muestra con `VisitKindChip`, y en
-  el calendario como franja + ícono (`components/calendarEvents.ts`). No se repiten
+  nunca va solo, salvo en el bloque del calendario de la Agenda**, donde el tipo es solo la franja de color y su
+  nombre va en el tooltip (el ícono sería redundante; la leyenda de arriba lo explica con ícono y texto).
+  La fuente única es `lib/visitKind.ts`; se muestra con `VisitKindChip` y, en el calendario, como franja
+  (`components/calendarEvents.ts`). No se repiten
   "Estética"/"Veterinaria" a mano. Para no confundirlos, el azul y el naranja **no se usan para
   otra cosa**: "Agendada" y el peso en el historial son gris pizarra (`secondary`), no `info`.
+- **Ancho del contenido (fase 24, PLAN.md D27):** hay dos anchos, definidos en `lib/contentWidth.ts`. El default de
+  `VContainer` (`plugins/vuetify.ts`) es el **ancho** `clamp(860px, 75vw, 1440px)`, para listados y tableros. Las
+  pantallas de formulario o detalle (cobro, atender cita, detalle de cita y de venta, Configuración) piden
+  `:max-width="CONTENT_WIDTH.narrow"` (860 px). Las páginas no escriben números sueltos. Agenda y punto de venta
+  (sin tope) y la vista pública (480 px) conservan el suyo. `SettingsPage` debe quedarse en `narrow`: su riel lateral
+  se ubica en el margen libre del contenedor.
 - **Modo claro, oscuro o del sistema:** `useThemeMode` (se elige en el menú de usuario; la
   preferencia es una comodidad del navegador, `fpc.themeMode`, nunca un dato de negocio).
 - **Piezas compartidas** (úsalas en lugar de rehacerlas): `BrandLogo`, `PageHeader` (todo
   encabezado de pantalla: título, subtítulo y acciones), `EmptyState` (estado vacío con
   ilustración), `UserMenu`, `WorkspaceSwitcher`, `SideMenu` (con secciones por `group`),
   `AuthPanelLayout` (hoy solo el login) y `VisitKindChip`.
+- **Estados de carga (fase 17, PLAN.md D22):** en la **primera** carga de una pantalla se muestra la
+  silueta de lo que viene (`TableSkeleton`, `CardSkeleton`, `PageSkeleton`, `CalendarSkeleton`); en las
+  **recargas** (filtrar, guardar, refrescar) se conservan las filas y solo va la barra fina. Se decide con
+  `useFirstLoad(loading)`, que usa `useDelayedLoading` (≈150 ms de retraso para que una respuesta rápida no
+  parpadee). `NavigationProgress` (en `App.vue`) es la barra global al cambiar de pantalla, y
+  `lib/chunkError.ts` reconoce el fallo de descarga de una pantalla tras un despliegue para que el router avise
+  con "Recarga la página". No se deja un círculo de carga suelto en pantallas nuevas.
 - **Inicio** (`/app/inicio`, `stores/home.ts`, `lib/homeSummary.ts`) es la pantalla de entrada.
   Cada bloque se consulta y se muestra solo si el rol o el permiso lo permite (la regla real la
   impone la base). El total "por cobrar" es **estimado**: solo suma servicios. Los accesos
-  rápidos mandan a la Agenda con `?accion=nueva-cita` o `?accion=llegada-sin-cita`.
+  rápidos ("Nueva cita", "Llegada sin cita") abren su diálogo **sobre Inicio** (`HomePage` los
+  monta; la sucursal y la fecha vienen de `stores/agenda`) y, al guardar, la persona se queda en
+  Inicio y el resumen se recarga: ya no se navega a la Agenda.
+- **Calendario de la Agenda (fase 25, PLAN.md D28):** cada cita es un bloque **tonal** (fondo = el color del
+  estado al 16 % sobre `surface`, `TONAL_WEIGHT` en `lib/calendarGrid.ts`; `palette.spec.ts` mide su contraste) con
+  borde del color del estado, punteado en cancelada y "no se presentó". El estado sale de `lib/agendaStatus.ts` (nombre,
+  ícono y color; no se repite en la página). **El bloque no lleva íconos** (decisión del usuario, 2026-10-12): solo
+  hora, mascota y cliente, y estado, tipo, origen y empleado van en el tooltip; la leyenda sí usa los íconos del
+  estado. Nunca emojis. Los estilos de los bloques viven en `styles/main.scss` (`ec-status-*`, `ec-kind-*`),
+  no en cada componente. La Agenda va en una `v-card` con barra única (`‹ Hoy ›` y la fecha escrita, que abre un
+  `v-date-picker`).
+- **Aviso de traslape (Correcciones 1):** token `overlap` en la paleta (amarillo Okabe-Ito
+  `#F0E442`, con `on-overlap` oscuro; en tema oscuro, mismo tono con su `on-`). Solo marca "este
+  horario se encima con otra cita del mismo empleado": **nunca va solo**, siempre con el ícono
+  `mdi-alert` y el texto del aviso. No se usa para otra cosa. Un `v-chip` dentro de un
+  `v-chip-group` ignora `color` hasta que se elige, por eso el chip lleva la clase propia
+  `slot-chip--overlap`.
+- **Botones de solo ícono con tooltip (Correcciones 1, D26 punto 7):** se escriben con
+  `IconButton` (envuelve `v-btn` y es un `v-btn` para todo lo demás), no con `<v-btn icon=…>`. El
+  texto del tooltip es el mismo `aria-label` (o el `title`, que pasa a ser `aria-label`); un
+  botón de ícono **sin** `aria-label` no muestra nada y es un defecto de accesibilidad. Solo con
+  puntero (`hover: hover`) y con foco de teclado; en pantallas táctiles no hay tooltip.
 
 ---
 
@@ -366,6 +418,12 @@ Reglas transversales, aplican a **toda** tabla de negocio:
 Que un `groomer` no pueda leer `medical_records` es una política RLS probada, no una
 condición en un `v-if`.
 
+**Un negocio nunca se queda sin dueño activo** (Correcciones 1): el trigger
+`app.prevent_losing_last_owner` rechaza (hint `last_active_owner`) desactivar, eliminar o cambiar
+de rol a su **último dueño activo**, venga de la pantalla, de una RPC o de la API directa; toma un
+candado por negocio para que dos dueños no se quiten el acceso a la vez. Un dueño inactivo no
+cuenta como relevo.
+
 ### 6.2 Clientes y mascotas
 
 | Tabla         | Campos clave                                                                                                                                                     |
@@ -377,12 +435,27 @@ condición en un `v-if`.
 `weight_grams` es entero (12 400 = 12.4 kg). Misma razón que el dinero: nada de
 flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
-- **Pantalla Clientes (fase 14, PLAN.md D19):** las tablas de clientes y de mascotas (`/app/clientes`, solo
-  dueño y recepción) ya no abren nada al presionar la fila: la columna "Acciones" trae editar y eliminar. Editar abre
-  un modal **directo a la edición** (`CustomerEditDialog.vue`: mascotas en tarjetas, datos y datos fiscales;
-  `PetEditDialog.vue`: foto cambiable, datos, último peso, cartilla en tabla con las vacunas del catálogo de su
-  especie, gráfica de peso y link para compartir). `CustomerFormDialog` sigue existiendo para el punto de venta
-  (§6.5) y `PetDetailDialog` para la agenda.
+- **Pantalla Clientes (fase 14, PLAN.md D19; cambiada en Correcciones 1, D26):** `/app/clientes` (solo dueño y
+  recepción) es **una sola tabla** — Nombre, Teléfono, Correo, **Mascotas** (chips con el ícono de su especie) y
+  Acciones; ya no hay pestaña Mascotas (`PetsPanel.vue` queda sin uso). La fila abre la **página del cliente**
+  (`/app/clientes/:id`, `CustomerPage.vue`: datos del cliente arriba y tres columnas — mascotas, información de la
+  mascota elegida con peso y link para compartir, y cartilla). "Editar" abre los modales que ya existían
+  (`CustomerEditDialog.vue`, `PetEditDialog.vue`); eliminar una mascota va en su tarjeta y "+ Agregar mascota" en
+  la página. `CustomerFormDialog` sigue para completar datos fiscales en el punto de venta (§6.5) y
+  `PetDetailDialog` para la agenda.
+- **Un cliente nunca nace sin mascota (D26 puntos 1 y 6):** el alta de un cliente **nuevo** va siempre por
+  `CustomerWithPetDialog.vue` y la RPC `create_customer_with_pet()` (cliente y mascota en una transacción; revalida
+  membresía y rol dueño o recepción). Se usa desde la nueva cita, la llegada sin cita, Clientes y el punto de venta
+  (factura a un cliente nuevo). No se llama a `customersService.create()` suelto para un alta.
+- **Correo del cliente (D26 punto 11):** opcional; si se captura, debe tener forma de correo
+  (`isValidEmail`) y **no repetirse en el mismo negocio** (sin distinguir mayúsculas ni espacios; un cliente
+  eliminado libera el suyo). Lo impone el trigger `app.prevent_duplicate_customer_email` (solo cuando el correo
+  cambia): error `23505` con `hint = 'customer_email_taken'`, que `lib/customerErrors.ts` traduce a "Este
+  correo ya está registrado.".
+- **Búsqueda (D26 punto 10):** la hacen las funciones `search_customers()` (EMPIEZA con), `search_pets()` y
+  `search_products()` (CONTIENE), `SECURITY INVOKER` (RLS aplica), con `app.search_norm()`: sin acentos ni
+  mayúsculas, y la **ñ no es la n**. El navegador no repite la regla salvo `lib/searchText.ts` (copia, para el
+  escáner de código exacto y la lista de empresas del superadmin).
 - **Eliminar es borrado suave en cascada, en la base:** las RPC `delete_customer()` y `delete_pet()` (`SECURITY
   DEFINER`, revalidan membresía y rol dueño o recepción) ocultan al cliente, a sus mascotas y **solo sus citas
   `scheduled`**. Las demás citas, las ventas y el expediente no se tocan (§8.5). Se llaman desde `softDelete()` de
@@ -401,6 +474,16 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - `status`: `scheduled` | `in_progress` | `completed` | `cancelled` | `no_show`.
 - `is_walk_in` / `is_urgent` (booleanos, default `false`): una visita sin cita es una cita normal
   marcada así (`create_walk_in_appointment`), para que atender, cobrar e historial no cambien.
+- **Reglas de fecha y hora (Correcciones 1, D26 puntos 4 y 12), impuestas en la base** por
+  `app.assert_appointment_window()` desde `create_appointment()` y `reschedule_appointment()`: una cita
+  **no puede estar en el pasado** (sin tolerancia), debe caer **dentro del horario de la sucursal**, en un
+  **día abierto**, y terminar después de empezar. Cada rechazo es `check_violation` con un `hint`
+  (`appointment_in_past`, `outside_branch_hours`, `branch_closed_day`, `end_before_start`) que
+  `lib/appointmentErrors.ts` traduce. **La llegada sin cita no se valida contra el horario ni el traslape**
+  (una urgencia fuera de horario se puede registrar) y conserva su ventana de 10 minutos.
+- **El traslape del mismo empleado ya NO se rechaza** (antes lo hacía la base): se **avisa**. En el selector
+  de horarios el hueco queda seleccionable en amarillo (§5.6) con el aviso "se traslapa con otra cita del
+  empleado, de las X a las Y"; en la llegada sin cita pide confirmar ("Registrar de todos modos").
 - `*_snapshot`: al agendar se **copia** nombre, precio y duración del servicio. Si mañana
   suben el precio del baño, las citas viejas conservan el suyo. Un ticket histórico
   nunca cambia de monto.
@@ -465,6 +548,21 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   (selector de clientes; si le faltan datos fiscales se le piden al momento). La forma de los datos fiscales
   se valida en `lib/validation.ts` (`fiscalReceiverProblems`, `customerFiscalProblems`); que exista en el
   catálogo del SAT lo decide el PAC. El cobro de una cita sigue en `pages/agenda/CheckoutPage.vue`.
+- **Captura del punto de venta (13F y 13G, PLAN.md D18 puntos 6 y 7):** un solo campo "código de barras o nombre"
+  (Enter con código exacto agrega; escribir reemplaza la fila de arriba por las coincidencias) y **dos filas** de
+  tarjetas (`components/PosProductTile.vue`): arriba, **categorías** (ícono y nombre) en una fila con scroll
+  horizontal o, al abrir una, sus productos (con la categoría como tarjeta fija en el primer lugar) y "Volver" a la derecha; abajo, los **últimos productos vendidos** de la
+  sucursal, tantos como quepan en el ancho. Los productos sin categoría (o con la categoría desactivada) caen en la
+  tarjeta "Sin categoría"; una categoría sin productos con existencia no se muestra. Los avisos de captura salen en un
+  toast de 3 s. Atajos: F2 va al campo y F9 cobra (no actúan con un diálogo abierto). Las categorías son la tabla `product_categories` (nombre + ícono de la
+  lista curada de `lib/productCategories.ts`, RLS con el permiso `inventory`, borrado suave) y `products.category_id`
+  con llave compuesta `(tenant_id, category_id)`; se administran en Inventario (`ProductCategoriesDialog`).
+  Desactivar una categoría no toca sus productos.
+- **Cambio (13H):** al pagar de más en efectivo, el diálogo de cobro muestra "Cambio a devolver" (`PaymentSummary`,
+  el mismo en punto de venta y cobro de citas) y el ticket una línea "Cambio". Se **deriva** con `lib/paymentChange.ts`
+  (la regla de Caja: solo el efectivo da cambio); no se guarda. Un sobrepago con tarjeta o transferencia no deja
+  cobrar, y la base también lo rechaza (`finalize_sale`: lo pagado de más no puede superar el efectivo recibido). Con el monto
+  cubierto, el formulario de agregar pago se oculta.
 
 - **Caja (fase 12, `cash_sessions` y `cash_movements`):** un turno de caja por sucursal. `cash_sessions` se abre
   con un fondo inicial (`opening_float_cents`) y se cierra contando el efectivo; al cerrar se congelan
@@ -788,8 +886,15 @@ escriben datos de negocio. La interfaz solo lo hace cómodo: el router manda a
   `encrypted_password`. No hay RPC para "saltarse" el cambio, y `authenticated` no tiene
   `UPDATE` sobre esa columna (permisos por columna en `profiles`).
 - **Cuentas existentes:** no se tocan (`default false`).
-- **Empleados** invitados con `invite-employee` **no** entran en esto (fuera del alcance
-  de la tarea #1904); sería agregar la misma línea de `app_metadata` allí.
+- **Empleados** dados de alta con `invite-employee` **no** entran en esto (fuera del alcance
+  de la tarea #1904). **Sí entran al restablecer su contraseña** (Correcciones 1, D26 punto 9):
+  la acción `reset_password` de la misma función (solo con el permiso `employees` de edición)
+  genera una contraseña temporal que se muestra **una sola vez**, cierra las sesiones del empleado
+  y deja `must_change_password` en `true` (misma regla que arriba, después del cambio de hash).
+  No se puede restablecer la contraseña de uno mismo (para eso está "Cambiar contraseña"), de un
+  dueño (la restablece el equipo de la plataforma, §7.5) ni de un empleado desactivado o
+  eliminado. Eliminar a un empleado es borrado suave de su membresía (RPC `delete_employee()`),
+  se bloquea si tiene **citas programadas** y se reactiva si se le da de alta otra vez.
 - Tocar `app.is_member_of()` sí es posible aquí porque es por **persona**, no por
   negocio; el estado de la empresa (§6.8) también la bloquea, con `app.is_tenant_blocked()`.
 

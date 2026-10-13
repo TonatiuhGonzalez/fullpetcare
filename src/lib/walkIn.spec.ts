@@ -3,7 +3,7 @@
 // afuera": sin Supabase ni reloj real (la hora "ahora" llega como argumento).
 import { describe, expect, it } from 'vitest'
 
-import { computeEmployeeWaits, waitLabel } from './walkIn'
+import { computeEmployeeWaits, findWalkInOverlap, waitLabel } from './walkIn'
 
 const ANA = 'ana'
 const BETO = 'beto'
@@ -137,5 +137,41 @@ describe('waitLabel', () => {
     // 75 min → "1 h 15 min"; 120 → "2 h" (sin "0 min" sobrando).
     expect(waitLabel(75)).toBe('Espera ~1 h 15 min')
     expect(waitLabel(120)).toBe('Espera ~2 h')
+  })
+})
+
+describe('findWalkInOverlap', () => {
+  const busy = [{ employeeId: ANA, startsAt: '10:00', endsAt: '10:45' }]
+
+  it('regresa la cita con la que se encima la visita', () => {
+    // La visita de 10:30 a 11:15 pisa la cita de Ana de 10:00 a 10:45. Si no se
+    // detectara, recepción registraría la visita encima de otra sin ningún aviso.
+    expect(
+      findWalkInOverlap({ employeeId: ANA, busyRanges: busy, startsAt: '10:30', endsAt: '11:15' }),
+    ).toEqual(busy[0])
+  })
+
+  it('terminar justo cuando la otra cita empieza no es traslape', () => {
+    // Borde: 09:15 a 10:00 toca la cita de las 10:00 sin pisarla. Pedir confirmación
+    // aquí sería un falso aviso en cada visita que cabe justo antes de una cita.
+    expect(
+      findWalkInOverlap({ employeeId: ANA, busyRanges: busy, startsAt: '09:15', endsAt: '10:00' }),
+    ).toBeNull()
+    expect(
+      findWalkInOverlap({ employeeId: ANA, busyRanges: busy, startsAt: '10:45', endsAt: '11:30' }),
+    ).toBeNull()
+  })
+
+  it('ignora las citas de otro empleado', () => {
+    // La cita es de Ana; Beto está libre. Avisar de un traslape ajeno confundiría.
+    expect(
+      findWalkInOverlap({ employeeId: BETO, busyRanges: busy, startsAt: '10:00', endsAt: '10:45' }),
+    ).toBeNull()
+  })
+
+  it('sin citas no hay traslape', () => {
+    expect(
+      findWalkInOverlap({ employeeId: ANA, busyRanges: [], startsAt: '10:00', endsAt: '10:45' }),
+    ).toBeNull()
   })
 })

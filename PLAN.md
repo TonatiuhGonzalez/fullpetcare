@@ -661,6 +661,30 @@ revisa pieza por pieza.
 
 **5. Sin dependencias nuevas** (§3). Todo con Vue, Vuetify y lo que ya existe.
 
+**6. Extensión de captura (2026-10-09, aprobada por el usuario).** Escribir el código o el nombre era poco amigable.
+Se agrega una **cuadrícula de productos tocables debajo de la barra de captura**, un solo campo "código de barras o
+nombre" que además filtra la cuadrícula, resaltado de la fila agregada, botones − y + en la cantidad y atajos F2
+(captura) y F9 (cobrar). **Esto revoca el "sin atajos" del punto 2.** *Alternativas descartadas por ahora:* cuadrícula
+junto al ticket (menos espacio para el ticket), categorías (necesitan migración y campo en Inventario), fotos de
+producto (bucket y columna nuevos) y escaneo con cámara (dependencia nueva, §3). *Costo aceptado:* la cuadrícula
+muestra todo el catálogo con existencia, que con cientos de productos obliga a filtrar; por eso el campo la filtra.
+
+**7. Categorías y dos filas (2026-10-09, aprobada por el usuario; reemplaza la cuadrícula única del punto 6).**
+La cuadrícula plana no escala con un catálogo grande. Los productos se agrupan en **categorías**; el punto de venta
+muestra **dos filas**: arriba, categorías (o los productos de la categoría abierta, con "Volver") en una sola fila con
+scroll horizontal; abajo, los **últimos productos vendidos**, tantos como quepan en el ancho. Decisiones del usuario:
+- *Modelo:* tabla `product_categories` por negocio (nombre + ícono, RLS con el permiso `inventory`), no un enum fijo.
+  **Alternativa descartada:** enum de Postgres (más simple, pero todos los negocios tendrían las mismas y agregar una
+  pide migración). **Costo aceptado:** migración, RLS, bitácora y una pantalla de administración.
+- *Administración:* en Inventario (diálogo de categorías y selector en el formulario de producto).
+- *Íconos:* lista curada de ~24 de Material Design; no se guarda texto libre.
+- *Sin categoría:* tarjeta "Sin categoría" (solo si hay productos sin ella). Desactivar una categoría (borrado suave)
+  **no modifica sus productos**: pasan ahí.
+- *Campo de captura:* escribir reemplaza la fila superior por los productos que coinciden; el código exacto sigue
+  agregando directo.
+- *Fila inferior:* últimos productos **vendidos** (no dados de alta), con existencia en la sucursal.
+*Costo aceptado:* "últimos vendidos" depende de que haya ventas; en un negocio nuevo la fila inferior empieza vacía.
+
 **Pendientes:** ninguno.
 
 ### D19 — Clientes y mascotas: acciones en la tabla y modales de edición directa
@@ -733,6 +757,428 @@ cambiar la pantalla de entrada hay que actualizar varias redirecciones (router, 
 
 ---
 
+### D21 — Acceso del cliente: PWA instalable y cuenta propia (sin app nativa)
+
+**Estado:** aprobada el 2026-10-09. Se construye en la rama `feat/loading-states` (fase 17).
+
+**Problema.** Hoy el cliente consulta a su mascota solo con un link con token (§7.4) que la recepción copia y pega.
+Si lo pierde, hay que generar otro; no hay forma de "entrar" por su cuenta ni de ver todas sus mascotas juntas.
+
+**1. Formato: PWA, no app nativa.** La vista pública ya es web y está pensada para móvil. Una PWA (manifest, ícono y
+service worker) se instala en la pantalla de inicio sin tienda. **Alternativa descartada:** app nativa (cuenta de
+Apple ~99 USD/año y de Google, revisión por versión, dos plataformas o un framework nuevo, y en multi-tenant habría que
+decidir una app para todos o una por negocio). §1 ya deja la app nativa fuera de alcance. **Costo aceptado de la PWA:**
+las notificaciones push en iPhone solo funcionan con la PWA instalada (iOS 16.4 o posterior), y no hay presencia en
+las tiendas.
+
+**2. Fase 16A — PWA sobre la vista actual (bajo riesgo).** Manifest con la identidad de la fase 15, íconos, pantalla
+sin conexión mínima y aviso "Agregar a inicio". **No cambia el acceso:** sigue siendo el link con token. Sin servicio
+externo. Dependencia: ninguna si el service worker se escribe a mano (el caché solo del cascarón de la app, **nunca de
+datos de la mascota**); si se prefiere `vite-plugin-pwa`, es dependencia nueva y se justifica aparte (§3).
+
+**3. Fase 16B — Cuenta del cliente (la parte grande, decidir antes de construir).** Que el cliente entre con su
+teléfono o correo mediante un código de un solo uso y vea todas sus mascotas. Implica:
+- **Rol nuevo "cliente"** con RLS propio y tests de aislamiento (no ve a otros clientes ni notas internas ni montos
+  ajenos). Hoy `anon` no lee nada y todo pasa por la Edge Function (§7.4). **Alternativa A (recomendada):** el cliente
+  sigue sin tocar Postgres; una Edge Function nueva emite una sesión corta y devuelve el mismo DTO de lista blanca.
+  **Alternativa B:** cliente como usuario de Supabase Auth con políticas RLS propias (más superficie de ataque).
+- **Envío del código:** correo (barato, sin costo por mensaje) o SMS/WhatsApp (servicio externo, costo por mensaje).
+  Se justifica con el usuario antes (§3) y se elige canal; el correo es el punto de partida.
+- Vincular persona ↔ cliente: por teléfono o correo ya capturado en `customers`; qué hacer si hay duplicados o el dato
+  no coincide.
+
+**4. Fuera de esta decisión:** push y recordatorios de vacunas (candidato aparte: WhatsApp, §1), pagos en línea y
+reserva en línea.
+
+**Pendientes:** elegir A o B del punto 3, el canal del código, y si el service worker es a mano o con plugin.
+
+---
+
+### D22 — Estados de carga: skeletons, barra de navegación y error de pantalla que no baja
+
+**Estado:** aprobada el 2026-10-09 y construida en la fase 17.
+
+**Problema.** Hoy hay 23 spinners o barras sueltas (`v-progress-circular` / `v-progress-linear`) y solo una pantalla
+usa skeleton (Inventario). Las tablas quedan vacías con una barra fina y "Cargando…". Varias pantallas de detalle
+(cobro, atención, venta, cita) muestran un círculo chico y nada más, y al navegar desde el menú no hay ninguna señal
+mientras baja el código de la pantalla nueva (las rutas son `() => import(...)`).
+
+**1. Skeletons compartidos.** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader` (ya se usa en
+Inventario, sin dependencia nueva). Se muestran **solo en la primera carga**; al recargar, la tabla conserva sus filas y
+solo lleva la barra fina, para que no parpadee. Con un **retraso de ~150 ms**: una respuesta rápida no enseña nada.
+Respetan `prefers-reduced-motion`. Pieza compartida de §5.6: se usa en lugar de rehacerla. **Alternativa descartada:**
+un spinner mejor estilizado (no dice qué viene ni evita el salto de diseño cuando llegan los datos).
+
+**2. Barra de progreso global arriba**, atada al router (`beforeEach` / `afterEach`). Aparece si la navegación tarda más
+de ~150 ms. Resuelve que, desde el menú, la pantalla anterior se queda quieta sin explicación mientras baja la nueva.
+**Alternativa descartada:** poner el skeleton en `AppLayout` (no cubre las rutas de superadmin ni la pública, y hoy la
+pantalla anterior sigue visible hasta que la nueva baja).
+
+**3. Error al bajar una pantalla (`router.onError`).** Tras un despliegue, los archivos con hash del build anterior
+desaparecen y la importación falla; hoy no hay manejo, así que no hay aviso. Se detecta el error de importación dinámica
+(el mensaje cambia entre Chrome, Firefox y Safari, así que la detección es una función pura en `lib/`, con tests) y se
+muestra "Hay una versión nueva de la aplicación" con botón para recargar. **No se recarga solo en bucle:** a lo más una
+vez por sesión de navegación (marca en `sessionStorage`, con `try/catch`, §5.6).
+
+**4. Skeleton por pantalla**, con la forma real de cada contenido, en lugar del círculo: Inicio, Reportes, Caja, cobro,
+atención, detalle de venta y de cita, diálogos de cliente y mascota, y las pantallas de superadmin. Se migra por lotes.
+
+**5. Fuera de esta decisión.**
+- **La pantalla en blanco al recargar la página (F5)** se **ignora a propósito** (decidido el 2026-10-08): no se
+  atiende en esta fase.
+- Precarga de pantallas al pasar el mouse por el menú: queda como opcional, solo si tras el punto 2 aún se nota la espera.
+- Cambiar cómo cargan los stores o los services: solo se cambia lo que se ve mientras llegan los datos.
+
+**6. Sin dependencias nuevas** (§3). No toca la base ni las reglas de §7 y §8.
+
+**Texto del aviso (decidido el 2026-10-09):** "Hay una versión nueva de FullPetCare. Recarga la página para continuar.", con el botón "Recargar".
+
+**Pendiente:** si el retraso de 150 ms se ajusta tras probarlo en staging con red lenta.
+
+### D23 — Suscripción modular: plan = base + módulos + extras, con derechos que impone la base
+
+**Estado:** aprobada como **planeación** el 2026-10-09; **aún no se trabaja** (no hay fecha). Las decisiones de producto
+de abajo ya las tomó el usuario; solo quedan pendientes los precios.
+
+**Problema.** Hoy el plan es solo informativo (§6.8): no limita nada, el dueño no puede elegirlo y no hay cobro real.
+Cada negocio necesita pagar por lo que usa: una veterinaria sin estética, un negocio que ya tiene su inventario o su
+terminal de cobro, etc.
+
+**Decidido por el usuario (2026-10-09).**
+1. **Precio = base + módulos sumados** (cuota dinámica). Los planes del catálogo pasan a ser **plantillas** que precargan
+   módulos; el superadmin puede ajustar a una empresa en particular. **Alternativa descartada:** planes cerrados
+   (Básico/Pro/Premium) con personalización como excepción.
+2. **Estética y Veterinaria son módulos independientes, pero se exige al menos uno.** Lo impone la base (restricción o
+   trigger), no solo el formulario.
+3. **Los cambios de plan aplican en el siguiente corte**, sin prorrateo. Se guardan como "cambio programado" y se
+   aplican al renovar. **Alternativa descartada:** prorratear (cálculo de saldos y devoluciones, más superficie de error).
+4. **Sucursales y empleados extra cobran por unidad pasada una cantidad incluida.** **Incluidos en la base: 1 sucursal y 3 empleados con acceso** (decidido el 2026-10-09); el umbral se guarda como dato
+   del catálogo, no en código, para poder ajustarlo sin migración.
+5. **Prueba gratis desde el primer release.** Duración: 14 días con todos los módulos (decidido el 2026-10-09). Al terminar sin plan
+   elegido entra al mecanismo que ya existe (vigencia vencida → gracia → solo lectura → baja, §6.8): no se inventa uno nuevo.
+
+**1. Derechos (*entitlements*) en la base, no en la interfaz.** Mismo patrón que `tenant_access_level()` (§6.8) y
+`has_permission()` (D13): `app.has_module(tenant_id, módulo)` y `app.within_limit(tenant_id, límite, cantidad)`,
+`STABLE`, que consultan las políticas RLS y las RPC (con `SECURITY DEFINER` donde haga falta, revalidando membresía,
+§7.3.4). Ocultar menús con `v-if` es comodidad, nunca la regla. Cada tabla de un módulo lleva su test: sin el módulo,
+ni la API directa escribe.
+
+**2. Qué es base y qué es módulo (confirmado el 2026-10-09).**
+- **Base (siempre):** clientes, mascotas, agenda, catálogo de servicios, cobro de citas, empleados y permisos, vista
+  pública, Inicio.
+- **Módulos:** Estética, Veterinaria, Inventario y productos, Punto de venta, Caja, Reportes, Facturación (CFDI).
+- **Dependencias:** Punto de venta requiere Inventario (solo vende productos); Facturación y Reportes no tienen
+  dependencia (confirmado).
+- **Límites:** sucursales y empleados con acceso. Almacenamiento queda fuera de esta decisión.
+
+**3. Apagar un módulo no borra nada (§8.5).** Los datos se conservan. Un módulo apagado deja de aceptar escrituras y
+desaparece de menús y rutas; el **expediente clínico sigue legible** aunque Veterinaria se apague, porque es un
+documento legal. Citas ya agendadas de un tipo apagado se pueden atender y cobrar hasta cerrarlas. Reactivar el módulo
+devuelve todo como estaba.
+
+**4. Precio como dato, con copia al contratar.** `module_prices` y límites en el catálogo; la suscripción guarda una
+**copia** de lo contratado (`*_snapshot`, como en §6.3), así que subir un precio del catálogo no toca a quien ya paga.
+Todo en centavos (§8.2) con IVA incluido (D5). Anual con descuento propuesto (porcentaje en *basis points*). La suma
+vive en `lib/subscriptionPricing.ts` (función pura, muy probada) y la repite la base, como `cashCount` (D17).
+
+**5. Pago real: se decide al final.** Se construye todo con pago simulado, como SPEI/OpenPay hoy, y el proveedor se elige
+cuando el modelo esté estable. Candidatos: Stripe, Conekta/OpenPay, Mercado Pago. Al elegir se justifica con el usuario
+(costo, alternativas y contras, §3) y entra por Edge Function con webhooks, sin tocar la `service_role` desde el frontend.
+
+**6. Cambia lo escrito en §6.8:** "el plan es solo informativo" y "autoservicio fuera de alcance". Se actualizan en el
+mismo PR de la fase 18.
+
+**7. Fases propuestas.**
+- **Fase 18, motor de derechos:** módulos, `has_module`, límites, menús y rutas limitados, restricción de "al menos uno",
+  tests de aislamiento. Aún sin precios ni cobro.
+- **Fase 19, constructor de planes:** el superadmin arma plantillas, precios y ajustes por empresa; calculadora.
+- **Fase 20, autoservicio del dueño:** elegir plan al darse de alta, prueba gratis, "Mi suscripción", cambios
+  programados al corte y pago simulado.
+- **Fase 21, pago real:** proveedor, webhooks, reintentos de cobro y factura de la suscripción.
+
+**Cambio de plan que choca con un límite (decidido el 2026-10-09):** si el plan nuevo permite menos sucursales o
+empleados de los que hay activos, el cambio **no se programa** hasta que el dueño desactive los sobrantes (se le pide en
+pantalla, nunca se desactiva a nadie solo). La base lo revalida también al aplicarse en el corte.
+
+**Pendiente:** precios de cada módulo, de la sucursal y del empleado extra, y el porcentaje de descuento anual.
+
+---
+
+### D24 — Recordatorios de citas y vacunas: primero a mano con un toque, después automáticos
+
+**Estado:** propuesta (2026-10-09); no se construye hasta que el usuario la apruebe.
+
+**Problema.** La cartilla guarda `next_due_date` y la agenda guarda las citas, pero nadie avisa al cliente: hoy el link
+se copia y se pega a mano (§1). Es donde más valor se pierde en una veterinaria o estética: citas a las que el cliente
+no llega y vacunas que nadie recuerda.
+
+**1. Se construye en dos escalones.** El primero no necesita ningún servicio externo.
+- **Escalón 1 (fase 22B y 22C): lista de recordatorios con envío "de un toque".** Una pantalla muestra a quién hay que
+  avisar hoy o mañana y arma el mensaje; el botón abre WhatsApp con el texto ya escrito (enlace `wa.me`) y la persona
+  solo presiona enviar. Se registra que se avisó. Costo: cero. Contra: lo manda una persona, desde el teléfono o el
+  WhatsApp Web del negocio.
+- **Escalón 2 (fase 22D): envío automático.** Requiere un servicio externo y se justifica con el usuario antes (§3).
+
+**2. Canal del envío automático (pendiente de elegir).**
+
+| Canal | A favor | En contra |
+| --- | --- | --- |
+| **A. WhatsApp Business API** (directo con Meta o con un proveedor intermediario) | Es el canal que el cliente sí lee en México | Cobra por conversación según tarifas vigentes (verificar antes de decidir); exige verificar el negocio y que Meta apruebe las plantillas; sin la respuesta del cliente no hay conversación |
+| **B. Correo** (servicio de correo transaccional) | Casi gratis, sin aprobación de plantillas, mismo canal que el código de acceso de D21 | Mucha gente no lo lee para esto; requiere dominio con SPF/DKIM para no caer en spam |
+| **C. SMS** | Llega a cualquier teléfono | Caro por mensaje y poco profesional; no se recomienda |
+
+Recomendación: empezar por **B** (o por el escalón 1 solamente) y dejar **A** como segundo canal cuando haya un negocio
+que lo pague, porque el costo por mensaje puede volverse un módulo o extra de la suscripción (D23, fases 19 a 21).
+
+**3. Qué se recuerda (primera versión).** (a) Cita agendada, con antelación configurable por negocio (por defecto 24 h).
+(b) Vacuna próxima, a 7 días del `next_due_date`. **No se recuerda** una cita `walk_in`, cancelada, ni de un cliente sin
+consentimiento. Queda como candidato aparte la `next_visit_date` de la consulta.
+
+**4. Consentimiento (obligatorio).** `customers.accepts_reminders` (booleano, `false` por defecto) con su fecha. Se marca
+en el formulario del cliente. WhatsApp exige el permiso del cliente y la ley mexicana de datos personales pide un aviso
+de privacidad; **sin consentimiento no se envía nada**, ni a mano ni automático. Los clientes que ya existen quedan en
+`false` (más seguro; el importador de D25 trae una columna opcional para marcarlo). Se necesita una forma de baja:
+enlace en el correo y, para WhatsApp, responder "BAJA" (esto último pide recibir mensajes entrantes, fuera de esta fase).
+
+**5. Diseño de datos.**
+- Tabla `reminders` (§6: `tenant_id`, borrado suave, RLS): `kind` (`appointment` | `vaccination`), `appointment_id` o
+  `vaccination_id` (un `check` exige exactamente uno), `customer_id`, `channel` (`manual_whatsapp` | `whatsapp` |
+  `email`), `scheduled_for`, `status` (`pending` | `sent` | `failed` | `skipped`), `sent_at`, `sent_by`, `attempts`,
+  `error_message`, `provider_message_id`. Un **índice único parcial** impide dos recordatorios vivos de lo mismo
+  (idempotencia: si el trabajo corre dos veces, no manda doble). Sin política de DELETE.
+- Los usuarios solo insertan `manual_whatsapp` (lo que ellos mismos mandaron); los envíos automáticos y sus estados los
+  escribe únicamente la Edge Function, mismo patrón que `invoice_requests` (§6.5).
+- Ajustes por negocio en `tenant_reminder_settings` (activar cada tipo, antelación, canal) y un módulo nuevo de
+  permisos `reminders` en `role_permissions` (dueño y recepción ver/editar; groomer y vet nada), como `cash_register`.
+- **Horas en la zona de la sucursal (§8.3).** `scheduled_for` es `timestamptz`; "mañana" se calcula con la zona IANA de
+  la sucursal, y no se envía de noche (ventana propuesta: 08:00 a 21:00 locales).
+
+**6. Envío automático.** `pg_cron` (ya lo usa `suspend_expired_tenants`, §6.8) corre cada hora y encola lo que toca
+(`app.enqueue_due_reminders()`, solo `postgres`/`service_role`). Una Edge Function `send-reminders` toma los pendientes
+(`for update skip locked`, para que dos ejecuciones no tomen la misma fila), envía, registra el resultado y reintenta
+hasta 3 veces. La llave del proveedor vive solo en las variables de la función, nunca en el frontend (§10). Si se
+reprograma o cancela la cita, el recordatorio pendiente se descarta.
+
+**7. Privacidad del mensaje.** Solo lo mínimo: nombre de la mascota, fecha, hora y sucursal. **Nunca** diagnóstico,
+tratamiento, montos ni notas internas (mismo criterio que la vista pública, §7.4).
+
+**8. El demo nunca manda mensajes reales.** Producción es el demo (D10). Local, staging y las empresas marcadas
+`is_demo` usan un **proveedor simulado** que solo registra; así ningún cliente ficticio, ni uno real por error, recibe un
+mensaje durante una presentación. Los tests de la Edge Function usan ese mismo simulado (sin mocks elaborados, §9).
+
+**9. Fuera de esta decisión:** confirmar la cita respondiendo el mensaje (necesita recibir mensajes entrantes),
+campañas o promociones, y recordatorios push de la PWA (D21).
+
+**Pendientes:** aprobar o ajustar el escalón 1; elegir canal del escalón 2 y proveedor; consentimiento de los clientes ya
+existentes; antelación y ventana de envío por defecto.
+
+---
+
+### D25 — Importador de clientes y mascotas desde CSV
+
+**Estado:** propuesta (2026-10-09); no se construye hasta que el usuario la apruebe.
+
+**Problema.** Casi ningún negocio empieza desde cero: trae cientos de clientes en Excel, en un cuaderno capturado o en otro
+sistema. Capturarlos uno por uno es la razón más probable por la que un negocio no se cambie.
+
+**1. Formato: un CSV, una fila por mascota.** Se ofrece una **plantilla descargable** con columnas fijas; los datos del
+cliente se repiten en cada una de sus mascotas y las filas con el mismo teléfono se agrupan en un solo cliente. Una fila
+sin datos de mascota crea un cliente sin mascotas. **Alternativas descartadas:** dos archivos (clientes y mascotas; el
+usuario tendría que ligarlos por una llave que no existe en sus hojas) y mapeo libre de columnas (más pantalla, más
+errores; se reconsidera si los negocios traen formatos muy distintos).
+
+**2. Excel (`.xlsx`) no se lee en esta fase.** Leer `.xlsx` en el navegador pide una librería nueva (§3). El usuario guarda
+la hoja como "CSV UTF-8" (se explica en la propia pantalla). El lector de CSV se escribe a mano en `lib/csv.ts`
+(comillas, comas y saltos de línea dentro de comillas, BOM, saltos CRLF y separador `;`, que Excel con configuración
+regional en español usa a veces). Si resulta frágil, se propone `papaparse` y se justifica aparte.
+
+**3. Todo se valida en el navegador y se revalida en la base.** La lógica es una función pura en
+`lib/importCustomers.ts`: de filas y clientes existentes a un plan (`crear`, `omitir`, `error`, con la fila y el motivo).
+Reutiliza `lib/validation.ts` (teléfono, RFC, CP, `customerFiscalProblems`). La vista previa muestra los errores por
+fila **antes** de escribir nada. Como el navegador no es de fiar (§7), la RPC vuelve a validar.
+
+**4. Duplicados.** Un cliente es duplicado si su teléfono normalizado (10 dígitos) ya existe en el negocio o se repite en
+el archivo (si no trae teléfono, por correo). **Política: omitir, nunca sobrescribir** lo que ya está capturado. Una
+mascota es duplicada si el mismo cliente ya tiene una del mismo nombre y especie.
+
+**5. Aplicar: una sola RPC atómica.** `import_customers(p_rows jsonb, p_file_name text)` (`SECURITY DEFINER`, revalida
+membresía y rol dueño o recepción en la primera línea, §7.3.4). **Todo o nada** en una transacción, con un máximo de
+**1 000 filas por archivo** (un archivo mayor se parte). Devuelve el resumen (creados, omitidos, errores).
+**Alternativa descartada:** un `insert` por cliente desde el navegador (no es atómico: una conexión caída dejaría la
+importación a medias, mismo argumento que el borrado en cascada de D19).
+
+**6. Deshacer.** Cada importación crea un registro en `import_batches` (`tenant_id`, quién, nombre del archivo, conteos) y
+`customers`/`pets` ganan `import_batch_id` (nullable, migración aditiva, §8.1). La RPC `undo_import(p_batch_id)` oculta
+(borrado suave, §8.5) lo importado **que todavía no tenga citas ni ventas**; lo que ya se usó se queda y se informa. Sin
+esto, un archivo mal armado ensucia la cartera y arreglarlo es a mano.
+
+**7. Privacidad.** El archivo se procesa en el navegador y **no se guarda**; solo queda el resumen. Los datos de los tests y
+de la plantilla de ejemplo son ficticios (§11). Los clientes importados quedan con `accepts_reminders = false`, salvo
+que el archivo traiga la columna opcional `acepta_recordatorios` (D24).
+
+**8. Fuera de esta decisión:** importar citas, ventas, historial clínico, cartillas de vacunación y productos
+(candidatos posteriores; la cartilla es el más pedido), y leer `.xlsx`.
+
+**Pendientes:** aprobar la plantilla de columnas (propuesta en 23.1), si el lector de CSV se escribe a mano o con
+librería, y el máximo de filas.
+
+---
+
+### D26 — Correcciones 1: el traslape avisa en vez de bloquear, cliente y mascota juntos, y búsqueda sin acentos en la base
+
+**Estado:** aprobada el 2026-10-12 (decisiones de producto y pendientes resueltos por el usuario; tabla de `TASKS.md`
+"Correcciones 1"). Aún no se construye.
+
+**Problema.** Doce observaciones de uso. La mayoría son de interfaz, pero tres tocan reglas que hoy vive la base (el
+traslape de citas, el correo del cliente y la búsqueda), y esas no se arreglan solo en Vue.
+
+**1. El traslape deja de rechazarse.** Hoy `create_appointment()` y `reschedule_appointment()` lanzan "Este empleado ya
+tiene una cita en ese horario" y `computeAvailableSlots` **oculta** los huecos ocupados. El usuario pidió lo contrario:
+elegirlos y solo avisar con un chip amarillo. Si solo cambiara la interfaz, la base lo rechazaría al guardar, así que
+**cambia la regla en la base**. Alternativas: (a) quitar el rechazo (elegida); (b) conservarlo y que el aviso sea "esto
+va a fallar" (contradice lo pedido); (c) un parámetro `p_allow_overlap` (una regla que depende de quien llama no
+protege nada). **Costo aceptado:** un empleado puede quedar con dos citas encimadas; "ocupado" pasa a ser un aviso, no una
+garantía, y los tests que hoy esperan el rechazo cambian de sentido.
+
+**2. Fecha y hora, validadas también en la base.** Pasado (sin tolerancia), fin ≤ inicio, día cerrado y fuera de
+horario, solo al crear y reprogramar. El "ahora" es el `now()` **de la base**, no el reloj del navegador (mismo motivo
+que ya usa `create_walk_in_appointment`), y el horario se calcula en la zona IANA de la sucursal (§8.3). **Alternativa
+descartada:** validar solo en el formulario (cualquier llamada directa a la API se salta la regla).
+
+**3. Correo único por negocio, con un trigger y no con un índice único.** Un índice único parcial
+(`where deleted_at is null`) **fallaría al aplicarse** si hoy hay duplicados, y no puede expresar "solo cuando el correo
+cambia", que es lo que se pidió para no bloquear a nadie por un dato que ya estaba así. El trigger toma un candado por
+(negocio, correo) para que dos altas simultáneas no pasen las dos. **Costo aceptado:** es una regla nuestra, no una
+garantía del motor. **Efecto en D25 (importador, propuesta):** una fila con correo repetido se reporta como error de
+esa fila.
+
+**4. Cliente y mascota se dan de alta en una sola transacción** (`create_customer_with_pet()`), por el mismo
+argumento que el borrado en cascada de D19: dos inserts desde el navegador pueden dejar un cliente sin mascota si el
+segundo falla, justo lo que la regla "mascota obligatoria" quiere evitar. **Alcance:** es una regla del **alta**, no un
+invariante de la tabla (un cliente puede quedarse sin mascotas si se eliminan después). **No definido:** si aplica al
+importador de D25.
+
+**5. Búsqueda sin acentos resuelta en la base.** Extensión `unaccent` (contrib de Postgres, disponible en Supabase) con
+una función `app.search_norm()` `IMMUTABLE` que la envuelve (la original es `STABLE` y no sirve para índices), y RPC
+`search_*` con la seguridad de **quien llama** (RLS aplica, §7.3). Se conserva el criterio de cada pantalla: clientes
+"empieza con" (ver el comentario de `customers.sql`), mascotas y productos "contiene". **Alternativas:** (b) columna
+generada `search_text` con índice trigram, más rápida con miles de filas pero con más piezas (se reconsidera si algún
+negocio crece); (c) normalizar en el navegador, que es lo que ya hacen `lib/petSearch.ts` y `lib/productSearch.ts` y lo
+que el usuario descartó ("lo debe procesar el back"). **Riesgo:** hoy mascotas, inventario y punto de venta filtran en
+memoria y una consulta por tecla agrega latencia; se mide en el punto de venta y, si estorba, se agrega espera al
+teclear. **Dependencia:** una extensión de Postgres, justificada aquí (§3, §11).
+
+**6. Página de cliente con ruta propia** (`/app/clientes/:id`) y no un diálogo a pantalla completa (lo eligió el
+usuario): se puede abrir con un enlace y el botón de atrás funciona. Reutiliza la gráfica de peso, el link para
+compartir y la cartilla de `PetEditDialog`, sin duplicarlos. **Revierte** la decisión 2 de la fase 14 ("la fila no abre
+nada"). `PetsPanel.vue` y los diálogos viejos se conservan sin uso (regla de D19).
+
+**7. Tooltips con `v-tooltip` de Vuetify en una pieza compartida.** Alternativa descartada: el atributo `title` del
+navegador (tarda, no se puede dar estilo y no aparece con el teclado; hoy solo 3 botones lo usan). El texto del tooltip
+es también el `aria-label`, así que los 6 botones que hoy no tienen ninguno quedan cubiertos. Solo con puntero.
+
+**8. Empleados.** "Eliminar" es borrado suave de la **membresía** (no de `auth.users` ni de `profiles`: la persona es
+global y podría trabajar en otro negocio, §6.1). Desactivar y eliminar se **bloquean con citas programadas**, como las
+sucursales, con un trigger (la regla vive en la base, §7.3).
+
+**9. Color de aviso de traslape: un token nuevo.** El `warning` actual (`#9A5B00` claro, `#F0B24A` oscuro) ya significa
+"sin esterilizar" y alertas de inventario, y en claro es casi el naranja de estética (`#C25400`), que §5.6 reserva.
+Reutilizarlo mezclaría significados. El usuario pidió "un amarillo distinto" y revisará la paleta después; el test de
+contraste AA valida cualquier valor.
+
+**10. Sin dependencias npm nuevas** (§3). No relaja §7 ni §8: la migración es aditiva (§8.1), no hay dinero ni fechas
+fuera de UTC, y todo `SECURITY DEFINER` revalida membresía.
+
+**Decisiones que cerraron los pendientes (2026-10-12):**
+
+1. **Llegada sin cita:** el traslape **avisa y el trabajador decide** si lo acepta (el aviso dice que ya hay una cita y
+   que puede alterar la cronología). A diferencia de agendar, pide **confirmación**. `create_walk_in_appointment()`
+   deja de heredar el rechazo, pero **conserva su ventana de pasado de 10 minutos**: no hereda la regla "sin tolerancia".
+2. **Reprogramar** permite el traslape con aviso, igual que agendar (misma regla en las dos RPC).
+3. **Fuera del horario laboral no se muestran huecos**, como hoy; solo se deshabilitan los pasados y se marcan los
+   ocupados.
+4. **Eliminar mascota** desde su tarjeta en la página de cliente.
+5. **"Editar" abre los modales** `CustomerEditDialog` y `PetEditDialog` ya existentes (menos código nuevo que un modo
+   edición dentro de la página).
+6. **Empleados:** la fila deja de abrir el formulario; se edita con el ícono.
+7. **Contraseña de empleado:** temporal, mostrada una sola vez y con cambio obligatorio. Esto **amplía §7.6**, que hoy
+   deja fuera a los empleados invitados; solo aplica al restablecimiento, no a la invitación. **Alternativa
+   descartada:** enlace de recuperación al correo.
+
+**Sin pendientes de producto.** Aprobada por escrito el 2026-10-12 (C1.1).
+
+**Decisiones surgidas al construir la ola 1 (2026-10-12):**
+
+8. **Re-alta de un empleado eliminado: se reactiva su fila.** `memberships` tiene `unique (tenant_id, user_id)` y el alta
+   rechaza si la fila existe aunque esté eliminada ("Esta persona ya tiene acceso"). El alta debe **reactivar** la
+   membresía eliminada (quitar `deleted_at`, `is_active = true`, nuevo rol y sucursales) en lugar de rechazarla.
+   Pendiente de construir (migración nueva sobre `create_employee_membership`).
+9. **La ñ no se confunde con la n** en la búsqueda de la base (`app.search_norm()` la conserva). Hoy el navegador
+   (`lib/petSearch.ts`, `lib/productSearch.ts`) las iguala; al conectar los buscadores (C1.20) ese comportamiento cambia
+   y es lo deseado.
+10. **La llegada sin cita no valida horario de sucursal ni traslape** (solo su ventana de 10 minutos de pasado): una
+    urgencia fuera de horario se puede registrar. El aviso y la confirmación del traslape son de la interfaz.
+
+### D27 — Ancho del contenido: dos anchos, el de listados crece con la ventana hasta 1440 px
+
+**Estado:** aprobada el 2026-10-12 (el usuario eligió `clamp` y tope de 1440 px). Construida en la fase 24.
+
+**Problema.** `VContainer` tiene un solo `maxWidth: 860` en `plugins/vuetify.ts`. En un monitor de 1920 px quedan
+unos 500 px vacíos a cada lado, y a las tablas y a la página del cliente (tres columnas) les falta espacio. Para
+formularios y detalle de una columna, en cambio, 860 px es lo correcto.
+
+**Decisión.**
+1. **Ancho de listados y tableros:** `clamp(860px, 75vw, 1440px)`. Nunca baja de 860 (como hoy), crece con la
+   ventana y no pasa de 1440. Es el nuevo default de `VContainer`.
+2. **Ancho de formularios y detalle:** 860 px fijos, pasados por una constante compartida (`lib/contentWidth.ts`);
+   las páginas no escriben números sueltos.
+3. **Sin cambio:** Agenda y Punto de venta (ya sin tope), vista pública (480 px) y las pantallas de autenticación.
+
+**Alternativas descartadas.** (a) Subir el tope global a un número fijo: estira los formularios. (b) Sin tope
+(`fluid`) en todo: las tablas se vuelven ilegibles en monitores ultraanchos. (c) Preferencia del usuario "centrado o
+completo" en el menú: más piezas (preferencia, control, probar dos modos por pantalla) para un problema que se
+resuelve con dos anchos; queda como mejora posterior si alguien la pide.
+
+**Contras y riesgos.** `75vw` incluye el menú lateral, así que el contenido real queda un poco más angosto de lo que
+dice la fórmula; se ajusta a ojo en 1366, 1440, 1920 y 2560 px. `SettingsPage` ubica su riel lateral en el margen libre
+del contenedor (`settings-container`): **debe quedarse en 860 explícito**, o el riel se mueve. Sin dependencias nuevas
+(§3), sin tocar la base ni §7 y §8.
+
+### D28 — Calendario de la agenda: bloques tonales, marco de tarjeta y barra única
+
+**Estado:** aprobada el 2026-10-12 (el usuario eligió las propuestas A y B). Se construye en la fase 25.
+
+**Problema.** El calendario de la agenda (`EmployeeDayScheduler.vue`, `EmployeeWeekCalendar.vue`) se ve básico junto
+al resto del sistema: cada cita es un relleno sólido y saturado del color de su estado, el calendario flota sin
+tarjeta, los encabezados son los de la librería, el origen de la cita se marca con emojis y el filete de la franja de
+tipo es blanco fijo (se ve duro en modo oscuro).
+
+**Decisión.**
+1. **Bloque tonal.** Fondo = el color del estado mezclado al 16 % con `surface`, texto `on-surface`, borde fino del
+   color del estado y radio `md`; punteado en cancelada y "no se presentó". El bloque **no lleva íconos** (decisión del
+   usuario, 2026-10-12): el nombre del estado va en el tooltip y en la leyenda (`lib/agendaStatus.ts`), que sí usa el
+   ícono. Excepción a "el color nunca va solo" (§5.6), igual que la franja de tipo.
+2. **Franja de tipo.** Se queda como única señal del tipo dentro del bloque (sin ícono; el nombre va en el tooltip,
+   decisión del usuario del 2026-10-12, excepción a "el color nunca va solo" de D20); su filete usa `surface`.
+3. **Origen de la cita.** Sin ícono en el bloque; "Sin cita" y "Urgente" van en el tooltip. Fuera los emojis.
+4. **Marco.** `v-card` con borde que agrupa barra, leyenda y calendario. Barra única con `‹ Hoy ›` y la fecha escrita,
+   que abre un `v-date-picker`.
+5. **Encabezados.** Empleado con avatar de iniciales y contador de citas del día; días de la semana con la tipografía
+   de marca.
+6. **Sin estado vacío.** Se construyó un `EmptyState` compacto sobre la cuadrícula y el usuario lo quitó por redundante
+   (2026-10-12): un día sin citas es la cuadrícula vacía, con los empleados en "Sin citas".
+
+**Alternativas descartadas.** (a) Mantener el relleno sólido y solo afinar bordes: no resuelve la sensación de peso.
+(b) Tarjeta que cambia de contenido según su alto, tooltip propio y línea de "ahora" (propuesta C): se pospone; depende
+de cómo se comporte `eventContent` con la altura real de cada bloque y la línea de "ahora" exige un reloj de sucursal.
+(c) Cambiar de librería de calendario: descartado en D20 y en `CLAUDE.md` §3.
+
+**Contras y riesgos.** El fondo tonal es más claro que el relleno sólido: el contraste debe medirse (25.3) y se
+revisa a ojo en ambos temas. `color-mix()` exige un navegador reciente (2023 en adelante), el mismo piso que ya pide
+Vuetify 3.13. Sin dependencias nuevas (§3), sin tocar la base ni §7 y §8.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |
@@ -748,3 +1194,4 @@ cambiar la pantalla de entrada hay que actualizar varias redirecciones (router, 
 | Migración mala en producción                       | Se prueba en local con `db reset` y en staging vía PR antes de llegar a `main`             |
 | Fila faltante/mal sembrada en `role_permissions`   | `owner` nunca depende de la tabla (bypass en `app.has_permission()`); test que confirma que cambiar una fila cambia el resultado sin tocar código |
 | `invite-employee` mal validada = invitación indebida | Revalida permiso con el JWT de quien llama ANTES de tocar `service_role`; el RPC vuelve a revalidar aunque la Edge Function fallara |
+| Dos citas encimadas del mismo empleado (desde Correcciones 1, D26) | Es un aviso y no un bloqueo, a propósito; la base sigue rechazando pasado, fuera de horario y día cerrado |

@@ -2,6 +2,7 @@
 // Marco de la vista de configuración (tarea #1959): menú vertical que clasifica
 // la configuración y, junto a él, la sección elegida (ruta hija). "Empresa y
 // sucursales" es solo del dueño; "Cuenta" la ven todos.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
@@ -11,7 +12,7 @@ const session = useSessionStore()
   <!-- El menú vive en el margen izquierdo del contenedor, fuera de su ancho por
        defecto. .settings-page es la referencia (100cqw) para medir ese margen. -->
   <div class="settings-page">
-    <v-container class="settings-container pa-4">
+    <v-container :max-width="CONTENT_WIDTH.narrow" class="settings-container pa-4">
       <nav class="settings-rail">
         <v-list nav density="comfortable" class="settings-menu border rounded">
           <v-list-item

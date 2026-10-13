@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildInventoryTableRows,
   canRemove,
+  compareBoolean,
+  compareOptionalText,
   computeStock,
   isValidQuantity,
   signedQuantity,
@@ -168,6 +171,7 @@ describe('validateProduct', () => {
     minStock: 0,
     satProductCode: '01010101',
     satUnitCode: 'H87',
+    categoryId: null,
   }
 
   it('acepta precio 0, costo vacío y mínimo 0', () => {
@@ -209,5 +213,71 @@ describe('validateProduct', () => {
     expect(validateProduct({ ...valid, satUnitCode: 'X' })).toBe(
       'La clave de unidad del SAT debe tener 2 o 3 caracteres.',
     )
+  })
+})
+
+describe('buildInventoryTableRows', () => {
+  const base = {
+    id: 'p1',
+    name: 'Shampoo',
+    sku: null,
+    price_cents: 12500,
+    is_active: true,
+    category_id: null,
+  }
+
+  it('resuelve la categoría por id y deja null si no tiene o ya no existe', () => {
+    // Un producto con categoría borrada o sin ella debe quedar como "Sin categoría";
+    // si no, la tabla mostraría "undefined" o rompería al ordenar por categoría.
+    const rows = buildInventoryTableRows(
+      [
+        { product: { ...base, id: 'a', category_id: 'c1' }, stock: 3, status: 'ok' },
+        { product: { ...base, id: 'b', category_id: 'borrada' }, stock: 0, status: 'out' },
+        { product: { ...base, id: 'c' }, stock: 1, status: 'low' },
+      ],
+      [{ id: 'c1', name: 'Higiene' }],
+    )
+    expect(rows.map((r) => r.categoryName)).toEqual(['Higiene', null, null])
+  })
+
+  it('conserva precio en centavos, existencia y estado para ordenar por valor', () => {
+    // Ordenar por precio debe usar el entero, no el texto "$125.00"; si se ordenara
+    // el texto, "$1,000.00" quedaría antes que "$250.00".
+    const [row] = buildInventoryTableRows(
+      [{ product: { ...base, is_active: false }, stock: 7, status: 'ok' }],
+      [],
+    )
+    expect(row).toMatchObject({ priceCents: 12500, stock: 7, status: 'ok', isActive: false })
+  })
+
+  it('sin productos regresa una lista vacía', () => {
+    // Un negocio nuevo no tiene productos: la tabla debe poder armarse con 0 filas.
+    expect(buildInventoryTableRows([], [])).toEqual([])
+  })
+})
+
+describe('compareOptionalText', () => {
+  it('ordena sin distinguir mayúsculas ni acentos', () => {
+    // "álamo" y "Bolsa" deben ordenarse como a < b; con un orden por código "á" caería al final.
+    expect(compareOptionalText('álamo', 'Bolsa')).toBeLessThan(0)
+    expect(compareOptionalText('Bolsa', 'álamo')).toBeGreaterThan(0)
+  })
+
+  it('manda los vacíos al final al ordenar ascendente', () => {
+    // Productos sin clave o sin categoría no deben encabezar la lista al ordenar A-Z.
+    expect(['b', null, 'a', ''].sort(compareOptionalText)).toEqual(['a', 'b', null, ''])
+  })
+
+  it('dos vacíos son iguales', () => {
+    // null y "" significan lo mismo ("sin valor"); si no fueran iguales, el orden sería inestable.
+    expect(compareOptionalText(null, '  ')).toBe(0)
+  })
+})
+
+describe('compareBoolean', () => {
+  it('pone inactivos antes que activos al ascender', () => {
+    // Define el orden de la columna Estado; sin esto dependería del texto "true"/"false".
+    expect(compareBoolean(false, true)).toBeLessThan(0)
+    expect(compareBoolean(true, true)).toBe(0)
   })
 })

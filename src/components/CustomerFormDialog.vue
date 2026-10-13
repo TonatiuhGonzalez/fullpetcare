@@ -8,8 +8,10 @@ import { computed, ref, watch } from 'vue'
 
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
+import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerErrors'
 import {
   fiscalReceiverProblems,
+  isValidEmail,
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
@@ -73,6 +75,14 @@ watch(
   },
 )
 
+// Correo vacío se permite; si hay algo, debe tener forma de correo (C1.14).
+const emailRules = [(v: string) => v.trim() === '' || isValidEmail(v) || 'Correo con formato inválido']
+// El rechazo de la base por correo repetido se marca en el propio campo.
+const emailError = ref<string | null>(null)
+watch(email, () => {
+  emailError.value = null
+})
+
 const phoneRules = [(v: string) => v === '' || isValidPhone(v) || 'Debe tener 10 dígitos']
 const rfcRules = [(v: string) => v === '' || isValidRFC(v) || 'RFC con formato inválido']
 const postalCodeRules = [
@@ -85,6 +95,10 @@ function close(): void {
 
 async function handleSubmit(): Promise<void> {
   errorMessage.value = null
+  if (email.value.trim() !== '' && !isValidEmail(email.value)) {
+    errorMessage.value = 'El correo no tiene un formato válido.'
+    return
+  }
   if (props.invoiceRequired) {
     const problems = fiscalReceiverProblems({
       rfc: rfc.value,
@@ -107,7 +121,7 @@ async function handleSubmit(): Promise<void> {
       first_name: firstName.value,
       last_name: lastName.value,
       phone: phone.value || null,
-      email: email.value || null,
+      email: email.value.trim() || null,
       notes: notes.value || null,
       requires_invoice: requiresInvoice.value,
       rfc: requiresInvoice.value ? rfc.value || null : null,
@@ -123,8 +137,9 @@ async function handleSubmit(): Promise<void> {
 
     emit('saved', saved)
     close()
-  } catch {
-    errorMessage.value = 'No se pudo guardar el cliente. Revisa tu conexión.'
+  } catch (e) {
+    errorMessage.value = customerSaveErrorMessage(e)
+    if (isEmailTakenError(e)) emailError.value = errorMessage.value
   } finally {
     saving.value = false
   }
@@ -158,7 +173,13 @@ async function handleSubmit(): Promise<void> {
           </v-row>
 
           <v-text-field v-model="phone" label="Teléfono" :rules="phoneRules" />
-          <v-text-field v-model="email" label="Correo" type="email" />
+          <v-text-field
+            v-model="email"
+            label="Correo"
+            type="email"
+            :rules="emailRules"
+            :error-messages="emailError ?? undefined"
+          />
           <v-textarea v-model="notes" label="Notas" rows="2" auto-grow />
 
           <v-checkbox

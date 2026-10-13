@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Superadmins de plataforma (fase 10): lista, alta y baja. Todos tienen los
 // mismos permisos (decisión de la fase). La base impide quitar al último.
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { computed, onMounted, ref } from 'vue'
 
 import * as platformService from '@/services/platform'
@@ -10,11 +12,13 @@ import { useSessionStore } from '@/stores/session'
 import AdminFormDialog from '@/components/AdminFormDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TemporaryPasswordDialog from '@/components/TemporaryPasswordDialog.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 
 const admins = ref<PlatformAdminUser[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 const headers = [
@@ -116,7 +120,9 @@ async function confirmRemove(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
+    <TableSkeleton v-if="isFirstLoad && showSkeleton" :columns="headers.length" />
     <v-data-table
+      v-else-if="!isFirstLoad"
       :headers="headers"
       :items="rows"
       :loading="loading"
@@ -128,7 +134,7 @@ async function confirmRemove(): Promise<void> {
         <v-chip v-if="item.isMe" size="x-small" class="ml-2" variant="tonal">Tú</v-chip>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-btn
+        <IconButton
           icon="mdi-account-remove-outline"
           variant="text"
           size="small"

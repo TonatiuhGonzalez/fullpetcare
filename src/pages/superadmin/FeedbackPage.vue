@@ -4,6 +4,8 @@
 // con su captura si la adjuntó. Un superadmin no pertenece a ningún negocio,
 // así que las fechas se muestran en la zona de la plataforma (Ciudad de México,
 // la misma del alta de empresas, CLAUDE.md §6.8), no en la del navegador.
+import CardSkeleton from '@/components/CardSkeleton.vue'
+import { useFirstLoad } from '@/composables/useFirstLoad'
 import { onMounted, ref } from 'vue'
 
 import { formatDate, formatTime } from '@/lib/datetime'
@@ -15,6 +17,7 @@ const PLATFORM_TIMEZONE = 'America/Mexico_City'
 
 const reports = ref<FeedbackReport[]>([])
 const loading = ref(false)
+const { isFirstLoad, showSkeleton } = useFirstLoad(loading)
 const errorMessage = ref<string | null>(null)
 
 async function load(): Promise<void> {
@@ -59,7 +62,8 @@ async function openScreenshot(report: FeedbackReport): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-progress-linear v-if="loading" indeterminate class="mb-2" />
+    <v-progress-linear v-if="loading && !isFirstLoad" indeterminate class="mb-2" />
+    <CardSkeleton v-if="isFirstLoad && showSkeleton" :count="3" :lines="3" />
 
     <p v-if="!loading && reports.length === 0 && !errorMessage" class="text-medium-emphasis">
       Todavía no hay reportes.

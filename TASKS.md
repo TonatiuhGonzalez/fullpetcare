@@ -1326,6 +1326,94 @@ Seguimiento en HMH Four: proyecto FullPetCare.
   que las ventas libres le caen igual que las demás. **No cubierto:** la fase no tiene un test E2E propio (§9 pide uno
   solo: agendar → atender → cobrar); lo verificado en navegador está en 13.3 a 13.6.
 
+### 13F. Extensión: captura más amigable (aprobada el 2026-10-09; `PLAN.md` D18, punto 6)
+
+Solo interfaz (Vue/Vuetify): sin migración, sin dependencia nueva, sin tocar dinero ni RLS. Cambia la decisión 9
+de arriba: **ahora sí hay atajos de teclado** (F2 y F9).
+
+- [x] **13.8** 🧪 Cuadrícula de productos tocables debajo de la barra de captura: tarjeta con nombre, precio y
+  existencia; un toque suma una pieza; muestra cuántas lleva el ticket. Se filtra en vivo con el mismo campo de
+  captura. Lógica de filtrado pura en `lib/productSearch.ts`. _Verificar:_ test de `filterProducts()` (texto vacío,
+  acentos, por código) y, en el navegador, vender tocando tarjetas.
+  **Reemplazada (2026-10-09):** la cuadrícula única se sustituyó por las dos filas de 13F y 13G (categorías y últimos
+  vendidos, `PosProductTile.vue`). `filterProducts()` y su test existen en `lib/productSearch.ts`.
+- [x] **13.9** Campo único "código de barras o nombre" (reemplaza al autocompletado aparte): Enter con código
+  exacto agrega; si no hay coincidencia exacta, la cuadrícula ya muestra las sugerencias y se avisa. _Verificar:_
+  escanear un código existente, uno inexistente y escribir un nombre parcial.
+- [x] **13.10** Retroalimentación al agregar (se resalta la fila recién agregada), botones − y + en la cantidad, y
+  atajos F2 (ir al campo de captura) y F9 (cobrar). _Verificar:_ en el navegador, con el diálogo de cobro y los
+  demás diálogos cerrados y abiertos (los atajos no deben actuar con un diálogo abierto).
+- [x] **13.11** 📚 Actualizar `CLAUDE.md` §6.5 (descripción del punto de venta) y marcar la extensión terminada.
+  **Hecho 2026-10-09** (con 13G): el campo único existe y la cuadrícula de 13.8 pasó a ser la fila de arriba. **Verificado** en el navegador: nombre parcial (`shampoo` filtra la fila de arriba). **No cubierto en el navegador:** escanear un código exacto y uno inexistente (cubierto solo por los tests de `findBySku`).
+  **Hecho 2026-10-09:** fila resaltada, − y + y atajos F2/F9. **Verificado** en el navegador: fila resaltada al agregar, − deshabilitado en 1, F9 abre el cobro. **No cubierto:** F2, + y − con existencia máxima, y que los atajos no actúen con un diálogo abierto (lo cubre el código, no lo probé).
+  **Hecho 2026-10-09:** cubierto por la 13.18 (`CLAUDE.md` §6.5 describe la captura completa).
+
+**No entra (decidido el 2026-10-09):** chips de categoría (los productos no tienen categoría; sería una migración
+aparte), fotos de producto y escaneo con cámara. Los productos agotados siguen sin aparecer (decisión 2 de la
+tarea 13.4): la cuadrícula muestra los mismos que el catálogo de venta.
+
+### 13G. Extensión: categorías de producto y dos filas en el punto de venta (aprobada el 2026-10-09; `PLAN.md` D18, punto 7)
+
+Reemplaza la cuadrícula única de 13.8. A diferencia de 13F, **sí lleva migración** (`product_categories`) y toca
+Inventario (fase 11). Sin dependencia nueva.
+
+- [x] **13.12** 🧪 Migración aditiva: tabla `product_categories` (`tenant_id`, `name`, `icon`, `is_active`, borrado suave,
+  RLS con el permiso `inventory`, bitácora y `enforce_tenant_writable`) y `products.category_id` (nulo). _Verificar:_
+  test de base con aislamiento entre negocios, permisos por rol, nombre repetido dentro de un negocio y que
+  `category_id` no apunte a una categoría de otro negocio; `db:types` regenerado.
+- [x] **13.13** 🧪 `lib/productCategories.ts`: lista curada de ~24 íconos, agrupación del catálogo por categoría (con la
+  tarjeta "Sin categoría" solo si hay productos sin ella) y orden de "últimos vendidos". _Verificar:_ tests de
+  producto de categoría desactivada, catálogo sin categorías, ventas repetidas del mismo producto y producto vendido
+  que ya no tiene existencia.
+- [x] **13.14** Inventario: diálogo para crear, renombrar, elegir ícono y desactivar categorías, y selector de
+  categoría en el formulario de producto. Desactivar una categoría **no toca sus productos**: pasan a "Sin
+  categoría". _Verificar:_ en el navegador como dueño y como recepción; groomer sin acceso.
+- [x] **13.15** Punto de venta con dos filas: arriba, categorías (tarjeta con ícono arriba y nombre abajo) o, al
+  abrir una, sus productos con botón "Volver" a la derecha; abajo, los últimos productos vendidos. Ambas en una sola
+  fila; la de arriba con scroll horizontal y la de abajo muestra tantas tarjetas como quepan en el ancho. Escribir
+  en el campo de captura reemplaza la fila de arriba por los productos que coinciden. _Verificar:_ en el navegador,
+  con ventana ancha y angosta.
+- [x] **13.16** Consulta de "últimos vendidos" de la sucursal activa (ventas cobradas, más reciente primero).
+  _Verificar:_ test de servicio y, en el navegador, tras vender un producto aparece primero.
+- [x] **13.17** Semilla: categorías de Patitas Felices y asignación a sus productos. _Verificar:_ `db:reset` deja el
+  punto de venta con categorías.
+- [x] **13.18** 📚 Actualizar `CLAUDE.md` (§6.5 punto de venta, §6 tabla nueva) y marcar 13G terminada.
+  **Hecho 2026-10-09:** migración `20261013120000_product_categories.sql`: `product_categories` (nombre, ícono con forma `mdi-…`, `is_active`, borrado suave, RLS con el permiso `inventory`, nombre único por negocio sin importar mayúsculas y solo entre las no ocultas) y `products.category_id` con **llave foránea compuesta** `(tenant_id, category_id)`, para que un producto no pueda apuntar a la categoría de otro negocio. Sin bitácora (`log_change`), igual que `products`. Test nuevo `product-categories-rls.spec.ts` (12 tests). **Verificado:** `db:reset` y `test:db` en verde salvo los mismos 55 de Edge Functions y Storage (§12).
+  **Hecho 2026-10-09:** `lib/productCategories.ts` (24 íconos, `groupByCategory`, `productsInCategory`, `recentlySold`, `validateCategory`) con 18 tests. **Decisiones mías que conviene revisar:** (1) una categoría **sin productos con existencia no aparece** en el punto de venta (no deja vender nada); (2) las categorías se ordenan por nombre y "Sin categoría" va al final; (3) nombre de categoría de máximo 40 caracteres.
+  **Hecho 2026-10-09:** `ProductCategoriesDialog.vue` (crear, renombrar, elegir ícono, desactivar/activar; botón "Categorías" en Inventario solo con `inventory:edit`) y selector "Categoría" en `ProductFormDialog.vue` (muestra también la actual si está desactivada). Store con `saveCategory` y `setCategoryActive` (nombre repetido → mensaje claro); 5 tests. **No cubierto:** probado solo como código y con tests de store; **no abrí Inventario en el navegador**.
+  **Hecho 2026-10-09:** punto de venta con dos filas (`PointOfSalePage.vue` y `PosProductTile.vue`). Arriba: categorías (ícono arriba, nombre abajo) en una fila con scroll horizontal; al abrir una, sus productos y "Volver" a la derecha; al escribir, los productos que coinciden. Abajo: "Últimos vendidos", tantos como quepan (`ResizeObserver`). **Verificado** en el navegador como recepción (Playwright, 1280 y 700 px): categorías con ícono, abrir Juguetes, Volver, búsqueda por nombre, tarjeta "Sin categoría", cobro con F9 y la fila inferior tras vender. **Ajustes 2026-10-09 (a pedido del usuario):** los avisos de captura (existencia insuficiente, código no encontrado, cantidad inválida) salen en un **toast de 3 s** en vez de texto rojo fijo, con el mismo texto; y la categoría abierta ocupa el **primer lugar de la fila** como tarjeta fija y resaltada (solo indica, no se toca; "Volver" sigue a la derecha). Verificado en el navegador: el toast sale, sigue al elegir otro producto y desaparece a los ~3 s. **No cubierto:** el ancho de la fila inferior con muchos vendidos (con 2 productos no se ve el recorte); lector de código real.
+  **Hecho 2026-10-09:** `listRecentlySoldProductIds()` en `services/checkout.ts` (últimas 40 ventas **cobradas** de la sucursal, más reciente primero; las canceladas no cuentan). **Verificado** en el navegador: tras cobrar Pelota y Cepillo aparecen en la fila inferior, y la Cuerda (vendida y agotada, existencia 0) no. Test nuevo en `checkout-service.spec.ts` (2 tests: orden por venta más reciente, y que no cuenta canceladas ni otra sucursal). **No cubierto:** dentro de una misma venta el orden de los productos no está definido.
+  **Hecho 2026-10-09:** `CLAUDE.md` §6.5 agrega el apartado "Captura del punto de venta" (campo único, dos filas, categorías, atajos). **Pendiente:** §1 sigue diciendo "ya construido (fase 13)" sin mencionar las categorías; no lo toqué porque la extensión es parte de esa fase.
+
+**Reemplaza** la tarea 13.8 (cuadrícula única, que queda sin marcar a propósito); 13.9 y 13.10 se conservan y ya están en el código (el campo único, el resaltado, − y +, F2 y F9).
+
+### 13H. Extensión: cambio al pagar de más en efectivo (aprobada el 2026-10-09)
+
+Solo interfaz; sin migración ni dependencia nueva. Decisiones del usuario: se muestra en **el punto de venta y en el
+cobro de citas** (`CheckoutPage` y `AppointmentDialog`), **en vivo en el diálogo y en el ticket**, y un sobrepago que
+no sea en efectivo **avisa y no deja cobrar**.
+
+- [x] **13.20** 🧪 Refuerzo en la base y pantalla de cobro más limpia. **Hecho 2026-10-09.** Migración
+  `20261013130000_checkout_change_rule.sql` (`create or replace` de `app.finalize_sale`): lo pagado de más no puede
+  superar el efectivo recibido, para que una llamada directa a la API no cobre de más a una tarjeta o transferencia
+  (la usan `checkout_appointment()` y `checkout_counter_sale()`). El mensaje se traduce en `checkoutErrors.ts`. Y
+  cuando el monto ya está cubierto (`cart.isCovered`) **se oculta el formulario de agregar pago** (método, monto,
+  "Todo", tipo de tarjeta) en las tres pantallas; al quitar el pago vuelve. **Verificado:** 5 tests de base nuevos
+  (efectivo de más, tarjeta, transferencia, tarjeta + efectivo extra con su borde, y cobro de cita), 2 tests de
+  store y 1 de mensaje; en el navegador (punto de venta): con el monto cubierto el formulario desaparece, al quitar
+  el pago reaparece, y con tarjeta de más sigue oculto con el aviso y "Cobrar" deshabilitado. **No cubierto:**
+  `CheckoutPage` y `AppointmentDialog` en el navegador. **Ojo:** el test de base `delete-customer-pet-rpc.spec.ts >
+  no borra el expediente` falló en 1 de 2 corridas completas idénticas (55 vs 56 fallos); en una base recién
+  reseteada pasa solo. Cuenta filas de expediente de Rocky, que otros tests dejan (el expediente no se borra), así que
+  depende del orden de ejecución; **no lo causa este cambio**, pero conviene arreglarlo.
+- [x] **13.19** 🧪 `lib/paymentChange.ts` (reutiliza la regla de Caja: solo el efectivo da cambio y nunca más del
+  efectivo recibido), `changeCents` y `unpayableExcessCents` en el store del carrito, `PaymentSummary.vue` (reemplaza
+  el "Pagado / Falta" de las tres pantallas) y la línea "Cambio" de `TicketView`. **Hecho 2026-10-09.** Tests: 7 de
+  `paymentChange` y 2 del store. **Verificado** en el navegador (punto de venta): tarjeta por $100 en una cuenta de
+  $79 muestra el aviso y deshabilita "Cobrar"; efectivo por $100 muestra "Cambio a devolver $21.00" y el ticket trae
+  la línea "Cambio $21.00". **No cubierto:** `CheckoutPage` y `AppointmentDialog` no se abrieron en el navegador (usan
+  el mismo componente y el mismo store, pero no los probé); el cambio del ticket se deriva y no se guarda.
+
 ## Fase 14 — Clientes y mascotas: acciones en la tabla y edición directa
 
 **Meta: que en Clientes se edite y se elimine desde la propia tabla, y que el modal de cliente y el de mascota
@@ -1353,8 +1441,9 @@ en curso, completadas, canceladas o no asistidas se conservan como historia, igu
 
 ### 14A. Preparación
 
-- [ ] **14.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D19, 
+- [x] **14.1** 📚 Revisar y aprobar las decisiones de arriba y `PLAN.md` D19, 
   _Verificar:_ el usuario aprobó por escrito; D19 sin "pendiente de aprobación".
+  **Hecho:** D19 dice "aprobada (2026-10-08)"; las tareas 14.2 a 14.6 ya están construidas.
 
 ### 14B. Base de datos
 
@@ -1742,3 +1831,630 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 6. **Vista pública del cliente** en un teléfono: foto grande, cartilla con "1 vacuna vencida / por vencer / al día".
 7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
 8. **Superadmin** con la misma identidad.
+
+## Fase 16 — Acceso del cliente: PWA y cuenta propia (propuesta)
+
+**Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta, trabajo a futuro; no se construye hasta
+que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
+
+### 16A. PWA sobre la vista actual
+
+- [ ] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
+  y aprobar `PLAN.md` D21. _Verificar:_ el usuario aprobó por escrito; D21 sin "propuesta".
+- [ ] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
+  nunca de datos de la mascota. _Verificar:_ Lighthouse "instalable"; en el teléfono se agrega a inicio y abre sin barra
+  del navegador; un token revocado sigue sin mostrar nada aun con caché.
+- [ ] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
+  modo avión se ve el aviso, no datos viejos de otra mascota.
+
+### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
+
+- [ ] **16.4** 📚 Elegir alternativa (Edge Function o Auth con RLS), canal del código y regla de vínculo persona↔cliente.
+- [ ] **16.5** 🧪 Backend del acceso con código de un solo uso (caducidad corta, intentos limitados). _Verificar:_ tests de
+  código caducado, reutilizado, de otro cliente y de otro negocio.
+- [ ] **16.6** Pantalla de entrada del cliente y lista de sus mascotas. _Verificar:_ solo ve las suyas; el DTO sigue en
+  lista blanca (§7.4).
+- [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+
+## Fase 17 — Estados de carga: skeletons y aviso de navegación
+
+**Meta: que mientras llegan los datos se vea la forma de lo que viene (tablas y tarjetas), que navegar desde el menú dé
+señal de que algo está cargando, y que una pantalla que no baja tras un despliegue avise en vez de quedarse muda.**
+Sexta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo ni dependencia nueva.
+**Estado: terminada (2026-10-09).** Decisiones y alternativas en
+`PLAN.md` D22. **Fuera de alcance (decidido el 2026-10-08):** la pantalla en blanco al recargar la página (F5).
+
+### 17A. Preparación
+
+- [x] **17.1** 📚 Revisar y aprobar `PLAN.md` D22; listar las pantallas con spinner suelto o tabla con `:loading`
+  (hoy: 23 spinners y 62 usos de `:loading`; solo Inventario tiene skeleton). _Verificar:_ el usuario aprobó por
+  escrito; D22 sin "propuesta"; la lista de pantallas queda anotada aquí.
+  **Inventario (2026-10-09).** Spinner o barra de carga de datos: `CheckoutPage`, `AttendPage`, `AppointmentDetailPage`,
+  `SaleDetailPage`, `HomePage`, `ReportsPage`, `CashRegisterPage`, `AgendaPage`, `PointOfSalePage`,
+  `BranchesSettingsPage`, `PublicPetPage`; superadmin: `PlansPage`, `ReasonsPage`, `FeedbackPage`, `TenantDetailDialog`;
+  diálogos: `CustomerDetailDialog`, `CustomerEditDialog`, `PetDetailDialog`, `PetEditDialog`, `AppointmentDialog`,
+  `NewAppointmentDialog`, `InvoicePanel`. Tablas con carga de datos: `CustomersPage`, `PetsPanel`, `EmployeesPage`,
+  `CatalogPage`, `CashRegisterPage`, `BranchesSettingsPage`, superadmin (`TenantsPage`, `PlansPage`, `ReasonsPage`,
+  `AdminsPage`). La mayoría de los 62 `:loading` son botones "Guardando…" de formularios y **no se tocan**. Aviso de
+  versión nueva: "Hay una versión nueva de FullPetCare. Recarga la página para continuar." con botón "Recargar".
+
+### 17B. Piezas compartidas
+
+- [x] **17.2** 🧪 Composable `useDelayedLoading` (retraso de ~150 ms antes de mostrar, para que una respuesta rápida no
+  parpadee). _Verificar:_ tests unitarios: respuesta más rápida que el retraso no muestra nada; más lenta sí lo
+  muestra; al terminar se apaga; sin fugas si el componente se desmonta.
+- [x] **17.3** `TableSkeleton`, `CardSkeleton` y `PageSkeleton` sobre `v-skeleton-loader`, con `prefers-reduced-motion`.
+  Documentarlos en `CLAUDE.md` §5.6 al cerrar. _Verificar:_ en navegador, claro y oscuro, sin desborde en móvil de 390 px.
+  **Verificado en navegador (2026-10-09):** con el build de producción y Supabase local (script desechable de Playwright, no se sube), las siluetas se ven en claro y oscuro y en móvil de 390 px **sin desborde horizontal** en Clientes, Inventario, Inicio y Sucursales. El brillo se apaga con `prefers-reduced-motion` (regla en `styles/main.scss`; se revisó el CSS, no se probó con la preferencia activa en el navegador). Están documentados en `CLAUDE.md` §4 y §5.6.
+- [x] **17.4** Barra de progreso global atada al router (aparece pasados ~150 ms, desaparece al terminar o fallar).
+  _Verificar:_ en navegador con la red limitada (Slow 3G) se ve al cambiar de pantalla desde el menú; con red normal no
+  aparece; también en superadmin.
+  **Verificado en navegador (2026-10-09):** con la descarga de pantallas retrasada (700 ms por archivo, **simulada con retraso de peticiones, no con el Slow 3G de DevTools**), la barra aparece al cambiar de pantalla desde el menú en Clientes, Empleados, Inventario, Reportes, Caja, Sucursales y Servicios, y en el superadmin (Motivos, Planes, Administradores y Reportes). Con red normal y la pantalla ya descargada **no aparece**. La barra cubre la **descarga de la pantalla**: si su archivo ya está en caché (Inicio, o la pantalla de entrada del superadmin) no sale, y de ahí en adelante manda la silueta de datos.
+- [x] **17.5** 🧪 Error al bajar una pantalla: función pura en `lib/` que reconoce el fallo de importación dinámica
+  (Chrome, Firefox y Safari) y `router.onError` que muestra el aviso con botón para recargar, una sola vez por sesión
+  de navegación. _Verificar:_ tests unitarios con los tres mensajes y con errores que **no** son de importación;
+  en navegador, simular el fallo (bloquear el archivo de una pantalla) y ver el aviso, sin bucle de recargas.
+  **Verificado en navegador (2026-10-09):** al bloquear los archivos de las pantallas no descargadas, aparece **una sola vez** "Hay una versión nueva de FullPetCare. Recarga la página para continuar." con su botón "Recargar"; un segundo intento no duplica el aviso y no hubo recargas automáticas (0 navegaciones del documento). Tests unitarios en verde.
+
+### 17C. Migración de pantallas
+
+- [x] **17.6** Tablas: primera carga con `TableSkeleton`, recargas conservan las filas y llevan solo la barra fina
+  (Clientes, Mascotas, Empleados, Inventario, ventas y las demás de 17.1). _Verificar:_ en navegador, la tabla no
+  parpadea al recargar y no hay salto de diseño al llegar los datos.
+  **Verificado en navegador (2026-10-09):** con las peticiones retrasadas, Clientes, Empleados, Inventario, Servicios, Caja y Sucursales muestran la silueta **a partir de ~150 ms** (antes no hay nada, no parpadea) y la quitan al llegar los datos. Al buscar en Clientes (recarga) **no sale la silueta** y la tabla no se queda vacía. Salto de diseño al llegar los datos en Clientes, Empleados e Inventario: **CLS = 0.000**. Sucursales e Inventario se migraron en esta fase al patrón (antes: barra suelta y skeleton sin retraso).
+- [x] **17.7** Tarjetas y tableros: Inicio, Reportes y Caja con skeleton de la forma real. _Verificar:_ en navegador,
+  claro y oscuro.
+  **Verificado en navegador (2026-10-09):** Inicio (en claro, oscuro y móvil, con las 2 columnas de la pantalla real), Reportes y Caja muestran su silueta mientras cargan y la quitan al llegar los datos.
+- [x] **17.8** Pantallas de detalle: cobro, atención, venta, cita y los diálogos de cliente y mascota dejan de mostrar
+  un círculo solo. _Verificar:_ en navegador, ninguna se ve vacía mientras carga.
+  **Verificado en navegador (2026-10-09):** cita, atención, cobro y venta muestran su silueta y la quitan al terminar; los diálogos de edición de cliente y de mascota muestran silueta mientras cargan.
+- [x] **17.9** Superadmin y vista pública. _Verificar:_ en navegador; la vista pública en móvil.
+  **Verificado en navegador (2026-10-09):** silueta de datos en Motivos, Planes, Administradores, Reportes y Empresas del superadmin, y en la vista pública con móvil de 390 px (sin desborde).
+
+### 17D. Cierre
+
+- [x] **17.10** 📚 Correr `lint`, `test:unit` y el E2E; actualizar `CLAUDE.md` (§4 estructura y §5.6 piezas
+  compartidas) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-09:** `lint`, `vue-tsc -b` y los 585 tests unitarios en verde; el E2E (agendar → atender → cobrar) pasa. `CLAUDE.md` §4, §5.6 y §1 y `PLAN.md` D22 ("aprobada") quedaron al día.
+  **Qué se puede demostrar:** navegar con la red lenta y ver siluetas en lugar de pantallas vacías, la barra de arriba al cambiar de pantalla, y el aviso de versión nueva si una pantalla no baja tras un despliegue.
+  **Sin cubrir:** Firefox y Safari (solo Chromium), el Slow 3G real de DevTools y la pantalla en blanco al recargar con F5 (fuera de alcance de la fase).
+
+## Correcciones 1 — Observaciones de uso: citas, clientes, empleados e inventario
+
+**Meta: atender las 12 observaciones que salieron de usar el sistema (agendar sin salir de Inicio, cliente y mascota
+en un solo lugar, horarios que avisan en vez de ocultarse, búsquedas sin acentos y validaciones de correo y de fecha).**
+Primera fase de **correcciones** de la **etapa de mejoras** (`CLAUDE.md` §1). Su nombre es "Correcciones 1" y no un
+número porque no agrega producto nuevo: corrige y completa lo ya construido. Sin servicio externo ni dependencia npm
+nueva; sí una **extensión de Postgres** (`unaccent`, aprobada el 2026-10-12).
+
+**Estado: planeada, decisiones y pendientes resueltos con el usuario el 2026-10-12; aún no se construye.** Decisiones y alternativas
+en `PLAN.md` D26. Las tareas se numeran `C1.n` para no chocar con las fases 18 a 23 (propuestas).
+
+### Observaciones y decisiones (acordadas el 2026-10-12)
+
+| #   | Observación                                  | Decisión                                                                                                                                                                                  |
+| --- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Cliente nuevo al crear una cita              | Modal **sobre** el formulario de la cita. Cliente: nombre, apellido y teléfono. **La mascota se da de alta ahí mismo y es obligatoria** (todos sus campos, una a la vez).                  |
+| 2   | Inicio no debe cambiar de vista              | "Nueva cita" y "Llegada sin cita" abren su diálogo **encima de Inicio**; al guardar se queda en Inicio y refresca el resumen. En la Agenda no cambia nada.                                |
+| 3   | Rol en el selector de empleado               | Chip con el rol en español (Dueño, Recepción, Groomer, Veterinario) en cada opción.                                                                                                       |
+| 4   | Horarios: deshabilitar y avisar de traslape  | **Pasado: deshabilitado.** **Ocupado por otra cita del mismo empleado: se puede elegir**, con chip amarillo y advertencia (solo informa, sin tope de minutos, sin confirmación).           |
+| 5   | Clientes: sin dividir cliente/mascota        | Una tabla de clientes con las mascotas como chips; **se quita la pestaña Mascotas**. Al presionar un cliente se abre la página `/app/clientes/:id` (ver "Página de cliente").              |
+| 6   | Mascota al crear un cliente                  | Una sola, **obligatoria**, con todos sus campos, en **todos** los lugares donde se da de alta un cliente (Clientes, nueva cita y punto de venta). Más mascotas se agregan después.        |
+| 7   | Tooltips                                     | En los botones de ícono sin texto (31 hoy, inventario abajo). Solo en navegador de escritorio.                                                                                           |
+| 8   | Inventario como tabla                        | `v-data-table`: Nombre, Clave, Categoría, Precio, Existencia, Estado y Acciones; **todas las columnas de datos ordenables**; paginación igual que `/app/servicios`.                         |
+| 9   | Acciones para empleados                      | Columna "Acciones" en `/app/empleados`: editar, desactivar/activar, eliminar y restablecer contraseña. Con citas programadas no se desactiva ni se elimina (igual que una sucursal).      |
+| 10  | Búsqueda sin acentos                         | En **todos** los buscadores, sin distinguir mayúsculas ("Jose" encuentra "José" y al revés). **Lo resuelve la base**, no el navegador.                                                    |
+| 11  | Validar el correo al registrar un cliente    | Formato **y** que no esté ya registrado en el negocio. Sigue siendo opcional. En alta, edición y punto de venta. Solo se valida **cuando el correo cambia**.                              |
+| 12  | Validar fecha y hora de la cita              | Se rechaza: pasado (**sin tolerancia**), fuera del horario de la sucursal, día cerrado y fin antes del inicio. **Solo al crear y reprogramar.** En el formulario **y** en la base.       |
+
+**Página de cliente (observación 5, acordada el 2026-10-12).** Ruta `/app/clientes/:id`, solo dueño y recepción.
+Solo lectura, con un botón "Editar" que edita **cliente y mascota**. Layout en dos filas:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Cliente: nombre, teléfono, correo, notas, datos fiscales  [Editar]   │
+├────────────────────┬──────────────────────┬─────────────────────────┤
+│ Mascotas           │ Información de la    │ Cartilla de vacunación  │
+│ (tarjetas)         │ mascota elegida      │ (tabla del catálogo)    │
+│ + Agregar mascota  │ (+ gráfica de peso   │ + Registrar vacuna      │
+│                    │  y link compartir)   │                         │
+└────────────────────┴──────────────────────┴─────────────────────────┘
+```
+
+En móvil todo son tarjetas, una debajo de otra. La gráfica de peso y el link para compartir **se conservan**, dentro
+de la información de la mascota. Las acciones de editar y eliminar del cliente **se quedan en la tabla**.
+
+**Pendientes resueltos el 2026-10-12** (alternativas en `PLAN.md` D26):
+
+1. **Llegada sin cita:** el traslape **avisa** y el trabajador decide si lo acepta o no; el aviso dice que ya hay una
+   cita y que aceptar puede alterar la cronología de eventos. Pide una **confirmación** (a diferencia de agendar, donde
+   el aviso es solo visual). Su ventana de "pasado" de 10 minutos no cambia.
+2. **Reprogramar:** también permite el traslape con aviso, igual que agendar.
+3. **Horarios fuera del horario laboral:** no se muestran (como hoy). Solo los pasados y los ocupados del horario de la
+   sucursal aparecen deshabilitados o en amarillo.
+4. **Eliminar mascota:** desde su tarjeta en la página de cliente.
+5. **Botón "Editar" de la página de cliente:** abre los modales de cliente y de mascota que ya existen.
+6. **Empleados:** la fila deja de abrir el formulario al presionarla; se edita con el ícono (como Clientes, fase 14).
+7. **Restablecer contraseña de un empleado:** temporal, que se muestra una sola vez, con cambio obligatorio (como los
+   dueños, §7.6).
+
+**Avance de la ola 1 (2026-10-12).** Construida en cinco ramas desde `develop` y probada junta en
+`integration/c1-wave1` (sin push ni PR): `feat/c1-palette-and-availability` (C1.8, C1.9), `feat/c1-inventory-table`
+(C1.17), `feat/c1-employee-password-reset` (C1.7), `feat/c1-db-rules` (C1.2 a C1.6 y la reactivación de empleados,
+D26 punto 8) y `feat/c1-customer-page` (C1.15, C1.16). **Verificado en la rama combinada:** `vue-tsc -b` limpio, 619
+tests unitarios en verde, ESLint sin errores en lo tocado, `db:reset` con todas las migraciones y la semilla, y
+`test:db` con las Edge Functions sirviéndose: 822 pasan y 1 falla, el que ya fallaba en `develop`
+(`delete-customer-pet-rpc`: cuenta expediente de Rocky y crece con lo que dejan otros tests). Los tests de la función de
+reset de contraseña (11) y de reactivación (8) pasan. **Verificado en navegador** (Chromium, dueño, recepción y groomer,
+datos de la semilla): inventario en tabla, orden de las columnas de datos, paginación, búsqueda y menú de acciones;
+tabla de clientes con chips, la fila abre la página, los botones no navegan, "Cliente no encontrado", recepción sin
+"Registrar vacuna", el groomer no entra, y 390 px sin desborde de la página. **No verificado:** cliente con 0 y con 3
+mascotas (la semilla trae clientes con 1 y 2), tema oscuro, Firefox y Safari, el E2E completo (C1.21), y a 1100 px la
+tarjeta de la cartilla se desplaza unos píxeles en horizontal. Los íconos salieron como cuadros en las capturas por la
+fuente de íconos del navegador desechable, no por estos cambios.
+
+**Avance de la ola 2 (2026-10-12).** Tres flujos desde `develop` sobre un módulo compartido
+(`lib/appointmentErrors.ts`: mensajes de las reglas de horario y texto del aviso de traslape), integrados en
+`feat/corrections-1-wave-2`: C1.10 y C1.12 (formulario de cita, llegada sin cita e Inicio), C1.13 (reprogramar) y
+C1.18 (acciones de empleados). **Verificado en la rama combinada:** `vue-tsc -b` limpio, 666 tests unitarios y ESLint
+en verde; con la base reseteada y las funciones sirviéndose, `test:db` 823 de 823 y el E2E pasa. **Verificado en
+navegador** (Chromium, dueño; 22 comprobaciones): Inicio abre "Nueva cita" y "Llegada sin cita" sin cambiar de vista;
+chip de rol en cada empleado; hoy los horarios pasados salen deshabilitados y la fecha no deja elegir días pasados;
+un horario que se traslapa sale en amarillo, es elegible, avisa con las horas de la otra cita y la base lo acepta;
+reagendar rechaza ayer, 23:00 y un domingo con su mensaje y deshabilita Guardar; empleados: columna Acciones, la fila
+ya no abre el formulario, el dueño no ofrece eliminar ni restablecer, eliminar y restablecer piden confirmación, y
+desactivar a quien tiene una cita programada se bloquea y explica por qué. **Defectos que solo se vieron en el
+navegador y ya se corrigieron:** el chip amarillo salía gris hasta elegirlo (Vuetify ignora `color` en un chip de un
+grupo no seleccionado; ahora va por clase propia, con test de regresión) y los cuatro íconos de Acciones se partían en
+dos filas. **No verificado:** el resultado de eliminar o restablecer contraseña hasta el final desde la pantalla (solo
+la confirmación; la función y la RPC tienen sus propios tests), la casilla de llegada sin cita con espera real,
+reagendar con traslape visto en pantalla, tema oscuro, móvil, Firefox y Safari.
+
+**Decisión abierta (llegada sin cita):** la lógica de espera siempre elige un hueco libre, así que no había un
+traslape que confirmar. El flujo agregó la casilla "Atender ahora de todos modos (se encima con una cita)" para el
+empleado con espera; si se marca, la visita empieza ya y se pide confirmar. Falta que el usuario la valide.
+
+**Hueco conocido en la base:** desactivar al último dueño activo no lo rechaza ninguna regla (solo la interfaz).
+
+**Piezas que aún nadie usa (a propósito):** el token `overlap` de la paleta, `computeSlotStatuses` de
+`lib/availability.ts` y las RPC `create_customer_with_pet`, `search_customers`, `search_pets`, `search_products` y
+`delete_employee`; se conectan en C1.10 a C1.14, C1.18 y C1.20.
+
+### C1A. Preparación
+
+- [x] **C1.1** 📚 Revisar y aprobar `PLAN.md` D26 y resolver los pendientes de arriba. _Verificar:_ el usuario aprobó por
+  escrito; D26 sin "propuesta" ni "pendiente".
+  **Hecho 2026-10-12:** el usuario aprobó D26 por escrito. Las 12 observaciones quedaron en el backlog del proyecto
+  FullPetCare del sistema de seguimiento, sin asignación y sin etiquetas: #2309 (1, cliente nuevo en la cita), #2310
+  (2, quedarse en Inicio), #2311 (3, puesto del trabajador), #2312 (4, horarios y traslape), #2313 (5, vista de
+  cliente), #2314 (6, mascota al alta), #2315 (7, mensajes de ayuda), #2316 (8, inventario en tabla), #2317 (9,
+  empleados), #2318 (10, búsqueda sin acentos), #2319 (11, correo) y #2320 (12, fecha y hora).
+
+### C1B. Base de datos (migraciones aditivas; ninguna editada, §8.1)
+
+- [x] **C1.2** 🧪 Reglas de fecha y hora y traslape en `create_appointment()` y `reschedule_appointment()`
+  (`CREATE OR REPLACE`, migración nueva). **Se quita** el rechazo "Este empleado ya tiene una cita en ese horario" y
+  **se agregan**: inicio en el pasado (sin tolerancia, contra `now()` de la base), fin ≤ inicio, día cerrado y fuera del
+  horario de la sucursal (en su zona IANA, §8.3). Se conservan membresía, rol que atiende y snapshots. _Verificar:_ test
+  de base por cada regla y por sus bordes (empieza este mismo minuto, termina justo al cierre, empieza justo a la
+  apertura, una cita termina cuando otra empieza, Tijuana y Mérida); hoy `appointments-service.spec.ts` espera que el
+  traslape se rechace y **cambia de sentido**. Revisar que la semilla, `demo:reset` y los tests existentes no agenden en el
+  pasado por la RPC. **Ojo:** `create_walk_in_appointment()` llama a `create_appointment()`: el traslape tampoco se
+  rechaza ahí (la confirmación es de la interfaz, C1.10), pero **conserva su ventana de pasado de 10 minutos**, que no
+  debe heredar la regla "sin tolerancia"; su test de traslape cambia de sentido.
+- [x] **C1.3** 🧪 Correo único por negocio: trigger `BEFORE INSERT OR UPDATE OF email` en `customers` que rechaza un
+  correo ya usado por otro cliente **no eliminado** del mismo negocio, sin distinguir mayúsculas ni espacios, **solo si
+  el correo cambia** (los duplicados que ya existen no bloquean otras ediciones). Con índice sobre `lower(email)` para
+  que no sea una búsqueda lenta. _Verificar:_ test de base: duplicado en alta y en edición, mayúsculas, cliente eliminado
+  (se puede reusar), otro negocio (se puede), editar el teléfono de un cliente con correo ya duplicado (pasa), y un
+  correo vacío o nulo (nunca choca).
+- [x] **C1.4** 🧪 RPC `create_customer_with_pet()`: da de alta el cliente **y** su mascota en una sola transacción
+  (`SECURITY DEFINER`, revalida membresía y rol dueño o recepción, §7.3.4). _Verificar:_ test de base: si la mascota es
+  inválida **no queda el cliente**; groomer, vet y otro negocio rechazados; el correo repetido (C1.3) la hace fallar
+  completa.
+- [x] **C1.5** 🧪 Búsqueda sin acentos: `CREATE EXTENSION unaccent` (esquema `extensions`), función `app.search_norm()`
+  (`IMMUTABLE`, minúsculas y sin acentos) y RPC `search_customers()`, `search_pets()` y `search_products()` con la
+  seguridad de quien llama (RLS), que respetan el criterio de hoy de cada pantalla. _Verificar:_ test de base: "jose"
+  encuentra "José", "JOSÉ" encuentra "jose", la ñ no se confunde con la n, otro negocio no aparece, un cliente eliminado
+  no aparece y el término vacío devuelve todo.
+- [x] **C1.6** 🧪 Empleados: RPC `delete_employee()` (borrado suave de la membresía y de sus sucursales, revalida
+  `employees:edit`, no se puede eliminar a uno mismo ni al último dueño) y un trigger que **impide desactivar o eliminar**
+  a quien tiene citas programadas. _Verificar:_ test de base: con y sin citas programadas, citas completadas (no
+  bloquean), uno mismo, último dueño, recepción sin permiso y otro negocio.
+  **Pendiente acordado el 2026-10-12 (PLAN D26 punto 8):** que volver a dar de alta a un empleado eliminado
+  **reactive** su membresía en vez de rechazarla con "Esta persona ya tiene acceso" (hoy `create_employee_membership`
+  la rechaza porque `unique (tenant_id, user_id)` incluye las eliminadas). Test: alta, eliminar, alta otra vez.
+
+### C1C. Edge Function
+
+- [x] **C1.7** 🧪 Restablecer la contraseña de un empleado desde `invite-employee` (solo `employees:edit`; se revalida
+  con el JWT de quien llama **antes** de usar `service_role`, igual que el alta). _Verificar:_ test de función
+  (`*-function.spec.ts`): dueño sí; recepción sin permiso y otro negocio no; la contraseña no se guarda ni se registra
+  en ningún lado; queda en la bitácora; cierra las sesiones del empleado, y su perfil queda con cambio de contraseña obligatorio (§7.6: hoy los empleados
+  quedan fuera de ese mecanismo; se amplía solo para este restablecimiento).
+
+### C1D. Interfaz
+
+- [x] **C1.8** Paleta: un color de **aviso de traslape** (amarillo, distinto del naranja de estética y del `warning`
+  actual) con su `on-*`, en claro y oscuro, en `lib/palette.ts` y registrado en `plugins/vuetify.ts`. El usuario
+  revisará los valores después. _Verificar:_ `lib/palette.spec.ts` (contraste AA 4.5:1 en ambos temas) en verde; el color
+  nunca va solo: lleva ícono y texto (§5.6).
+- [x] **C1.9** 🧪 `lib/availability.ts`: en vez de **omitir** los huecos ocupados, devuelve **todos** con un estado
+  (`free`, `overlap` y `past`; lo que cae fuera del horario de la sucursal sigue sin mostrarse) y, para `overlap`, con
+  qué cita choca. Recibe
+  la hora actual **de la sucursal** como argumento (sigue siendo pura, sin reloj). _Verificar:_ tests unitarios: hueco
+  pasado, de hoy a media hora, traslape parcial por minutos, traslape total, citas de otro empleado (no cuentan),
+  cita que termina cuando otro empieza (no traslapa), día cerrado y duración 0.
+- [x] **C1.10** Selector de horarios y empleado en `NewAppointmentDialog`/`TimeSlotPicker`: chips `past` deshabilitados,
+  `overlap` en amarillo con ícono y el aviso "Este horario se traslapa con la cita de las 10:00 a las 10:45" al elegirlo;
+  la fecha no permite días pasados; cada empleado con su chip de rol; el mensaje de error al guardar distingue pasado,
+  fuera de horario y día cerrado. **Llegada sin cita (`WalkInDialog`):** al elegir un hueco que se traslapa, avisa que
+  ya hay una cita y que aceptar puede alterar la cronología, y pide **confirmar** o elegir otro. _Verificar:_ en navegador, claro y oscuro, escritorio y móvil de 390 px; test del
+  componente `TimeSlotPicker` (ya existe `TimeSlotPicker.spec.ts`).
+- [x] **C1.11** Alta de cliente con su mascota (modal): componente nuevo que usa `create_customer_with_pet()`; se abre
+  sobre la nueva cita y la deja con el cliente y la mascota ya elegidos. Se usa también en Clientes y en el punto de
+  venta (que hoy usa `CustomerFormDialog`). _Verificar:_ en navegador: sin mascota no deja guardar; correo repetido
+  avisa; tras guardar, la cita queda lista para elegir servicios.
+- [x] **C1.12** Inicio: `NewAppointmentDialog` y `WalkInDialog` se montan en `HomePage`; al guardar se queda en Inicio y
+  recarga el resumen. Los diálogos leen sucursal y fecha de `stores/agenda`, que hoy solo inicializa la Agenda: Inicio
+  debe inicializarla (o recibirlas por props). Se retira el `?accion=` que ya nadie usa. _Verificar:_ en navegador, como
+  dueño y recepción: la URL no cambia de `/app/inicio` y el contador "por cobrar" se actualiza; groomer y vet no ven los
+  botones.
+- [x] **C1.13** Reprogramar (`AppointmentDialog`, `AppointmentDetailPage`): fecha mínima hoy y las mismas reglas y
+  avisos que agendar. _Verificar:_ en navegador: pasado, fuera de horario y día cerrado se rechazan con mensaje claro.
+- [x] **C1.14** Correo: `isValidEmail` y mensaje "Este correo ya está registrado" en alta, edición y punto de venta;
+  el error de la base se traduce a ese mensaje (§5.4). _Verificar:_ en navegador; el correo vacío sigue permitido.
+- [x] **C1.15** Clientes: una sola tabla (Nombre, Teléfono, Correo, **Mascotas** como chips con el ícono de su especie,
+  Acciones); se retira la pestaña Mascotas (`PetsPanel.vue` se conserva sin uso, como acordó D19) y la fila abre la
+  página del cliente. **Revierte la decisión 2 de la fase 14** ("la fila no abre nada"). _Verificar:_ en navegador
+  como dueño y recepción; groomer y vet siguen sin entrar.
+- [x] **C1.16** Página de cliente `/app/clientes/:id` con el layout de arriba, mascota elegida, cartilla y "+ Agregar
+  mascota", "Editar" que abre `CustomerEditDialog` y `PetEditDialog`, eliminar mascota desde su tarjeta (con
+  `ConfirmDeleteDialog`), reutilizando lo de `PetEditDialog` (gráfica de peso, compartir, cartilla) sin duplicarlo. _Verificar:_ en
+  navegador: cliente con 0, 1 y 3 mascotas, en claro y oscuro y en móvil sin desborde; un id de otro negocio muestra
+  "no encontrado" (RLS).
+- [x] **C1.17** Inventario en tabla: `v-data-table` con las columnas de la decisión 8, todas ordenables y paginación
+  como `/app/servicios` (10/25/50/100/Todos); el menú de acciones (compra, ajuste, editar, activar) se conserva; con
+  `TableSkeleton` en la primera carga (§5.6). _Verificar:_ en navegador: ordenar cada columna, paginar, buscar, sin
+  salto de diseño (CLS ≈ 0).
+- [x] **C1.18** Empleados: columna "Acciones" con editar, desactivar/activar, eliminar y restablecer contraseña,
+  confirmación en las destructivas y la contraseña temporal mostrada **una sola vez** (`TemporaryPasswordDialog` ya
+  existe); la fila deja de abrir el formulario. _Verificar:_ en navegador como dueño; con citas programadas el desactivar y el eliminar explican por qué no.
+- [x] **C1.19** Tooltips: pieza compartida sobre `v-tooltip` (el texto sirve también de `aria-label`; hoy 6 botones no
+  tienen ninguno) y migración de los 31 botones de abajo. Solo con puntero (`hover: hover`), no en táctil. _Verificar:_ en
+  navegador, cada uno muestra su texto al pasar el mouse y con el teclado (foco); en móvil no estorba.
+- [x] **C1.20** Conectar los buscadores a la base (`search_customers`, `search_pets`, `search_products`): Clientes,
+  mascotas, nueva cita, llegada sin cita, Inventario, punto de venta y empresas del superadmin. Se conserva el escáner de
+  código de barras (coincidencia exacta de `sku`). _Verificar:_ en navegador, en cada pantalla, "jose" encuentra "José";
+  los tests existentes de `lib/petSearch.ts`, `lib/productSearch.ts` y `services/customers.ts` se actualizan o se retiran
+  con su código.
+
+### C1E. Cierre
+
+- [x] **C1.21** 🧪 Semilla y `demo:reset` (un cliente con correo repetido **no**; citas con horas válidas), E2E (agendar →
+  atender → cobrar) revisado porque ahora el pasado se rechaza: el flujo debe agendar **a una hora futura**, aunque se
+  corra tarde. Correr `lint`, `vue-tsc -b`, `test:unit`, `test:db` y `test:e2e`. _Verificar:_ todo en verde.
+  **Hecho 2026-10-12** (rama `feat/c1-customer-with-pet`): `db:reset` aplica las 9 migraciones nuevas y la semilla sin
+  chocar con la regla del correo; `lint`, `vue-tsc`, `test:unit` (676) y `test:e2e` en verde (el E2E ya agendaba al
+  siguiente día hábil). `test:db`: 824 pasan; fallan `delete-customer-pet-rpc` (intermitente de siempre) y los tests de
+  Storage (`storage-rls`, `employee-documents-rls`, `feedback-service`) con `42P10` al subir archivos: la migración 72 del
+  contenedor de Storage de la CLI local quitó el índice único que su versión 1.73.1 usa en `ON CONFLICT`; es del
+  entorno local tras el `db:reset`, no de estos cambios (el CI, con base nueva, los corre en verde).
+- [x] **C1.22** 📚 Actualizar `CLAUDE.md` (§1 fase construida; §5.6 tooltips y color de aviso; §6.2 Clientes y la página
+  de cliente; §6.3 el traslape ya no se rechaza; §7.6 (los empleados ahora entran en la contraseña temporal obligatoria al restablecerse); §3 la extensión
+  `unaccent`; §4 estructura) y marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+### Inventario de tooltips (C1.19, propuesta del 2026-10-12)
+
+31 botones con solo ícono (revisados en `src/`; los demás ya llevan texto). Texto propuesto:
+
+| Pantalla o componente            | Botones                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `AppLayout`                      | Ayuda → "Ayuda"; botón flotante de venta de mostrador → "Venta de mostrador"                                              |
+| `AgendaPage`                     | Flechas del día → "Día anterior" y "Día siguiente"                                                                         |
+| `CustomersPage`                  | Lápiz → "Editar cliente"; bote → "Eliminar cliente"                                                                        |
+| `PetsPanel`                      | Lápiz → "Editar mascota"; bote → "Eliminar mascota" (queda sin uso con C1.15; se migra por si se reutiliza)                |
+| `CatalogPage`                    | Lápiz → "Editar servicio"; bote → "Eliminar servicio"                                                                      |
+| `InventoryPage`                  | Tres puntos → "Acciones del producto"                                                                                      |
+| `ProductCategoriesDialog`        | Lápiz → "Editar categoría"                                                                                                 |
+| `AppointmentDialog` (cobro)      | Quitar pago → "Quitar pago"; agregar pago → "Agregar pago"                                                                 |
+| `CheckoutPage`                   | Quitar producto, agregar producto, quitar pago y agregar pago (4)                                                          |
+| `AppointmentProductsPanel`       | Quitar producto → "Quitar producto"; agregar → "Agregar producto"                                                          |
+| `PointOfSalePage`                | Menos → "Quitar una pieza"; más → "Agregar una pieza"; bote → "Quitar producto"; cerrar → "Quitar pago"; más → "Agregar pago" |
+| Diálogos de cliente y de mascota | Cerrar → "Cerrar" (`CustomerDetailDialog`, `CustomerEditDialog`, `PetDetailDialog`, `PetEditDialog`, `TenantDetailDialog`) |
+| Superadmin                       | `AdminsPage` → "Quitar superadmin"; `PlansPage` y `ReasonsPage` → "Renombrar"                                              |
+
+## Fase 18 — Suscripción modular: motor de derechos (planeada)
+
+**Meta: que lo que una empresa puede usar dependa de los módulos que contrató, y que lo imponga la base y no solo la
+interfaz.** Séptima fase de la **etapa de mejoras** (`CLAUDE.md` §1) y primera del release de suscripciones (fases 18 a
+21). **Estado: planeación aprobada el 2026-10-09; aún no se trabaja (sin fecha).** Decisiones y alternativas
+en `PLAN.md` D23. Sin servicio externo ni dependencia nueva; **no incluye precios ni cobro** (fases 19 a 21).
+
+### 18A. Preparación
+
+- [ ] **18.1** 📚 Revisar `PLAN.md` D23 (ya decidido: base y módulos, Punto de venta depende de Inventario, 1 sucursal y
+  3 empleados incluidos) y darla por vigente al arrancar. _Verificar:_ el usuario aprobó por escrito; D23 sin "propuesta"; la lista de
+  módulos y de tablas por módulo queda anotada aquí.
+- [ ] **18.2** 📚 Inventariar qué tablas, RPC, rutas y entradas de menú pertenecen a cada módulo. _Verificar:_ la lista
+  cubre toda tabla con `tenant_id` que no sea base; las que no encajan se discuten antes de seguir.
+
+### 18B. Base de datos
+
+- [ ] **18.3** 🧪 Migración aditiva: catálogo de módulos y derechos por empresa (con RLS, `tenant_id`, borrado suave y
+  `enforce_tenant_writable`, §6 y §7.3). Las empresas existentes reciben **todos** los módulos para no quitarle nada a
+  nadie. _Verificar:_ test de aislamiento; una empresa nueva y una existente quedan con los derechos esperados.
+- [ ] **18.4** 🧪 `app.has_module()` y `app.within_limit()` (`STABLE`, revalidan membresía). _Verificar:_ tests con
+  módulo activo, apagado, empresa en solo lectura y usuario de otra empresa.
+- [ ] **18.5** 🧪 Restricción de "al menos Estética o Veterinaria". _Verificar:_ intentar apagar el último falla en la
+  base aunque se haga por la API directa.
+- [ ] **18.6** 🧪 Políticas y RPC de cada módulo exigen su derecho para **escribir**; la lectura de datos existentes se
+  conserva (expediente clínico siempre legible, §8.5). _Verificar:_ por módulo, un test de "sin módulo no escribe" y otro
+  de "sin módulo sigue leyendo lo ya guardado".
+
+### 18C. Interfaz
+
+- [ ] **18.7** Store de derechos y `lib/entitlements.ts` (función pura: de derechos a menú y rutas permitidas).
+  _Verificar:_ tests unitarios; un módulo apagado no aparece en el menú ni abre por URL directa.
+- [ ] **18.8** Pantallas con módulo apagado: estética o veterinaria ausentes en agenda, citas y servicios; mensaje
+  "No incluido en tu plan" en rutas bloqueadas. _Verificar:_ en navegador con una empresa solo veterinaria y otra solo
+  estética.
+- [ ] **18.9** Superadmin: ver y editar los módulos de una empresa desde su detalle, con bitácora de plataforma.
+  _Verificar:_ el cambio queda en `platform_audit_log`; un no-superadmin no puede.
+
+### 18D. Cierre
+
+- [ ] **18.10** 🧪 Actualizar la semilla y `demo:reset` (un negocio con todos los módulos, otro parcial) y correr
+  `lint`, `test:unit`, `test:db` y el E2E.
+- [ ] **18.11** 📚 Actualizar `CLAUDE.md` (§1, §6.8 "el plan es solo informativo", §7.2 funciones auxiliares) y marcar la
+  fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+> Fases 19 (constructor de planes y precios), 20 (autoservicio del dueño y prueba gratis) y 21 (pago real) se detallan
+> cuando se apruebe la 18; su resumen está en `PLAN.md` D23, punto 7.
+
+## Fase 22 — Recordatorios de citas y vacunas (propuesta)
+
+**Meta: que el cliente reciba un aviso antes de su cita y cuando le toca una vacuna, primero con un toque de una persona
+y después de forma automática.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta (2026-10-09);
+no se construye hasta que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D24. **22A a 22C no necesitan
+servicio externo ni dependencia nueva.** 22D sí (correo o WhatsApp) y se justifica con el usuario antes de empezar (§3).
+
+### 22A. Preparación
+
+- [ ] **22.1** 📚 Revisar `PLAN.md` D24 y decidir: si se aprueba el escalón 1 solo o también el 2, el consentimiento de
+  los clientes ya existentes, la antelación (24 h) y la ventana de envío (08:00 a 21:00). _Verificar:_ el usuario aprobó
+  por escrito; D24 sin "propuesta".
+- [ ] **22.2** 📚 Inventariar de dónde salen los datos: citas (`appointments.starts_at`, estados que sí se recuerdan),
+  vacunas (`vaccinations.next_due_date`), teléfono y correo en `customers`, zona de la sucursal; y confirmar que una
+  visita sin cita (`is_walk_in`) no genera recordatorio. _Verificar:_ la lista queda anotada aquí.
+
+### 22B. Base de datos
+
+- [ ] **22.3** 🧪 Migración aditiva: `customers.accepts_reminders` (`false` por defecto) y `reminders_consent_at`.
+  _Verificar:_ test de que el dueño y recepción lo cambian, el groomer no, y un cliente de otro negocio no se toca.
+- [ ] **22.4** 🧪 Tabla `reminders` con RLS, `tenant_id`, borrado suave, sin política de DELETE y con
+  `enforce_tenant_writable` (§6 y §7.3). Índice único parcial contra duplicados; un `check` exige exactamente un
+  origen (cita o vacuna). Los usuarios solo insertan `manual_whatsapp`. _Verificar:_ test de aislamiento entre negocios;
+  groomer y vet no la ven; insertar dos veces lo mismo falla; un usuario no puede insertar un envío automático.
+- [ ] **22.5** 🧪 `tenant_reminder_settings` y módulo de permisos `reminders` (dueño y recepción ver/editar; groomer y
+  vet nada). _Verificar:_ test de permisos por rol; cambiar una fila cambia el resultado sin tocar código (D13).
+
+### 22C. Escalón 1: lista de recordatorios con envío de un toque
+
+- [ ] **22.6** 🧪 `lib/reminders.ts` (función pura): de citas, vacunas, recordatorios ya hechos, ajustes y fecha a la
+  lista de avisos pendientes, con el texto armado y el teléfono en formato internacional de México. _Verificar:_ tests
+  de bordes: cita a las 00:30 y sucursal en otra zona (Tijuana vista desde Mérida), cita cancelada, visita sin cita,
+  cliente sin teléfono o sin consentimiento, vacuna vencida hace semanas, ya avisado, mensaje sin datos clínicos (§7.4).
+- [ ] **22.7** 🧪 `services/reminders.ts` y store: leer pendientes, registrar el aviso como enviado. _Verificar:_ tests
+  contra Supabase local con sesión real.
+- [ ] **22.8** Casilla "El cliente acepta recibir recordatorios" en `CustomerFormDialog` y `CustomerEditDialog`.
+  _Verificar:_ en navegador, queda guardada y se ve en la ficha.
+- [ ] **22.9** Pantalla `/app/recordatorios` (dueño y recepción; menú y ruta según el permiso): pendientes de hoy y de
+  mañana por sucursal, botón "Enviar por WhatsApp" que abre el chat con el mensaje escrito y registra el aviso.
+  _Verificar:_ en navegador y en móvil de 390 px; el botón no aparece sin teléfono ni consentimiento; avisar dos veces el
+  mismo recordatorio no es posible.
+- [ ] **22.10** Ajustes de recordatorios (antelación, tipos activos, texto del mensaje con variables limitadas) y un
+  bloque en Inicio con los pendientes del día (`stores/home.ts`, §5.6). _Verificar:_ en navegador, solo con permiso.
+
+### 22D. Escalón 2: envío automático (requiere aprobar canal y proveedor)
+
+- [ ] **22.11** 📚 Justificar con el usuario el canal y el proveedor (costo por mensaje, alternativas y contras, §3);
+  dar de alta la cuenta y guardar las llaves solo en las variables de la Edge Function y en GitHub Secrets (§10).
+  _Verificar:_ el usuario eligió por escrito; `.env.example` lleva la variable con valor vacío.
+- [ ] **22.12** 🧪 📚 Edge Function `send-reminders`: solo la invoca el cron o `service_role` (revalida antes de tocar
+  nada), toma pendientes con `for update skip locked`, envía, registra y reintenta hasta 3 veces. **Explicar el
+  proveedor simulado** (qué es, por qué no es un mock elaborado). _Verificar:_ tests con el simulado: éxito, fallo con
+  reintento, tercer fallo, dos ejecuciones simultáneas sin mensaje doble.
+- [ ] **22.13** 🧪 `app.enqueue_due_reminders()` y trabajo `pg_cron` cada hora, solo para `postgres`/`service_role`.
+  _Verificar:_ correrlo dos veces no duplica; respeta consentimiento y ventana horaria de la sucursal; una cita
+  reprogramada o cancelada descarta su recordatorio pendiente.
+- [ ] **22.14** 🧪 Baja del cliente: enlace en el correo que apaga `accepts_reminders` (token firmado, mismo cuidado que
+  §7.4). La baja por respuesta de WhatsApp queda para una fase posterior. _Verificar:_ token inválido, usado y de otro
+  negocio; tras la baja no se envía nada más.
+- [ ] **22.15** 🧪 El demo nunca manda mensajes reales: local, staging y empresas `is_demo` usan siempre el simulado.
+  _Verificar:_ test que fuerza una empresa `is_demo` con proveedor real configurado y comprueba que no se envía.
+
+### 22E. Cierre
+
+- [ ] **22.16** 🧪 Actualizar la semilla y `demo:reset` (recordatorios de ejemplo para hoy y mañana) y correr `lint`,
+  `test:unit`, `test:db` y el E2E. _Verificar:_ todo en verde; tras `demo:reset` la pantalla muestra datos.
+- [ ] **22.17** 📚 Actualizar `CLAUDE.md` (§1, §4 estructura, §6 tablas nuevas, §6.7 módulo `reminders`, §12 si hay
+  comandos) y marcar la fase; decir qué se puede demostrar. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+## Fase 23 — Importador de clientes y mascotas (propuesta)
+
+**Meta: que un negocio que ya tiene sus clientes en una hoja de cálculo los cargue en minutos y pueda deshacerlo si se
+equivocó.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta (2026-10-09); no se construye hasta que
+el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D25. Sin servicio externo ni dependencia nueva (el lector
+de CSV se escribe a mano). Trabaja mejor después de la fase 22 (usa su columna de consentimiento), pero no depende de ella.
+
+### 23A. Preparación
+
+- [ ] **23.1** 📚 Revisar `PLAN.md` D25 y aprobar la plantilla de columnas. Propuesta: `cliente_nombre`,
+  `cliente_apellido`, `cliente_telefono`, `cliente_correo`, `cliente_notas`, `acepta_recordatorios` (sí/no, opcional),
+  datos fiscales opcionales (`rfc`, `razon_social`, `regimen_fiscal`, `uso_cfdi`, `codigo_postal`), `mascota_nombre`,
+  `mascota_especie`, `mascota_raza`, `mascota_sexo`, `mascota_nacimiento` (AAAA-MM-DD), `mascota_esterilizada` (sí/no),
+  `mascota_notas`. _Verificar:_ el usuario aprobó por escrito; D25 sin "propuesta".
+- [ ] **23.2** 📚 Inventariar los campos obligatorios y los valores permitidos de `customers` y `pets` (especies, sexo,
+  formato de teléfono) y qué hace hoy `validation.ts`. _Verificar:_ la lista queda anotada aquí.
+
+### 23B. Piezas puras (`lib/`)
+
+- [ ] **23.3** 🧪 `lib/csv.ts`: lector de CSV. _Verificar:_ tests de bordes: comillas con comas y saltos de línea
+  adentro, comillas escapadas, BOM al inicio, CRLF, separador `;`, archivo vacío, solo encabezado, fila con menos
+  columnas, acentos y eñes.
+- [ ] **23.4** 🧪 `lib/importCustomers.ts`: de filas y clientes existentes al plan (`crear`, `omitir`, `error` con fila y
+  motivo en español). _Verificar:_ tests de bordes: teléfono con espacios, guiones y `+52`; dos filas del mismo cliente
+  agrupadas; cliente ya existente omitido sin sobrescribir; mascota duplicada; especie desconocida; fecha futura; RFC
+  inválido; más de 1 000 filas; fila sin teléfono ni correo.
+- [ ] **23.5** Plantilla descargable con filas de ejemplo ficticias y la instrucción de guardar como "CSV UTF-8".
+  _Verificar:_ el archivo descargado se abre en Excel y vuelve a leerse en el importador sin errores.
+
+### 23C. Base de datos
+
+- [ ] **23.6** 🧪 Migración aditiva: tabla `import_batches` (RLS, `tenant_id`, `enforce_tenant_writable`, sin DELETE) y
+  `import_batch_id` nullable en `customers` y `pets`. _Verificar:_ test de aislamiento; las filas existentes quedan
+  intactas.
+- [ ] **23.7** 🧪 📚 RPC `import_customers(p_rows jsonb, p_file_name text)` `SECURITY DEFINER`: revalida membresía y rol
+  dueño o recepción en la primera línea, vuelve a validar formato y duplicados, es atómica y tiene tope de 1 000 filas.
+  **Explicar por qué se revalida lo que el navegador ya validó.** _Verificar:_ tests: usuario de otro negocio, groomer
+  rechazado, una fila inválida revierte todo, duplicado omitido, tope excedido, negocio en solo lectura rechazado.
+- [ ] **23.8** 🧪 RPC `undo_import(p_batch_id)`: oculta (borrado suave) lo importado sin citas ni ventas e informa lo que
+  se conserva. _Verificar:_ tests: deshace un lote limpio; conserva un cliente que ya tiene una cita; otro negocio no
+  puede; deshacer dos veces no falla.
+
+### 23D. Interfaz
+
+- [ ] **23.9** `services/importCustomers.ts`: parte el archivo, llama a la RPC y devuelve el resumen. _Verificar:_ test
+  contra Supabase local con sesión real.
+- [ ] **23.10** Diálogo "Importar clientes" en Clientes (dueño y recepción), por pasos: plantilla, subir archivo, vista
+  previa con errores por fila, confirmar y resumen con "Deshacer". _Verificar:_ en navegador con un archivo ficticio de 5
+  filas con errores de cada tipo y otro de 1 000 filas; móvil de 390 px, claro y oscuro; skeleton de carga (fase 17).
+- [ ] **23.11** Lista corta de importaciones recientes con su "Deshacer". _Verificar:_ en navegador, tras deshacer los
+  clientes desaparecen de Clientes y el historial lo refleja.
+
+### 23E. Cierre
+
+- [ ] **23.12** 🧪 Correr `lint`, `test:unit`, `test:db` y el E2E; archivo de ejemplo ficticio en la semilla de pruebas.
+  _Verificar:_ todo en verde, sin datos reales (§11).
+- [ ] **23.13** 📚 Actualizar `CLAUDE.md` (§1, §4 estructura, §6.2 clientes) y marcar la fase; decir qué se puede
+  demostrar. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+
+> Candidatos posteriores, sin fase: importar la cartilla de vacunación (el más pedido), citas e historial, y leer `.xlsx`.
+> También sin fase, por decidir según el primer cliente piloto: pagos reales, paquetes y membresías, comisiones por
+> empleado y la "clínica a fondo" (receta y cartilla imprimibles, desparasitación, lotes y caducidades, fotos antes y
+> después).
+
+## Fase 24 — Ancho del contenido: dos anchos y márgenes que se adaptan al monitor
+
+**Meta: que en pantallas anchas el contenido de listados y tableros aproveche el espacio en vez de dejar cientos de
+píxeles vacíos a los lados, sin estirar los formularios.** Fase de la **etapa de mejoras** (`CLAUDE.md` §1).
+**Estado: construida (2026-10-12), pendiente de PR.** Decisiones y alternativas en `PLAN.md` D27.
+Sin servicio externo ni dependencia nueva; solo interfaz.
+
+### 24A. Preparación
+
+- [x] **24.1** 📚 Confirmar la clasificación de pantallas. **Anchas** (default, `clamp(860px, 75vw, 1440px)`): Inicio,
+  Clientes, página del cliente, Inventario, Empleados, Caja, Reportes, Servicios (catálogo) y las pantallas del
+  superadmin (Empresas, Planes, Motivos, Administradores, Reportes). **Angostas** (860 px): Cobro, Atender cita, Detalle
+  de cita, Detalle de venta y Configuración (`SettingsPage`, que aloja Sucursales, Facturación y Cuenta). **Sin cambio:**
+  Agenda, Punto de venta, vista pública y autenticación. _Verificar:_ el usuario confirma la lista.
+  **Confirmada por el usuario (2026-10-12).**
+
+### 24B. Construcción
+
+- [x] **24.2** `lib/contentWidth.ts` con las dos constantes (`wide` y `narrow`) y su comentario del porqué.
+  _Verificar:_ test unitario de que `wide` empieza en el mismo valor que `narrow` y termina en 1440.
+- [x] **24.3** `plugins/vuetify.ts`: `VContainer.maxWidth` pasa a `wide`. Comprobar que Vuetify acepta `clamp(...)` en
+  esa propiedad; si no, aplicarlo con una clase global en `styles/main.scss`. _Verificar:_ en navegador, el estilo
+  calculado del contenedor en una página ancha.
+  **Verificado (2026-10-12):** `VContainer` acepta `clamp(...)` tal cual; no hizo falta la clase global.
+- [x] **24.4** Pantallas angostas de 24.1 pasan `narrow`. `SettingsPage` conserva su riel en el margen libre.
+  _Verificar:_ en navegador, el riel de Configuración no se mueve respecto a hoy.
+
+### 24C. Cierre
+
+- [x] **24.5** Revisión visual en 1366, 1440, 1920 y 2560 px y en móvil de 390 px, en claro y oscuro: sin desborde
+  horizontal, tablas y tarjetas de Inicio bien repartidas, formularios sin estirarse. _Verificar:_ capturas o
+  anotación aquí de lo observado.
+  **Verificado en navegador (2026-10-12, claro, dueño de Patitas Felices, medido con Playwright desechable):** ancho del
+  contenedor en Inicio, Clientes, Inventario, Empleados, Caja y Reportes = **1025 px a 1366**, **1440 px a 1920** y
+  **1440 px a 2560**; Configuración (Cuenta) = 860 px en los tres. Sin desborde horizontal. **Sin cubrir:** móvil de 390 px
+  y tema oscuro (no cambian: a ese ancho gana el piso de 860 y `100%`), y las pantallas del superadmin.
+- [x] **24.6** 📚 Correr `lint` y `test:unit`; actualizar `CLAUDE.md` (§3 la nota de `VContainer`, §4 `lib/` y §5.6) y
+  marcar la fase. _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-12:** `lint`, `vue-tsc -b` y 680 tests unitarios en verde. **Qué se puede demostrar:** abrir Clientes en un
+  monitor de 1920 px y ver la tabla a 1440 px, y abrir Cuenta o un cobro y ver que siguen en 860 px.
+
+---
+
+## Fase 25 — Calendario de la agenda con la identidad visual del sistema
+
+**Meta: que el calendario de `/app/agenda` se vea como el resto de las pantallas (tarjetas con borde fino, bloques
+ligeros, tipografía de marca, íconos en lugar de emojis) en tema claro y oscuro, sin cambiar lo que hace.** Fase de la
+**etapa de mejoras** (`CLAUDE.md` §1). Tarea de seguimiento: #2325. **Estado: construida (2026-10-12), pendiente de PR.**
+Decisiones y alternativas en `PLAN.md` D28. Sin servicio externo, sin dependencia nueva, sin tocar la base: solo
+interfaz. Alcance elegido por el usuario: propuestas **A** (reskin con tokens) y **B** (marco y barra); la **C**
+(tarjeta que cambia según su alto, tooltip propio, línea de "ahora") queda fuera.
+
+### 25A. Preparación
+
+- [x] **25.1** 📚 Confirmar el alcance: A + B, sin C. _Verificar:_ el usuario lo confirma.
+  **Confirmado por el usuario (2026-10-12).**
+
+### 25B. Piezas puras (`lib/`)
+
+- [x] **25.2** `lib/agendaStatus.ts`: el estado a MOSTRAR de una cita (`scheduled`, `in_progress`, `completed`,
+  `paid`, `cancelled`, `no_show`) con su nombre, su ícono y el color del tema que le toca. Sale de `AgendaPage.vue`,
+  donde hoy vive como tabla de estilos. _Verificar:_ test unitario de que cada estado tiene nombre, ícono y color, y
+  de que dos estados no comparten ícono (el color nunca va solo, §5.6).
+- [x] **25.3** `lib/contrast.ts#blend` (mezcla de dos colores por porcentaje) y un test en `palette.spec.ts`: el texto
+  `on-surface` sobre cada color de estado mezclado al 16 % con `surface` llega a 4.5:1, en claro y en oscuro.
+  _Verificar:_ el test, y el control negativo de siempre (un par que no cumple, falla).
+- [x] **25.4** `CalendarBlock` (`lib/calendarGrid.ts`) cambia de `color`/`textColor` a `status`, `customer`, `pet` y
+  `origin` (`walk_in` | `urgent` | nulo); `text` queda como texto completo para el tooltip. _Verificar:_ `vue-tsc`
+  sin errores.
+
+### 25C. Bloques y encabezados
+
+- [x] **25.5** `calendarEvents.ts`: el bloque lleva la clase de su estado (`ec-status-*`) y se arma con hora, mascota en
+  negritas y cliente, siempre como texto del DOM. **Sin íconos** (decisión del usuario, 2026-10-12: estado, tipo y
+  origen van en el tooltip). _Verificar:_ tests de que el nombre con HTML sigue siendo texto y de que el título no
+  lleva ningún ícono ni emoji.
+- [x] **25.6** `styles/main.scss`: bloque tonal (fondo mezclado con `surface`, borde del color del estado, radio `md`);
+  la franja de tipo conserva su ancho y su filete pasa a usar `surface` en lugar de blanco fijo. _Verificar:_ en
+  navegador, claro y oscuro: la franja y el texto se leen en los seis estados.
+- [x] **25.7** Encabezados: en la línea de tiempo, empleado con avatar de iniciales, nombre y "N citas" del día
+  (`resourceLabelContent`); en la semana, día con tipografía de marca y el "hoy" resaltado. Las variables `--ec-*` se
+  completan en los dos componentes. _Verificar:_ en navegador, el contador cambia al cambiar de día.
+
+### 25D. Marco y barra
+
+- [x] **25.8** `AgendaPage.vue`: calendario, barra y leyenda dentro de una `v-card` con borde (`overflow: hidden`).
+  La barra pasa a un solo bloque: `‹`, `Hoy`, `›` y la fecha escrita ("lunes 12 de octubre"), que abre un selector de
+  fecha (`v-date-picker`) en un menú; el `<input type="date">` nativo desaparece. Groomer y vet conservan solo la
+  etiqueta del rango. _Verificar:_ en navegador, cambiar de día con flechas, con "Hoy" y con el selector.
+- [x] **25.9** Leyenda compacta de una sola fila (estados con su ícono y tipos con `VisitKindChip`); desaparecen
+  `status-dot` y `kind-swatch`. _Verificar:_ en navegador, a 390 px la leyenda hace salto de línea sin desbordar.
+- [x] **25.10** ~~Estado vacío: si el rango no trae citas, un `EmptyState` compacto sobre la cuadrícula.~~
+  **Descartada por el usuario (2026-10-12):** se construyó y se quitó por redundante, la cuadrícula vacía ya lo dice.
+  La Agenda no lleva estado vacío.
+
+### 25E. Cierre
+
+- [x] **25.11** Revisión visual en 1366, 1920 y 390 px, en claro y oscuro, con dueño (línea de tiempo) y con groomer
+  (semana). _Verificar:_ anotación aquí de lo observado.
+  **Verificado en navegador (2026-10-12, Playwright desechable, Patitas Felices):** dueño en línea de tiempo y
+  groomer en semana, en claro y oscuro a 1366 px, y dueño a 390 px sin desborde horizontal. Se ve el bloque tonal con
+  su borde, los íconos de estado, tipo y origen, el encabezado de empleado con su contador, el estado vacío y el
+  selector de fecha (elegir el 20 deja "Martes 20 de octubre"). El estado vacío de 25.10 se vio y se quitó. Se ajustó sobre la marcha: la hora se oculta en la línea
+  de tiempo (no cabía junto a la mascota), el ícono de estado pasó al título, se ocultó la barra vacía de la librería y
+  el selector usa el color de marca. **Sin cubrir:** un bloque `walk_in`/`urgent` y uno cancelado en pantalla (la
+  semilla no los trae; los cubre el test unitario), y las pantallas con varias sucursales.
+- [x] **25.12** 📚 Correr `lint` y `test:unit`; actualizar `CLAUDE.md` (§1, §4 `lib/` y §5.6) y marcar la fase.
+  _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Hecho 2026-10-12:** `lint`, `vue-tsc -b`, 705 tests unitarios y el E2E (agendar → atender → cobrar) en verde. El E2E
+  se ajustó: ya no hay `input[type=date]` en la Agenda (avanza con "Día siguiente") y ubica el bloque por su clase
+  `ec-status-*` en lugar del color en línea. **Qué se puede demostrar:** abrir la Agenda como dueño, ver cada cita
+  como bloque tonal con ícono de estado, elegir el día desde el selector y alternar tema claro y oscuro.

@@ -143,16 +143,25 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
 
   // La cita quedó en OTRO día (ver nextBusinessDay): se lleva la agenda a
   // esa fecha para que el bloque de la cita sea visible y clicable.
-  await page.locator('input[type="date"]').fill(appointmentDate)
+  // La barra de la agenda ya no tiene un input de fecha: se avanza con "Día siguiente"
+  // (1 clic si es mañana, 2 si hoy es sábado y la cita quedó el lunes).
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const [year, month, day] = appointmentDate.split('-').map(Number)
+  const daysAhead = Math.round(
+    (new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000,
+  )
+  for (let i = 0; i < daysAhead; i++) {
+    await page.getByRole('button', { name: 'Día siguiente' }).click()
+  }
 
   // La cita se ubica por su ESTADO, no por su posición: si el test ya corrió
   // antes ese mismo día, la agenda trae citas viejas de Sofía (ya cobradas)
   // y ni el orden del DOM ni "la primera" sirven para distinguir la nueva.
-  // AgendaPage.vue pinta cada bloque con el color de su estado
-  // (rgb(var(--v-theme-warning)) = "En curso"), y ese valor queda en su
-  // estilo en línea. Recién atendida, solo la nuestra está "En curso".
+  // El bloque lleva la clase de su estado (ec-status-in_progress = "En curso",
+  // lib/agendaStatus.ts). Recién atendida, solo la nuestra está "En curso".
   await page
-    .locator('[style*="--v-theme-warning"]')
+    .locator('.ec-status-in_progress')
     .filter({ hasText: 'Sofía Ramírez' })
     .first()
     .click()
@@ -169,9 +178,9 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // 4. Cobrar en efectivo — "Cobrar" desliza al mismo formulario que antes
   // vivía en /cobrar, DENTRO del diálogo (pedido explícito del usuario).
   // Recién terminada la ficha, la nuestra es la única "Completada" sin
-  // cobrar (success); las viejas ya están "Cobradas" (primary).
+  // cobrar (ec-status-completed); las viejas ya están "Cobradas" (ec-status-paid).
   await page
-    .locator('[style*="--v-theme-success"]')
+    .locator('.ec-status-completed')
     .filter({ hasText: 'Sofía Ramírez' })
     .first()
     .click()
@@ -198,10 +207,15 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // 6. El historial de Rocky ve esta visita, con la nota que se acaba de
   // escribir — prueba que services/petHistory.ts (fase 6) refleja la cita
   // recién cobrada, no solo que "algo" se guardó.
-  // La ficha de la mascota es un diálogo (tarea #1968): se abre desde la
-  // pestaña "Mascotas" de Clientes, ya no hay ruta propia. Desde la fase 14 la
-  // fila ya no abre nada: se entra con el lápiz de la columna "Acciones".
-  await page.goto('/app/clientes?tab=mascotas')
-  await page.getByRole('row', { name: /Rocky/ }).getByLabel('Editar mascota').click()
+  // Desde Correcciones 1 ya no hay pestaña "Mascotas": la tabla de clientes
+  // muestra las mascotas como chips y la fila abre la página del cliente
+  // (/app/clientes/:id). Ahí se elige la tarjeta de Rocky y el lápiz de su
+  // información abre la ficha de la mascota, que trae el historial.
+  await page.goto('/app/clientes')
+  const ownerRow = page.getByRole('row').filter({ hasText: 'Rocky' }).first()
+  await ownerRow.getByRole('link').first().click()
+  await page.waitForURL(/\/app\/clientes\/[0-9a-f-]{36}/)
+  await page.locator('.pet-card', { hasText: 'Rocky' }).click()
+  await page.getByLabel('Editar mascota').click()
   await expect(page.getByText(groomerNotes)).toBeVisible()
 })

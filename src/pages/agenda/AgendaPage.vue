@@ -12,21 +12,24 @@
 // (visibleDates) — esta página solo arma los bloques a pintar y elige
 // qué componente mostrar.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { toNaiveLocalIso } from '@/lib/datetime'
 import { isFrontDesk } from '@/lib/roles'
+import { AGENDA_STATUSES, agendaStatusOf, type AgendaStatus } from '@/lib/agendaStatus'
 import { VISIT_KINDS, visitKindInfo } from '@/lib/visitKind'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
 import { listUpcomingVaccines } from '@/services/records'
 import type { UpcomingVaccine } from '@/services/records'
-import type { Appointment, AppointmentStatus } from '@/services/appointments'
+import type { Appointment } from '@/services/appointments'
 import type { CalendarBlock } from '@/lib/calendarGrid'
 import { useAgendaStore } from '@/stores/agenda'
 import { useSessionStore } from '@/stores/session'
+import CalendarSkeleton from '@/components/CalendarSkeleton.vue'
+import VisitKindChip from '@/components/VisitKindChip.vue'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
@@ -34,11 +37,17 @@ import AppointmentDialog from '@/components/AppointmentDialog.vue'
 import PetDetailDialog from '@/components/PetDetailDialog.vue'
 import EmployeeDayScheduler, { type SchedulerRow } from '@/components/EmployeeDayScheduler.vue'
 import EmployeeWeekCalendar from '@/components/EmployeeWeekCalendar.vue'
+import IconButton from '@/components/IconButton.vue'
 
 const session = useSessionStore()
 const agenda = useAgendaStore()
 
 const isFrontDeskView = computed(() => isFrontDesk(session.role))
+// 'idle' cuenta como cargando (ver el comentario sobre el calendario en el template).
+const isAgendaLoading = computed(
+  () => agenda.status === 'loading' || agenda.status === 'idle',
+)
+const showCalendarSkeleton = useDelayedLoading(isAgendaLoading)
 
 const employees = ref<EmployeeSummary[]>([])
 // Vacunas por reforzar, del negocio COMPLETO — no llevan sucursal (una
@@ -59,53 +68,16 @@ const branchTimezone = computed(
   () => session.activeBranches.find((b) => b.id === agenda.activeBranchId)?.timezone ?? 'UTC',
 )
 
-// 'paid' no es un valor de appointments.status (ese enum nunca deja
-// 'completed' — CLAUDE.md §6.3/§8.5) — es un estado SOLO VISUAL para esta
-// página: "completada y además ya tiene una venta que la cubre"
-// (stores/agenda.ts#paidAppointmentIds, calculado aparte con
-// services/checkout.ts#listPaidAppointmentIds). displayStatus() de abajo
-// es la única función que combina ambas cosas.
-type DisplayStatus = AppointmentStatus | 'paid'
-
-const statusLabels: Record<DisplayStatus, string> = {
-  scheduled: 'Agendada',
-  in_progress: 'En curso',
-  completed: 'Completada',
-  paid: 'Cobrada',
-  cancelled: 'Cancelada',
-  no_show: 'No se presentó',
-}
-// El bloque se pinta por ESTADO (¿ya se cobró o canceló?), que es lo que más importa
-// distinguir de un vistazo; el TIPO de visita va aparte, como franja de color e ícono
-// en el propio bloque (components/calendarEvents.ts) — decisión del 2026-10-08
-// (PLAN.md D20). "Agendada" es gris pizarra y no azul, para que el azul quede solo
-// para veterinaria. rgb(var(--v-theme-xxx)) reutiliza la paleta de plugins/vuetify.ts
-// (cambia sola entre claro y oscuro); cada fondo lleva su `on-*` para el texto.
-const statusStyles: Record<DisplayStatus, { bg: string; text: string }> = {
-  scheduled: { bg: 'rgb(var(--v-theme-secondary))', text: 'rgb(var(--v-theme-on-secondary))' },
-  in_progress: { bg: 'rgb(var(--v-theme-warning))', text: 'rgb(var(--v-theme-on-warning))' },
-  completed: { bg: 'rgb(var(--v-theme-success))', text: 'rgb(var(--v-theme-on-success))' },
-  paid: { bg: 'rgb(var(--v-theme-primary))', text: 'rgb(var(--v-theme-on-primary))' },
-  cancelled: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
-  no_show: { bg: 'rgb(var(--v-theme-error))', text: 'rgb(var(--v-theme-on-error))' },
+// El estado que se muestra de una cita (lib/agendaStatus.ts): su estado real, salvo que ya
+// se cobró ('paid' no es un valor de appointments.status, CLAUDE.md §6.3/§8.5; viene de
+// stores/agenda.ts#paidAppointmentIds, calculado aparte con services/checkout.ts).
+function displayStatus(appointment: Appointment): AgendaStatus {
+  return agendaStatusOf(appointment.status, agenda.paidAppointmentIds.has(appointment.id))
 }
 
-/** El estado a MOSTRAR de una cita — como appointment.status, salvo que ya se cobró. */
-function displayStatus(appointment: Appointment): DisplayStatus {
-  if (appointment.status === 'completed' && agenda.paidAppointmentIds.has(appointment.id)) {
-    return 'paid'
-  }
-  return appointment.status
-}
-
-// Para la leyenda de colores del template.
-const statusLegend = computed(() =>
-  (Object.keys(statusLabels) as DisplayStatus[]).map((key) => ({
-    key,
-    label: statusLabels[key],
-    color: statusStyles[key].bg,
-  })),
-)
+// Para la leyenda: los estados y, aparte, los tipos de visita.
+const statusLegend = Object.values(AGENDA_STATUSES)
+const kindLegend = Object.values(VISIT_KINDS)
 
 function employeeName(userId: string): string {
   return employees.value.find((e) => e.userId === userId)?.fullName ?? '(empleado)'
@@ -117,14 +89,14 @@ const schedulerRows = computed<SchedulerRow[]>(() =>
   employees.value.map((e) => ({ id: e.userId, name: e.fullName })),
 )
 
-// Marca de texto al inicio del bloque para las visitas sin cita (tarea
-// #1969): el color ya significa "estado" (statusStyles), así que el origen
-// de la cita va en el texto, sin tocar los componentes del calendario.
-function appointmentBadge(appointment: Appointment): string {
-  if (appointment.is_urgent) return '🚨 Urgente · '
-  if (appointment.is_walk_in) return '🚶 Sin cita · '
-  return ''
+// Origen de la cita (tarea #1969): el bloque lo pinta como ícono; en el tooltip va su texto.
+function appointmentOrigin(appointment: Appointment): CalendarBlock['origin'] {
+  if (appointment.is_urgent) return 'urgent'
+  if (appointment.is_walk_in) return 'walk_in'
+  return null
 }
+
+const ORIGIN_LABELS = { urgent: 'Urgente', walk_in: 'Sin cita' } as const
 
 // Los bloques que pintan EmployeeDayScheduler.vue / EmployeeWeekCalendar.vue
 // — ninguno de los dos sabe nada de citas ni de zonas horarias.
@@ -132,16 +104,28 @@ function appointmentBadge(appointment: Appointment): string {
 // de dársela al calendario (CLAUDE.md §8.3): EventCalendar lee el string
 // sin zona como "hora de pared" del navegador y lo pinta igual.
 const calendarBlocks = computed<CalendarBlock[]>(() =>
-  agenda.appointments.map((appointment) => ({
-    id: appointment.id,
-    start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
-    end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
-    text: `${appointmentBadge(appointment)}${appointment.customerName} · ${appointment.petName} — ${visitKindInfo(appointment.kind).label} · ${employeeName(appointment.employee_user_id)}`,
-    color: statusStyles[displayStatus(appointment)].bg,
-    textColor: statusStyles[displayStatus(appointment)].text,
-    kind: appointment.kind,
-    resource: appointment.employee_user_id,
-  })),
+  agenda.appointments.map((appointment) => {
+    const status = displayStatus(appointment)
+    const origin = appointmentOrigin(appointment)
+    const details = [
+      origin ? ORIGIN_LABELS[origin] : null,
+      visitKindInfo(appointment.kind).label,
+      employeeName(appointment.employee_user_id),
+      AGENDA_STATUSES[status].label,
+    ].filter(Boolean)
+    return {
+      id: appointment.id,
+      start: toNaiveLocalIso(appointment.starts_at, branchTimezone.value),
+      end: toNaiveLocalIso(appointment.ends_at, branchTimezone.value),
+      text: `${appointment.customerName} · ${appointment.petName} — ${details.join(' · ')}`,
+      customer: appointment.customerName,
+      pet: appointment.petName,
+      status,
+      kind: appointment.kind,
+      origin,
+      resource: appointment.employee_user_id,
+    }
+  }),
 )
 
 async function loadEmployees(): Promise<void> {
@@ -170,28 +154,10 @@ async function loadUpcomingVaccines(): Promise<void> {
   upcomingVaccines.value = await listUpcomingVaccines(session.activeTenantId, today)
 }
 
-// Los accesos rápidos de Inicio mandan aquí con `?accion=nueva-cita` o
-// `?accion=llegada-sin-cita` para abrir el diálogo correspondiente. Se limpia la
-// URL enseguida: si no, al recargar la página el diálogo se volvería a abrir.
-const route = useRoute()
-const router = useRouter()
-
-function runRequestedAction(): void {
-  const action = route.query.accion
-  if (!action) return
-  // Solo recepción y dueño agendan; para otros roles el parámetro se ignora.
-  if (isFrontDeskView.value) {
-    if (action === 'nueva-cita') showNewAppointmentDialog.value = true
-    if (action === 'llegada-sin-cita') showWalkInDialog.value = true
-  }
-  router.replace({ query: {} })
-}
-
 onMounted(() => {
   agenda.initFromSession()
   loadEmployees()
   loadUpcomingVaccines()
-  runRequestedAction()
 })
 
 // --- Navegación: SOLO para dueño/recepción. Groomer/vet no tienen
@@ -209,9 +175,34 @@ function shiftDay(deltaDays: number): void {
   agenda.setDate(format(next, 'yyyy-MM-dd'))
 }
 
-function handleDateInput(value: unknown): void {
-  if (typeof value === 'string' && value) agenda.setDate(value)
+// El selector de fecha (v-date-picker) trabaja con Date; la agenda guarda 'YYYY-MM-DD'.
+// Se arma con año, mes y día para que el navegador no la mueva de día por la zona.
+function parseDay(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
 }
+
+const showDateMenu = ref(false)
+const pickedDate = computed<Date | null>({
+  get: () => (agenda.activeDate ? parseDay(agenda.activeDate) : null),
+  set: (value) => {
+    if (!value) return
+    agenda.setDate(format(value, 'yyyy-MM-dd'))
+    showDateMenu.value = false
+  },
+})
+
+// "lunes 12 de octubre" (con año si no es el actual).
+const activeDateLabel = computed(() => {
+  if (!agenda.activeDate) return ''
+  const date = parseDay(agenda.activeDate)
+  const pattern =
+    date.getFullYear() === new Date().getFullYear()
+      ? "EEEE d 'de' MMMM"
+      : "EEEE d 'de' MMMM 'de' yyyy"
+  const text = format(date, pattern, { locale: es })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+})
 
 // Etiqueta informativa para groomer/vet ("8 sep – 14 sep 2026") — no hay
 // controles para cambiarla, solo para ubicarse.
@@ -297,98 +288,100 @@ function handleAppointmentCreated(appointment: Appointment): void {
       </template>
     </PageHeader>
 
-    <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
-    <div class="d-flex align-center flex-wrap ga-2 mb-4">
-      <template v-if="isFrontDeskView">
-        <v-btn icon="mdi-chevron-left" variant="text" size="small" @click="shiftDay(-1)" />
-        <v-text-field
-          :model-value="agenda.activeDate"
-          type="date"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="max-width: 170px"
-          @update:model-value="handleDateInput"
-        />
-        <v-btn icon="mdi-chevron-right" variant="text" size="small" @click="shiftDay(1)" />
-        <v-btn variant="text" size="small" @click="goToday">Hoy</v-btn>
-      </template>
-      <span v-else class="text-body-2 text-medium-emphasis text-capitalize">
-        {{ visibleRangeLabel }}
-      </span>
-    </div>
-
     <v-alert v-if="agenda.errorMessage" type="error" density="compact" variant="tonal" class="mb-4">
       {{ agenda.errorMessage }}
     </v-alert>
 
-    <!-- 'idle' cuenta como "todavía cargando" aquí: es el instante entre
-         el primer render y que onMounted() dispare initFromSession().
-         Sin esto, EmployeeDayScheduler/EmployeeWeekCalendar montaban con
-         agenda.activeDate todavía en null (fecha vacía), y el calendario
-         tronaba tratando de parsear un string vacío como fecha
-         (verificado a mano en el navegador). -->
-    <v-progress-circular
-      v-if="agenda.status === 'loading' || agenda.status === 'idle'"
-      indeterminate
-      color="primary"
-    />
-
-    <!-- El "&& agenda.visibleDates.length > 0" de aquí abajo es la misma
-         protección que agenda.status === 'idle' de arriba, para OTRO
-         momento en el que pasa lo mismo: al cerrar sesión (AppLayout.vue
-         handleLogout), session.logout() limpia session.role y
-         session.activeBranches ANTES de que el router termine de
-         desmontar esta página. Con la sesión ya vacía, isFrontDeskView
-         cambia y Vue monta EmployeeWeekCalendar en vez de
-         EmployeeDayScheduler con agenda.visibleDates ya en [] (depende
-         de session.activeBranches, stores/agenda.ts) — start-date llega
-         vacío y el calendario truena igual que antes. agenda.status se queda
-         en 'ready' en ese instante (el store de agenda no se resetea al
-         cerrar sesión), así que sin este segundo chequeo el de arriba no
-         lo detecta. Verificado a mano: sin esto, el logout deja la URL en
-         /login pero la pantalla congelada hasta hacer F5. -->
-    <template v-else-if="agenda.status === 'ready' && agenda.visibleDates.length > 0">
-      <div class="d-flex flex-wrap ga-3 mb-2">
-        <span
-          v-for="item in statusLegend"
-          :key="item.key"
-          class="d-flex align-center ga-1 text-caption text-medium-emphasis"
-        >
-          <span class="status-dot" :style="{ backgroundColor: item.color }" />
-          {{ item.label }}
-        </span>
-      </div>
-      <!-- Tipo de visita: la franja del bloque y su ícono. -->
-      <div class="d-flex flex-wrap ga-3 mb-2">
-        <span
-          v-for="info in Object.values(VISIT_KINDS)"
-          :key="info.kind"
-          class="d-flex align-center ga-1 text-caption text-medium-emphasis"
-        >
-          <span class="kind-swatch" :style="{ backgroundColor: `rgb(var(--v-theme-${info.color}))` }" />
-          <v-icon :icon="info.icon" size="x-small" />
-          {{ info.label }}
+    <!-- Marco del calendario (PLAN.md D28): barra, leyenda y cuadrícula en una sola tarjeta. -->
+    <v-card class="agenda-card">
+      <!-- Navegación por día (recepción y dueño) o el rango visible (groomer/vet). -->
+      <div class="agenda-toolbar">
+        <template v-if="isFrontDeskView">
+          <div class="d-flex align-center ga-1">
+            <IconButton icon="mdi-chevron-left" aria-label="Día anterior" variant="text" size="small" @click="shiftDay(-1)" />
+            <v-btn variant="tonal" size="small" @click="goToday">Hoy</v-btn>
+            <IconButton icon="mdi-chevron-right" aria-label="Día siguiente" variant="text" size="small" @click="shiftDay(1)" />
+          </div>
+          <v-menu v-model="showDateMenu" :close-on-content-click="false" location="bottom start">
+            <template #activator="{ props: menuProps }">
+              <v-btn
+                v-bind="menuProps"
+                variant="text"
+                append-icon="mdi-calendar-month-outline"
+                class="agenda-date-button"
+                aria-label="Elegir fecha"
+              >
+                {{ activeDateLabel }}
+              </v-btn>
+            </template>
+            <v-date-picker v-model="pickedDate" color="primary" hide-header show-adjacent-months />
+          </v-menu>
+        </template>
+        <span v-else class="text-subtitle-1 font-weight-medium text-capitalize">
+          {{ visibleRangeLabel }}
         </span>
       </div>
 
-      <EmployeeDayScheduler
-        v-if="isFrontDeskView"
-        :date="agenda.activeDate ?? ''"
-        :hour-range="agenda.hourRange"
-        :rows="schedulerRows"
-        :blocks="calendarBlocks"
-        @select="openAppointmentDialog"
+      <!-- 'idle' cuenta como "todavía cargando" aquí: es el instante entre
+           el primer render y que onMounted() dispare initFromSession().
+           Sin esto, EmployeeDayScheduler/EmployeeWeekCalendar montaban con
+           agenda.activeDate todavía en null (fecha vacía), y el calendario
+           tronaba tratando de parsear un string vacío como fecha
+           (verificado a mano en el navegador). -->
+      <CalendarSkeleton
+        v-if="isAgendaLoading && showCalendarSkeleton"
+        :variant="isFrontDeskView ? 'timeline' : 'week'"
       />
-      <EmployeeWeekCalendar
-        v-else
-        :start-date="agenda.visibleDates[0] ?? ''"
-        :days="agenda.visibleDates.length"
-        :hour-range="agenda.hourRange"
-        :blocks="calendarBlocks"
-        @select="openAppointmentDialog"
-      />
-    </template>
+
+      <!-- El "&& agenda.visibleDates.length > 0" de aquí abajo es la misma
+           protección que agenda.status === 'idle' de arriba, para OTRO
+           momento en el que pasa lo mismo: al cerrar sesión (AppLayout.vue
+           handleLogout), session.logout() limpia session.role y
+           session.activeBranches ANTES de que el router termine de
+           desmontar esta página. Con la sesión ya vacía, isFrontDeskView
+           cambia y Vue monta EmployeeWeekCalendar en vez de
+           EmployeeDayScheduler con agenda.visibleDates ya en [] (depende
+           de session.activeBranches, stores/agenda.ts) — start-date llega
+           vacío y el calendario truena igual que antes. agenda.status se queda
+           en 'ready' en ese instante (el store de agenda no se resetea al
+           cerrar sesión), así que sin este segundo chequeo el de arriba no
+           lo detecta. Verificado a mano: sin esto, el logout deja la URL en
+           /login pero la pantalla congelada hasta hacer F5. -->
+      <template v-else-if="agenda.status === 'ready' && agenda.visibleDates.length > 0">
+        <!-- Leyenda en una sola fila: estados (ícono + texto) y tipos de visita. -->
+        <div class="agenda-legend" aria-label="Significado de colores e íconos">
+          <v-chip
+            v-for="item in statusLegend"
+            :key="item.status"
+            size="x-small"
+            variant="tonal"
+            :color="item.color"
+            :prepend-icon="item.icon"
+          >
+            {{ item.label }}
+          </v-chip>
+          <span class="agenda-legend__divider" aria-hidden="true" />
+          <VisitKindChip v-for="info in kindLegend" :key="info.kind" :kind="info.kind" size="x-small" />
+        </div>
+
+        <EmployeeDayScheduler
+          v-if="isFrontDeskView"
+          :date="agenda.activeDate ?? ''"
+          :hour-range="agenda.hourRange"
+          :rows="schedulerRows"
+          :blocks="calendarBlocks"
+          @select="openAppointmentDialog"
+        />
+        <EmployeeWeekCalendar
+          v-else
+          :start-date="agenda.visibleDates[0] ?? ''"
+          :days="agenda.visibleDates.length"
+          :hour-range="agenda.hourRange"
+          :blocks="calendarBlocks"
+          @select="openAppointmentDialog"
+        />
+      </template>
+    </v-card>
 
     <v-card v-if="upcomingVaccines.length > 0" class="pa-4 mt-6">
       <p class="text-subtitle-1 mb-2">Próximas vacunas</p>
@@ -418,24 +411,46 @@ function handleAppointmentCreated(appointment: Appointment): void {
     <AppointmentDialog
       v-model="showAppointmentDialog"
       :appointment-id="selectedAppointmentId"
+      :is-paid="!!selectedAppointmentId && agenda.paidAppointmentIds.has(selectedAppointmentId)"
       @changed="agenda.load()"
     />
   </v-container>
 </template>
 
 <style scoped lang="scss">
-.status-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+// El calendario pinta su propio DOM con esquinas rectas: la tarjeta las recorta.
+.agenda-card {
+  overflow: hidden;
 }
 
-// Muestra de la franja de tipo de visita (la misma forma que en el bloque del calendario).
-.kind-swatch {
-  display: inline-block;
-  width: 4px;
-  height: 14px;
-  border-radius: 2px;
+.agenda-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border-bottom: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+// Primera letra en mayúscula ya viene del texto; sin tope de ancho para que no se corte.
+.agenda-date-button {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.agenda-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+
+  &__divider {
+    width: 1px;
+    height: 16px;
+    margin-inline: 4px;
+    background: rgba(var(--v-border-color), var(--v-border-opacity));
+  }
 }
 </style>

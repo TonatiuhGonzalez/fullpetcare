@@ -7,6 +7,7 @@ import 'vuetify/styles'
 import { createVuetify, type ThemeDefinition } from 'vuetify'
 import { es } from 'vuetify/locale'
 
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import { darkPalette, lightPalette } from '@/lib/palette'
 import { DARK_THEME, LIGHT_THEME } from '@/lib/themeMode'
 
@@ -58,8 +59,9 @@ export const vuetify = createVuetify({
     VTextarea: { rounded: 'md' },
     VAlert: { rounded: 'md' },
     VBtn: { style: 'text-transform: none;', rounded: 'md', elevation: 0 },
-    // Ancho máximo único del contenido de todas las pantallas (centrado por el
-    // propio v-container). Las páginas no ponen su propio max-width.
-    VContainer: { maxWidth: 860 },
+    // Ancho del contenido (PLAN.md D27): por defecto el "ancho" (listados y tableros),
+    // que crece con la ventana hasta 1440 px. Las pantallas de formulario o detalle piden
+    // `CONTENT_WIDTH.narrow`; las páginas no escriben su propio número (lib/contentWidth.ts).
+    VContainer: { maxWidth: CONTENT_WIDTH.wide },
   },
 })

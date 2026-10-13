@@ -6,6 +6,7 @@
 // de CSS (sin librería de gráficas, D11).
 import { computed, onMounted, ref, watch } from 'vue'
 
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { formatMXN } from '@/lib/money'
 import {
   PERIOD_LABELS,
@@ -19,6 +20,7 @@ import {
 import type { BranchRow, DayRow, StaffRow, TopItem } from '@/services/reports'
 import { useReportsStore } from '@/stores/reports'
 import { useSessionStore } from '@/stores/session'
+import CardSkeleton from '@/components/CardSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 
@@ -47,6 +49,9 @@ watch(
 )
 
 const summary = computed(() => reports.summary)
+// Primera carga: aún no hay datos. Recargas (cambiar periodo o sucursal): se conservan y solo hay barra.
+const isFirstLoad = computed(() => reports.status === 'loading' && !summary.value)
+const showSkeleton = useDelayedLoading(isFirstLoad)
 const averageTicket = computed(() => {
   const t = summary.value?.totals
   return t && t.salesCount > 0 ? Math.round(t.totalCents / t.salesCount) : 0
@@ -234,7 +239,12 @@ function exportStaff(): void {
     >
       {{ reports.errorMessage }}
     </v-alert>
-    <v-progress-linear v-if="reports.status === 'loading'" indeterminate class="mb-4" />
+    <v-progress-linear
+      v-if="reports.status === 'loading' && !isFirstLoad"
+      indeterminate
+      class="mb-4"
+    />
+    <CardSkeleton v-if="isFirstLoad && showSkeleton" :count="4" :lines="1" />
 
     <v-tabs v-model="tab" class="mb-4">
       <v-tab value="summary">Resumen de ventas</v-tab>

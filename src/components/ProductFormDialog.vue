@@ -3,7 +3,7 @@
 // "inventory:edit" ve el botón que abre esto; la política RLS de `products` es
 // quien de verdad lo exige, este componente solo evita mostrar un formulario
 // que fallaría. Las reglas de validación viven en lib/inventory.ts.
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { pesosToCents } from '@/lib/money'
 import { isValidSatProductCode, isValidSatUnitCode } from '@/lib/validation'
@@ -29,6 +29,18 @@ const minStock = ref<number | null>(0)
 // su contador (mismo criterio que ServiceFormDialog).
 const satProductCode = ref('01010101')
 const satUnitCode = ref('H87')
+const categoryId = ref<string | null>(null)
+
+// Categorías para elegir: las activas y, al editar, la actual aunque esté desactivada
+// (si no, el selector la mostraría vacía y guardar la dejaría sin categoría sin avisar).
+const categoryOptions = computed(() =>
+  inventory.categories
+    .filter((c) => c.is_active || c.id === categoryId.value)
+    .map((c) => ({
+      value: c.id,
+      title: c.is_active ? c.name : `${c.name} (desactivada)`,
+    })),
+)
 
 const satProductRules = [
   (v: string) => isValidSatProductCode(v) || 'Deben ser 8 dígitos, por ejemplo 01010101.',
@@ -51,6 +63,7 @@ watch(
     minStock.value = p?.min_stock ?? 0
     satProductCode.value = p?.sat_product_code ?? '01010101'
     satUnitCode.value = p?.sat_unit_code ?? 'H87'
+    categoryId.value = p?.category_id ?? null
     errorMessage.value = null
   },
 )
@@ -72,6 +85,7 @@ async function handleSubmit(): Promise<void> {
       minStock: minStock.value ?? NaN,
       satProductCode: satProductCode.value,
       satUnitCode: satUnitCode.value,
+      categoryId: categoryId.value,
     },
     props.product?.id,
   )
@@ -97,6 +111,16 @@ async function handleSubmit(): Promise<void> {
       <v-card-text>
         <v-form @submit.prevent="handleSubmit">
           <v-text-field v-model="name" label="Nombre" required />
+
+          <v-select
+            v-model="categoryId"
+            :items="categoryOptions"
+            label="Categoría"
+            clearable
+            hint="Agrupa el producto en el punto de venta. Sin categoría, aparece en «Sin categoría»."
+            persistent-hint
+            class="mb-2"
+          />
 
           <v-row dense>
             <v-col cols="6">

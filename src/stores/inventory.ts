@@ -6,6 +6,8 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import * as inventoryService from '@/services/inventory'
+import * as categoriesService from '@/services/productCategories'
+import type { ProductCategory } from '@/services/productCategories'
 import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
 import {
@@ -16,6 +18,7 @@ import {
   type ProductInput,
   type StockStatus,
 } from '@/lib/inventory'
+import { validateCategory } from '@/lib/productCategories'
 import { useSessionStore } from './session'
 
 export interface InventoryRow {
@@ -34,6 +37,8 @@ export interface MovementRequest {
 
 export const useInventoryStore = defineStore('inventory', () => {
   const rows = ref<InventoryRow[]>([])
+  /** Categorías del negocio, activas e inactivas (el diálogo de categorías las muestra todas). */
+  const categories = ref<ProductCategory[]>([])
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const errorMessage = ref<string | null>(null)
 
@@ -49,10 +54,12 @@ export const useInventoryStore = defineStore('inventory', () => {
     status.value = 'loading'
     errorMessage.value = null
     try {
-      const [products, stock] = await Promise.all([
+      const [products, stock, allCategories] = await Promise.all([
         productsService.list(session.activeTenantId),
         inventoryService.listStock(session.activeTenantId, session.activeBranchId),
+        categoriesService.list(session.activeTenantId),
       ])
+      categories.value = allCategories
       const stockByProduct = new Map(stock.map((s) => [s.product_id, s.stock]))
       rows.value = products.map((product) => {
         // Sin fila en la vista = sin movimientos = 0 (nunca undefined).
@@ -119,6 +126,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       min_stock: input.minStock,
       sat_product_code: input.satProductCode.trim(),
       sat_unit_code: input.satUnitCode.trim().toUpperCase(),
+      category_id: input.categoryId,
     }
     try {
       if (productId) await productsService.update(productId, fields)
@@ -145,14 +153,60 @@ export const useInventoryStore = defineStore('inventory', () => {
     return null
   }
 
+  /**
+   * Alta (`categoryId` ausente) o edición de una categoría, y recarga. Devuelve el mensaje de
+   * error listo para mostrar o `null` si salió bien.
+   */
+  async function saveCategory(
+    input: { name: string; icon: string },
+    categoryId?: string,
+  ): Promise<string | null> {
+    const session = useSessionStore()
+    if (!session.activeTenantId)
+      return 'No se pudo guardar la categoría. Inicia sesión de nuevo.'
+    const validationError = validateCategory(input)
+    if (validationError) return validationError
+
+    const fields = { name: input.name.trim(), icon: input.icon }
+    try {
+      if (categoryId) await categoriesService.update(categoryId, fields)
+      else await categoriesService.create(session.activeTenantId, fields)
+    } catch (err) {
+      // 23505 = violación de índice único: ya hay una categoría con ese nombre.
+      if ((err as { code?: string }).code === '23505') {
+        return 'Ya existe una categoría con ese nombre.'
+      }
+      return 'No se pudo guardar la categoría. Revisa tu conexión.'
+    }
+    await load()
+    return null
+  }
+
+  /** Desactiva o reactiva una categoría; sus productos no se tocan (pasan a "Sin categoría"). */
+  async function setCategoryActive(
+    categoryId: string,
+    isActive: boolean,
+  ): Promise<string | null> {
+    try {
+      await categoriesService.setActive(categoryId, isActive)
+    } catch {
+      return `No se pudo ${isActive ? 'activar' : 'desactivar'} la categoría. Revisa tu conexión.`
+    }
+    const category = categories.value.find((c) => c.id === categoryId)
+    if (category) category.is_active = isActive
+    return null
+  }
+
   function reset(): void {
     rows.value = []
+    categories.value = []
     status.value = 'idle'
     errorMessage.value = null
   }
 
   return {
     rows,
+    categories,
     status,
     errorMessage,
     alertRows,
@@ -160,6 +214,8 @@ export const useInventoryStore = defineStore('inventory', () => {
     registerMovement,
     saveProduct,
     setProductActive,
+    saveCategory,
+    setCategoryActive,
     reset,
   }
 })

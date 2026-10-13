@@ -8,6 +8,7 @@
 //
 // Solo dueño y recepción editan (pets_update); groomer y vet ven los mismos datos
 // con los campos bloqueados. No reemplaza a PetDetailDialog: la agenda lo sigue usando.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { format } from 'date-fns'
 
@@ -32,6 +33,7 @@ import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
+import IconButton from '@/components/IconButton.vue'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 type PetSex = Database['public']['Enums']['pet_sex']
@@ -59,6 +61,7 @@ const timeline = ref<TimelineEntry[]>([])
 const upcomingAppointments = ref<UpcomingAppointment[]>([])
 const photoUrl = ref<string | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -263,11 +266,14 @@ async function handleVaccinationSaved(): Promise<void> {
       <v-card-title class="d-flex align-center">
         <span>{{ pet?.name ?? 'Mascota' }}</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
+        <IconButton icon="mdi-close" variant="text" aria-label="Cerrar" @click="close" />
       </v-card-title>
 
       <v-card-text>
-        <v-progress-circular v-if="loading && !pet" indeterminate color="primary" />
+        <v-skeleton-loader
+          v-if="showSkeleton && !pet"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <template v-else-if="pet">
           <!-- Foto centrada; presionarla abre el selector de archivos. -->
@@ -310,7 +316,7 @@ async function handleVaccinationSaved(): Promise<void> {
                 <v-select v-model="sex" :items="sexOptions" label="Sexo" />
               </v-col>
               <v-col cols="3" sm="1" class="d-flex justify-center pb-5">
-                <v-btn
+                <IconButton
                   :icon="sterilization.icon"
                   :color="sterilization.color"
                   :title="sterilization.label"

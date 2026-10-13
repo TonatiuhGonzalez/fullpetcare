@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { finishNavigation, startNavigation } from '@/composables/useNavigationProgress'
+import { showAppUpdateNotice } from '@/composables/useAppUpdateNotice'
+import { isChunkLoadError } from '@/lib/chunkError'
 import { isFrontDesk } from '@/lib/roles'
 import type { PermissionModule } from '@/lib/permissions'
 import { useSessionStore } from '@/stores/session'
@@ -116,6 +119,14 @@ export const router = createRouter({
           // (CLAUDE.md §6.1) — groomer/vet ven al cliente dueño de la
           // mascota que atienden (customers sigue siendo legible para
           // ellos vía RLS), pero no un directorio del negocio completo.
+          meta: { requiresFrontDesk: true },
+        },
+        {
+          // Página de un cliente (C1.16): sus mascotas, la ficha de la elegida y su
+          // cartilla. Misma regla que el listado: solo dueño y recepción.
+          path: 'clientes/:id',
+          name: 'cliente',
+          component: () => import('@/pages/clientes/CustomerPage.vue'),
           meta: { requiresFrontDesk: true },
         },
         {
@@ -240,6 +251,23 @@ export const router = createRouter({
       ],
     },
   ],
+})
+
+// Barra de progreso de navegación (PLAN.md D22). Este guard se registra PRIMERO para
+// que la barra arranque antes de cualquier espera (la sesión, la descarga de la
+// pantalla). Se apaga en `afterEach`, que Vue Router llama también cuando la
+// navegación se cancela o se redirige, y en `onError` si falla la descarga.
+router.beforeEach(() => {
+  startNavigation()
+})
+router.afterEach(() => {
+  finishNavigation()
+})
+router.onError((error) => {
+  finishNavigation()
+  // Tras un despliegue, la pantalla pedida ya no existe en el servidor: se avisa en
+  // lugar de dejar el clic sin respuesta (PLAN.md D22). Otros errores no tocan esto.
+  if (isChunkLoadError(error)) showAppUpdateNotice()
 })
 
 // Guard de sesión: corre ANTES de cada navegación, para las tres rutas

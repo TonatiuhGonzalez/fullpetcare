@@ -14,6 +14,8 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import * as checkoutService from '@/services/checkout'
+import * as categoriesService from '@/services/productCategories'
+import type { ProductCategory } from '@/services/productCategories'
 import type {
   CheckoutLineItem,
   CheckoutProductItem,
@@ -23,6 +25,7 @@ import type {
 } from '@/services/checkout'
 import { applyDiscount, sumLineItems } from '@/lib/money'
 import { canRemove } from '@/lib/inventory'
+import { paymentChange } from '@/lib/paymentChange'
 
 export const useCartStore = defineStore('cart', () => {
   const appointmentId = ref<string | null>(null)
@@ -33,6 +36,10 @@ export const useCartStore = defineStore('cart', () => {
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
   const catalog = ref<SellableProduct[]>([])
+  /** Categorías activas del negocio (13G): agrupan el catálogo en el punto de venta. */
+  const categories = ref<ProductCategory[]>([])
+  /** Ids de los productos vendidos hace poco en la sucursal, del más reciente al más antiguo (con repetidos). */
+  const recentSoldProductIds = ref<string[]>([])
   /** Solo en venta de mostrador (sin cita). El cliente es opcional: venta libre = null. */
   const counterBranchId = ref<string | null>(null)
   const counterCustomerId = ref<string | null>(null)
@@ -60,10 +67,20 @@ export const useCartStore = defineStore('cart', () => {
   )
   /** Cuánto falta por pagar. 0 cuando el pago ya cubre (o excede) el total. */
   const remainingCents = computed(() => Math.max(0, totalCents.value - paidCents.value))
-  /** Listo para cobrar: hay al menos un pago y alcanza el total. */
-  const isFullyPaid = computed(
+  /** El monto ya está cubierto: hay pagos y no falta nada. La pantalla deja de ofrecer agregar otro pago. */
+  const isCovered = computed(
     () => payments.value.length > 0 && remainingCents.value === 0,
   )
+  /** Cambio que se le devuelve al cliente en efectivo (0 si no pagó de más). */
+  const changeCents = computed(
+    () => paymentChange(totalCents.value, payments.value).changeCents,
+  )
+  /** Lo pagado de más que no vino en efectivo y no se puede devolver; debe ser 0 para cobrar. */
+  const unpayableExcessCents = computed(
+    () => paymentChange(totalCents.value, payments.value).unpayableExcessCents,
+  )
+  /** Listo para cobrar: hay al menos un pago, alcanza el total y no hay sobrepago imposible de devolver. */
+  const isFullyPaid = computed(() => isCovered.value && unpayableExcessCents.value === 0)
 
   /** Carga las partidas de una cita atendida y reinicia descuento/pagos. */
   async function loadAppointment(id: string): Promise<void> {
@@ -99,14 +116,28 @@ export const useCartStore = defineStore('cart', () => {
     counterCustomerId.value = customerId
   }
 
-  /** Carga los productos vendibles de la sucursal (activos y con existencia). */
+  /**
+   * Carga lo que necesita el punto de venta: los productos vendibles de la sucursal
+   * (activos y con existencia) y, aparte, sus categorías y los últimos vendidos. Estos dos
+   * últimos son comodidades: si fallan, el catálogo igual sirve (todo cae en "Sin categoría" y
+   * la fila de últimos vendidos queda vacía), así que no bloquean la venta.
+   */
   async function loadCatalog(tenantId: string, branchId: string): Promise<void> {
-    try {
-      catalog.value = await checkoutService.listSellableProducts(tenantId, branchId)
-    } catch {
+    const [catalogResult, categoriesResult, recentResult] = await Promise.allSettled([
+      checkoutService.listSellableProducts(tenantId, branchId),
+      categoriesService.listActive(tenantId),
+      checkoutService.listRecentlySoldProductIds(tenantId, branchId),
+    ])
+    if (catalogResult.status === 'fulfilled') {
+      catalog.value = catalogResult.value
+    } else {
       catalog.value = []
       errorMessage.value = 'No se pudieron cargar los productos. Revisa tu conexión.'
     }
+    categories.value =
+      categoriesResult.status === 'fulfilled' ? categoriesResult.value : []
+    recentSoldProductIds.value =
+      recentResult.status === 'fulfilled' ? recentResult.value : []
   }
 
   /**
@@ -200,6 +231,8 @@ export const useCartStore = defineStore('cart', () => {
     counterCustomerId.value = null
     productItems.value = []
     catalog.value = []
+    categories.value = []
+    recentSoldProductIds.value = []
     lineItems.value = []
     supplyItems.value = []
     discountCents.value = 0
@@ -214,6 +247,8 @@ export const useCartStore = defineStore('cart', () => {
     supplyItems,
     productItems,
     catalog,
+    categories,
+    recentSoldProductIds,
     counterBranchId,
     counterCustomerId,
     discountCents,
@@ -225,6 +260,9 @@ export const useCartStore = defineStore('cart', () => {
     totalCents,
     paidCents,
     remainingCents,
+    changeCents,
+    unpayableExcessCents,
+    isCovered,
     isFullyPaid,
     loadAppointment,
     loadCounterSale,

@@ -46,6 +46,8 @@ export interface SellableProduct {
   priceCents: number
   taxRateBp: number
   stock: number
+  /** Categoría del producto (13G); null si no tiene. Una desactivada se trata como "sin categoría" en lib/. */
+  categoryId: string | null
 }
 
 /** Código del SAT de la forma de pago con tarjeta: crédito o débito. */
@@ -222,7 +224,7 @@ export async function listSellableProducts(
   const [productsResult, stockResult] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name, sku, price_cents, tax_rate_bp')
+      .select('id, name, sku, price_cents, tax_rate_bp, category_id')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -248,8 +250,36 @@ export async function listSellableProducts(
       priceCents: p.price_cents,
       taxRateBp: p.tax_rate_bp,
       stock: stockByProduct.get(p.id) ?? 0,
+      categoryId: p.category_id,
     }))
     .filter((p) => p.stock > 0)
+}
+
+/**
+ * Ids de los productos vendidos en una sucursal, del más reciente al más antiguo y con
+ * repeticiones (lib/productCategories.ts los reduce a únicos). Mira las últimas
+ * `salesLimit` ventas cobradas, no todo el historial: la fila "últimos vendidos" del
+ * punto de venta solo necesita las recientes. Una venta cancelada no cuenta.
+ */
+export async function listRecentlySoldProductIds(
+  tenantId: string,
+  branchId: string,
+  salesLimit = 40,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('sales')
+    .select('paid_at, sale_items ( product_id )')
+    .eq('tenant_id', tenantId)
+    .eq('branch_id', branchId)
+    .eq('status', 'paid')
+    .is('deleted_at', null)
+    .order('paid_at', { ascending: false })
+    .limit(salesLimit)
+
+  if (error) throw error
+  return (data ?? []).flatMap((sale) =>
+    (sale.sale_items ?? []).flatMap((item) => (item.product_id ? [item.product_id] : [])),
+  )
 }
 
 /**

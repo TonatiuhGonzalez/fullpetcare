@@ -8,6 +8,8 @@
 // Rediseño de la fase 15 (PLAN.md D20): foto grande, cartilla con un resumen y estados
 // con ícono y texto, y el tipo de visita con su color. Es solo presentación: no cambia
 // lo que la función devuelve.
+import CardSkeleton from '@/components/CardSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
 
 import VisitKindChip from '@/components/VisitKindChip.vue'
@@ -61,6 +63,7 @@ interface PublicPetDto {
 }
 
 const status = ref<'loading' | 'ready' | 'error'>('loading')
+const showSkeleton = useDelayedLoading(() => status.value === 'loading')
 const data = ref<PublicPetDto | null>(null)
 
 // "Hoy" en la zona horaria del negocio, no la del teléfono de quien abre el link.
@@ -117,12 +120,7 @@ onMounted(load)
 
 <template>
   <v-container class="py-4" max-width="480">
-    <v-progress-circular
-      v-if="status === 'loading'"
-      indeterminate
-      color="primary"
-      class="d-block mx-auto mt-8"
-    />
+    <CardSkeleton v-if="status === 'loading' && showSkeleton" :count="3" :lines="3" />
 
     <v-alert v-else-if="status === 'error'" type="warning" variant="tonal" class="mt-4">
       Este link no es válido o ya venció. Pide uno nuevo al negocio.

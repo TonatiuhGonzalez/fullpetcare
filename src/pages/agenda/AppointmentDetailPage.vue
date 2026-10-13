@@ -1,6 +1,9 @@
 <script setup lang="ts">
 // Detalle de una cita: reagendar, cancelar (tarea 3.19).
-import { onMounted, ref } from 'vue'
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
 import type { Appointment, AppointmentService } from '@/services/appointments'
@@ -13,7 +16,16 @@ import type { Branch } from '@/services/branches'
 import { findPaidSaleIdByAppointment } from '@/services/invoicing'
 import { listBranchEmployees } from '@/services/memberships'
 import type { EmployeeSummary } from '@/services/memberships'
-import { formatDate, formatTime, fromBranchTime } from '@/lib/datetime'
+import {
+  branchToday,
+  formatDate,
+  formatTime,
+  fromBranchTime,
+  toNaiveLocalIso,
+} from '@/lib/datetime'
+import { appointmentRuleMessage, overlapNoticeText } from '@/lib/appointmentErrors'
+import { findOverlap, hoursForDate, type BranchHours } from '@/lib/availability'
+import { overlapCandidates, rescheduleProblem, type DayAppointment } from '@/lib/rescheduleRules'
 import { formatMXN } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
 import VisitKindChip from '@/components/VisitKindChip.vue'
@@ -25,6 +37,9 @@ const session = useSessionStore()
 
 const appointment = ref<Appointment | null>(null)
 const branch = ref<Branch | null>(null)
+// Horario por día de la semana, aparte de `branch` porque `opening_hours` es un jsonb genérico
+// (Json) y leerlo desde `branch.value` hace que TS expanda un tipo recursivo (TS2589).
+const branchOpeningHours = ref<Record<string, BranchHours | null>>({})
 const customer = ref<Customer | null>(null)
 const pet = ref<Pet | null>(null)
 const lines = ref<AppointmentService[]>([])
@@ -33,12 +48,97 @@ const employees = ref<EmployeeSummary[]>([])
 // Venta ya cobrada de esta cita (si la hay): desde ahí se factura (tarea 11.19).
 const paidSaleId = ref<string | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
 
 const showReschedule = ref(false)
 const rescheduleDate = ref('')
 const rescheduleTime = ref('')
 const rescheduling = ref(false)
+// Error del intento de guardar, dentro del propio diálogo de reagendar (el `errorMessage`
+// de la pantalla queda detrás de él).
+const rescheduleError = ref<string | null>(null)
+// Citas del día elegido (de la sucursal), para avisar de un traslape con el mismo empleado.
+const rescheduleDayAppointments = ref<DayAppointment[]>([])
+// Evita que una respuesta lenta de otro día pise a la del día que ya se eligió.
+let rescheduleDayRequest = 0
+
+// "Hoy" y "ahora" son los de la sucursal de la cita, no los del navegador (§8.3).
+const rescheduleMinDate = computed(() =>
+  branch.value ? branchToday(branch.value.timezone) : '',
+)
+const appointmentDurationMinutes = computed(() =>
+  appointment.value
+    ? Math.round(
+        (new Date(appointment.value.ends_at).getTime() -
+          new Date(appointment.value.starts_at).getTime()) /
+          60000,
+      )
+    : 0,
+)
+
+// Mismas reglas que agendar (C1.13), vivas mientras se escribe. La base las repite.
+const rescheduleIssue = computed<string | null>(() => {
+  if (!branch.value || !showReschedule.value) return null
+  const tz = branch.value.timezone
+  return rescheduleProblem({
+    date: rescheduleDate.value,
+    time: rescheduleTime.value,
+    durationMinutes: appointmentDurationMinutes.value,
+    branchHours: rescheduleDate.value
+      ? hoursForDate(
+          branchOpeningHours.value,
+          rescheduleDate.value,
+        )
+      : null,
+    now: { date: branchToday(tz), time: formatTime(new Date(), tz) },
+  })
+})
+
+// Traslape con otra cita del mismo empleado: solo informa, no bloquea (D26 punto 1).
+const rescheduleOverlapNotice = computed<string | null>(() => {
+  if (!branch.value || !appointment.value || rescheduleIssue.value) return null
+  const tz = branch.value.timezone
+  const startsAt = fromBranchTime(rescheduleDate.value, rescheduleTime.value, tz)
+  const endsAt = new Date(startsAt.getTime() + appointmentDurationMinutes.value * 60000)
+  const conflict = findOverlap({
+    existingAppointments: overlapCandidates(
+      rescheduleDayAppointments.value,
+      appointment.value.id,
+      tz,
+    ),
+    employeeId: appointment.value.employee_user_id,
+    startsAt: rescheduleTime.value,
+    endsAt: formatTime(endsAt, tz),
+  })
+  return conflict ? overlapNoticeText(conflict) : null
+})
+
+async function loadRescheduleDay(): Promise<void> {
+  const request = ++rescheduleDayRequest
+  if (!showReschedule.value || !session.activeTenantId || !branch.value || !appointment.value) {
+    return
+  }
+  if (!rescheduleDate.value) {
+    rescheduleDayAppointments.value = []
+    return
+  }
+  try {
+    const day = await appointmentsService.listByDay(
+      session.activeTenantId,
+      appointment.value.branch_id,
+      rescheduleDate.value,
+      branch.value.timezone,
+    )
+    if (request === rescheduleDayRequest) rescheduleDayAppointments.value = day
+  } catch {
+    // El aviso de traslape es informativo: si no se pudo consultar, simplemente no sale.
+    // Guardar sigue funcionando y la base valida lo que sí es obligatorio.
+    if (request === rescheduleDayRequest) rescheduleDayAppointments.value = []
+  }
+}
+
+watch([showReschedule, rescheduleDate], loadRescheduleDay)
 
 const statusLabels: Record<string, string> = {
   scheduled: 'Agendada',
@@ -68,6 +168,8 @@ async function load(): Promise<void> {
       appointmentsService.listServices(found.id),
     ])
     branch.value = foundBranch
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- opening_hours es un jsonb genérico (Json); misma nota que NewAppointmentDialog.vue.
+    branchOpeningHours.value = (foundBranch?.opening_hours as any) ?? {}
     customer.value = foundCustomer
     pet.value = foundPet
     lines.value = foundLines
@@ -103,15 +205,22 @@ async function handleCancel(): Promise<void> {
 function openReschedule(): void {
   if (!appointment.value || !branch.value) return
   // Prellena con la fecha/hora actual, en la zona de la sucursal.
-  rescheduleDate.value = formatDate(appointment.value.starts_at, branch.value.timezone)
+  // El input de fecha pide 'YYYY-MM-DD' en hora de la sucursal (formatDate daba texto en español).
+  rescheduleDate.value = toNaiveLocalIso(appointment.value.starts_at, branch.value.timezone).slice(0, 10)
   rescheduleTime.value = formatTime(appointment.value.starts_at, branch.value.timezone)
+  rescheduleError.value = null
   showReschedule.value = true
 }
 
 async function handleReschedule(): Promise<void> {
   if (!appointment.value || !branch.value) return
+  // Mismas reglas que agendar, antes de ir a la base.
+  if (rescheduleIssue.value) {
+    rescheduleError.value = rescheduleIssue.value
+    return
+  }
   rescheduling.value = true
-  errorMessage.value = null
+  rescheduleError.value = null
   try {
     const durationMs =
       new Date(appointment.value.ends_at).getTime() - new Date(appointment.value.starts_at).getTime()
@@ -121,9 +230,10 @@ async function handleReschedule(): Promise<void> {
     await appointmentsService.reschedule(appointment.value.id, startsAt, endsAt)
     showReschedule.value = false
     await load()
-  } catch {
-    errorMessage.value =
-      'No se pudo reagendar — puede que el empleado ya tenga otra cita en ese horario.'
+  } catch (error) {
+    // La base rechaza con un `hint` por causa; si es otra cosa (red, permisos), el genérico.
+    rescheduleError.value =
+      appointmentRuleMessage(error) ?? 'No se pudo reagendar la cita. Revisa tu conexión.'
   } finally {
     rescheduling.value = false
   }
@@ -131,7 +241,7 @@ async function handleReschedule(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-6">
     <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2" to="/app/agenda">
       Volver a la agenda
     </v-btn>
@@ -140,7 +250,7 @@ async function handleReschedule(): Promise<void> {
       {{ errorMessage }}
     </v-alert>
 
-    <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton && !appointment" />
 
     <v-card v-else-if="appointment && branch" class="pa-4">
       <div class="d-flex align-center mb-2">
@@ -229,13 +339,41 @@ async function handleReschedule(): Promise<void> {
       <v-card>
         <v-card-title>Reagendar cita</v-card-title>
         <v-card-text>
-          <v-text-field v-model="rescheduleDate" type="date" label="Fecha" density="compact" />
+          <v-text-field
+            v-model="rescheduleDate"
+            type="date"
+            label="Fecha"
+            density="compact"
+            :min="rescheduleMinDate"
+          />
           <v-text-field v-model="rescheduleTime" type="time" label="Hora" density="compact" />
+          <v-alert v-if="rescheduleIssue" type="error" variant="tonal" density="compact" class="mb-2">
+            {{ rescheduleIssue }}
+          </v-alert>
+          <v-alert
+            v-else-if="rescheduleOverlapNotice"
+            color="overlap"
+            variant="flat"
+            icon="mdi-alert-outline"
+            density="compact"
+            class="mb-2"
+          >
+            {{ rescheduleOverlapNotice }}
+          </v-alert>
+          <v-alert v-if="rescheduleError" type="error" variant="tonal" density="compact">
+            {{ rescheduleError }}
+          </v-alert>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showReschedule = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="rescheduling" @click="handleReschedule">Guardar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="rescheduling"
+            :disabled="!!rescheduleIssue"
+            @click="handleReschedule"
+            >Guardar</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>

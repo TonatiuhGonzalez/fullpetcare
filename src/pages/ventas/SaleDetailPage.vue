@@ -1,6 +1,9 @@
 <script setup lang="ts">
 // Detalle de una venta cobrada (tarea 11.19): el ticket y su factura. Aquí se
 // factura "cuando el cliente la pide", aunque haya pasado tiempo desde el cobro.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
 
 import InvoicePanel from '@/components/InvoicePanel.vue'
@@ -26,6 +29,7 @@ const receiver = ref<InvoiceReceiver>({
   cfdiUse: 'G03',
 })
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const loadError = ref<string | null>(null)
 const cancelledByName = ref<string | null>(null)
 const busy = ref(false)
@@ -144,7 +148,7 @@ async function handleOpen(kind: 'xml' | 'pdf'): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-4">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-4">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"
@@ -157,7 +161,7 @@ async function handleOpen(kind: 'xml' | 'pdf'): Promise<void> {
     <v-alert v-if="loadError" type="error" density="compact" variant="tonal" class="mb-4">
       {{ loadError }}
     </v-alert>
-    <v-progress-circular v-if="loading" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton" />
 
     <template v-else-if="ticket">
       <v-card class="pa-4 mb-4">

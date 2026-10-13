@@ -33,6 +33,7 @@
 // el diálogo muestra directo el ticket (TicketView, que ya trae su propio
 // botón "Imprimir") en vez de la información editable — sin "Cobrar" y sin
 // pasar por el slide, porque no hay nada que cobrar de nuevo.
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, ref, watch } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -50,22 +51,41 @@ import type { GroomingRecord, MedicalRecord, VaccinationWithName } from '@/servi
 import * as checkoutService from '@/services/checkout'
 import type { PaymentMethod, Ticket } from '@/services/checkout'
 import * as invoiceRequestsService from '@/services/invoiceRequests'
-import { formatDate, formatTime, fromBranchTime } from '@/lib/datetime'
+import {
+  branchToday,
+  formatDate,
+  formatTime,
+  fromBranchTime,
+  toNaiveLocalIso,
+} from '@/lib/datetime'
+import { appointmentRuleMessage, overlapNoticeText } from '@/lib/appointmentErrors'
+import { findOverlap, hoursForDate, type BranchHours } from '@/lib/availability'
+import { overlapCandidates, rescheduleProblem, type DayAppointment } from '@/lib/rescheduleRules'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { isFrontDesk } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
 import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
+import PaymentSummary from '@/components/PaymentSummary.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import TicketView from '@/components/TicketView.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { visitKindInfo } from '@/lib/visitKind'
+import IconButton from '@/components/IconButton.vue'
 
 const props = defineProps<{
   modelValue: boolean
   /** null cuando no hay ninguna cita seleccionada todavía. */
   appointmentId: string | null
+  /**
+   * La agenda ya sabe si la cita está cobrada (stores/agenda.ts#paidAppointmentIds).
+   * Con esto el diálogo abre directo en "Cobro" y pide el ticket desde el primer
+   * momento, en lugar de enseñar el detalle con "Cobrar" y cambiar al recibo
+   * cuando por fin llega la respuesta. Es solo una pista: si luego no se encuentra
+   * la venta, el diálogo cae al detalle normal.
+   */
+  isPaid?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -86,6 +106,10 @@ const view = ref<'appointment' | 'checkout'>('appointment')
 
 const appointment = ref<Appointment | null>(null)
 const branch = ref<Branch | null>(null)
+// Horario de la sucursal por día de la semana. Se guarda aparte porque `opening_hours` es un
+// jsonb genérico (Json) y leerlo desde `branch.value` hace que TS expanda un tipo recursivo
+// (TS2589); aquí se convierte una sola vez al cargar.
+const branchOpeningHours = ref<Record<string, BranchHours | null>>({})
 const customer = ref<Customer | null>(null)
 const pet = ref<Pet | null>(null)
 const lines = ref<import('@/services/appointments').AppointmentService[]>([])
@@ -95,12 +119,102 @@ const existingMedical = ref<MedicalRecord | null>(null)
 const appliedVaccines = ref<VaccinationWithName[]>([])
 
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const errorMessage = ref<string | null>(null)
+
+// Cita cobrada (lo sabe la agenda) cuyo ticket aún no llega: se pinta la silueta del
+// recibo y no el detalle, para que la pantalla no cambie de forma a media carga.
+const awaitingTicket = computed(() => props.isPaid === true && !ticket.value && loading.value)
 
 const showReschedule = ref(false)
 const rescheduleDate = ref('')
 const rescheduleTime = ref('')
 const rescheduling = ref(false)
+// Error del intento de guardar, dentro del propio diálogo de reagendar (el `errorMessage`
+// de la pantalla queda detrás de él).
+const rescheduleError = ref<string | null>(null)
+// Citas del día elegido (de la sucursal), para avisar de un traslape con el mismo empleado.
+const rescheduleDayAppointments = ref<DayAppointment[]>([])
+// Evita que una respuesta lenta de otro día pise a la del día que ya se eligió.
+let rescheduleDayRequest = 0
+
+// "Hoy" y "ahora" son los de la sucursal de la cita, no los del navegador (§8.3).
+const rescheduleMinDate = computed(() =>
+  branch.value ? branchToday(branch.value.timezone) : '',
+)
+const appointmentDurationMinutes = computed(() =>
+  appointment.value
+    ? Math.round(
+        (new Date(appointment.value.ends_at).getTime() -
+          new Date(appointment.value.starts_at).getTime()) /
+          60000,
+      )
+    : 0,
+)
+
+// Mismas reglas que agendar (C1.13), vivas mientras se escribe. La base las repite.
+const rescheduleIssue = computed<string | null>(() => {
+  const b = branch.value
+  if (!b || !showReschedule.value) return null
+  const tz = b.timezone
+  return rescheduleProblem({
+    date: rescheduleDate.value,
+    time: rescheduleTime.value,
+    durationMinutes: appointmentDurationMinutes.value,
+    branchHours: rescheduleDate.value
+      ? hoursForDate(
+          branchOpeningHours.value,
+          rescheduleDate.value,
+        )
+      : null,
+    now: { date: branchToday(tz), time: formatTime(new Date(), tz) },
+  })
+})
+
+// Traslape con otra cita del mismo empleado: solo informa, no bloquea (D26 punto 1).
+const rescheduleOverlapNotice = computed<string | null>(() => {
+  if (!branch.value || !appointment.value || rescheduleIssue.value) return null
+  const tz = branch.value.timezone
+  const startsAt = fromBranchTime(rescheduleDate.value, rescheduleTime.value, tz)
+  const endsAt = new Date(startsAt.getTime() + appointmentDurationMinutes.value * 60000)
+  const conflict = findOverlap({
+    existingAppointments: overlapCandidates(
+      rescheduleDayAppointments.value,
+      appointment.value.id,
+      tz,
+    ),
+    employeeId: appointment.value.employee_user_id,
+    startsAt: rescheduleTime.value,
+    endsAt: formatTime(endsAt, tz),
+  })
+  return conflict ? overlapNoticeText(conflict) : null
+})
+
+async function loadRescheduleDay(): Promise<void> {
+  const request = ++rescheduleDayRequest
+  if (!showReschedule.value || !session.activeTenantId || !branch.value || !appointment.value) {
+    return
+  }
+  if (!rescheduleDate.value) {
+    rescheduleDayAppointments.value = []
+    return
+  }
+  try {
+    const day = await appointmentsService.listByDay(
+      session.activeTenantId,
+      appointment.value.branch_id,
+      rescheduleDate.value,
+      branch.value.timezone,
+    )
+    if (request === rescheduleDayRequest) rescheduleDayAppointments.value = day
+  } catch {
+    // El aviso de traslape es informativo: si no se pudo consultar, simplemente no sale.
+    // Guardar sigue funcionando y la base valida lo que sí es obligatorio.
+    if (request === rescheduleDayRequest) rescheduleDayAppointments.value = []
+  }
+}
+
+watch([showReschedule, rescheduleDate], loadRescheduleDay)
 const cancelling = ref(false)
 const attending = ref(false)
 const terminando = ref(false)
@@ -164,6 +278,12 @@ function employeeName(userId: string): string {
   return employees.value.find((e) => e.userId === userId)?.fullName ?? '(empleado)'
 }
 
+/** El ticket de la venta que cubre la cita, o null si no tiene venta. */
+async function findTicketForAppointment(appointmentId: string): Promise<Ticket | null> {
+  const saleId = await checkoutService.findSaleIdForAppointment(appointmentId)
+  return saleId ? await checkoutService.getTicket(saleId) : null
+}
+
 async function load(id: string): Promise<void> {
   const tenantId = session.activeTenantId
   if (!tenantId) return
@@ -171,34 +291,60 @@ async function load(id: string): Promise<void> {
   // Limpia lo que hubiera de una cita anterior — sin esto, al abrir el
   // diálogo para OTRA cita se alcanza a ver un instante los datos viejos
   // antes de que termine de cargar la nueva.
+  // Debe limpiarse TODO lo que se muestra de la cita, no solo `appointment`: la
+  // cita llega primero y el resto después. Si branch/customer/pet/lines/employees
+  // conservaran los de la cita anterior, el contenido se pintaría ya con la cita
+  // nueva mezclada con datos viejos hasta que termine la segunda tanda de consultas.
   appointment.value = null
+  branch.value = null
+  customer.value = null
+  pet.value = null
+  lines.value = []
+  employees.value = []
   existingGrooming.value = null
   existingMedical.value = null
   appliedVaccines.value = []
   view.value = 'appointment'
   ticket.value = null
   chargeError.value = null
+  showReschedule.value = false
+  discountInPesos.value = null
+  newPaymentMethod.value = 'cash'
+  newPaymentAmountInPesos.value = null
+  requiresInvoice.value = false
 
   loading.value = true
   errorMessage.value = null
+
+  // Si la agenda ya dijo que está cobrada, el ticket se pide EN PARALELO con la cita
+  // (no depende de ella) en lugar de esperar a saber su estado. El `.catch` vacío solo
+  // evita un aviso de "promesa sin manejar" si otra consulta falla primero; el error
+  // real se vuelve a lanzar donde se espera esta promesa (más abajo).
+  const ticketLookup = props.isPaid ? findTicketForAppointment(id) : null
+  ticketLookup?.catch(() => undefined)
+
   try {
     const found = await appointmentsService.getById(tenantId, id)
-    appointment.value = found
     if (!found) return
 
-    const [foundBranch, foundCustomer, foundPet, foundLines] = await Promise.all([
-      branchesService.getById(found.branch_id),
-      customersService.getById(tenantId, found.customer_id),
-      petsService.getById(tenantId, found.pet_id),
-      appointmentsService.listServices(found.id),
-    ])
+    // Todo junto: la cita se publica hasta tener también su sucursal, cliente,
+    // mascota, servicios y empleados, así el contenido nunca se pinta a medias.
+    const [foundBranch, foundCustomer, foundPet, foundLines, foundEmployees] =
+      await Promise.all([
+        branchesService.getById(found.branch_id),
+        customersService.getById(tenantId, found.customer_id),
+        petsService.getById(tenantId, found.pet_id),
+        appointmentsService.listServices(found.id),
+        listBranchEmployees(tenantId, found.branch_id),
+      ])
     branch.value = foundBranch
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- opening_hours es un jsonb genérico (Json); misma nota que NewAppointmentDialog.vue.
+    branchOpeningHours.value = (foundBranch?.opening_hours as any) ?? {}
     customer.value = foundCustomer
     pet.value = foundPet
     lines.value = foundLines
-    if (foundBranch) {
-      employees.value = await listBranchEmployees(tenantId, found.branch_id)
-    }
+    employees.value = foundEmployees
+    appointment.value = found
 
     if (found.status === 'in_progress') {
       if (found.kind === 'grooming') {
@@ -213,8 +359,7 @@ async function load(id: string): Promise<void> {
     // ESTA apertura del diálogo, `ticket` ya lo tiene handleCharge() sin
     // pasar por aquí). Ver el comentario de cabecera.
     if (found.status === 'completed') {
-      const saleId = await checkoutService.findSaleIdForAppointment(found.id)
-      if (saleId) ticket.value = await checkoutService.getTicket(saleId)
+      ticket.value = ticketLookup ? await ticketLookup : await findTicketForAppointment(found.id)
     }
   } catch {
     errorMessage.value = 'No se pudo cargar la cita. Revisa tu conexión.'
@@ -274,15 +419,22 @@ async function handleCancel(): Promise<void> {
 
 function openReschedule(): void {
   if (!appointment.value || !branch.value) return
-  rescheduleDate.value = formatDate(appointment.value.starts_at, branch.value.timezone)
+  // El input de fecha pide 'YYYY-MM-DD' en hora de la sucursal (formatDate daba texto en español).
+  rescheduleDate.value = toNaiveLocalIso(appointment.value.starts_at, branch.value.timezone).slice(0, 10)
   rescheduleTime.value = formatTime(appointment.value.starts_at, branch.value.timezone)
+  rescheduleError.value = null
   showReschedule.value = true
 }
 
 async function handleReschedule(): Promise<void> {
   if (!appointment.value || !branch.value) return
+  // Mismas reglas que agendar, antes de ir a la base.
+  if (rescheduleIssue.value) {
+    rescheduleError.value = rescheduleIssue.value
+    return
+  }
   rescheduling.value = true
-  errorMessage.value = null
+  rescheduleError.value = null
   try {
     const durationMs =
       new Date(appointment.value.ends_at).getTime() - new Date(appointment.value.starts_at).getTime()
@@ -293,9 +445,10 @@ async function handleReschedule(): Promise<void> {
     showReschedule.value = false
     emit('changed')
     close()
-  } catch {
-    errorMessage.value =
-      'No se pudo reagendar — puede que el empleado ya tenga otra cita en ese horario.'
+  } catch (error) {
+    // La base rechaza con un `hint` por causa; si es otra cosa (red, permisos), el genérico.
+    rescheduleError.value =
+      appointmentRuleMessage(error) ?? 'No se pudo reagendar la cita. Revisa tu conexión.'
   } finally {
     rescheduling.value = false
   }
@@ -441,7 +594,7 @@ function checkoutErrorMessage(err: unknown): string {
   >
     <v-card>
       <v-card-title>
-        {{ ticket ? 'Cobro' : view === 'checkout' ? 'Cobrar' : stage === 'attend' ? 'Atender cita' : 'Detalle de la cita' }}
+        {{ ticket || awaitingTicket ? 'Cobro' : view === 'checkout' ? 'Cobrar' : stage === 'attend' ? 'Atender cita' : 'Detalle de la cita' }}
       </v-card-title>
 
       <v-card-text>
@@ -449,7 +602,18 @@ function checkoutErrorMessage(err: unknown): string {
           {{ errorMessage }}
         </v-alert>
 
-        <v-progress-circular v-if="loading && !appointment" indeterminate color="primary" />
+        <!-- Cita cobrada: se sabe desde que se abre, así que desde el primer
+             instante se enseña la silueta del recibo (sin retraso, para que el
+             diálogo no abra vacío). -->
+        <v-skeleton-loader
+          v-if="awaitingTicket"
+          type="heading, text, text, list-item-two-line, list-item-two-line, text"
+        />
+
+        <v-skeleton-loader
+          v-else-if="showSkeleton && !appointment"
+          type="heading, text, text, list-item-two-line, list-item-two-line"
+        />
 
         <!-- La cita ya se cobró (ahora o antes): solo el ticket, sin
              pasar por el slide de abajo — no hay nada que cobrar de
@@ -627,12 +791,13 @@ function checkoutErrorMessage(err: unknown): string {
                 <template #title>{{ methodLabels[payment.method] }}</template>
                 <template #append>
                   <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-                  <v-btn icon="mdi-close" size="x-small" variant="text" @click="cart.removePayment(index)" />
+                  <IconButton icon="mdi-close" aria-label="Quitar pago" size="x-small" variant="text" @click="cart.removePayment(index)" />
                 </template>
               </v-list-item>
             </v-list>
 
-            <div class="d-flex align-end ga-2 mb-2">
+            <!-- Con el monto cubierto ya no tiene sentido registrar otro pago. -->
+            <div v-if="!cart.isCovered" class="d-flex align-end ga-2 mb-2">
               <v-select
                 v-model="newPaymentMethod"
                 :items="[
@@ -655,12 +820,10 @@ function checkoutErrorMessage(err: unknown): string {
                 hide-details
               />
               <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-              <v-btn icon="mdi-plus" color="primary" variant="tonal" @click="handleAddPayment" />
+              <IconButton icon="mdi-plus" aria-label="Agregar pago" color="primary" variant="tonal" @click="handleAddPayment" />
             </div>
 
-            <p class="text-body-2 mb-3">
-              Pagado: {{ formatMXN(cart.paidCents) }} · Falta: {{ formatMXN(cart.remainingCents) }}
-            </p>
+            <PaymentSummary />
 
             <v-checkbox
               v-model="requiresInvoice"
@@ -690,7 +853,7 @@ function checkoutErrorMessage(err: unknown): string {
         </v-window>
       </v-card-text>
 
-      <v-card-actions v-if="appointment">
+      <v-card-actions v-if="appointment && !awaitingTicket">
         <v-btn variant="text" @click="close">Cerrar</v-btn>
         <v-spacer />
 
@@ -738,13 +901,41 @@ function checkoutErrorMessage(err: unknown): string {
       <v-card>
         <v-card-title>Reagendar cita</v-card-title>
         <v-card-text>
-          <v-text-field v-model="rescheduleDate" type="date" label="Fecha" density="compact" />
+          <v-text-field
+            v-model="rescheduleDate"
+            type="date"
+            label="Fecha"
+            density="compact"
+            :min="rescheduleMinDate"
+          />
           <v-text-field v-model="rescheduleTime" type="time" label="Hora" density="compact" />
+          <v-alert v-if="rescheduleIssue" type="error" variant="tonal" density="compact" class="mb-2">
+            {{ rescheduleIssue }}
+          </v-alert>
+          <v-alert
+            v-else-if="rescheduleOverlapNotice"
+            color="overlap"
+            variant="flat"
+            icon="mdi-alert-outline"
+            density="compact"
+            class="mb-2"
+          >
+            {{ rescheduleOverlapNotice }}
+          </v-alert>
+          <v-alert v-if="rescheduleError" type="error" variant="tonal" density="compact">
+            {{ rescheduleError }}
+          </v-alert>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showReschedule = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="rescheduling" @click="handleReschedule">Guardar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="rescheduling"
+            :disabled="!!rescheduleIssue"
+            @click="handleReschedule"
+            >Guardar</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>

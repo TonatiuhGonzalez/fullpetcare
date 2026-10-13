@@ -7,6 +7,10 @@
 //
 // Tarea 11.11: el ticket de una cita también puede llevar productos extra. La venta de
 // mostrador (sin cita) tiene su propia pantalla desde la fase 13: pages/ventas/PointOfSalePage.vue.
+import { CONTENT_WIDTH } from '@/lib/contentWidth'
+import PageSkeleton from '@/components/PageSkeleton.vue'
+import PaymentSummary from '@/components/PaymentSummary.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { computed, onMounted, ref } from 'vue'
 
 import * as appointmentsService from '@/services/appointments'
@@ -21,6 +25,7 @@ import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
 import TicketView from '@/components/TicketView.vue'
+import IconButton from '@/components/IconButton.vue'
 
 type PaymentMethod = Database['public']['Enums']['payment_method']
 
@@ -32,6 +37,7 @@ const cart = useCartStore()
 const appointment = ref<Appointment | null>(null)
 const customer = ref<Customer | null>(null)
 const loading = ref(false)
+const showSkeleton = useDelayedLoading(loading)
 const loadError = ref<string | null>(null)
 
 const discountInPesos = ref<number | null>(null)
@@ -182,7 +188,7 @@ async function handleCharge(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="py-6">
+  <v-container :max-width="CONTENT_WIDTH.narrow" class="py-6">
     <v-btn
       variant="text"
       prepend-icon="mdi-arrow-left"
@@ -196,7 +202,7 @@ async function handleCharge(): Promise<void> {
       {{ loadError }}
     </v-alert>
 
-    <v-progress-circular v-if="loading" indeterminate color="primary" />
+    <PageSkeleton v-if="showSkeleton" />
 
     <template v-else-if="appointment">
       <v-alert
@@ -276,7 +282,7 @@ async function handleCharge(): Promise<void> {
               <span class="mr-2">{{
                 formatMXN(item.unitPriceCents * item.quantity)
               }}</span>
-              <v-btn
+              <IconButton
                 icon="mdi-close"
                 size="x-small"
                 variant="text"
@@ -316,7 +322,7 @@ async function handleCharge(): Promise<void> {
             hide-details
             style="max-width: 90px"
           />
-          <v-btn
+          <IconButton
             icon="mdi-plus"
             color="primary"
             variant="tonal"
@@ -373,8 +379,8 @@ async function handleCharge(): Promise<void> {
             </template>
             <template #append>
               <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
-              <v-btn
-                icon="mdi-close"
+              <IconButton
+                icon="mdi-close" aria-label="Quitar pago"
                 size="x-small"
                 variant="text"
                 @click="cart.removePayment(index)"
@@ -383,7 +389,8 @@ async function handleCharge(): Promise<void> {
           </v-list-item>
         </v-list>
 
-        <div class="d-flex align-end ga-2 mb-2">
+        <!-- Con el monto cubierto ya no tiene sentido registrar otro pago. -->
+        <div v-if="!cart.isCovered" class="d-flex align-end ga-2 mb-2">
           <v-select
             v-model="newPaymentMethod"
             :items="[
@@ -406,7 +413,7 @@ async function handleCharge(): Promise<void> {
             hide-details
           />
           <v-btn variant="text" size="small" @click="fillRemaining">Todo</v-btn>
-          <v-btn
+          <IconButton
             icon="mdi-plus"
             color="primary"
             variant="tonal"
@@ -417,7 +424,7 @@ async function handleCharge(): Promise<void> {
         </div>
 
         <v-select
-          v-if="newPaymentMethod === 'card'"
+          v-if="!cart.isCovered && newPaymentMethod === 'card'"
           v-model="newCardType"
           :items="[
             { title: 'Tarjeta de crédito', value: '04' },
@@ -431,10 +438,7 @@ async function handleCharge(): Promise<void> {
           class="mb-2"
         />
 
-        <p class="text-body-2 mb-3">
-          Pagado: {{ formatMXN(cart.paidCents) }} · Falta:
-          {{ formatMXN(cart.remainingCents) }}
-        </p>
+        <PaymentSummary />
 
         <v-checkbox
           v-model="requiresInvoice"

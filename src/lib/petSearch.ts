@@ -1,14 +1,13 @@
 // Búsqueda de mascotas para la pestaña "Mascotas" de Clientes. Función
 // pura: entra texto, sale sí/no — sin red ni Supabase (CLAUDE.md §4).
 import { speciesLabel } from '@/lib/petLabels'
+import { normalizeSearchText } from './searchText'
 import type { Database } from '@/types/database'
 
 type PetSpecies = Database['public']['Enums']['pet_species']
 
-/** Minúsculas y sin acentos, para que "Perro", "perro" y "PÉRRO" coincidan. */
-function normalize(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-}
+/** Minúsculas y sin acentos, para que "Perro", "perro" y "PÉRRO" coincidan (la ñ se conserva). */
+const normalize = normalizeSearchText
 
 /**
  * ¿La mascota coincide con lo que se escribió en el buscador? Compara

@@ -99,6 +99,8 @@ export interface ProductInput {
   minStock: number
   satProductCode: string
   satUnitCode: string
+  /** Categoría para agrupar el punto de venta; null = sin categoría. */
+  categoryId: string | null
 }
 
 /**
@@ -127,4 +129,83 @@ export function validateProduct(input: ProductInput): string | null {
     return 'La clave de unidad del SAT debe tener 2 o 3 caracteres.'
   }
   return null
+}
+
+// ── Tabla de Inventario (Correcciones 1, C1.17) ──────────────────────────────
+
+/** Etiqueta de la categoría cuando el producto no tiene (o su categoría ya no existe). */
+export const NO_CATEGORY_LABEL = 'Sin categoría'
+
+/** Lo mínimo que necesita la tabla de un renglón del store (sin importar el store: lib/ es puro). */
+export interface InventoryRowSource {
+  product: {
+    id: string
+    name: string
+    sku: string | null
+    price_cents: number
+    is_active: boolean
+    category_id: string | null
+  }
+  stock: number
+  status: StockStatus
+}
+
+/** Un renglón plano de la tabla: cada columna ordenable es un campo propio. */
+export interface InventoryTableRow<T extends InventoryRowSource = InventoryRowSource> {
+  id: string
+  name: string
+  /** Clave (sku); `null` si el producto no tiene. */
+  sku: string | null
+  /** Nombre de la categoría; `null` = sin categoría (se muestra como `NO_CATEGORY_LABEL`). */
+  categoryName: string | null
+  priceCents: number
+  stock: number
+  status: StockStatus
+  isActive: boolean
+  /** El renglón original, para que los botones de acción reciban lo que ya esperaban. */
+  source: T
+}
+
+/**
+ * Arma los renglones de la tabla. La categoría se resuelve por id; si el producto no
+ * tiene categoría, o apunta a una que ya no está en la lista, queda en `null`.
+ */
+export function buildInventoryTableRows<T extends InventoryRowSource>(
+  rows: T[],
+  categories: { id: string; name: string }[],
+): InventoryTableRow<T>[] {
+  const nameById = new Map(categories.map((c) => [c.id, c.name]))
+  return rows.map((row) => ({
+    id: row.product.id,
+    name: row.product.name,
+    sku: row.product.sku,
+    categoryName: row.product.category_id
+      ? (nameById.get(row.product.category_id) ?? null)
+      : null,
+    priceCents: row.product.price_cents,
+    stock: row.stock,
+    status: row.status,
+    isActive: row.product.is_active,
+    source: row,
+  }))
+}
+
+/**
+ * Compara textos para ordenar: sin distinguir mayúsculas ni acentos ("Álamo" junto a
+ * "alamo"), en orden de español. Los vacíos (`null` o "") van SIEMPRE al final al ordenar
+ * ascendente (y al inicio al descendente, porque Vuetify solo invierte el signo): así
+ * "Sin categoría" y "sin clave" no estorban arriba de la lista.
+ */
+export function compareOptionalText(a: string | null, b: string | null): number {
+  const left = (a ?? '').trim()
+  const right = (b ?? '').trim()
+  if (!left && !right) return 0
+  if (!left) return 1
+  if (!right) return -1
+  return left.localeCompare(right, 'es', { sensitivity: 'base' })
+}
+
+/** Activo/inactivo para ordenar: los inactivos primero al ascender (false < true). */
+export function compareBoolean(a: boolean, b: boolean): number {
+  return Number(a) - Number(b)
 }
