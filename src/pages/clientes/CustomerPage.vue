@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import { useRoute, useRouter } from 'vue-router'
 
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
+import CustomerAccountCard from '@/components/CustomerAccountCard.vue'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import FamilyCard from '@/components/FamilyCard.vue'
@@ -307,6 +308,14 @@ async function handleVaccinationSaved(): Promise<void> {
             </v-btn>
           </div>
         </v-card>
+
+        <!-- Cuenta del dueño vinculada (fase 16B). -->
+        <CustomerAccountCard
+          v-if="session.activeTenantId"
+          :tenant-id="session.activeTenantId"
+          :customer-id="customer.id"
+          :can-edit="canEdit"
+        />
 
         <!-- Familia del cliente (fase 31): mascotas de todos sus miembros y el titular. -->
         <FamilyCard

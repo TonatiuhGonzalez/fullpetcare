@@ -1871,24 +1871,28 @@ rediseñada en `PLAN.md` D31 (cuenta del dueño), pendiente de aprobación.** De
 **Estado: propuesta; no se construye hasta que el usuario apruebe D31.** El plan anterior (código de un solo uso con
 tabla propia) queda descartado a favor de Supabase Auth con código por correo (D31 punto 1).
 
-- [ ] **16.4** 📚 Aprobar D31 (el dominio remitente y el SMTP quedan pendientes: ver 16.7). _Verificar:_ el usuario
+- [x] **16.4** 📚 Aprobar D31 (el dominio remitente y el SMTP quedan pendientes: ver 16.7). _Verificar:_ el usuario
   aprobó por escrito; D31 sin "propuesta".
-- [ ] **16.5** 🧪 Migración: `customer_accounts` (vínculo `user_id` ↔ `customer_id` por negocio, único por negocio) con RLS,
+- [x] **16.5** 🧪 Migración: `customer_accounts` (vínculo `user_id` ↔ `customer_id` por negocio, único por negocio) con RLS,
   y la RPC `claim_customer_link()` que vincula con un token vigente (no revocado ni vencido, de la mascota del cliente).
   _Verificar:_ tests de token revocado, vencido, inexistente, de otro negocio y reutilizado por otra cuenta.
-- [ ] **16.6** 🧪 Funciones de lectura con lista blanca: `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()`.
+- [x] **16.6** 🧪 Funciones de lectura con lista blanca: `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()`.
   _Verificar:_ solo ve lo vinculado; sin teléfonos de otros ni notas internas; reglas de la fase 31 (dueño anterior,
   titular y familia); un usuario del personal no obtiene nada por esta vía.
 - [ ] **16.7** ⏸ **PENDIENTE: no hay correo de salida todavía** (decisión del usuario, 2026-10-14). Configurar el envío
   de correo (SMTP) y habilitar el acceso con código para cuentas de dueño. _Verificar:_ el código llega a un correo
   personal y caduca; el login del personal sigue igual. Hasta entonces el código se prueba con la bandeja local
   (Inbucket) y la cuenta no se abre a usuarios reales.
-- [ ] **16.8** Pantalla `/mi-cuenta`: entrar con código, lista de mascotas, detalle (cartilla, historial, próximas citas) y
+- [x] **16.8** Pantalla `/mi-cuenta`: entrar con código, lista de mascotas, detalle (cartilla, historial, próximas citas) y
   "Guardar en mi cuenta" en la vista pública. Sin vínculos, un mensaje claro. _Verificar:_ en navegador, 390 y 768 px.
-- [ ] **16.9** Eliminar mi cuenta y desvincular desde el negocio. _Verificar:_ el expediente del negocio no cambia.
-- [ ] **16.10** 🧪 Lectura de la **bitácora de hospitalización** por el dueño (cierra 33.5): salud y bitácora para la
+- [x] **16.9** Eliminar mi cuenta y desvincular desde el negocio. _Verificar:_ el expediente del negocio no cambia.
+- [x] **16.10** 🧪 Lectura de la **bitácora de hospitalización** por el dueño (cierra 33.5): salud y bitácora para la
   familia, costo solo para el titular. _Verificar:_ tests de aislamiento y de visibilidad por periodo.
-- [ ] **16.11** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+- [x] **16.11** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase. _Construido (2026-10-14):_ funciones de lectura
+  en SQL (`customer_account_overview/pet_detail`, solo `service_role`) llamadas por la Edge Function `customer-account`
+  (código por correo con `signInWithOtp`, plantilla `supabase/templates/access-code.html`); pruebas en
+  `customer-accounts.spec.ts` y `customer-account-function.spec.ts` (recorrido completo con la bandeja local). **16.7 sigue
+  pendiente** (correo de salida real).
 
 ## Fase 34 — Mi clínica: perfil y promociones (propuesta; capa B de `PLAN.md` D31)
 

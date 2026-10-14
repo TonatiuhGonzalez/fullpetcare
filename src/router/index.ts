@@ -28,7 +28,7 @@ declare module 'vue-router' {
 
 /** Rutas de la vista pública del cliente: sin sesión y sin gateos del personal. */
 function isPublicPath(path: string): boolean {
-  return path === '/c' || path.startsWith('/c/')
+  return path === '/c' || path.startsWith('/c/') || path === '/mi-cuenta'
 }
 
 export const router = createRouter({
@@ -324,6 +324,18 @@ export const router = createRouter({
           path: '',
           name: 'cliente-inicio',
           component: () => import('@/pages/publico/ClientHomePage.vue'),
+        },
+      ],
+    },
+    // Cuenta del dueño de la mascota (fase 16B, PLAN.md D31): sesión propia, aparte de la del personal.
+    {
+      path: '/mi-cuenta',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'mi-cuenta',
+          component: () => import('@/pages/publico/CustomerAccountPage.vue'),
         },
       ],
     },
