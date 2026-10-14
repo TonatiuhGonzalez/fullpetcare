@@ -2837,18 +2837,34 @@ Decisiones: D30 puntos 4 y 5.
 - [x] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
   **Hecho (2026-10-14, en la integración de la oleada 2):** ver el avance de la oleada 2. Sin dependencias nuevas (§3).
 
-## Fase 30 — Cobro de paso (propuesta)
+## Fase 30 — Cobro de paso (construida en rama; oleada 3)
 
 **Meta: cobrar un servicio sin cita y sin registrar al cliente.** Decisiones: D30 punto 6.
 
-- [ ] **30.1** 📚 Inventariar `checkout_counter_sale`, `create_walk_in_appointment` y el POS para ubicar dónde entra.
+- [x] **30.1** 📚 Inventariar `checkout_counter_sale`, `create_walk_in_appointment` y el POS para ubicar dónde entra.
   _Verificar:_ anotado.
-- [ ] **30.2** 🧪 RPC que cobra servicios y productos sin cita ni cliente, con quién atendió y el grupo de especie
+  **Decidido (2026-10-14):** `checkout_counter_sale` solo vende productos y `create_walk_in_appointment` exige cliente y
+  mascota, así que el cobro rápido es una RPC nueva (`checkout_quick_sale`) con su propia pantalla; reutiliza
+  `app.add_product_items` y `app.finalize_sale` (misma existencia, mismo cierre de pagos y misma regla de cambio).
+- [x] **30.2** 🧪 RPC que cobra servicios y productos sin cita ni cliente, con quién atendió y el grupo de especie
   (`sales.species_group_id`, nulo en ventas anteriores). _Verificar:_ test de permisos, de IVA por partida y de que
   entra a caja y a reportes.
-- [ ] **30.3** 🧪 `report_*`: dato de grupo de especie en el resumen. _Verificar:_ test.
-- [ ] **30.4** Interfaz: acción "Cobro rápido" con servicios y productos, ticket imprimible desde el navegador.
+  **Hecho:** `20261025120000_quick_sale.sql`: `sales.attended_by_user_id` y `sales.species_group_id` (nulos) y
+  `checkout_quick_sale()` (dueño y recepción; servicios del catálogo con su IVA por partida, productos por envase o
+  unidad). 8 tests en `quick-sale-rpc.spec.ts` (sin cita ni cliente, servicio + producto en un ticket, roles, otro
+  negocio, pago insuficiente sin dejar nada).
+- [x] **30.3** 🧪 `report_*`: dato de grupo de especie en el resumen. _Verificar:_ test.
+  **Hecho:** `report_staff_activity` atribuye el servicio de un cobro rápido a quien atendió (si no, a quien cobró) y
+  `report_sales_by_species_group()` agrupa por especie (lo demás va en "Sin dato"); Reportes lo muestra en "Por
+  especie". Además, "Lo más vendido" ya no mezcla envases con unidades (`sold_unit` en la llave de la fila).
+- [x] **30.4** Interfaz: acción "Cobro rápido" con servicios y productos, ticket imprimible desde el navegador.
   _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
+  **Hecho:** `/app/cobro-rapido` (`QuickSalePage`, entrada "Cobro rápido" del menú para dueño y recepción): servicio
+  y/o producto, quién atendió, especie, descuento, pagos y el ticket imprimible. **Verificado en navegador** (Chromium,
+  dueño): servicio + quién atendió + Gatos, cobro en efectivo y ticket; la venta queda `paid`, sin cliente, con su
+  atendió y su grupo. **No verificado:** el producto fraccionado desde esta pantalla, el veterinario/recepción en la
+  ruta, tema oscuro y celular. **No ofrece factura** (sin cliente no hay a quién); para facturar se usa el punto de
+  venta, que sí captura al cliente.
 - [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
 
 ## Fase 31 — Familias y transferencia de mascota (construida; integrada en la oleada 2)

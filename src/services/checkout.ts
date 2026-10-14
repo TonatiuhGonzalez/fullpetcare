@@ -117,6 +117,24 @@ export interface ChargeArgs {
   products?: ProductSaleLine[]
 }
 
+/** Un servicio en un cobro rápido (fase 30): sin cita, con el precio del catálogo. */
+export interface QuickServiceLine {
+  serviceId: string
+  quantity: number
+}
+
+export interface QuickSaleArgs {
+  branchId: string
+  services: QuickServiceLine[]
+  products: ProductSaleLine[]
+  payments: NewPayment[]
+  discountCents?: number
+  /** Quién atendió; para el reporte por empleado. */
+  attendedBy: string | null
+  /** Grupo de especie de la mascota atendida, solo estadística. */
+  speciesGroupId: string | null
+}
+
 export interface CounterSaleArgs {
   branchId: string
   /** Opcional: una venta libre no lleva cliente registrado (fase 13). */
@@ -237,6 +255,29 @@ export async function chargeCounterSale(args: CounterSaleArgs): Promise<Ticket> 
     p_products: productsPayload(args.products),
     p_payments: paymentsPayload(args.payments),
     p_discount_cents: args.discountCents ?? 0,
+  })
+
+  if (error) throw error
+  return getTicket(saleId)
+}
+
+/**
+ * Cobra un cobro rápido (fase 30): servicios y/o productos sin cita y sin cliente. Los tipos
+ * generados marcan los argumentos con valor por defecto como obligatorios y no nulos: de ahí
+ * los `as string`.
+ */
+export async function chargeQuickSale(args: QuickSaleArgs): Promise<Ticket> {
+  const { data: saleId, error } = await supabase.rpc('checkout_quick_sale', {
+    p_branch_id: args.branchId,
+    p_services: args.services.map((l) => ({
+      service_id: l.serviceId,
+      quantity: l.quantity,
+    })),
+    p_products: productsPayload(args.products),
+    p_payments: paymentsPayload(args.payments),
+    p_discount_cents: args.discountCents ?? 0,
+    p_attended_by: args.attendedBy as string,
+    p_species_group_id: args.speciesGroupId as string,
   })
 
   if (error) throw error

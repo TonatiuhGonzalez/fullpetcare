@@ -41,6 +41,8 @@ export interface SalesSummary {
 
 export interface TopItem {
   itemId: string
+  /** 'package' o 'unit' (fase 29C): un mismo producto sale en dos renglones si se vendió de las dos formas. */
+  soldUnit: string
   name: string
   quantity: number
   revenueCents: number
@@ -131,6 +133,7 @@ export async function getSalesSummary(
 function mapItems(rows: Json[]): TopItem[] {
   return rows.map((i) => ({
     itemId: s(i.item_id),
+    soldUnit: typeof i.sold_unit === 'string' ? i.sold_unit : 'package',
     name: s(i.name),
     quantity: n(i.quantity),
     revenueCents: n(i.revenue_cents),
@@ -180,6 +183,35 @@ export async function getStaffActivity(
     appointmentsCompleted: n(r.appointments_completed),
     servicesCents: n(r.services_cents),
     productsCents: n(r.products_cents),
+    totalCents: n(r.total_cents),
+  }))
+}
+
+export interface SpeciesGroupRow {
+  groupId: string | null
+  name: string
+  salesCount: number
+  totalCents: number
+}
+
+/** Ventas pagadas por grupo de especie (dato de estadística del cobro rápido, fase 30). */
+export async function getSalesBySpeciesGroup(
+  tenantId: string,
+  from: string,
+  to: string,
+  branchId: string | null,
+): Promise<SpeciesGroupRow[]> {
+  const { data, error } = await supabase.rpc('report_sales_by_species_group', {
+    p_tenant_id: tenantId,
+    p_from: from,
+    p_to: to,
+    p_branch_id: branchId ?? undefined,
+  })
+  if (error) throw friendly(error)
+  return (data as Json[]).map((r) => ({
+    groupId: (r.group_id as string | null) ?? null,
+    name: s(r.name),
+    salesCount: n(r.sales_count),
     totalCents: n(r.total_cents),
   }))
 }
