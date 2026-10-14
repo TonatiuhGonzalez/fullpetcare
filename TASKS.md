@@ -2644,6 +2644,11 @@ mascota y calcular la fecha por edad; asignar proveedores a un producto; como ve
 con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
 agregarla a inicio y verla sin red.
 
+**Preparación de la oleada 3 (2026-10-14).** Antes de las fases 30 y 32: rutas `/app/cobro-rapido` (dueño y recepción) y
+`/app/configuracion/cirugias` (dueño y veterinario), sus entradas de menú, páginas vacías y secciones reservadas en las
+semillas. **16B** (cuenta del cliente y notificaciones) queda fuera de esta preparación: pide un servicio de correo y
+una librería de cifrado para Web Push, y se justifica con el usuario antes (§3).
+
 **Avance de la oleada 2 (2026-10-14).** Construida en dos ramas desde `integration/d30-wave1` —`feat/d30-fractional`
 (29C) y `feat/d30-families` (31)— y probada junta en `integration/d30-wave2` (sin push ni PR). **Verificado en la
 rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 831 tests unitarios, `test:db` 934 de 934 (con las Edge
