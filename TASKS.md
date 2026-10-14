@@ -1832,21 +1832,39 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
 8. **Superadmin** con la misma identidad.
 
-## Fase 16 — Acceso del cliente: PWA y cuenta propia (propuesta)
+## Fase 16 — Acceso del cliente: PWA y cuenta propia (16A construida en rama; 16B planeada para la oleada 3)
 
 **Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
-Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta, trabajo a futuro; no se construye hasta
-que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: 16A construida en rama (2026-10-14, paquete D30); 16B
+planeada para la oleada 3.** Decisiones y alternativas en `PLAN.md` D21.
 
 ### 16A. PWA sobre la vista actual
 
-- [ ] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
+- [x] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
   y aprobar `PLAN.md` D21. _Verificar:_ el usuario aprobó por escrito; D21 sin "propuesta".
-- [ ] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
+  **Hecho (2026-10-14):** D21 ya estaba aprobada; el usuario aprobó construir la 16A dentro del paquete D30
+  (oleada 1). Se confirmó que no había manifest ni service worker.
+- [x] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
   nunca de datos de la mascota. _Verificar:_ Lighthouse "instalable"; en el teléfono se agrega a inicio y abre sin barra
   del navegador; un token revocado sigue sin mostrar nada aun con caché.
-- [ ] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
+  **Hecho:** `public/manifest.webmanifest`, íconos en `public/icons/` (192, 512 y maskable, generados con
+  `scripts/gen-pwa-icons.mjs` desde el isotipo), `public/sw.js` escrito a mano (sin dependencia), `plugins/pwa.ts` y
+  cabeceras `no-cache` para `sw.js`, el manifiesto y `offline.html`. El worker **ignora todo lo de otro dominio** (ahí
+  viven los datos de la mascota), no guarda pantallas y solo guarda los archivos con hash de `/assets/`. 7 tests del
+  worker real (`serviceWorker.spec.ts`). **Verificado en navegador** (Chromium, build de producción en `vite preview`):
+  manifiesto enlazado, worker activo y, sin red, una navegación muestra "Sin conexión". **No verificado:** Lighthouse
+  "instalable" ni instalación en un teléfono real, ni con Cloudflare (cabeceras `_headers`).
+  **Decisión nueva (a confirmar):** `start_url` es `/c`: el manifiesto es uno solo y no puede llevar el token de cada
+  mascota. La vista pública recuerda en el teléfono el último token abierto (`lib/lastPetLink.ts`, `localStorage`,
+  solo con forma de token y borrado si el link deja de servir) y `/c` lleva a esa mascota; sin token, explica que hay
+  que abrir el link de la clínica. El acceso sigue siendo el link con token.
+- [x] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
   modo avión se ve el aviso, no datos viejos de otra mascota.
+  **Hecho:** `InstallAppBanner` en el layout público: en Android un botón que lanza el diálogo del navegador; en
+  iPhone y iPad la instrucción de Compartir → Agregar a pantalla de inicio. "Ahora no" y "Entendido" lo ocultan 30 días
+  en este teléfono. Pantalla `offline.html` estática, sin datos. **Verificado en navegador:** con un agente de usuario
+  de iPhone sale la instrucción y no vuelve tras "Entendido", ni al recargar. **No verificado:** el botón de Android
+  (`beforeinstallprompt`) en un teléfono real ni el modo avión de un dispositivo.
 
 ### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
 

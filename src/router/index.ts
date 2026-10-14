@@ -26,6 +26,11 @@ declare module 'vue-router' {
   }
 }
 
+/** Rutas de la vista pública del cliente: sin sesión y sin gateos del personal. */
+function isPublicPath(path: string): boolean {
+  return path === '/c' || path.startsWith('/c/')
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -272,6 +277,19 @@ export const router = createRouter({
     // Vista pública (tarea 7.12): NO va dentro de /app — no exige sesión
     // y usa su propio layout, sin nada de la navegación interna (el
     // guard de abajo solo revisa rutas que empiecen con "/app").
+    // Inicio de la app instalada (fase 16A, PLAN.md D21): el manifiesto abre aquí. Sin token en
+    // la dirección, lleva a la última mascota consultada en este teléfono.
+    {
+      path: '/c',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'cliente-inicio',
+          component: () => import('@/pages/publico/ClientHomePage.vue'),
+        },
+      ],
+    },
     {
       path: '/c/:token',
       component: () => import('@/layouts/PublicLayout.vue'),
@@ -338,7 +356,7 @@ router.beforeEach(async (to) => {
   // los demás gateos porque para esta persona aún no se cargaron ni negocios
   // ni rol de plataforma. Quien ya la cambió y entra a mano a esa pantalla
   // se manda a su casa.
-  if (session.isAuthenticated && !to.path.startsWith('/c/')) {
+  if (session.isAuthenticated && !isPublicPath(to.path)) {
     if (session.mustChangePassword && !isForcePasswordRoute) {
       return { path: '/cambiar-contrasena' }
     }
@@ -350,7 +368,7 @@ router.beforeEach(async (to) => {
   // Todos sus negocios están suspendidos, dados de baja o vencidos: no hay
   // nada que mostrarle salvo el aviso, que vive en /login (LoginPage abre el
   // diálogo solo). Se le deja ahí, y la vista pública /c/:token no se toca.
-  if (session.isBlockedOnly && !to.path.startsWith('/c/')) {
+  if (session.isBlockedOnly && !isPublicPath(to.path)) {
     return to.path === '/login' ? true : { path: '/login' }
   }
 

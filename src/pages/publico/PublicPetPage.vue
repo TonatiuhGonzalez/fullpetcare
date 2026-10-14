@@ -14,6 +14,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { branchToday, formatDate, formatDateOnly } from '@/lib/datetime'
+import { forgetLastPetLink, saveLastPetLink } from '@/lib/lastPetLink'
 import { sexLabel, speciesLabel } from '@/lib/petLabels'
 import {
   cardHeadline,
@@ -105,11 +106,15 @@ async function load(): Promise<void> {
     // (CLAUDE.md §7.4: nunca detalles técnicos en la vista pública).
     if (error || !result) {
       status.value = 'error'
+      // Un link que ya no sirve no se recuerda: la app instalada no debe volver a él.
+      forgetLastPetLink(props.token)
       return
     }
     data.value = result as PublicPetDto
     emit('business-name', data.value.businessName)
     status.value = 'ready'
+    // La app instalada abre en /c y necesita saber a qué mascota ir (fase 16A).
+    saveLastPetLink(props.token)
   } catch {
     status.value = 'error'
   }
