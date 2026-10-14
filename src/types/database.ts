@@ -40,9 +40,11 @@ export type Database = {
           name_snapshot: string
           product_id: string
           quantity: number
+          sold_unit: string
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot: number
           updated_at: string
         }
         ComputedFields: never
@@ -56,9 +58,11 @@ export type Database = {
           name_snapshot: string
           product_id: string
           quantity: number
+          sold_unit?: string
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Update: {
@@ -71,9 +75,11 @@ export type Database = {
           name_snapshot?: string
           product_id?: string
           quantity?: number
+          sold_unit?: string
           tax_rate_bp?: number
           tenant_id?: string
           unit_price_cents?: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Relationships: [
@@ -1746,12 +1752,17 @@ export type Database = {
           is_active: boolean
           min_stock: number
           name: string
+          package_name: string | null
           price_cents: number
           sat_product_code: string
           sat_unit_code: string
           sku: string | null
           tax_rate_bp: number
           tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
           updated_at: string
         }
         ComputedFields: never
@@ -1764,12 +1775,17 @@ export type Database = {
           is_active?: boolean
           min_stock?: number
           name: string
+          package_name?: string | null
           price_cents: number
           sat_product_code?: string
           sat_unit_code?: string
           sku?: string | null
           tax_rate_bp?: number
           tenant_id: string
+          unit_name?: string | null
+          unit_price_cents?: number | null
+          unit_sat_code?: string | null
+          units_per_package?: number
           updated_at?: string
         }
         Update: {
@@ -1781,12 +1797,17 @@ export type Database = {
           is_active?: boolean
           min_stock?: number
           name?: string
+          package_name?: string | null
           price_cents?: number
           sat_product_code?: string
           sat_unit_code?: string
           sku?: string | null
           tax_rate_bp?: number
           tenant_id?: string
+          unit_name?: string | null
+          unit_price_cents?: number | null
+          unit_sat_code?: string | null
+          units_per_package?: number
           updated_at?: string
         }
         Relationships: [
@@ -1895,11 +1916,14 @@ export type Database = {
           product_id: string | null
           quantity: number
           sale_id: string
+          sat_unit_code_snapshot: string | null
           service_id: string | null
+          sold_unit: string
           tax_cents: number
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot: number
           updated_at: string
         }
         ComputedFields: never
@@ -1915,11 +1939,14 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id: string
+          sat_unit_code_snapshot?: string | null
           service_id?: string | null
+          sold_unit?: string
           tax_cents: number
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Update: {
@@ -1934,11 +1961,14 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id?: string
+          sat_unit_code_snapshot?: string | null
           service_id?: string | null
+          sold_unit?: string
           tax_cents?: number
           tax_rate_bp?: number
           tenant_id?: string
           unit_price_cents?: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Relationships: [
@@ -2769,6 +2799,7 @@ export type Database = {
           p_is_billable?: boolean
           p_product_id: string
           p_quantity: number
+          p_unit?: string
         }
         Returns: string
       }
@@ -3405,12 +3436,17 @@ export type Database = {
           is_active: boolean
           min_stock: number
           name: string
+          package_name: string | null
           price_cents: number
           sat_product_code: string
           sat_unit_code: string
           sku: string | null
           tax_rate_bp: number
           tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
           updated_at: string
         }[]
         SetofOptions: {
@@ -3418,6 +3454,44 @@ export type Database = {
           to: "products"
           isOneToOne: false
           isSetofReturn: true
+        }
+      }
+      set_product_presentation: {
+        Args: {
+          p_package_name?: string
+          p_product_id: string
+          p_unit_name?: string
+          p_unit_price_cents?: number
+          p_unit_sat_code?: string
+          p_units_per_package: number
+        }
+        Returns: {
+          category_id: string | null
+          cost_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          min_stock: number
+          name: string
+          package_name: string | null
+          price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
+          sku: string | null
+          tax_rate_bp: number
+          tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "products"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       set_tenant_logo: {

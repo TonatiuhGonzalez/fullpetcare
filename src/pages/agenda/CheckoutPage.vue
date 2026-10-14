@@ -21,6 +21,7 @@ import * as invoiceRequestsService from '@/services/invoiceRequests'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import type { Database } from '@/types/database'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
+import { formatStock, isFractional, type SaleUnit } from '@/lib/fractional'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
@@ -48,6 +49,8 @@ const newCardType = ref<CardFormCode | null>(null)
 
 const productToAdd = ref<SellableProduct | null>(null)
 const productQuantity = ref(1)
+// Envase o unidad suelta, solo para productos fraccionados (fase 29C).
+const productUnit = ref<SaleUnit>('package')
 const productError = ref<string | null>(null)
 
 const requiresInvoice = ref(false)
@@ -108,17 +111,19 @@ async function loadProducts(branchId: string): Promise<void> {
 function handleAddProduct(): void {
   productError.value = null
   if (!productToAdd.value) return
-  if (!cart.addProduct(productToAdd.value, productQuantity.value)) {
-    productError.value = `Solo hay ${productToAdd.value.stock} pieza(s) de "${productToAdd.value.name}".`
+  const unit = isFractional(productToAdd.value) ? productUnit.value : 'package'
+  if (!cart.addProduct(productToAdd.value, productQuantity.value, unit)) {
+    productError.value = `Solo hay ${formatStock(productToAdd.value.stock, productToAdd.value)} de "${productToAdd.value.name}".`
     return
   }
   productToAdd.value = null
   productQuantity.value = 1
+  productUnit.value = 'package'
 }
 
-function handleProductQuantity(productId: string, value: string | number): void {
+function handleProductQuantity(key: string, value: string | number): void {
   productError.value = null
-  if (!cart.setProductQuantity(productId, Number(value))) {
+  if (!cart.setProductQuantity(key, Number(value))) {
     productError.value =
       'La cantidad debe ser un entero y no puede pasar de la existencia.'
   }
@@ -265,10 +270,17 @@ async function handleCharge(): Promise<void> {
               formatMXN(item.unitPriceCents * item.quantity)
             }}</template>
           </v-list-item>
-          <v-list-item v-for="item in cart.productItems" :key="item.productId">
+          <v-list-item v-for="item in cart.productItems" :key="item.key">
             <template #title>{{ item.description }}</template>
             <template #subtitle
-              >{{ formatMXN(item.unitPriceCents) }} c/u · hay {{ item.stock }}</template
+              >{{ formatMXN(item.unitPriceCents) }} c/u · hay
+              {{
+                formatStock(item.stock, {
+                  unitsPerPackage: item.unitsPerPackage,
+                  packageName: item.packageName,
+                  unitName: item.unitName,
+                })
+              }}</template
             >
             <template #append>
               <v-text-field
@@ -281,7 +293,7 @@ async function handleCharge(): Promise<void> {
                 style="width: 80px"
                 class="mr-2"
                 aria-label="Cantidad"
-                @update:model-value="handleProductQuantity(item.productId, $event)"
+                @update:model-value="handleProductQuantity(item.key, $event)"
               />
               <span class="mr-2">{{
                 formatMXN(item.unitPriceCents * item.quantity)
@@ -291,7 +303,7 @@ async function handleCharge(): Promise<void> {
                 size="x-small"
                 variant="text"
                 aria-label="Quitar producto"
-                @click="cart.removeProduct(item.productId)"
+                @click="cart.removeProduct(item.key)"
               />
             </template>
           </v-list-item>
@@ -312,10 +324,23 @@ async function handleCharge(): Promise<void> {
             <template #item="{ props: itemProps, item }">
               <v-list-item
                 v-bind="itemProps"
-                :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${item.raw.stock}`"
+                :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${formatStock(item.raw.stock, item.raw)}`"
               />
             </template>
           </v-autocomplete>
+          <!-- Producto fraccionado (fase 29C): envase completo o unidad suelta. -->
+          <v-btn-toggle
+            v-if="productToAdd && isFractional(productToAdd)"
+            v-model="productUnit"
+            mandatory
+            density="compact"
+            color="primary"
+            variant="outlined"
+            divided
+          >
+            <v-btn value="package" size="small">{{ productToAdd.packageName ?? 'Envase' }}</v-btn>
+            <v-btn value="unit" size="small">{{ productToAdd.unitName ?? 'Unidad' }}</v-btn>
+          </v-btn-toggle>
           <v-text-field
             v-model.number="productQuantity"
             label="Cant.*"

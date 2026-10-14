@@ -2753,15 +2753,22 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
   ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
 
-## Fase 29 — Proveedores y medicamentos fraccionados (29B construida en rama; 29C pendiente)
+## Fase 29 — Proveedores y medicamentos fraccionados (29B integrada en la oleada 1; 29C construida en rama)
 
 **Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
 Decisiones: D30 puntos 4 y 5.
 
 ### 29A. Preparación
-- [ ] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
+- [x] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
   y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
 
+  **Decidido (2026-10-14):** la existencia se guarda en la **unidad base** (tableta, ml), siempre entera;
+  `products.units_per_package` dice cuántas hay por envase y con 1 el producto no se fracciona (todo como antes, sin
+  tocar existencias). Se vende o se consume por **envase** (por defecto) o por **unidad**. El envase abierto **se deriva**
+  (`existencia mod unidades por envase`), no es otra tabla. La `ClaveUnidad` de la unidad suelta es
+  `products.unit_sat_code` y se copia a la partida (`sale_items.sat_unit_code_snapshot`); la Edge Function `invoicing`
+  la usa en lugar de la del producto. Cambiar la presentación reescala la existencia con un ajuste por sucursal y se
+  rechaza si no da enteros. `report_top_items` ya no mezcla envases con unidades.
 ### 29B. Proveedores
 - [x] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
   suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
@@ -2778,18 +2785,37 @@ Decisiones: D30 puntos 4 y 5.
   (ids `31000000-…`); 2 tests en `demo-reset.spec.ts`.
 
 ### 29C. Fraccionados
-- [ ] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
+- [x] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
   guarda en unidad base (entera). Migración aditiva: los productos actuales quedan con factor 1. _Verificar:_ test de
   que nada cambia en los productos existentes.
-- [ ] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
+  **Hecho:** `20261023120000_fractional_products.sql`: columnas de presentación en `products`, `sold_unit` y
+  snapshots en `sale_items` y `appointment_products`, y `set_product_presentation()` (reescala la existencia).
+  Los productos existentes quedan con factor 1: ninguna existencia cambia.
+- [x] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
   límites (precio 0, 1 unidad, centavos sobrantes). _Verificar:_ tests de redondeo.
-- [ ] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
+  **Hecho:** `lib/fractional.ts` (precio de la unidad, unidades base, existencia por envases y sueltas, envase abierto y
+  validación); 15 tests, con el borde del redondeo ($100.00 entre 3 = $33.33).
+- [x] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
   el producto y en la venta; el snapshot conserva la unidad. _Verificar:_ test de que vender 3 tabletas descuenta 3 y no
   1 caja, y de que cancelar la venta las devuelve.
-- [ ] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
+  **Hecho:** `app.add_product_items()` y `add_appointment_product()` (nuevo parámetro `p_unit`) aceptan `unit` y
+  `unit_price_cents`; el insumo cobrable llega al ticket con su unidad por un trigger sobre `sale_items`. 17 tests en
+  `fractional-products-rpc.spec.ts` (3 tabletas bajan 3 y no 1 caja, envase + sueltas cuadran, el precio corregido,
+  cancelar devuelve las unidades, consumo y reporte). Cart: partidas por producto + unidad y existencia en unidades
+  base (7 tests nuevos).
+- [x] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
   abierto no descuenta uno nuevo hasta agotarlo.
-- [ ] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
+  **Hecho (derivado, sin tabla):** el envase abierto sale de la existencia; se muestra en Inventario ("Caja abierta:
+  quedan 3 de 20"). 3 tests en `fractional.spec.ts`.
+- [x] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
   navegador.
+  **Hecho:** presentación en el formulario de producto, entrada de compra/ajuste en envases o unidades
+  (`StockMovementDialog`), selector envase/unidad en el punto de venta (con el precio de la unidad corregible), en el
+  cobro de cita y en los productos usados en consulta. **Verificado en navegador** (Chromium, dueño): 3 cajas se
+  convierten en "60 tabletas · 3 cajas"; en el punto de venta, 3 tabletas cuestan $7.25 × 3 = $21.75. **No verificado:**
+  cobro completo desde la pantalla, el cobro de cita y los insumos en consulta (solo por pruebas de base), tema oscuro
+  y celular. **Sin semilla:** no se agregó un producto fraccionado a la demo (habría que tocar `demo_reset` y varias
+  pruebas); para mostrarlo se edita un producto desde Inventario.
 - [ ] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
 
 ## Fase 30 — Cobro de paso (propuesta)

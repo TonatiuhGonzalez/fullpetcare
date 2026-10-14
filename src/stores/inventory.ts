@@ -115,6 +115,8 @@ export const useInventoryStore = defineStore('inventory', () => {
     productId?: string,
     // Proveedores del producto (fase 29B). Ausente = no se tocan los que ya tiene.
     supplierIds?: string[],
+    // Presentación fraccionada (fase 29C). Ausente = no se toca.
+    presentation?: productsService.ProductPresentationInput,
   ): Promise<string | null> {
     const session = useSessionStore()
     if (!session.activeTenantId)
@@ -145,6 +147,23 @@ export const useInventoryStore = defineStore('inventory', () => {
       }
     } catch {
       return 'No se pudo guardar el producto. Revisa tu conexión.'
+    }
+
+    // La presentación va después de guardar el producto (necesita su id). Si la base la rechaza
+    // (p. ej. la existencia no cabe exacta en el nuevo envase) trae su mensaje en español.
+    if (presentation) {
+      try {
+        await productsService.setPresentation(savedId, presentation)
+      } catch (error) {
+        await load()
+        const message =
+          error && typeof error === 'object' && 'message' in error
+            ? String((error as { message: string }).message)
+            : ''
+        return message
+          ? `El producto se guardó, pero la presentación no: ${message}`
+          : 'El producto se guardó, pero no se pudo guardar la presentación. Inténtalo de nuevo.'
+      }
     }
 
     // El producto ya quedó guardado: si falla solo el vínculo con proveedores, se avisa
