@@ -2560,3 +2560,206 @@ empresa (columna y bucket nuevos) y el permiso de escritura del catálogo de vac
   §6.2 y §6.4). **Qué se puede demostrar:** como dueño, subir la imagen de la empresa y verla en el menú; como
   veterinario, agregar una vacuna y ocultarla; buscar un cliente por el nombre de su mascota; y abrir el sistema en un
   celular: tarjetas en lugar de tablas y la agenda como lista del día.
+
+---
+
+# Paquete D30 — Observaciones del veterinario (fases 27 a 33)
+
+**Estado: propuesta (2026-10-14); ninguna fase se construye hasta que el usuario apruebe `PLAN.md` D30.** Etapa de
+mejoras (`CLAUDE.md` §1). Una fase a la vez, en este orden. La **16B** (cuenta del cliente y push) es requisito de la 33.
+Simbología: 📚 documentación, 🧪 con prueba obligatoria.
+
+### Oleadas (acordadas con el usuario, 2026-10-14)
+
+Se trabaja por oleadas, como en Correcciones 1: una rama por fase desde `develop`, una rama de integración por oleada
+(`integration/d30-waveN`) donde se prueba todo junto, sin push ni PR hasta pedirlo. **Máximo 4 ramas a la vez.** Las
+ramas se construyen una tras otra en el mismo repositorio (no hay agentes en paralelo). La numeración de fases no cambia;
+el orden de construcción sí.
+
+| Oleada | Ramas | Por qué no chocan |
+| ------ | ----- | ----------------- |
+| **0** (secuencial, corta) | Preparación: rangos de migración reservados, rutas y entradas de menú vacías, secciones de `seed.sql` | Quita de en medio los archivos compartidos |
+| **1** | **27** especies, razas y edad · **28** receta · **29B** proveedores · **16A** PWA | Tablas nuevas y pantallas distintas |
+| **2** | **29C** fraccionados · **31** familias y transferencia | Una toca inventario y ventas; la otra, clientes y mascotas |
+| **3** | **30** cobro de paso · **32** cirugías · **16B** cuenta del cliente y push | Con 29C integrada; 16B ya con la visibilidad de 31 |
+| **4** | **33** hospitalización, sola | Depende de 29C, 31, 32 y 16B |
+
+**Reglas para que no choquen:**
+1. Cada rama es **dueña de sus tablas**; una migración solo altera tablas de su fase. Si necesita otra, esa tarea pasa
+   a una oleada posterior.
+2. **Migraciones con rango de fecha reservado por rama** (se fija en la oleada 0), para que el orden sea el mismo sin
+   importar quién se integre primero.
+3. **`src/types/database.ts` no se versiona en las ramas:** se regenera una sola vez en la rama de integración.
+4. **`CLAUDE.md` y `PLAN.md` solo se tocan en el cierre de la oleada.** Cada rama marca solo las tareas de su sección
+   de `TASKS.md`; la tarea 📚 "actualizar `CLAUDE.md`" de cada fase se hace en el cierre.
+5. **`test:db` y el E2E se corren en la rama de integración**, no por rama (la base local acumula datos de los tests).
+6. **Dentro de una fase no se paraleliza:** migración → servicio → pantalla van en orden.
+7. `router/index.ts`, `AppLayout`, `SettingsPage`, `seed.sql` y `seed/demo_reset.sql` los prepara la oleada 0 **para las
+   oleadas 1 y 2**; las ramas solo llenan sus páginas y secciones. Cada oleada posterior abre con su propia
+   preparación corta (rutas y secciones que le toquen), en lugar de inventarlas hoy.
+8. **Rangos de migración reservados** (`AAAAMMDD` + hora; dentro del rango la rama elige libremente):
+
+   | Rama | Rango | Rama | Rango |
+   | ---- | ----- | ---- | ----- |
+   | 27 especies y razas | `20261020…` | 31 familias y transferencia | `20261024…` |
+   | 28 receta | `20261021…` | 30 cobro de paso | `20261025…` |
+   | 29B proveedores | `20261022…` | 32 cirugías | `20261026…` |
+   | 29C fraccionados | `20261023…` | 16B cuenta del cliente | `20261027…` |
+   | | | 33 hospitalización | `20261028…` |
+
+   Un rango es de **una** rama: si una migración necesita pasar a otro rango, es señal de que toca tablas de otra fase.
+
+**Antes de la oleada 1** (bloquean): aprobación escrita de D30; 27.1 (lista de grandes grupos de especies y si perro y
+gato son grupos); 28.1 (formato de la receta y dónde va la cédula). 16B pasa a la oleada 3, después de 31.
+
+## Fase 27 — Catálogos de especies y razas, y edad de la mascota (propuesta)
+
+**Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
+Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
+
+### 27A. Preparación
+- [ ] **27.1** 📚 Aprobar D30 y confirmar la lista inicial de grandes grupos (propuesta: perros, gatos, aves, reptiles,
+  roedores y otros) y si "perro" y "gato" son grupos o especies dentro de uno. _Verificar:_ el usuario aprobó por
+  escrito; D30 sin "propuesta".
+- [ ] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
+  vacunas por especie, importador). _Verificar:_ la lista queda anotada aquí.
+
+### 27B. Base de datos
+- [ ] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
+  DELETE, y escritura de dueño y veterinario (patrón de `vaccines`, D29). _Verificar:_ test de aislamiento; recepción y
+  groomer leen y no escriben; otro negocio no ve nada.
+- [ ] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
+  anteriores se conservan. _Verificar:_ las mascotas existentes siguen funcionando sin tocarlas.
+- [ ] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
+  `seed.sql`. _Verificar:_ un negocio creado después ya lo trae; `demo:reset` lo restaura.
+
+### 27C. Reglas y servicios
+- [ ] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
+  bordes (cumpleaños hoy, 29 de febrero, 0 meses, mes de 31 días). _Verificar:_ tests unitarios con su explicación.
+- [ ] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
+  acentos, ñ aparte. _Verificar:_ test de servicio.
+
+### 27D. Interfaz
+- [ ] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
+  años/meses que propone una fecha editable y marcada como estimada. _Verificar:_ en navegador, claro y oscuro, 390 y 768 px.
+- [ ] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
+- [ ] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+
+## Fase 28 — Receta médica imprimible (propuesta)
+
+**Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
+
+### 28A. Preparación
+- [ ] **28.1** 📚 Confirmar con el usuario el formato (foto del que usa el veterinario) y dónde va la cédula
+  (`employee_details` o `profiles`). _Verificar:_ aprobado por escrito.
+
+### 28B. Base de datos
+- [ ] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
+  `lib/validation.ts`). _Verificar:_ test; solo quien tiene permiso de empleados la edita.
+- [ ] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
+  duración) ligadas a la consulta; es **expediente**: sin borrado y con bitácora. Emitirla solo la hace veterinario o
+  dueño **con cédula**; la RPC lo revalida. _Verificar:_ test de RLS (recepción y groomer no la crean; groomer no la
+  lee) y de que sin cédula se rechaza.
+- [ ] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
+  crear el producto. _Verificar:_ test; solo lo ve el dueño.
+
+### 28C. Interfaz
+- [ ] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
+  Encabezado: empresa y sucursal, veterinario y cédula, fecha, mascota y dueño; cuerpo: tabla de medicamentos; pie:
+  espacio de firma. _Verificar:_ imprimir a PDF desde el navegador y revisar una hoja carta.
+- [ ] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+
+## Fase 29 — Proveedores y medicamentos fraccionados (propuesta)
+
+**Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
+Decisiones: D30 puntos 4 y 5.
+
+### 29A. Preparación
+- [ ] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
+  y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
+
+### 29B. Proveedores
+- [ ] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
+  suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
+- [ ] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+
+### 29C. Fraccionados
+- [ ] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
+  guarda en unidad base (entera). Migración aditiva: los productos actuales quedan con factor 1. _Verificar:_ test de
+  que nada cambia en los productos existentes.
+- [ ] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
+  límites (precio 0, 1 unidad, centavos sobrantes). _Verificar:_ tests de redondeo.
+- [ ] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
+  el producto y en la venta; el snapshot conserva la unidad. _Verificar:_ test de que vender 3 tabletas descuenta 3 y no
+  1 caja, y de que cancelar la venta las devuelve.
+- [ ] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
+  abierto no descuenta uno nuevo hasta agotarlo.
+- [ ] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
+  navegador.
+- [ ] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+
+## Fase 30 — Cobro de paso (propuesta)
+
+**Meta: cobrar un servicio sin cita y sin registrar al cliente.** Decisiones: D30 punto 6.
+
+- [ ] **30.1** 📚 Inventariar `checkout_counter_sale`, `create_walk_in_appointment` y el POS para ubicar dónde entra.
+  _Verificar:_ anotado.
+- [ ] **30.2** 🧪 RPC que cobra servicios y productos sin cita ni cliente, con quién atendió y el grupo de especie
+  (`sales.species_group_id`, nulo en ventas anteriores). _Verificar:_ test de permisos, de IVA por partida y de que
+  entra a caja y a reportes.
+- [ ] **30.3** 🧪 `report_*`: dato de grupo de especie en el resumen. _Verificar:_ test.
+- [ ] **30.4** Interfaz: acción "Cobro rápido" con servicios y productos, ticket imprimible desde el navegador.
+  _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
+- [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
+
+## Fase 31 — Familias y transferencia de mascota (propuesta)
+
+**Meta: varios dueños de una misma mascota dentro de una familia, y poder cambiar de dueño sin perder el historial.**
+Decisiones: D30 puntos 7 y 8.
+
+- [ ] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
+- [ ] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
+  aislamiento y de que un cliente no entra a dos familias.
+- [ ] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
+- [ ] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
+  ventas, revoca los links y cierra el periodo anterior. _Verificar:_ test de cada efecto y de que otro negocio no puede.
+- [ ] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
+  montos; el no titular no ve montos. _Verificar:_ tests de aislamiento propios (el riesgo mayor del paquete).
+- [ ] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
+  _Verificar:_ en navegador, 390 y 768 px.
+- [ ] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+
+## Fase 32 — Catálogo de cirugías y costos (propuesta)
+
+**Meta: cobrar una cirugía con sus consumibles, medicamentos y honorarios, partiendo de un paquete.** D30 punto 9.
+
+- [ ] **32.1** 📚 Inventariar `services`, `appointment_services` y `appointment_products` para decidir qué se reutiliza.
+- [ ] **32.2** 🧪 `surgery_packages` y `surgery_package_items` (consumible, honorario o medicamento; producto ligado u
+  opcional) con RLS y borrado suave. _Verificar:_ test de aislamiento y permisos.
+- [ ] **32.3** 🧪 Aplicar un paquete a una cita veterinaria con snapshot de precios, ajustable renglón por renglón, o
+  armar uno desde cero. Consumibles y medicamentos descuentan inventario; honorarios no. _Verificar:_ test de
+  inventario, de IVA por partida y de que cambiar el catálogo no altera una cita ya cobrada.
+- [ ] **32.4** Interfaz: catálogo en Configuración (dueño y veterinario) y selector en la atención. _Verificar:_ en
+  navegador.
+- [ ] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
+
+## Fase 33 — Hospitalización con bitácora y aviso al dueño (propuesta, requiere 16B)
+
+**Meta: controlar la estancia de un paciente, cobrarla y mantener al dueño al tanto dentro del sistema.** D30
+puntos 10 y 11. **Depende de la 16B** (cuenta del cliente y notificaciones push).
+
+- [ ] **33.1** 📚 Confirmar el orden con la 16B y qué se entrega si ésta se retrasa (ver riesgos de D30).
+- [ ] **33.2** 🧪 `hospital_spaces` (por sucursal) y configuración del negocio: día natural o 24 horas, tarifa única o
+  por tipo de espacio. _Verificar:_ test.
+- [ ] **33.3** 🧪 `hospital_stays` (ingreso, alta, espacio, tarifa por día o por estancia con snapshot). Varias mascotas
+  por espacio. _Verificar:_ test de cálculo de días en ambas reglas, con zona horaria de sucursal (§8.3).
+- [ ] **33.4** 🧪 `hospital_notes` (hora, lo realizado, temperatura, peso, frecuencia cardiaca, mucosas, ánimo,
+  micción/defecación, todo opcional, y texto libre) y medicamentos administrados con inventario y cobro. Es expediente:
+  sin borrado, con bitácora. _Verificar:_ test de roles (veterinario, dueño y recepción escriben; groomer no).
+- [ ] **33.5** 🧪 Lectura del dueño de la mascota por la 16B: salud, bitácora y costo para el titular; sin costo para
+  miembros no titulares; notificación "Hay novedades de <mascota>" sin datos clínicos. _Verificar:_ tests de
+  aislamiento y de que la notificación no lleva contenido clínico.
+- [ ] **33.6** 🧪 Aviso al abrir el cobro de una mascota con estancia abierta. _Verificar:_ test.
+- [ ] **33.7** Interfaz: tablero de espacios, ficha de estancia con bitácora, formulario de nota y cobro de la
+  estancia. _Verificar:_ en navegador, 390 y 768 px.
+- [ ] **33.8** 📚 `lint`, `test:unit`, `test:db`, E2E; `CLAUDE.md` (§6 y §7) y marcar la fase.

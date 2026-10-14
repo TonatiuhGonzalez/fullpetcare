@@ -482,3 +482,13 @@ begin
       internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
   where tenant_id = v_tenant_mimos;
 end $$;
+
+-- ===========================================================================
+-- Oleada 1 del paquete D30 (PLAN.md D30): secciones reservadas
+-- ===========================================================================
+-- Cada rama llena SU sección y no toca las de las demás, para que dos ramas no editen
+-- las mismas líneas al integrarse.
+--
+-- (fase 27) Catálogo base de grupos, especies y razas de Patitas Felices y Huellitas Spa.
+
+-- (fase 29B) Proveedores de ejemplo de Patitas Felices.
