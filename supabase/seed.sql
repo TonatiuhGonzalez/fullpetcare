@@ -508,4 +508,17 @@ from breeds b
 where b.tenant_id = p.tenant_id and b.species_id = p.species_id and b.deleted_at is null
   and lower(btrim(b.name)) = lower(btrim(p.breed)) and p.breed_id is null;
 
+-- (fase 28) Cédula profesional (ficticia) del veterinario y del dueño de Patitas Felices: sin
+-- ella no pueden emitir recetas (save_prescription la exige). La fila de employee_details
+-- puede no existir todavía para los usuarios de demo, por eso es un upsert.
+insert into employee_details (tenant_id, membership_id, professional_license)
+select m.tenant_id, m.id, v.license
+from memberships m
+join (values
+  ('a0000000-0000-4000-8000-000000000004'::uuid, '1234567'),
+  ('a0000000-0000-4000-8000-000000000001'::uuid, '7654321')
+) as v(user_id, license) on v.user_id = m.user_id
+where m.tenant_id = 'b0000000-0000-4000-8000-000000000001'
+on conflict (membership_id) do update set professional_license = excluded.professional_license;
+
 -- (fase 29B) Proveedores de ejemplo de Patitas Felices.
