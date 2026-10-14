@@ -742,4 +742,31 @@ end $$;
 --
 -- (fase 27) Restaurar el catálogo de grupos, especies y razas de Patitas Felices.
 
--- (fase 29B) Restaurar los proveedores de ejemplo de Patitas Felices.
+-- (fase 29B) Proveedores de Patitas Felices: los de ejemplo vuelven a estar activos y visibles,
+-- y los que se agregaron durante una demo se ocultan (son catálogo, no historial: ocultarlos
+-- no pierde nada). Los vínculos de los productos de la semilla se restauran igual.
+update suppliers
+set deleted_at = null, is_active = true
+where id in (
+  '31000000-0000-4000-8000-000000000001',
+  '31000000-0000-4000-8000-000000000002',
+  '31000000-0000-4000-8000-000000000003'
+);
+update suppliers
+set deleted_at = now()
+where tenant_id = 'b0000000-0000-4000-8000-000000000001'
+  and deleted_at is null
+  and id not in (
+    '31000000-0000-4000-8000-000000000001',
+    '31000000-0000-4000-8000-000000000002',
+    '31000000-0000-4000-8000-000000000003'
+  );
+update product_suppliers
+set deleted_at = now()
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is null;
+insert into product_suppliers (tenant_id, product_id, supplier_id)
+values
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000002'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000003'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000003');

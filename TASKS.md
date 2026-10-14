@@ -2675,7 +2675,7 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   espacio de firma. _Verificar:_ imprimir a PDF desde el navegador y revisar una hoja carta.
 - [ ] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
 
-## Fase 29 — Proveedores y medicamentos fraccionados (propuesta)
+## Fase 29 — Proveedores y medicamentos fraccionados (29B construida en rama; 29C pendiente)
 
 **Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
 Decisiones: D30 puntos 4 y 5.
@@ -2685,9 +2685,19 @@ Decisiones: D30 puntos 4 y 5.
   y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
 
 ### 29B. Proveedores
-- [ ] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
+- [x] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
   suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
-- [ ] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `20261022120000_suppliers.sql`: `suppliers` (nombre, tipo, contacto, teléfono, correo, notas,
+  `is_active`) y `product_suppliers` (varios por producto), con llaves compuestas, RLS bajo `inventory` y sin DELETE.
+  Agrega el índice único `products(tenant_id, id)` (solo índice, para la llave compuesta). 8 tests en
+  `suppliers-rls.spec.ts`. **Para la oleada 2 (29C):** ese índice ya existe; no hay que crearlo otra vez.
+- [x] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `SuppliersPage` (`/app/proveedores`, ruta y menú de la oleada 0), `SupplierFormDialog`, `stores/suppliers.ts`
+  y selector múltiple de proveedores en `ProductFormDialog` (`inventory.saveProduct` recibe `supplierIds`; si fallan solo
+  los proveedores, el producto ya queda guardado y se avisa). **Verificado en navegador** (Chromium, dueño): lista de 3,
+  teléfono corto marca error, alta, y el alimento muestra sus 2 proveedores de la semilla. **No verificado:** guardar
+  desde el selector, el veterinario (solo lectura) y celular. Semilla y `demo_reset` con 3 proveedores y 4 vínculos
+  (ids `31000000-…`); 2 tests en `demo-reset.spec.ts`.
 
 ### 29C. Fraccionados
 - [ ] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se

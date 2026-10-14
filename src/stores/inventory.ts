@@ -9,6 +9,7 @@ import * as inventoryService from '@/services/inventory'
 import * as categoriesService from '@/services/productCategories'
 import type { ProductCategory } from '@/services/productCategories'
 import * as productsService from '@/services/products'
+import * as suppliersService from '@/services/suppliers'
 import type { Product } from '@/services/products'
 import {
   stockStatus,
@@ -112,6 +113,8 @@ export const useInventoryStore = defineStore('inventory', () => {
   async function saveProduct(
     input: ProductInput,
     productId?: string,
+    // Proveedores del producto (fase 29B). Ausente = no se tocan los que ya tiene.
+    supplierIds?: string[],
   ): Promise<string | null> {
     const session = useSessionStore()
     if (!session.activeTenantId)
@@ -128,11 +131,31 @@ export const useInventoryStore = defineStore('inventory', () => {
       sat_unit_code: input.satUnitCode.trim().toUpperCase(),
       category_id: input.categoryId,
     }
+    let savedId: string
     try {
-      if (productId) await productsService.update(productId, fields)
-      else await productsService.create({ ...fields, tenant_id: session.activeTenantId })
+      if (productId) {
+        await productsService.update(productId, fields)
+        savedId = productId
+      } else {
+        const created = await productsService.create({
+          ...fields,
+          tenant_id: session.activeTenantId,
+        })
+        savedId = created.id
+      }
     } catch {
       return 'No se pudo guardar el producto. Revisa tu conexión.'
+    }
+
+    // El producto ya quedó guardado: si falla solo el vínculo con proveedores, se avisa
+    // sin deshacer el producto (se puede reintentar editándolo).
+    if (supplierIds) {
+      try {
+        await suppliersService.setProductSuppliers(session.activeTenantId, savedId, supplierIds)
+      } catch {
+        await load()
+        return 'El producto se guardó, pero no se pudieron guardar sus proveedores. Inténtalo de nuevo.'
+      }
     }
     await load()
     return null
