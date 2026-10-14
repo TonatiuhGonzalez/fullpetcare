@@ -170,3 +170,50 @@ export async function getPhotoUrl(photoPath: string): Promise<string | null> {
   if (error) throw error
   return data.signedUrl
 }
+
+export interface PetOwnership {
+  id: string
+  customerId: string
+  customerName: string
+  startedAt: string
+  /** Nulo = es el dueño actual. */
+  endedAt: string | null
+}
+
+/** Quién ha sido dueño de la mascota y cuándo, del más reciente al más antiguo. */
+export async function listOwnerships(
+  tenantId: string,
+  petId: string,
+): Promise<PetOwnership[]> {
+  const { data, error } = await supabase
+    .from('pet_ownerships')
+    .select('id, customer_id, started_at, ended_at, customers ( first_name, last_name )')
+    .eq('tenant_id', tenantId)
+    .eq('pet_id', petId)
+    .order('started_at', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    customerId: row.customer_id,
+    customerName: row.customers
+      ? `${row.customers.first_name} ${row.customers.last_name}`.trim()
+      : '',
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+  }))
+}
+
+/**
+ * Transfiere la mascota a otro cliente (RPC `transfer_pet`): sus citas programadas se van con
+ * ella, sus links se revocan y las ventas no se tocan.
+ */
+export async function transfer(petId: string, newCustomerId: string): Promise<Pet> {
+  const { data, error } = await supabase.rpc('transfer_pet', {
+    p_pet_id: petId,
+    p_new_customer_id: newCustomerId,
+  })
+
+  if (error) throw error
+  return data as Pet
+}

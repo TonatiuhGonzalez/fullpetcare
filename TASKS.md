@@ -2806,21 +2806,41 @@ Decisiones: D30 puntos 4 y 5.
   _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
 - [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
 
-## Fase 31 — Familias y transferencia de mascota (propuesta)
+## Fase 31 — Familias y transferencia de mascota (construida en rama; oleada 2)
 
 **Meta: varios dueños de una misma mascota dentro de una familia, y poder cambiar de dueño sin perder el historial.**
 Decisiones: D30 puntos 7 y 8.
 
-- [ ] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
-- [ ] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
+- [x] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
+  **Decidido (2026-10-14):** la familia es un hogar con **un titular** (el único que ve montos) y miembros de acceso
+  básico; un cliente pertenece a **una sola** familia. La mascota sigue teniendo un dueño (`pets.customer_id`) y la
+  familia accede a las mascotas de todos sus miembros. La **visibilidad por periodo** se resuelve en SQL
+  (`app.customer_can_view_pet()` y `..._money()`), pero **hoy nadie las consulta**: la cuenta del cliente es la 16B y
+  el link con token es por mascota y se revoca al transferir. Los links `customer` no los usa la vista pública.
+- [x] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
   aislamiento y de que un cliente no entra a dos familias.
-- [ ] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
-- [ ] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
+  **Hecho:** `20261024120000_families_and_pet_transfer.sql`: `families` y `family_members` (un titular por familia, un
+  cliente en una sola; llaves compuestas), solo se escriben con `save_family()` / `delete_family()`. Agrega el índice
+  único `customers(tenant_id, id)`. 7 tests en `families-and-transfer.spec.ts`.
+- [x] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
+  **Hecho:** `pet_ownerships` (periodos, un dueño actual por mascota, sin política de DELETE), alimentada por un trigger sobre
+  `pets` al crear y al cambiar `customer_id`; las mascotas existentes quedan con su dueño desde `created_at`.
+- [x] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
   ventas, revoca los links y cierra el periodo anterior. _Verificar:_ test de cada efecto y de que otro negocio no puede.
-- [ ] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
+  **Hecho:** `transfer_pet()` (`SECURITY DEFINER`, solo dueño y recepción): pasa las citas `scheduled`, deja las ventas
+  y las citas atendidas, revoca los links `pet`. 6 tests (incluye los rechazos y que un UPDATE directo también deja
+  historial).
+- [x] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
   montos; el no titular no ve montos. _Verificar:_ tests de aislamiento propios (el riesgo mayor del paquete).
-- [ ] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
+  **Hecho:** `app.customer_can_view_pet()` y `app.customer_can_view_pet_money()` (solo `service_role`). 5 tests: el dueño
+  anterior ve solo su periodo, el nuevo ve todo el historial pero solo sus montos, la familia ve la mascota y solo el
+  titular ve montos, un ajeno no ve nada, y un usuario autenticado no puede llamarlas.
+- [x] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
   _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `FamilyCard` ("Familia Ramírez – Michi, Rocky, Luna" con miembros y titular), `FamilyFormDialog`,
+  `TransferPetDialog` y la lista de dueños con sus periodos en la página del cliente. **Verificado en navegador**
+  (Chromium, dueño): crear familia con otro cliente, la etiqueta con las mascotas de los miembros y transferir una
+  mascota a otro cliente. **No verificado:** disolver y editar desde la pantalla, tema oscuro, 390 y 768 px.
 - [ ] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
 
 ## Fase 32 — Catálogo de cirugías y costos (propuesta)
