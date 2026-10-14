@@ -2618,9 +2618,11 @@ gato son grupos); 28.1 (formato de la receta y dónde va la cédula). 16B pasa a
 Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
 
 ### 27A. Preparación
-- [ ] **27.1** 📚 Aprobar D30 y confirmar la lista inicial de grandes grupos (propuesta: perros, gatos, aves, reptiles,
-  roedores y otros) y si "perro" y "gato" son grupos o especies dentro de uno. _Verificar:_ el usuario aprobó por
-  escrito; D30 sin "propuesta".
+- [x] **27.1** 📚 Aprobar D30 y confirmar la lista inicial de grandes grupos de especies. _Verificar:_ el usuario aprobó
+  por escrito. **Aprobada (2026-10-14).** Estructura grupo → especie → raza. Grupos: Perros, Gatos, Aves, Reptiles,
+  Roedores y conejos, y Otros; "perro" y "gato" son grupos con una especie cada uno (así el grupo sirve de dato genérico
+  de estadística). Solo Perro y Gato llevan razas. Cada raza lleva nombre oficial y **variantes de búsqueda** opcionales
+  ("xolo", "teckel", "dachshund"). `dog` pasa a Perro, `cat` a Gato y `other` queda sin especie con su texto intacto.
 - [ ] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
   vacunas por especie, importador). _Verificar:_ la lista queda anotada aquí.
 
@@ -2650,8 +2652,12 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
 **Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
 
 ### 28A. Preparación
-- [ ] **28.1** 📚 Confirmar con el usuario el formato (foto del que usa el veterinario) y dónde va la cédula
-  (`employee_details` o `profiles`). _Verificar:_ aprobado por escrito.
+- [x] **28.1** 📚 Confirmar con el usuario el formato y dónde va la cédula. _Verificar:_ aprobado por escrito.
+  **Aprobada (2026-10-14).** Hoja carta vertical: encabezado (imagen y nombre de la empresa, sucursal con dirección y
+  teléfono), folio consecutivo por negocio y fecha, veterinario con cédula, paciente (nombre, especie, raza, sexo, edad y
+  último peso), propietario (nombre y teléfono), diagnóstico opcional, tabla de medicamentos (medicamento, dosis,
+  frecuencia, duración), indicaciones adicionales, próxima visita y línea de firma con nombre y cédula. Sin precios.
+  La cédula va en `employee_details` y la receta guarda una copia al emitirse.
 
 ### 28B. Base de datos
 - [ ] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
