@@ -2905,18 +2905,36 @@ Decisiones: D30 puntos 7 y 8.
 - [x] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
   **Hecho (2026-10-14, en la integración de la oleada 2).**
 
-## Fase 32 — Catálogo de cirugías y costos (propuesta)
+## Fase 32 — Catálogo de cirugías y costos (construida en rama; oleada 3)
 
 **Meta: cobrar una cirugía con sus consumibles, medicamentos y honorarios, partiendo de un paquete.** D30 punto 9.
 
-- [ ] **32.1** 📚 Inventariar `services`, `appointment_services` y `appointment_products` para decidir qué se reutiliza.
-- [ ] **32.2** 🧪 `surgery_packages` y `surgery_package_items` (consumible, honorario o medicamento; producto ligado u
+- [x] **32.1** 📚 Inventariar `services`, `appointment_services` y `appointment_products` para decidir qué se reutiliza.
+  **Decidido (2026-10-14):** `appointment_products` lleva los renglones con producto (existencia y cobro ya
+  resueltos); `appointment_services` NO se reutiliza (exige `service_id` y lo leen la agenda, el cobro y los reportes).
+  Los honorarios y consumibles sin producto van en una tabla propia `appointment_surgery_lines`, que
+  `checkout_appointment()` copia a `sale_items` con sus claves del SAT (`sat_product_code_snapshot`); la Edge Function
+  `invoicing` usa esas claves cuando la partida no es de un servicio ni de un producto.
+- [x] **32.2** 🧪 `surgery_packages` y `surgery_package_items` (consumible, honorario o medicamento; producto ligado u
   opcional) con RLS y borrado suave. _Verificar:_ test de aislamiento y permisos.
-- [ ] **32.3** 🧪 Aplicar un paquete a una cita veterinaria con snapshot de precios, ajustable renglón por renglón, o
+  **Hecho:** `20261026120000_surgeries.sql`: `surgery_packages`, `surgery_package_items` y
+  `appointment_surgery_lines`; el catálogo solo se escribe con `save_surgery_package()` (dueño y veterinario, nombre
+  único con mensaje claro) y lo leen dueño, recepción y veterinario. 5 tests de paquetes.
+- [x] **32.3** 🧪 Aplicar un paquete a una cita veterinaria con snapshot de precios, ajustable renglón por renglón, o
   armar uno desde cero. Consumibles y medicamentos descuentan inventario; honorarios no. _Verificar:_ test de
   inventario, de IVA por partida y de que cambiar el catálogo no altera una cita ya cobrada.
-- [ ] **32.4** Interfaz: catálogo en Configuración (dueño y veterinario) y selector en la atención. _Verificar:_ en
+  **Hecho:** `apply_surgery_lines()` (mismas reglas que los insumos: dueño o veterinario, cita veterinaria no cobrada)
+  y `remove_surgery_line()`. Un renglón con producto baja existencia por `add_appointment_product` (por envase o por
+  unidad, con el **precio y el IVA del paquete**); los demás se cobran directo en `checkout_appointment()`. Uso interno
+  no llega al ticket. 6 tests: baja y devolución, ticket con honorario y consumible, sin existencia no queda nada y
+  las negativas.
+- [x] **32.4** Interfaz: catálogo en Configuración (dueño y veterinario) y selector en la atención. _Verificar:_ en
   navegador.
+  **Hecho:** `/app/configuracion/cirugias` (catálogo con editor de renglones y totales), `SurgeryPanel` en la atención de
+  la consulta (elegir paquete, ajustar renglón por renglón, armar desde cero, quitar) y los honorarios en el resumen de
+  cobro. **Verificado en navegador** (Chromium, veterinario): el catálogo de la semilla muestra $2,750.00 y
+  $1,050.00, y aplicar "Esterilización de hembra" a una cita deja sus 3 renglones y el total. **No verificado:** cobrar
+  esa cita desde la pantalla de cobro (solo por pruebas de base), tema oscuro y celular.
 - [ ] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
 
 ## Fase 33 — Hospitalización con bitácora y aviso al dueño (propuesta, requiere 16B)

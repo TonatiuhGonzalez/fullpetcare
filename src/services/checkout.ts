@@ -31,6 +31,12 @@ export interface CheckoutSupplyItem extends LineItem {
   description: string
 }
 
+/** Un renglón de cirugía sin producto (honorario, fase 32): ya aplicado en la consulta, solo se cobra. */
+export interface CheckoutSurgeryItem extends LineItem {
+  surgeryLineId: string
+  description: string
+}
+
 /** Un producto en el resumen de cobro, con la existencia que había al agregarlo. */
 export interface CheckoutProductItem extends LineItem {
   /** Identifica la partida en el ticket: producto + unidad (un envase y unidades sueltas pueden convivir). */
@@ -84,6 +90,8 @@ export interface CheckoutSummary {
   lineItems: CheckoutLineItem[]
   /** Insumos cobrables de la consulta (los de uso interno no entran). */
   supplyItems: CheckoutSupplyItem[]
+  /** Honorarios y renglones de cirugía sin producto (fase 32). */
+  surgeryItems: CheckoutSurgeryItem[]
   subtotalCents: number
   taxCents: number
   discountCents: number
@@ -203,14 +211,43 @@ export async function buildSummary(
     taxRateBp: row.tax_rate_bp,
   }))
 
+  // Renglones de cirugía sin producto (honorarios y consumibles fuera de inventario; fase 32):
+  // los que sí llevan producto ya vienen arriba como insumos. Con el precio de ese día.
+  const { data: surgery, error: surgeryError } = await supabase
+    .from('appointment_surgery_lines')
+    .select('id, description, unit_price_cents, tax_rate_bp, quantity')
+    .eq('appointment_id', appointmentId)
+    .is('product_id', null)
+    .eq('is_billable', true)
+    .is('deleted_at', null)
+    .order('created_at')
+
+  if (surgeryError) throw surgeryError
+
+  const surgeryItems: CheckoutSurgeryItem[] = (surgery ?? []).map((row) => ({
+    surgeryLineId: row.id,
+    description: row.description,
+    quantity: row.quantity,
+    unitPriceCents: row.unit_price_cents,
+    taxRateBp: row.tax_rate_bp,
+  }))
+
   const {
     subtotalCents,
     taxCents,
     totalCents: grossTotalCents,
-  } = sumLineItems([...lineItems, ...supplyItems])
+  } = sumLineItems([...lineItems, ...supplyItems, ...surgeryItems])
   const totalCents = applyDiscount(grossTotalCents, discountCents)
 
-  return { lineItems, supplyItems, subtotalCents, taxCents, discountCents, totalCents }
+  return {
+    lineItems,
+    supplyItems,
+    surgeryItems,
+    subtotalCents,
+    taxCents,
+    discountCents,
+    totalCents,
+  }
 }
 
 function paymentsPayload(payments: NewPayment[]) {

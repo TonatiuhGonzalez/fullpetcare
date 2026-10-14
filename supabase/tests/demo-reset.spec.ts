@@ -456,3 +456,40 @@ describe('demo_reset.sql — proveedores de demostración (fase 29B)', () => {
     })
   })
 })
+
+describe('demo_reset.sql — paquetes de cirugía de demostración (fase 32)', () => {
+  it('restaura los paquetes de ejemplo y sus precios, y oculta los que se agregaron', async () => {
+    // Qué prueba: que después de una demo (un paquete nuevo, un precio cambiado y un paquete
+    // de ejemplo desactivado) el reset deja el catálogo como la semilla.
+    // Qué se rompería: la siguiente presentación arrancaría con precios de cirugía de la
+    // anterior, o con el catálogo de ejemplo incompleto.
+    await withTransaction(async (client) => {
+      await client.query(
+        "insert into surgery_packages (tenant_id, name) values ($1, 'Cirugía de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update surgery_package_items set unit_price_cents = 1 where id = '33000000-0000-4000-8000-000000000001'",
+      )
+      await client.query(
+        "update surgery_packages set is_active = false where id = '32000000-0000-4000-8000-000000000002'",
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const packages = await client.query(
+        `select name, is_active from surgery_packages
+          where tenant_id = $1 and deleted_at is null order by name`,
+        [TENANT_PATITAS],
+      )
+      expect(packages.rows).toEqual([
+        { name: 'Esterilización de hembra', is_active: true },
+        { name: 'Limpieza dental', is_active: true },
+      ])
+      const fee = await client.query(
+        "select unit_price_cents from surgery_package_items where id = '33000000-0000-4000-8000-000000000001'",
+      )
+      expect(fee.rows[0].unit_price_cents).toBe(180000)
+    })
+  })
+})

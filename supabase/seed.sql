@@ -549,4 +549,20 @@ values
 --
 -- (fase 30) Sin semilla: el cobro rápido no trae datos de ejemplo.
 
--- (fase 32) Paquetes de cirugía de ejemplo de Patitas Felices.
+-- (fase 32) Paquetes de cirugía de ejemplo de Patitas Felices (ficticios). Sin producto ligado
+-- a propósito: así no dependen de las existencias de la semilla. Precios con IVA incluido.
+insert into surgery_packages (id, tenant_id, name, notes)
+values
+  ('32000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+   'Esterilización de hembra', 'Incluye anestesia y material de sutura.'),
+  ('32000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+   'Limpieza dental', null);
+
+insert into surgery_package_items
+  (id, tenant_id, package_id, position, kind, description, quantity, unit_price_cents, tax_rate_bp)
+values
+  ('33000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 1, 'fee', 'Honorarios del cirujano', 1, 180000, 1600),
+  ('33000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 2, 'medication', 'Anestesia', 1, 60000, 1600),
+  ('33000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 3, 'consumable', 'Material de sutura', 1, 35000, 1600),
+  ('33000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002', 1, 'fee', 'Honorarios', 1, 90000, 1600),
+  ('33000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002', 2, 'consumable', 'Material', 1, 15000, 1600);
