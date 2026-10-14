@@ -1337,6 +1337,16 @@ al final**, porque depende de la 16B.
   personal ve todo como siempre.
 - **Dependencias entre ramas:** 29C y 31 no tocaron las mismas tablas y se fusionaron sin conflictos de texto.
 
+**Decisiones surgidas al construir la oleada 3 (2026-10-14).**
+- **Cobro rápido (30):** es una pantalla y una RPC propias (`checkout_quick_sale`), no una extensión del punto de venta
+  ni de la llegada sin cita (ambos exigen cliente o solo venden productos). Sin factura.
+- **Cirugías (32):** `appointment_services` no se reutiliza; los renglones sin producto van en
+  `appointment_surgery_lines` y `checkout_appointment()` se reemplazó agregando un bloque. El precio del paquete manda
+  sobre el del catálogo del día (un medicamento puede cobrarse distinto dentro de una cirugía).
+- **16B y 33 siguen sin construirse:** la 16B pide un servicio de correo (código de acceso) y una librería de cifrado
+  para Web Push, y CLAUDE.md §3 exige justificarlos con el usuario antes. La 33 puede construirse sin la 16B con el
+  personal como único lector (ver los riesgos de abajo); falta decidirlo.
+
 **Contras y riesgos.**
 - **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.
 - **Hospitalización y 16B:** si la 16B se retrasa, la 33 se puede construir con el dueño del negocio como único lector y

@@ -2662,6 +2662,22 @@ visibilidad por periodo de la 31.
 "60 tabletas · 3 cajas"; en el punto de venta vender 3 tabletas a $7.25 cada una; en la página de un cliente crear una
 familia ("Familia Ramírez – Michi, Rocky, Luna") y transferir una mascota a otro cliente con su lista de dueños.
 
+**Avance de la oleada 3 (2026-10-14).** Construida en dos ramas desde `chore/d30-wave3-prep` —`feat/d30-quick-sale` (30) y
+`feat/d30-surgeries` (32)— y probada junta en `integration/d30-wave3` (sin push ni PR). **16B no se construyó** (ver
+abajo). **Verificado en la rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 839 tests unitarios, `test:db`
+954 de 954 y el E2E. Las dos ramas chocaron en un solo `import` de `stores/cart.ts` (cada una agregó un tipo), resuelto
+conservando ambos; `database.ts` se regeneró una sola vez, en la integración. **No verificado en conjunto:** tema
+oscuro, 390 y 768 px de las pantallas nuevas, el cobro de una cita con cirugía desde la pantalla de cobro, ni un
+teléfono real.
+
+**Qué se puede demostrar (oleada 3):** en "Cobro rápido", cobrar un servicio con quién atendió y la especie sin dar de
+alta al cliente y ver el ticket; en Reportes, la tabla "Por especie"; en Configuración, el catálogo de cirugías; y en la
+atención de una consulta, aplicar "Esterilización de hembra", ajustar un renglón y cobrarla con sus honorarios.
+
+**Pendiente del paquete D30 (requiere decisión del usuario):** la **16B** (cuenta del cliente y notificaciones: servicio
+de correo y librería de Web Push, §3) y la **33** (hospitalización), que depende de ella para que el dueño lea la
+bitácora; o se construye la 33 con el personal como único lector y el dueño se suma después.
+
 ## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
@@ -2837,7 +2853,7 @@ Decisiones: D30 puntos 4 y 5.
 - [x] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
   **Hecho (2026-10-14, en la integración de la oleada 2):** ver el avance de la oleada 2. Sin dependencias nuevas (§3).
 
-## Fase 30 — Cobro de paso (construida en rama; oleada 3)
+## Fase 30 — Cobro de paso (construida; integrada en la oleada 3)
 
 **Meta: cobrar un servicio sin cita y sin registrar al cliente.** Decisiones: D30 punto 6.
 
@@ -2865,7 +2881,8 @@ Decisiones: D30 puntos 4 y 5.
   atendió y su grupo. **No verificado:** el producto fraccionado desde esta pantalla, el veterinario/recepción en la
   ruta, tema oscuro y celular. **No ofrece factura** (sin cliente no hay a quién); para facturar se usa el punto de
   venta, que sí captura al cliente.
-- [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
+- [x] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 3).**
 
 ## Fase 31 — Familias y transferencia de mascota (construida; integrada en la oleada 2)
 
@@ -2905,7 +2922,7 @@ Decisiones: D30 puntos 7 y 8.
 - [x] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
   **Hecho (2026-10-14, en la integración de la oleada 2).**
 
-## Fase 32 — Catálogo de cirugías y costos (construida en rama; oleada 3)
+## Fase 32 — Catálogo de cirugías y costos (construida; integrada en la oleada 3)
 
 **Meta: cobrar una cirugía con sus consumibles, medicamentos y honorarios, partiendo de un paquete.** D30 punto 9.
 
@@ -2935,7 +2952,8 @@ Decisiones: D30 puntos 7 y 8.
   cobro. **Verificado en navegador** (Chromium, veterinario): el catálogo de la semilla muestra $2,750.00 y
   $1,050.00, y aplicar "Esterilización de hembra" a una cita deja sus 3 renglones y el total. **No verificado:** cobrar
   esa cita desde la pantalla de cobro (solo por pruebas de base), tema oscuro y celular.
-- [ ] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
+- [x] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 3).**
 
 ## Fase 33 — Hospitalización con bitácora y aviso al dueño (propuesta, requiere 16B)
 
