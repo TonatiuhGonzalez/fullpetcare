@@ -820,3 +820,29 @@ from (values
   ('33000000-0000-4000-8000-000000000005'::uuid, 'consumable', 'Material', 15000)
 ) as v(id, kind, description, price)
 where surgery_package_items.id = v.id;
+
+-- =============================================================================
+-- Hospitalización (fase 33, PLAN.md D30)
+-- =============================================================================
+-- Las estancias son historial clínico y no se borran: las que se abrieron durante una demo
+-- se DAN DE ALTA para que la siguiente presentación arranque sin mascotas "hospitalizadas".
+-- (Un alta es un UPDATE normal; no toca notas ni medicamentos.) Los espacios de ejemplo
+-- vuelven a estar activos y los que se agregaron en la demo se ocultan.
+update hospital_stays
+set discharged_at = now(), discharged_by = admitted_by
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and discharged_at is null;
+
+update hospital_spaces
+set deleted_at = null, is_active = true
+where id in (
+  '34000000-0000-4000-8000-000000000001', '34000000-0000-4000-8000-000000000002',
+  '34000000-0000-4000-8000-000000000003', '34000000-0000-4000-8000-000000000004'
+);
+update hospital_spaces
+set deleted_at = now()
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is null
+  and id not in (
+    '34000000-0000-4000-8000-000000000001', '34000000-0000-4000-8000-000000000002',
+    '34000000-0000-4000-8000-000000000003', '34000000-0000-4000-8000-000000000004'
+  );
+

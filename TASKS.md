@@ -2955,23 +2955,41 @@ Decisiones: D30 puntos 7 y 8.
 - [x] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
   **Hecho (2026-10-14, en la integración de la oleada 3).**
 
-## Fase 33 — Hospitalización con bitácora y aviso al dueño (propuesta, requiere 16B)
+## Fase 33 — Hospitalización con bitácora y aviso al dueño (construida sin la 16B; la lectura del dueño queda pendiente)
 
 **Meta: controlar la estancia de un paciente, cobrarla y mantener al dueño al tanto dentro del sistema.** D30
 puntos 10 y 11. **Depende de la 16B** (cuenta del cliente y notificaciones push).
 
-- [ ] **33.1** 📚 Confirmar el orden con la 16B y qué se entrega si ésta se retrasa (ver riesgos de D30).
-- [ ] **33.2** 🧪 `hospital_spaces` (por sucursal) y configuración del negocio: día natural o 24 horas, tarifa única o
+- [x] **33.1** 📚 Confirmar el orden con la 16B y qué se entrega si ésta se retrasa (ver riesgos de D30).
+  **Decidido (2026-10-14, con el usuario):** se construye **sin** la 16B, con el personal como único lector. La
+  lectura del dueño de la mascota y la notificación (33.5) quedan para cuando exista la cuenta del cliente.
+- [x] **33.2** 🧪 `hospital_spaces` (por sucursal) y configuración del negocio: día natural o 24 horas, tarifa única o
   por tipo de espacio. _Verificar:_ test.
-- [ ] **33.3** 🧪 `hospital_stays` (ingreso, alta, espacio, tarifa por día o por estancia con snapshot). Varias mascotas
+  **Hecho:** `20261028120000_hospitalization.sql`: `hospital_settings` (regla de días y tarifas por defecto) y
+  `hospital_spaces` por sucursal (varias mascotas por espacio; tarifa propia opcional). Los administra el dueño. 3 tests.
+- [x] **33.3** 🧪 `hospital_stays` (ingreso, alta, espacio, tarifa por día o por estancia con snapshot). Varias mascotas
   por espacio. _Verificar:_ test de cálculo de días en ambas reglas, con zona horaria de sucursal (§8.3).
-- [ ] **33.4** 🧪 `hospital_notes` (hora, lo realizado, temperatura, peso, frecuencia cardiaca, mucosas, ánimo,
+  **Hecho:** `hospital_stays` con copia de tarifa y regla de días, una abierta por mascota, `app.hospital_stay_days()`
+  (mismo cálculo que `lib/hospitalization.ts`, con tests espejo) y `admit_pet()` / `discharge_pet()`. Tests de ambas
+  reglas, de la zona de la sucursal y de los bordes de 24 horas.
+- [x] **33.4** 🧪 `hospital_notes` (hora, lo realizado, temperatura, peso, frecuencia cardiaca, mucosas, ánimo,
   micción/defecación, todo opcional, y texto libre) y medicamentos administrados con inventario y cobro. Es expediente:
   sin borrado, con bitácora. _Verificar:_ test de roles (veterinario, dueño y recepción escriben; groomer no).
-- [ ] **33.5** 🧪 Lectura del dueño de la mascota por la 16B: salud, bitácora y costo para el titular; sin costo para
+  **Hecho:** `hospital_notes` (expediente: sin UPDATE ni borrado, una nota vacía no existe) y
+  `hospital_medications` con inventario (`administer_hospital_medication`, por envase o unidad) y cobro
+  (`bill_hospital_stay`). 15 tests de la RPC: roles (el groomer nada), existencia, devolución y cobro.
+- [ ] **33.5** 🧪 **PENDIENTE (requiere 16B).** Lectura del dueño de la mascota por la 16B: salud, bitácora y costo para el titular; sin costo para
   miembros no titulares; notificación "Hay novedades de <mascota>" sin datos clínicos. _Verificar:_ tests de
   aislamiento y de que la notificación no lleva contenido clínico.
-- [ ] **33.6** 🧪 Aviso al abrir el cobro de una mascota con estancia abierta. _Verificar:_ test.
-- [ ] **33.7** Interfaz: tablero de espacios, ficha de estancia con bitácora, formulario de nota y cobro de la
+- [x] **33.6** 🧪 Aviso al abrir el cobro de una mascota con estancia abierta. _Verificar:_ test.
+  **Hecho (sin pantalla de rol sin permiso):** `CheckoutPage` consulta la estancia abierta de la mascota de la cita y
+  muestra un aviso que no bloquea el cobro. La consulta respeta RLS; un rol sin permiso simplemente no ve el aviso.
+- [x] **33.7** Interfaz: tablero de espacios, ficha de estancia con bitácora, formulario de nota y cobro de la
   estancia. _Verificar:_ en navegador, 390 y 768 px.
-- [ ] **33.8** 📚 `lint`, `test:unit`, `test:db`, E2E; `CLAUDE.md` (§6 y §7) y marcar la fase.
+  **Hecho:** `/app/hospitalizacion` (tablero con días y costo en curso, y "Por cobrar"), la ficha de la estancia
+  (bitácora con biometrías, medicamentos, alta y cobro) y `/app/configuracion/hospitalizacion` (dueño). **Verificado en
+  navegador** (Chromium, dueño): ingresar a Rocky, una nota con temperatura, peso, pulso y ánimo, administrar un
+  medicamento, dar de alta y cobrar. **No verificado:** 390 y 768 px, tema oscuro, el veterinario y la recepción en las
+  pantallas, y el aviso al cobrar desde la pantalla.
+- [x] **33.8** 📚 `lint`, `test:unit`, `test:db`, E2E; `CLAUDE.md` (§6 y §7) y marcar la fase.
+  **Hecho (2026-10-14):** `lint`, `vue-tsc`, 849 tests unitarios y `test:db` pasan; `CLAUDE.md` actualizado (§1, §4, §6.4).

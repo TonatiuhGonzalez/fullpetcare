@@ -34,6 +34,12 @@ const session = useSessionStore()
             title="Vacunas"
           />
           <v-list-item
+            v-if="session.role === 'owner'"
+            to="/app/configuracion/hospitalizacion"
+            prepend-icon="mdi-hospital-box-outline"
+            title="Hospitalización"
+          />
+          <v-list-item
             v-if="session.role === 'owner' || session.role === 'vet'"
             to="/app/configuracion/cirugias"
             prepend-icon="mdi-medical-bag"

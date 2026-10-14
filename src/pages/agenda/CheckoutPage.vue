@@ -22,6 +22,8 @@ import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import type { Database } from '@/types/database'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
 import { formatStock, isFractional, type SaleUnit } from '@/lib/fractional'
+import * as hospitalService from '@/services/hospitalization'
+import type { StayListItem } from '@/services/hospitalization'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
@@ -75,6 +77,22 @@ const customerHasFiscalData = computed(
     !!customer.value?.postal_code,
 )
 
+/**
+ * Aviso (fase 33): la mascota de esta cita sigue hospitalizada. Casi siempre es un olvido de
+ * dar de alta; no bloquea el cobro. Si la consulta falla (p. ej. un rol sin permiso para ver
+ * hospitalización) simplemente no hay aviso.
+ */
+const openStay = ref<StayListItem | null>(null)
+
+async function loadOpenStay(petId: string): Promise<void> {
+  if (!session.activeTenantId) return
+  try {
+    openStay.value = await hospitalService.getOpenStayByPet(session.activeTenantId, petId)
+  } catch {
+    openStay.value = null
+  }
+}
+
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
   loading.value = true
@@ -89,6 +107,7 @@ async function load(): Promise<void> {
       found.customer_id,
     )
     requiresInvoice.value = customer.value?.requires_invoice ?? false
+    await loadOpenStay(found.pet_id)
 
     if (found.status === 'completed') {
       await cart.loadAppointment(found.id)
@@ -211,6 +230,22 @@ async function handleCharge(): Promise<void> {
       {{ loadError }}
     </v-alert>
 
+    <!-- Aviso (fase 33): la mascota sigue hospitalizada; no bloquea el cobro. -->
+    <v-alert
+      v-if="openStay"
+      type="warning"
+      density="compact"
+      variant="tonal"
+      class="mb-4"
+      data-testid="open-stay-alert"
+    >
+      {{ openStay.petName }} sigue hospitalizada en {{ openStay.spaceName }}. Si ya se
+      fue, da de alta su estancia en
+      <router-link :to="`/app/hospitalizacion/${openStay.id}`"
+        >Hospitalización</router-link
+      >.
+    </v-alert>
+
     <PageSkeleton v-if="showSkeleton" />
 
     <template v-else-if="appointment">
@@ -276,7 +311,9 @@ async function handleCharge(): Promise<void> {
               {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
             </template>
             <template #subtitle>Cirugía</template>
-            <template #append>{{ formatMXN(item.unitPriceCents * item.quantity) }}</template>
+            <template #append>{{
+              formatMXN(item.unitPriceCents * item.quantity)
+            }}</template>
           </v-list-item>
           <v-list-item v-for="item in cart.productItems" :key="item.key">
             <template #title>{{ item.description }}</template>
@@ -346,8 +383,12 @@ async function handleCharge(): Promise<void> {
             variant="outlined"
             divided
           >
-            <v-btn value="package" size="small">{{ productToAdd.packageName ?? 'Envase' }}</v-btn>
-            <v-btn value="unit" size="small">{{ productToAdd.unitName ?? 'Unidad' }}</v-btn>
+            <v-btn value="package" size="small">{{
+              productToAdd.packageName ?? 'Envase'
+            }}</v-btn>
+            <v-btn value="unit" size="small">{{
+              productToAdd.unitName ?? 'Unidad'
+            }}</v-btn>
           </v-btn-toggle>
           <v-text-field
             v-model.number="productQuantity"
@@ -417,7 +458,8 @@ async function handleCharge(): Promise<void> {
             <template #append>
               <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
               <IconButton
-                icon="mdi-close" aria-label="Quitar pago"
+                icon="mdi-close"
+                aria-label="Quitar pago"
                 size="x-small"
                 variant="text"
                 @click="cart.removePayment(index)"

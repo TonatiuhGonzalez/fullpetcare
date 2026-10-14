@@ -172,6 +172,21 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Hospitalización (fase 33, PLAN.md D30): tablero y ficha de cada estancia. Dueño,
+          // recepción y veterinario; el groomer no. La base lo impone con RLS y las RPC.
+          path: 'hospitalizacion',
+          name: 'hospitalizacion',
+          component: () => import('@/pages/hospitalizacion/HospitalizationPage.vue'),
+          meta: { requiresRoles: ['owner', 'receptionist', 'vet'] },
+        },
+        {
+          path: 'hospitalizacion/:id',
+          name: 'hospitalizacion-estancia',
+          component: () => import('@/pages/hospitalizacion/HospitalStayPage.vue'),
+          props: true,
+          meta: { requiresRoles: ['owner', 'receptionist', 'vet'] },
+        },
+        {
           // Cobro rápido (fase 30, PLAN.md D30): cobrar un servicio y/o productos sin cita y sin
           // registrar al cliente. Solo dueño y recepción, como la venta de mostrador.
           path: 'cobro-rapido',
@@ -227,6 +242,13 @@ export const router = createRouter({
               name: 'configuracion-vacunas',
               component: () => import('@/pages/configuracion/VaccinesSettingsPage.vue'),
               meta: { requiresRoles: ['owner', 'vet'] },
+            },
+            {
+              // Hospitalización (fase 33, PLAN.md D30): reglas de días, tarifas y espacios. Dueño.
+              path: 'hospitalizacion',
+              name: 'configuracion-hospitalizacion',
+              component: () => import('@/pages/configuracion/HospitalSettingsPage.vue'),
+              meta: { requiresOwner: true },
             },
             {
               // Catálogo de cirugías (fase 32, PLAN.md D30): paquetes de renglones con su precio.
