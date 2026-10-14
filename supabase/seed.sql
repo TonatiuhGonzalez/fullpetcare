@@ -489,6 +489,23 @@ end $$;
 -- Cada rama llena SU sección y no toca las de las demás, para que dos ramas no editen
 -- las mismas líneas al integrarse.
 --
--- (fase 27) Catálogo base de grupos, especies y razas de Patitas Felices y Huellitas Spa.
+-- (fase 27) Catálogo de grupos, especies y razas: lo siembra el trigger de `tenants` (y la
+-- migración, para los negocios existentes), así que aquí solo se ENLAZAN las mascotas de
+-- la semilla, que se insertan después de la migración, a su especie y raza del catálogo.
+-- La raza se busca por nombre exacto (sin mayúsculas); las que no coinciden (p. ej.
+-- "Doméstico de pelo corto") quedan con el texto y sin raza del catálogo, como las
+-- mascotas reales que ya existían.
+update pets p
+set species_id = s.id
+from species s
+where s.tenant_id = p.tenant_id and s.deleted_at is null
+  and s.has_breeds and s.legacy_kind = p.species
+  and p.species in ('dog', 'cat') and p.species_id is null;
+
+update pets p
+set breed_id = b.id
+from breeds b
+where b.tenant_id = p.tenant_id and b.species_id = p.species_id and b.deleted_at is null
+  and lower(btrim(b.name)) = lower(btrim(p.breed)) and p.breed_id is null;
 
 -- (fase 29B) Proveedores de ejemplo de Patitas Felices.

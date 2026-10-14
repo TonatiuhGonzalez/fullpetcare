@@ -740,6 +740,16 @@ end $$;
 -- =============================================================================
 -- Cada rama agrega aquí SU restauración y no toca la de las demás.
 --
--- (fase 27) Restaurar el catálogo de grupos, especies y razas de Patitas Felices.
+-- (fase 27) Catálogo de grupos, especies y razas de Patitas Felices: se vuelven a mostrar
+-- las filas que se ocultaron durante una demo. Lo que se AGREGUE en la demo se queda
+-- (no hay forma de distinguirlo del catálogo base sin una marca; un `is_base` sería una
+-- columna solo para esto) y no estorba: se oculta a mano desde Configuración.
+-- Las mascotas no se tocan aquí: este script no las borra.
+update species_groups set deleted_at = null
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is not null;
+update species set deleted_at = null
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is not null;
+update breeds set deleted_at = null
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is not null;
 
 -- (fase 29B) Restaurar los proveedores de ejemplo de Patitas Felices.
