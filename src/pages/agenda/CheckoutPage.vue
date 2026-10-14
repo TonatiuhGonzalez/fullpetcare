@@ -270,6 +270,14 @@ async function handleCharge(): Promise<void> {
               formatMXN(item.unitPriceCents * item.quantity)
             }}</template>
           </v-list-item>
+          <!-- Honorarios y renglones de cirugía sin producto (fase 32): solo lectura. -->
+          <v-list-item v-for="item in cart.surgeryItems" :key="item.surgeryLineId">
+            <template #title>
+              {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
+            </template>
+            <template #subtitle>Cirugía</template>
+            <template #append>{{ formatMXN(item.unitPriceCents * item.quantity) }}</template>
+          </v-list-item>
           <v-list-item v-for="item in cart.productItems" :key="item.key">
             <template #title>{{ item.description }}</template>
             <template #subtitle

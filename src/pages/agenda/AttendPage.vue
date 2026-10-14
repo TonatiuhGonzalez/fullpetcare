@@ -27,6 +27,7 @@ import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
 import AppointmentProductsPanel from '@/components/AppointmentProductsPanel.vue'
 import PrescriptionPanel from '@/components/PrescriptionPanel.vue'
+import SurgeryPanel from '@/components/SurgeryPanel.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import { formatDate } from '@/lib/datetime'
 import { canRegisterSupplies } from '@/lib/roles'
@@ -242,6 +243,16 @@ async function handleVaccinationSaved(): Promise<void> {
           <PrescriptionPanel
             :tenant-id="session.activeTenantId!"
             :appointment-id="appointment.id"
+          />
+        </template>
+
+        <!-- Cirugía (fase 32): un paquete del catálogo ajustable. Mismo permiso que los insumos. -->
+        <template v-if="canRegisterSupplies(session.role)">
+          <v-divider class="my-4" />
+          <SurgeryPanel
+            :tenant-id="session.activeTenantId!"
+            :appointment-id="appointment.id"
+            @changed="productsPanel?.reload()"
           />
         </template>
 

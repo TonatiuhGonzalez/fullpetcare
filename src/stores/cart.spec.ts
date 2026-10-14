@@ -51,6 +51,7 @@ function summaryWith(lineItems: CheckoutLineItem[]): CheckoutSummary {
   return {
     lineItems,
     supplyItems: [],
+    surgeryItems: [],
     subtotalCents: 0,
     taxCents: 0,
     discountCents: 0,

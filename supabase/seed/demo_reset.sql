@@ -788,4 +788,35 @@ values
 --
 -- (fase 30) Nada que restaurar: un cobro rápido es una venta más y la lleva el reset de ventas.
 
--- (fase 32) Restaurar los paquetes de cirugía de ejemplo de Patitas Felices.
+-- (fase 32) Paquetes de cirugía de Patitas Felices: los de ejemplo vuelven a estar activos y
+-- visibles con sus renglones originales, y los que se agregaron en una demo se ocultan (son
+-- catálogo: ocultarlos no pierde nada; las citas ya atendidas conservan sus renglones).
+update surgery_packages
+set deleted_at = null, is_active = true
+where id in ('32000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002');
+update surgery_packages
+set deleted_at = now()
+where tenant_id = 'b0000000-0000-4000-8000-000000000001' and deleted_at is null
+  and id not in ('32000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002');
+-- Renglones: los editados en una demo se ocultan y vuelven los originales (ids fijos).
+update surgery_package_items
+set deleted_at = now()
+where package_id in ('32000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002')
+  and deleted_at is null
+  and id not in (
+    '33000000-0000-4000-8000-000000000001', '33000000-0000-4000-8000-000000000002',
+    '33000000-0000-4000-8000-000000000003', '33000000-0000-4000-8000-000000000004',
+    '33000000-0000-4000-8000-000000000005'
+  );
+update surgery_package_items
+set deleted_at = null,
+    kind = v.kind::surgery_item_kind, description = v.description, quantity = 1,
+    unit_price_cents = v.price, tax_rate_bp = 1600, product_id = null
+from (values
+  ('33000000-0000-4000-8000-000000000001'::uuid, 'fee', 'Honorarios del cirujano', 180000),
+  ('33000000-0000-4000-8000-000000000002'::uuid, 'medication', 'Anestesia', 60000),
+  ('33000000-0000-4000-8000-000000000003'::uuid, 'consumable', 'Material de sutura', 35000),
+  ('33000000-0000-4000-8000-000000000004'::uuid, 'fee', 'Honorarios', 90000),
+  ('33000000-0000-4000-8000-000000000005'::uuid, 'consumable', 'Material', 15000)
+) as v(id, kind, description, price)
+where surgery_package_items.id = v.id;

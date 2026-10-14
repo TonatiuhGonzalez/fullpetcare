@@ -20,6 +20,7 @@ import type {
   CheckoutLineItem,
   CheckoutProductItem,
   CheckoutSupplyItem,
+  CheckoutSurgeryItem,
   NewPayment,
   SellableProduct,
 } from '@/services/checkout'
@@ -33,6 +34,8 @@ export const useCartStore = defineStore('cart', () => {
   const lineItems = ref<CheckoutLineItem[]>([])
   /** Insumos cobrables de la consulta: ya salieron del inventario, solo se cobran. */
   const supplyItems = ref<CheckoutSupplyItem[]>([])
+  /** Honorarios y renglones de cirugía sin producto de la consulta (fase 32): solo se cobran. */
+  const surgeryItems = ref<CheckoutSurgeryItem[]>([])
   /** Productos agregados al ticket (de la cita o de una venta de mostrador). */
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
@@ -97,6 +100,7 @@ export const useCartStore = defineStore('cart', () => {
       const summary = await checkoutService.buildSummary(id)
       lineItems.value = summary.lineItems
       supplyItems.value = summary.supplyItems
+      surgeryItems.value = summary.surgeryItems
       status.value = 'ready'
     } catch {
       status.value = 'error'
@@ -329,6 +333,7 @@ export const useCartStore = defineStore('cart', () => {
     recentSoldProductIds.value = []
     lineItems.value = []
     supplyItems.value = []
+    surgeryItems.value = []
     discountCents.value = 0
     payments.value = []
     status.value = 'idle'
@@ -339,6 +344,7 @@ export const useCartStore = defineStore('cart', () => {
     appointmentId,
     lineItems,
     supplyItems,
+    surgeryItems,
     productItems,
     catalog,
     categories,
