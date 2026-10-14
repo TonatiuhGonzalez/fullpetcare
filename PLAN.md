@@ -1438,8 +1438,13 @@ más adelante, recomendaciones, horarios y veterinarias cercanas.
 **Qué NO cambia.** El link con token por mascota (§7.4) sigue funcionando sin cuenta; la cuenta es opcional para el
 dueño. La vista pública, el PWA (16A) y la cartilla actual no se tocan.
 
-**Pendientes antes de construir.** Aprobar esta decisión; **confirmar el dominio remitente** y el proveedor de SMTP
-(recomendación: Resend, con `sendEmail()` aislado para poder cambiarlo); redactar el aviso de privacidad.
+**Pendientes antes de construir.** Aprobar esta decisión y redactar el aviso de privacidad.
+
+**Pendiente (2026-10-14, a petición del usuario): correo de salida.** Todavía **no existe un correo ni un dominio
+remitente** del negocio. Queda como pendiente: el dominio con SPF y DKIM y el proveedor de SMTP (recomendación: Resend,
+con `sendEmail()` aislado para poder cambiarlo). **No bloquea el desarrollo:** el Supabase local entrega los códigos
+a una bandeja de pruebas (Inbucket), así que cuenta, vínculo, funciones de lectura y pantallas se construyen y prueban
+completos. Lo que **sí** queda bloqueado es la tarea 16.7 (envío real) y, por tanto, abrir la cuenta a usuarios reales.
 
 ---
 
