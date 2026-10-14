@@ -1,10 +1,5 @@
 export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+  string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   graphql_public: {
@@ -50,6 +45,7 @@ export type Database = {
           unit_price_cents: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           appointment_id: string
           created_at?: string
@@ -125,6 +121,7 @@ export type Database = {
           unit_price_cents: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           appointment_id: string
           created_at?: string
@@ -195,6 +192,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           branch_id: string
           created_at?: string
@@ -283,6 +281,7 @@ export type Database = {
           table_name: string
           tenant_id: string
         }
+        ComputedFields: never
         Insert: {
           action: Database["public"]["Enums"]["audit_action"]
           actor_user_id?: string | null
@@ -323,13 +322,14 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
-          opening_hours: Json
+          opening_hours: NonNullable<Json>
           phone: string | null
           postal_code: string | null
           tenant_id: string
           timezone: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           address?: string | null
           created_at?: string
@@ -337,7 +337,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
-          opening_hours?: Json
+          opening_hours?: NonNullable<Json>
           phone?: string | null
           postal_code?: string | null
           tenant_id: string
@@ -351,7 +351,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
-          opening_hours?: Json
+          opening_hours?: NonNullable<Json>
           phone?: string | null
           postal_code?: string | null
           tenant_id?: string
@@ -361,6 +361,55 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "branches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeds: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          search_aliases: string[]
+          species_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          search_aliases?: string[]
+          species_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          search_aliases?: string[]
+          species_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeds_species_fkey"
+            columns: ["tenant_id", "species_id"]
+            isOneToOne: false
+            referencedRelation: "species"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "breeds_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -378,6 +427,7 @@ export type Database = {
           label: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -410,6 +460,7 @@ export type Database = {
           reason: string
           tenant_id: string
         }
+        ComputedFields: never
         Insert: {
           amount_cents: number
           branch_id: string
@@ -482,6 +533,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           branch_id: string
           closed_at?: string | null
@@ -561,6 +613,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           cfdi_use?: string | null
           created_at?: string
@@ -615,11 +668,13 @@ export type Database = {
           deleted_at: string | null
           id: string
           membership_id: string
+          professional_license: string | null
           rfc: string | null
           tenant_id: string
           updated_at: string
           voter_id_number: string | null
         }
+        ComputedFields: never
         Insert: {
           birth_date?: string | null
           created_at?: string
@@ -627,6 +682,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           membership_id: string
+          professional_license?: string | null
           rfc?: string | null
           tenant_id: string
           updated_at?: string
@@ -639,6 +695,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           membership_id?: string
+          professional_license?: string | null
           rfc?: string | null
           tenant_id?: string
           updated_at?: string
@@ -674,6 +731,7 @@ export type Database = {
           uploaded_at: string
           uploaded_by: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -726,6 +784,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -771,6 +830,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           appointment_id: string
           behavior_notes?: string | null
@@ -849,6 +909,7 @@ export type Database = {
           updated_at: string
           xml_path: string | null
         }
+        ComputedFields: never
         Insert: {
           cancellation_reason_code?: string | null
           cancelled_at?: string | null
@@ -933,6 +994,7 @@ export type Database = {
           treatment: string | null
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           appointment_id: string
           created_at?: string
@@ -999,6 +1061,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           branch_id: string
           created_at?: string
@@ -1059,6 +1122,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -1111,6 +1175,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           amount_cents: number
           created_at?: string
@@ -1168,6 +1233,7 @@ export type Database = {
           updated_at: string
           weight_grams: number
         }
+        ComputedFields: never
         Insert: {
           appointment_id?: string | null
           created_at?: string
@@ -1217,7 +1283,9 @@ export type Database = {
       pets: {
         Row: {
           birth_date: string | null
+          birth_date_is_estimated: boolean
           breed: string | null
+          breed_id: string | null
           created_at: string
           customer_id: string
           deleted_at: string | null
@@ -1229,12 +1297,16 @@ export type Database = {
           photo_path: string | null
           sex: Database["public"]["Enums"]["pet_sex"] | null
           species: Database["public"]["Enums"]["pet_species"]
+          species_id: string | null
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           birth_date?: string | null
+          birth_date_is_estimated?: boolean
           breed?: string | null
+          breed_id?: string | null
           created_at?: string
           customer_id: string
           deleted_at?: string | null
@@ -1246,12 +1318,15 @@ export type Database = {
           photo_path?: string | null
           sex?: Database["public"]["Enums"]["pet_sex"] | null
           species: Database["public"]["Enums"]["pet_species"]
+          species_id?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
           birth_date?: string | null
+          birth_date_is_estimated?: boolean
           breed?: string | null
+          breed_id?: string | null
           created_at?: string
           customer_id?: string
           deleted_at?: string | null
@@ -1263,16 +1338,31 @@ export type Database = {
           photo_path?: string | null
           sex?: Database["public"]["Enums"]["pet_sex"] | null
           species?: Database["public"]["Enums"]["pet_species"]
+          species_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pets_breed_fkey"
+            columns: ["tenant_id", "species_id", "breed_id"]
+            isOneToOne: false
+            referencedRelation: "breeds"
+            referencedColumns: ["tenant_id", "species_id", "id"]
+          },
           {
             foreignKeyName: "pets_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pets_species_fkey"
+            columns: ["tenant_id", "species_id"]
+            isOneToOne: false
+            referencedRelation: "species"
+            referencedColumns: ["tenant_id", "id"]
           },
           {
             foreignKeyName: "pets_tenant_id_fkey"
@@ -1292,6 +1382,7 @@ export type Database = {
           name: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -1318,6 +1409,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -1347,6 +1439,7 @@ export type Database = {
           table_name: string
           tenant_id: string | null
         }
+        ComputedFields: never
         Insert: {
           action: Database["public"]["Enums"]["audit_action"]
           actor_user_id?: string | null
@@ -1381,6 +1474,166 @@ export type Database = {
           },
         ]
       }
+      prescription_items: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          dose: string | null
+          duration: string | null
+          frequency: string | null
+          id: string
+          medication_name: string
+          position: number
+          prescription_id: string
+          product_id: string | null
+          review_dismissed_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          dose?: string | null
+          duration?: string | null
+          frequency?: string | null
+          id?: string
+          medication_name: string
+          position?: number
+          prescription_id: string
+          product_id?: string | null
+          review_dismissed_at?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          dose?: string | null
+          duration?: string | null
+          frequency?: string | null
+          id?: string
+          medication_name?: string
+          position?: number
+          prescription_id?: string
+          product_id?: string | null
+          review_dismissed_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescription_items_prescription_id_fkey"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "prescription_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prescriptions: {
+        Row: {
+          appointment_id: string
+          branch_id: string
+          created_at: string
+          folio: number
+          id: string
+          issued_at: string
+          issued_by_user_id: string
+          issuer_license_snapshot: string
+          issuer_name_snapshot: string
+          pet_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          appointment_id: string
+          branch_id: string
+          created_at?: string
+          folio: number
+          id?: string
+          issued_at?: string
+          issued_by_user_id: string
+          issuer_license_snapshot: string
+          issuer_name_snapshot: string
+          pet_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          branch_id?: string
+          created_at?: string
+          folio?: number
+          id?: string
+          issued_at?: string
+          issued_by_user_id?: string
+          issuer_license_snapshot?: string
+          issuer_name_snapshot?: string
+          pet_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescriptions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: true
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "prescriptions_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_categories: {
         Row: {
           created_at: string
@@ -1392,6 +1645,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -1422,6 +1676,66 @@ export type Database = {
           },
         ]
       }
+      product_suppliers: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          product_id: string
+          supplier_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          product_id: string
+          supplier_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          product_id?: string
+          supplier_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_suppliers_product_fkey"
+            columns: ["tenant_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["tenant_id", "product_id"]
+          },
+          {
+            foreignKeyName: "product_suppliers_product_fkey"
+            columns: ["tenant_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "product_suppliers_supplier_fkey"
+            columns: ["tenant_id", "supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "product_suppliers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string | null
@@ -1440,6 +1754,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           category_id?: string | null
           cost_cents?: number | null
@@ -1502,6 +1817,7 @@ export type Database = {
           phone: string | null
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           avatar_path?: string | null
           created_at?: string
@@ -1535,6 +1851,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           can_edit?: boolean
           can_view?: boolean
@@ -1585,6 +1902,7 @@ export type Database = {
           unit_price_cents: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           appointment_id?: string | null
           appointment_product_id?: string | null
@@ -1693,6 +2011,7 @@ export type Database = {
           total_cents: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           branch_id: string
           closed_by?: string | null
@@ -1774,6 +2093,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           deleted_at?: string | null
@@ -1832,6 +2152,7 @@ export type Database = {
           token_prefix: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           access_count?: number
           created_at?: string
@@ -1890,6 +2211,97 @@ export type Database = {
           },
         ]
       }
+      species: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          group_id: string
+          has_breeds: boolean
+          id: string
+          legacy_kind: Database["public"]["Enums"]["pet_species"]
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          group_id: string
+          has_breeds?: boolean
+          id?: string
+          legacy_kind?: Database["public"]["Enums"]["pet_species"]
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          group_id?: string
+          has_breeds?: boolean
+          id?: string
+          legacy_kind?: Database["public"]["Enums"]["pet_species"]
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "species_group_fkey"
+            columns: ["tenant_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "species_groups"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "species_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      species_groups: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "species_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           appointment_product_id: string | null
@@ -1904,6 +2316,7 @@ export type Database = {
           sale_id: string | null
           tenant_id: string
         }
+        ComputedFields: never
         Insert: {
           appointment_product_id?: string | null
           branch_id: string
@@ -1982,6 +2395,60 @@ export type Database = {
           },
         ]
       }
+      suppliers: {
+        Row: {
+          contact_name: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          supplier_type: Database["public"]["Enums"]["supplier_type"]
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          contact_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          supplier_type?: Database["public"]["Enums"]["supplier_type"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          supplier_type?: Database["public"]["Enums"]["supplier_type"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_invoicing_settings: {
         Row: {
           created_at: string
@@ -1993,6 +2460,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           csd_valid_until?: string | null
@@ -2041,6 +2509,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           billing_period?: Database["public"]["Enums"]["plan_billing_period"]
           created_at?: string
@@ -2114,6 +2583,7 @@ export type Database = {
           timezone: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           default_cfdi_use?: string | null
@@ -2160,6 +2630,7 @@ export type Database = {
           updated_at: string
           vaccine_id: string
         }
+        ComputedFields: never
         Insert: {
           applied_at?: string
           applied_by_user_id?: string | null
@@ -2239,6 +2710,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           default_interval_days?: number | null
@@ -2278,6 +2750,7 @@ export type Database = {
           stock: number | null
           tenant_id: string | null
         }
+        ComputedFields: never
         Relationships: [
           {
             foreignKeyName: "products_tenant_id_fkey"
@@ -2412,13 +2885,16 @@ export type Database = {
           p_legal_name?: string
           p_notes?: string
           p_pet_birth_date?: string
+          p_pet_birth_date_is_estimated?: boolean
           p_pet_breed?: string
+          p_pet_breed_id?: string
           p_pet_grooming_notes?: string
           p_pet_is_sterilized?: boolean
           p_pet_medical_alerts?: string
           p_pet_name?: string
           p_pet_sex?: Database["public"]["Enums"]["pet_sex"]
           p_pet_species?: Database["public"]["Enums"]["pet_species"]
+          p_pet_species_id?: string
           p_phone?: string
           p_postal_code?: string
           p_requires_invoice?: boolean
@@ -2499,8 +2975,16 @@ export type Database = {
       delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
       delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
       delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
+      list_unregistered_medications: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          last_prescribed_at: string
+          medication_name: string
+          times_prescribed: number
+        }[]
+      }
       my_tenant_notices: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           grace_ends_at: string
           notice: string
@@ -2512,11 +2996,7 @@ export type Database = {
         }[]
       }
       open_cash_session: {
-        Args: {
-          p_branch_id: string
-          p_note?: string
-          p_opening_float_cents: number
-        }
+        Args: { p_branch_id: string; p_note?: string; p_opening_float_cents: number }
         Returns: string
       }
       platform_add_admin: {
@@ -2601,7 +3081,7 @@ export type Database = {
         }
       }
       platform_list_admins: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           created_at: string
           email: string
@@ -2610,7 +3090,7 @@ export type Database = {
         }[]
       }
       platform_list_feedback: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           created_at: string
           id: string
@@ -2624,7 +3104,7 @@ export type Database = {
         }[]
       }
       platform_list_tenants: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           billing_period: Database["public"]["Enums"]["plan_billing_period"]
           created_at: string
@@ -2802,26 +3282,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      remove_appointment_product: {
-        Args: { p_line_id: string }
-        Returns: undefined
-      }
+      remove_appointment_product: { Args: { p_line_id: string }; Returns: undefined }
       report_sales_summary: {
-        Args: {
-          p_branch_id?: string
-          p_from: string
-          p_tenant_id: string
-          p_to: string
-        }
+        Args: { p_branch_id?: string; p_from: string; p_tenant_id: string; p_to: string }
         Returns: Json
       }
       report_staff_activity: {
-        Args: {
-          p_branch_id?: string
-          p_from: string
-          p_tenant_id: string
-          p_to: string
-        }
+        Args: { p_branch_id?: string; p_from: string; p_tenant_id: string; p_to: string }
         Returns: Json
       }
       report_top_items: {
@@ -2835,11 +3302,7 @@ export type Database = {
         Returns: Json
       }
       reschedule_appointment: {
-        Args: {
-          p_appointment_id: string
-          p_ends_at: string
-          p_starts_at: string
-        }
+        Args: { p_appointment_id: string; p_ends_at: string; p_starts_at: string }
         Returns: {
           branch_id: string
           created_at: string
@@ -2866,7 +3329,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_unregistered_medication: {
+        Args: { p_medication_name: string; p_product_id?: string; p_tenant_id: string }
+        Returns: number
+      }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      save_prescription: {
+        Args: { p_appointment_id: string; p_items: Json }
+        Returns: string
+      }
       search_customers: {
         Args: { p_tenant_id: string; p_term?: string }
         Returns: {
@@ -2898,7 +3369,9 @@ export type Database = {
         Args: { p_tenant_id: string; p_term?: string }
         Returns: {
           birth_date: string | null
+          birth_date_is_estimated: boolean
           breed: string | null
+          breed_id: string | null
           created_at: string
           customer_id: string
           deleted_at: string | null
@@ -2910,6 +3383,7 @@ export type Database = {
           photo_path: string | null
           sex: Database["public"]["Enums"]["pet_sex"] | null
           species: Database["public"]["Enums"]["pet_species"]
+          species_id: string | null
           tenant_id: string
           updated_at: string
         }[]
@@ -2963,27 +3437,16 @@ export type Database = {
     }
     Enums: {
       appointment_status:
-        | "scheduled"
-        | "in_progress"
-        | "completed"
-        | "cancelled"
-        | "no_show"
+        "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show"
       audit_action: "INSERT" | "UPDATE" | "DELETE"
       cancellation_reason_kind: "non_payment" | "customer_request" | "other"
       cash_movement_type: "withdrawal" | "expense" | "income"
-      employee_document_type:
-        | "voter_id"
-        | "address_proof"
-        | "employment_contract"
+      employee_document_type: "voter_id" | "address_proof" | "employment_contract"
       member_role: "owner" | "receptionist" | "groomer" | "vet"
       payment_method: "cash" | "card" | "transfer_spei" | "openpay"
       payment_status: "approved" | "simulated_approved"
       permission_module:
-        | "employees"
-        | "inventory"
-        | "invoicing"
-        | "cash_register"
-        | "reports"
+        "employees" | "inventory" | "invoicing" | "cash_register" | "reports"
       pet_sex: "male" | "female"
       pet_species: "dog" | "cat" | "other"
       plan_billing_period: "monthly" | "yearly" | "indefinite"
@@ -2999,6 +3462,7 @@ export type Database = {
         | "consumption_reversal"
         | "adjustment"
         | "loss"
+      supplier_type: "medication" | "food" | "accessories" | "other"
       tenant_status: "active" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -3015,15 +3479,13 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
@@ -3042,16 +3504,13 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
@@ -3067,16 +3526,13 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
@@ -3092,16 +3548,13 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
@@ -3109,16 +3562,13 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
@@ -3140,11 +3590,7 @@ export const Constants = {
       audit_action: ["INSERT", "UPDATE", "DELETE"],
       cancellation_reason_kind: ["non_payment", "customer_request", "other"],
       cash_movement_type: ["withdrawal", "expense", "income"],
-      employee_document_type: [
-        "voter_id",
-        "address_proof",
-        "employment_contract",
-      ],
+      employee_document_type: ["voter_id", "address_proof", "employment_contract"],
       member_role: ["owner", "receptionist", "groomer", "vet"],
       payment_method: ["cash", "card", "transfer_spei", "openpay"],
       payment_status: ["approved", "simulated_approved"],
@@ -3171,8 +3617,8 @@ export const Constants = {
         "adjustment",
         "loss",
       ],
+      supplier_type: ["medication", "food", "accessories", "other"],
       tenant_status: ["active", "suspended", "closed"],
     },
   },
 } as const
-

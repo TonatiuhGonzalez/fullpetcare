@@ -1210,8 +1210,8 @@ aditivas, borrado suave).
 
 ### D30 — Observaciones del veterinario: catálogos, receta, cobro de paso, familias, cirugías y hospitalización
 
-**Estado:** propuesta del 2026-10-14, pendiente de aprobación. Sale de la visita a un veterinario (12 observaciones) y de
-una ronda de preguntas con el usuario. Se construye en las fases **27 a 33** (más la 16B, ya propuesta). Ninguna fase
+**Estado:** aprobada por el usuario el 2026-10-14. Sale de la visita a un veterinario (12 observaciones) y de
+una ronda de preguntas con el usuario. Construida la oleada 1 (fases 27, 28, 29B y 16A). Se construye en las fases **27 a 33** (más la 16B, ya propuesta). Ninguna fase
 arranca sin que se apruebe esta decisión.
 
 **Las 12 observaciones y dónde cae cada una.**
@@ -1306,6 +1306,25 @@ al final**, porque depende de la 16B.
   mano**, y notificaciones con **Web Push estándar** (sin servicio de terceros). Si una librería de cifrado en la Edge
   Function resulta necesaria, se justifica antes de agregarla (§3). El aviso de la fase 33 **no** manda datos clínicos en
   el cuerpo de la notificación: solo "Hay novedades de <mascota>".
+
+**Decisiones surgidas al construir la oleada 1 (2026-10-14).**
+- **Cédula (28):** quedó en `employee_details.professional_license` (no en `profiles`). La receta guarda una **copia**
+  del nombre y la cédula al emitirse, así que corregir la ficha después no cambia recetas viejas.
+- **Quién emite y quién lee (28):** emite el dueño o el veterinario **asignado a la cita** (misma regla que
+  `medical_records`) y solo con cédula; la leen dueño y veterinario. Recepción y groomer no la ven. Cuando llegue la
+  fase 31, el nuevo dueño y la familia la ven por la misma regla de visibilidad que el resto del expediente.
+- **Aviso de medicamentos de texto libre (28):** vive en **Inicio** del dueño, no en Inventario (para no tocar el
+  formulario de producto de la 29B). Ligar a un producto nuevo exige registrarlo antes en Inventario.
+- **Especie y raza (27):** el enum `pet_species` y el texto `breed` se conservan y la interfaz los mantiene al elegir del
+  catálogo (`species.legacy_kind`). Las vacunas "por especie" siguen distinguiendo solo perro y gato; ampliarlas a aves
+  y reptiles queda como mejora aparte.
+- **`demo:reset` (27):** vuelve a mostrar lo que se ocultó del catálogo, pero **no quita** lo que se agregó durante una
+  demo (sin una marca `is_base` no se distingue de lo base).
+- **PWA (16A):** el manifiesto es uno solo y no puede llevar el token de cada mascota, así que `start_url` es `/c` y la
+  vista pública **recuerda en el teléfono el último link abierto** (`localStorage`). Es el único cambio al
+  comportamiento del acceso; el acceso sigue siendo el link con token. **A confirmar con el usuario.**
+- **Proveedores (29B):** el tipo de proveedor es un enum corto (medicamentos, alimento, accesorios, otro). Se agregó un
+  índice único `products(tenant_id, id)` solo para la llave compuesta del vínculo.
 
 **Contras y riesgos.**
 - **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.

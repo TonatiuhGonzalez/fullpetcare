@@ -8,7 +8,8 @@ import { computed, onMounted, ref } from 'vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { CONTENT_WIDTH } from '@/lib/contentWidth'
-import { formatDate, formatDateOnly } from '@/lib/datetime'
+import { branchToday, formatDate } from '@/lib/datetime'
+import { ageFromBirthDate, formatAge } from '@/lib/petAge'
 import { sexLabel, speciesLabel } from '@/lib/petLabels'
 import { prescriptionFolioLabel, prescriptionPages } from '@/lib/prescription'
 import * as appointmentsService from '@/services/appointments'
@@ -75,11 +76,15 @@ async function load(): Promise<void> {
 
 onMounted(load)
 
-// Fecha de nacimiento tal cual (sin zona, §8.3). La edad calculada ("3 años 2 meses",
-// `lib/petAge.ts`) llega con la fase 27: al integrarla, la hoja cambia a la edad.
-const petBirth = computed(() =>
-  pet.value?.birth_date ? formatDateOnly(pet.value.birth_date) : null,
-)
+// Edad de la mascota hoy en la zona de la sucursal; "aprox." si la fecha de nacimiento se
+// calculó a partir de la edad (fase 27).
+const petAge = computed(() => {
+  if (!pet.value?.birth_date) return null
+  const age = ageFromBirthDate(pet.value.birth_date, branchToday(timezone.value))
+  if (!age) return null
+  const text = formatAge(age)
+  return pet.value.birth_date_is_estimated ? `${text} (aprox.)` : text
+})
 
 const pages = computed(() => prescriptionPages(prescription.value?.items.length ?? 0))
 
@@ -171,7 +176,7 @@ function print(): void {
             <span v-if="pet.breed"> · {{ pet.breed }}</span>
           </p>
           <p>
-            {{ sexLabel(pet.sex) }}<span v-if="petBirth"> · Nac. {{ petBirth }}</span
+            {{ sexLabel(pet.sex) }}<span v-if="petAge"> · {{ petAge }}</span
             ><span v-if="lastWeightKg"> · {{ lastWeightKg }} kg</span>
           </p>
         </div>

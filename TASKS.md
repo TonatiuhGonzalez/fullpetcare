@@ -2627,10 +2627,24 @@ el orden de construcción sí.
 
    Un rango es de **una** rama: si una migración necesita pasar a otro rango, es señal de que toca tablas de otra fase.
 
-**Antes de la oleada 1** (bloquean): aprobación escrita de D30; 27.1 (lista de grandes grupos de especies y si perro y
-gato son grupos); 28.1 (formato de la receta y dónde va la cédula). 16B pasa a la oleada 3, después de 31.
+**Avance de la oleada 1 (2026-10-14).** Construida en cuatro ramas desde `chore/d30-wave0` —`feat/d30-species-breeds`
+(27), `feat/d30-prescriptions` (28), `feat/d30-suppliers` (29B) y `feat/d30-pwa` (16A)— y probada junta en
+`integration/d30-wave1` (sin push ni PR). **Verificado en la rama combinada:** `vue-tsc -b` limpio, ESLint sin
+errores, 804 tests unitarios en verde, `db:reset` con todas las migraciones y la semilla, y `test:db` con las Edge
+Functions sirviéndose: 897 de 898 (falla solo `delete-customer-pet-rpc`, el que ya fallaba: cuenta el expediente de
+Rocky y crece con lo que dejan otros tests). Las cuatro ramas se fusionaron sin conflictos de texto (las secciones
+reservadas de la oleada 0 funcionaron). `database.ts` se regeneró una sola vez, aquí: el generador del CLI instalado
+(2.120) cambió su formato respecto al archivo anterior y se normalizó con Prettier sin comillas simples ni punto y coma
+para reducir el diff. **Verificado en navegador por fase** (ver cada una). **El E2E (agendar → atender → cobrar)
+pasa con las cuatro ramas.** **No verificado en conjunto:** tema oscuro, 390 y 768 px de las pantallas nuevas, ni nada en un
+teléfono real. **Decisión a confirmar:** `start_url` de la PWA en `/c` con el último link recordado (ver PLAN.md D30).
 
-## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida en rama, pendiente de integrar)
+**Qué se puede demostrar:** como dueño, abrir Especies y razas en Configuración, escribir "xolo" al registrar una
+mascota y calcular la fecha por edad; asignar proveedores a un producto; como veterinario, emitir e imprimir una receta
+con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
+agregarla a inicio y verla sin red.
+
+## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
 Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
@@ -2687,12 +2701,11 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   **Hecho:** `SpeciesSettingsPage` con `SpeciesFormDialog`, `BreedsDialog` y `SpeciesGroupsDialog`. **Verificado en
   navegador** (dueño): la lista carga las 31 especies y el ícono de razas solo aparece en Perro y Gato. **No verificado:**
   agregar, editar y ocultar desde la pantalla (solo por servicio), el veterinario y el groomer en la ruta.
-- [ ] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
-  **Parcial (2026-10-14):** `lint`, `vue-tsc`, 763 tests unitarios y `test:db` (869 de 870; falla solo
-  `delete-customer-pet-rpc`, el de siempre) pasan. **Falta** `CLAUDE.md` y `database.ts`: van en el cierre de la
-  oleada (regla 3 y 4).
+- [x] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** `lint`, `vue-tsc`, 804 tests unitarios y `test:db` (897 de
+  898; falla solo `delete-customer-pet-rpc`, el de siempre) pasan con las cuatro ramas juntas. `CLAUDE.md` actualizado.
 
-## Fase 28 — Receta médica imprimible (construida en rama, pendiente de integrar)
+## Fase 28 — Receta médica imprimible (construida; integrada en la oleada 1)
 
 **Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
 
@@ -2736,9 +2749,9 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   en Inicio. **No verificado:** impresión real a PDF, más de una hoja, tema oscuro y celular.
   **Pendiente al integrar con la fase 27:** la hoja muestra la fecha de nacimiento; con `lib/petAge` debe mostrar la
   edad ("3 años 2 meses", con "aprox." si es estimada).
-- [ ] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
-  **Parcial (2026-10-14):** `lint`, `vue-tsc`, 748 tests unitarios y 869 de `test:db` pasan en esta rama. **Falta**
-  `CLAUDE.md` y `database.ts`: van en el cierre de la oleada.
+- [x] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
+  ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
 
 ## Fase 29 — Proveedores y medicamentos fraccionados (29B construida en rama; 29C pendiente)
 
