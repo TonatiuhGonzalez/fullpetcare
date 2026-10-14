@@ -1835,8 +1835,8 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 ## Fase 16 — Acceso del cliente: PWA y cuenta propia (16A construida en rama; 16B planeada para la oleada 3)
 
 **Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
-Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: 16A construida en rama (2026-10-14, paquete D30); 16B
-planeada para la oleada 3.** Decisiones y alternativas en `PLAN.md` D21.
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: 16A construida (2026-10-14, paquete D30); 16B
+rediseñada en `PLAN.md` D31 (cuenta del dueño), pendiente de aprobación.** Decisiones y alternativas en `PLAN.md` D21.
 
 ### 16A. PWA sobre la vista actual
 
@@ -1866,14 +1866,48 @@ planeada para la oleada 3.** Decisiones y alternativas en `PLAN.md` D21.
   de iPhone sale la instrucción y no vuelve tras "Entendido", ni al recargar. **No verificado:** el botón de Android
   (`beforeinstallprompt`) en un teléfono real ni el modo avión de un dispositivo.
 
-### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
+### 16B. Cuenta del dueño de la mascota (capa A de `PLAN.md` D31; reemplaza el plan anterior)
 
-- [ ] **16.4** 📚 Elegir alternativa (Edge Function o Auth con RLS), canal del código y regla de vínculo persona↔cliente.
-- [ ] **16.5** 🧪 Backend del acceso con código de un solo uso (caducidad corta, intentos limitados). _Verificar:_ tests de
-  código caducado, reutilizado, de otro cliente y de otro negocio.
-- [ ] **16.6** Pantalla de entrada del cliente y lista de sus mascotas. _Verificar:_ solo ve las suyas; el DTO sigue en
-  lista blanca (§7.4).
-- [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+**Estado: propuesta; no se construye hasta que el usuario apruebe D31.** El plan anterior (código de un solo uso con
+tabla propia) queda descartado a favor de Supabase Auth con código por correo (D31 punto 1).
+
+- [ ] **16.4** 📚 Aprobar D31 y confirmar el dominio remitente y el proveedor de SMTP (§3). _Verificar:_ el usuario aprobó
+  por escrito; D31 sin "propuesta".
+- [ ] **16.5** 🧪 Migración: `customer_accounts` (vínculo `user_id` ↔ `customer_id` por negocio, único por negocio) con RLS,
+  y la RPC `claim_customer_link()` que vincula con un token vigente (no revocado ni vencido, de la mascota del cliente).
+  _Verificar:_ tests de token revocado, vencido, inexistente, de otro negocio y reutilizado por otra cuenta.
+- [ ] **16.6** 🧪 Funciones de lectura con lista blanca: `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()`.
+  _Verificar:_ solo ve lo vinculado; sin teléfonos de otros ni notas internas; reglas de la fase 31 (dueño anterior,
+  titular y familia); un usuario del personal no obtiene nada por esta vía.
+- [ ] **16.7** Configurar el envío de correo (SMTP) y habilitar el acceso con código para cuentas de dueño. _Verificar:_ el
+  código llega a un correo personal y caduca; el login del personal sigue igual.
+- [ ] **16.8** Pantalla `/mi-cuenta`: entrar con código, lista de mascotas, detalle (cartilla, historial, próximas citas) y
+  "Guardar en mi cuenta" en la vista pública. Sin vínculos, un mensaje claro. _Verificar:_ en navegador, 390 y 768 px.
+- [ ] **16.9** Eliminar mi cuenta y desvincular desde el negocio. _Verificar:_ el expediente del negocio no cambia.
+- [ ] **16.10** 🧪 Lectura de la **bitácora de hospitalización** por el dueño (cierra 33.5): salud y bitácora para la
+  familia, costo solo para el titular. _Verificar:_ tests de aislamiento y de visibilidad por periodo.
+- [ ] **16.11** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+
+## Fase 34 — Mi clínica: perfil y promociones (propuesta; capa B de `PLAN.md` D31)
+
+**Meta: que el dueño de la mascota vea los datos de su clínica y sus promociones.** Requiere la 16B. Sin dependencia nueva.
+
+- [ ] **34.1** 📚 Aprobar el alcance: perfil con dirección, teléfono y horarios de cada sucursal (ya existen) y promociones
+  solo de texto y vigencia, visibles únicamente para clientes vinculados.
+- [ ] **34.2** 🧪 `promotions` (título, texto, vigencia, publicada) con RLS; las administra el dueño; función de lectura
+  `my_promotions()` con lista blanca. _Verificar:_ solo ve las vigentes de su negocio; nadie de otro negocio.
+- [ ] **34.3** Pantalla de promociones en Configuración (dueño) y bloque "Mi clínica" y promociones en `/mi-cuenta`.
+  _Verificar:_ en navegador.
+
+## Fase 35 — Avisos en el teléfono (propuesta; capa C de `PLAN.md` D31)
+
+**Meta: notificar sin pasar por WhatsApp.** Requiere la 16B y una librería de Web Push (spike y autorización antes, §3).
+
+- [ ] **35.1** 📚 Spike: PushForge o `@negrel/webpush` corriendo en una Edge Function local; decidir y fijar la versión.
+- [ ] **35.2** 🧪 `push_subscriptions` por dispositivo y por cuenta, con RLS; alta y baja desde `/mi-cuenta`.
+- [ ] **35.3** 🧪 Envío de "Hay novedades de <mascota>" **sin datos clínicos**, al registrarse una nota de bitácora y para
+  recordatorios de cita y vacuna (fase 22). _Verificar:_ el cuerpo no lleva contenido clínico; un dispositivo
+  revocado no recibe.
 
 ## Fase 17 — Estados de carga: skeletons y aviso de navegación
 
