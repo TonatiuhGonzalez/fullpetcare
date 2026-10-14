@@ -2644,6 +2644,19 @@ mascota y calcular la fecha por edad; asignar proveedores a un producto; como ve
 con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
 agregarla a inicio y verla sin red.
 
+**Avance de la oleada 2 (2026-10-14).** Construida en dos ramas desde `integration/d30-wave1` —`feat/d30-fractional`
+(29C) y `feat/d30-families` (31)— y probada junta en `integration/d30-wave2` (sin push ni PR). **Verificado en la
+rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 831 tests unitarios, `test:db` 934 de 934 (con las Edge
+Functions sirviéndose y la base recién reseteada) y el E2E (agendar → atender → cobrar). Las dos ramas se fusionaron
+sin conflictos de texto; `database.ts` se regeneró una sola vez, en la integración. **No verificado en conjunto:**
+tema oscuro, 390 y 768 px de las pantallas nuevas, el cobro de cita con productos por unidad desde la pantalla, ni un
+teléfono real. **Pendiente de la oleada 2:** nada de código; la cuenta del cliente (16B) es quien usa las reglas de
+visibilidad por periodo de la 31.
+
+**Qué se puede demostrar (oleada 2):** como dueño, en Inventario convertir un producto en "caja de 20 tabletas" y ver
+"60 tabletas · 3 cajas"; en el punto de venta vender 3 tabletas a $7.25 cada una; en la página de un cliente crear una
+familia ("Familia Ramírez – Michi, Rocky, Luna") y transferir una mascota a otro cliente con su lista de dueños.
+
 ## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
@@ -2753,7 +2766,7 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
   ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
 
-## Fase 29 — Proveedores y medicamentos fraccionados (29B integrada en la oleada 1; 29C construida en rama)
+## Fase 29 — Proveedores y medicamentos fraccionados (construida; 29B en la oleada 1 y 29C en la 2)
 
 **Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
 Decisiones: D30 puntos 4 y 5.
@@ -2816,7 +2829,8 @@ Decisiones: D30 puntos 4 y 5.
   cobro completo desde la pantalla, el cobro de cita y los insumos en consulta (solo por pruebas de base), tema oscuro
   y celular. **Sin semilla:** no se agregó un producto fraccionado a la demo (habría que tocar `demo_reset` y varias
   pruebas); para mostrarlo se edita un producto desde Inventario.
-- [ ] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+- [x] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2):** ver el avance de la oleada 2. Sin dependencias nuevas (§3).
 
 ## Fase 30 — Cobro de paso (propuesta)
 
@@ -2832,7 +2846,7 @@ Decisiones: D30 puntos 4 y 5.
   _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
 - [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
 
-## Fase 31 — Familias y transferencia de mascota (construida en rama; oleada 2)
+## Fase 31 — Familias y transferencia de mascota (construida; integrada en la oleada 2)
 
 **Meta: varios dueños de una misma mascota dentro de una familia, y poder cambiar de dueño sin perder el historial.**
 Decisiones: D30 puntos 7 y 8.
@@ -2867,7 +2881,8 @@ Decisiones: D30 puntos 7 y 8.
   `TransferPetDialog` y la lista de dueños con sus periodos en la página del cliente. **Verificado en navegador**
   (Chromium, dueño): crear familia con otro cliente, la etiqueta con las mascotas de los miembros y transferir una
   mascota a otro cliente. **No verificado:** disolver y editar desde la pantalla, tema oscuro, 390 y 768 px.
-- [ ] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+- [x] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2).**
 
 ## Fase 32 — Catálogo de cirugías y costos (propuesta)
 
