@@ -91,6 +91,16 @@ const menuItems = computed<SideMenuItem[]>(() => [
         },
       ]
     : []),
+  ...(isFrontDesk(session.role)
+    ? [
+        {
+          title: 'Cobro rápido',
+          icon: 'mdi-receipt-text-plus-outline',
+          to: '/app/cobro-rapido',
+          group: 'Operación',
+        },
+      ]
+    : []),
   ...(session.canView('cash_register')
     ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja', group: 'Operación' }]
     : []),
