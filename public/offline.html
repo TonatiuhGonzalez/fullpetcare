@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0F6B66" />
+    <title>Sin conexión · FullPetCare</title>
+    <!--
+      Pantalla que muestra el service worker (sw.js) cuando no hay red. Es estática a
+      propósito: NO lleva datos de ninguna mascota ni de ningún negocio, para que lo que se
+      ve sin conexión nunca sea información vieja de otra persona.
+    -->
+    <style>
+      :root {
+        --bg: #f4f7f8;
+        --text: #17262b;
+        --muted: #4d5f65;
+        --brand: #0f6b66;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1b1e;
+          --text: #e6eef0;
+          --muted: #a8b9be;
+          --brand: #4fd1c5;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+      }
+      main {
+        max-width: 360px;
+      }
+      svg {
+        width: 96px;
+        height: 64px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 20px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 12px 20px;
+        font-size: 1rem;
+        font-weight: 600;
+        background: var(--brand);
+        color: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg viewBox="8 16 48 32" aria-hidden="true">
+        <defs><clipPath id="c"><circle cx="40" cy="32" r="16" /></clipPath></defs>
+        <circle cx="24" cy="32" r="16" fill="#c25400" />
+        <circle cx="40" cy="32" r="16" fill="#0072b2" />
+        <circle cx="24" cy="32" r="16" fill="#0f6b66" clip-path="url(#c)" />
+      </svg>
+      <h1>Sin conexión</h1>
+      <p>
+        Necesitas internet para ver la información de tu mascota. Conéctate y vuelve a intentarlo.
+      </p>
+      <button type="button" onclick="location.reload()">Reintentar</button>
+    </main>
+  </body>
+</html>
