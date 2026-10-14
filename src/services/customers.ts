@@ -107,6 +107,9 @@ export interface NewCustomerWithPet {
     breed: string | null
     sex: Database['public']['Enums']['pet_sex'] | null
     birth_date: string | null
+    birth_date_is_estimated?: boolean
+    species_id?: string | null
+    breed_id?: string | null
     is_sterilized: boolean
     grooming_notes: string | null
     medical_alerts: string | null
@@ -143,6 +146,9 @@ export async function createWithPet(
     p_pet_is_sterilized: p.is_sterilized,
     p_pet_grooming_notes: p.grooming_notes ?? undefined,
     p_pet_medical_alerts: p.medical_alerts ?? undefined,
+    p_pet_species_id: p.species_id ?? undefined,
+    p_pet_breed_id: p.breed_id ?? undefined,
+    p_pet_birth_date_is_estimated: p.birth_date_is_estimated ?? false,
   })
 
   if (error) throw error

@@ -2612,7 +2612,7 @@ el orden de construcción sí.
 **Antes de la oleada 1** (bloquean): aprobación escrita de D30; 27.1 (lista de grandes grupos de especies y si perro y
 gato son grupos); 28.1 (formato de la receta y dónde va la cédula). 16B pasa a la oleada 3, después de 31.
 
-## Fase 27 — Catálogos de especies y razas, y edad de la mascota (propuesta)
+## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida en rama, pendiente de integrar)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
 Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
@@ -2623,29 +2623,56 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   Roedores y conejos, y Otros; "perro" y "gato" son grupos con una especie cada uno (así el grupo sirve de dato genérico
   de estadística). Solo Perro y Gato llevan razas. Cada raza lleva nombre oficial y **variantes de búsqueda** opcionales
   ("xolo", "teckel", "dachshund"). `dog` pasa a Perro, `cat` a Gato y `other` queda sin especie con su texto intacto.
-- [ ] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
+- [x] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
   vacunas por especie, importador). _Verificar:_ la lista queda anotada aquí.
+  **Hecho:** `pet_species` y `breed` se leen en `PetEditDialog`, `PetFormDialog`, `CustomerWithPetDialog` (los tres se
+  cambiaron), `PetDetailDialog`, `AppointmentDialog`, `WalkInDialog`, `VaccinationDialog`, `CustomersPage`/`CustomerPage`,
+  `PublicPetPage`, `lib/petSearch.ts`, `lib/customerPets.ts` y `services/vaccines.ts`. Ninguno cambia: el enum y el texto
+  se conservan y el formulario los mantiene al elegir del catálogo.
 
 ### 27B. Base de datos
-- [ ] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
+- [x] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
   DELETE, y escritura de dueño y veterinario (patrón de `vaccines`, D29). _Verificar:_ test de aislamiento; recepción y
   groomer leen y no escriben; otro negocio no ve nada.
-- [ ] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
+  **Hecho:** `20261020120000_species_breeds_catalog.sql`; 14 tests en `species-breeds-rls.spec.ts`. Una raza solo
+  combina con su especie (llave compuesta + `check`), y el nombre no se repite por negocio.
+- [x] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
   anteriores se conservan. _Verificar:_ las mascotas existentes siguen funcionando sin tocarlas.
-- [ ] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
+  **Hecho** (misma migración): columnas nulas con llave compuesta que impide mezclar una raza con otra especie;
+  `birth_date_is_estimated` por defecto `false`. Los perros y gatos existentes se enlazan a su especie; el texto de la
+  raza no se toca. Las mascotas `other` quedan sin especie de catálogo. `create_customer_with_pet()` se reemplazó
+  (`drop` + `create`, tres parámetros nuevos con valor por defecto) y tiene 3 tests nuevos.
+- [x] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
   `seed.sql`. _Verificar:_ un negocio creado después ya lo trae; `demo:reset` lo restaura.
+  **Hecho:** `app.seed_species_catalog()` (idempotente) la llaman un trigger sobre `tenants` y la propia migración; no
+  se tocó `platform_create_tenant`. 6 grupos, 31 especies y 38 razas por negocio, con variantes de búsqueda. `seed.sql`
+  enlaza las mascotas de la semilla. `demo_reset.sql` vuelve a mostrar lo que se ocultó en una demo; **no** quita lo
+  que se agregó (sin una marca `is_base` no se distingue de lo base).
 
 ### 27C. Reglas y servicios
-- [ ] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
+- [x] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
   bordes (cumpleaños hoy, 29 de febrero, 0 meses, mes de 31 días). _Verificar:_ tests unitarios con su explicación.
-- [ ] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
+- [x] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
   acentos, ñ aparte. _Verificar:_ test de servicio.
+  **Hecho:** más `stores/speciesCatalog.ts` (carga una vez por negocio) y `lib/speciesCatalog.ts` (duplicados y
+  búsqueda por variante). 21 tests unitarios (`petAge`, `speciesCatalog`), 4 del store y 2 de servicio con sesión real.
 
 ### 27D. Interfaz
-- [ ] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
+- [x] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
   años/meses que propone una fecha editable y marcada como estimada. _Verificar:_ en navegador, claro y oscuro, 390 y 768 px.
-- [ ] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
+  **Hecho:** `components/PetSpeciesFields.vue`, compartido por `CustomerWithPetDialog`, `PetFormDialog` y
+  `PetEditDialog`. **Verificado en navegador** (Chromium, dueño, tema claro, 1280 px): al escribir "xolo" el selector
+  deja solo Xoloitzcuintle; "No sé la fecha" con 3 años propone 2023-10-14, marcada como aproximada; el alta guarda
+  especie, raza, fecha y la marca (`pets`: Perro / Xoloitzcuintle / t). **No verificado:** tema oscuro, 390 y 768 px,
+  y la edición de una mascota existente desde la pantalla.
+- [x] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
+  **Hecho:** `SpeciesSettingsPage` con `SpeciesFormDialog`, `BreedsDialog` y `SpeciesGroupsDialog`. **Verificado en
+  navegador** (dueño): la lista carga las 31 especies y el ícono de razas solo aparece en Perro y Gato. **No verificado:**
+  agregar, editar y ocultar desde la pantalla (solo por servicio), el veterinario y el groomer en la ruta.
 - [ ] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+  **Parcial (2026-10-14):** `lint`, `vue-tsc`, 763 tests unitarios y `test:db` (869 de 870; falla solo
+  `delete-customer-pet-rpc`, el de siempre) pasan. **Falta** `CLAUDE.md` y `database.ts`: van en el cierre de la
+  oleada (regla 3 y 4).
 
 ## Fase 28 — Receta médica imprimible (propuesta)
 

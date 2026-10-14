@@ -24,12 +24,14 @@ import type { UpcomingAppointment } from '@/services/appointments'
 import * as petHistoryService from '@/services/petHistory'
 import type { TimelineEntry } from '@/lib/timeline'
 import { formatDate, formatTime } from '@/lib/datetime'
-import { speciesLabel, sterilizationIndicator } from '@/lib/petLabels'
+import { sterilizationIndicator } from '@/lib/petLabels'
 import { isFrontDesk, visibleTimelineTypes } from '@/lib/roles'
 import { buildVaccineTableRows } from '@/lib/vaccination'
 import { useSessionStore } from '@/stores/session'
 import type { Database } from '@/types/database'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
+import PetSpeciesFields from '@/components/PetSpeciesFields.vue'
+import { usePetCatalog } from '@/composables/usePetCatalog'
 import WeightChart from '@/components/WeightChart.vue'
 import PetTimeline from '@/components/PetTimeline.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
@@ -71,6 +73,15 @@ const errorMessage = ref<string | null>(null)
 const name = ref('')
 const species = ref<PetSpecies>('dog')
 const breed = ref('')
+const speciesId = ref<string | null>(null)
+const breedId = ref<string | null>(null)
+const birthDateIsEstimated = ref(false)
+const {
+  catalog: speciesCatalog,
+  today,
+  loadError: catalogError,
+  ensureLoaded: ensureCatalogLoaded,
+} = usePetCatalog()
 const sex = ref<PetSex | null>(null)
 const birthDate = ref('')
 const isSterilized = ref(false)
@@ -89,10 +100,6 @@ const canRegisterVaccine = computed(
   () => session.role === 'owner' || session.role === 'vet',
 )
 
-const speciesOptions = (['dog', 'cat', 'other'] as PetSpecies[]).map((value) => ({
-  value,
-  title: speciesLabel(value),
-}))
 const sexOptions: Array<{ value: PetSex | null; title: string }> = [
   { value: null, title: 'No especificado' },
   { value: 'male', title: 'Macho' },
@@ -136,6 +143,9 @@ function fillForm(p: Pet): void {
   isSterilized.value = p.is_sterilized
   groomingNotes.value = p.grooming_notes ?? ''
   medicalAlerts.value = p.medical_alerts ?? ''
+  speciesId.value = p.species_id
+  breedId.value = p.breed_id
+  birthDateIsEstimated.value = p.birth_date_is_estimated
 }
 
 function clearPhotoSelection(): void {
@@ -181,6 +191,7 @@ async function load(id: string): Promise<void> {
       ? await petsService.getPhotoUrl(foundPet.photo_path)
       : null
     fillForm(foundPet)
+    ensureCatalogLoaded(tenantId)
   } catch {
     errorMessage.value = 'No se pudo cargar la mascota. Revisa tu conexión.'
   } finally {
@@ -234,6 +245,9 @@ async function handleSubmit(): Promise<void> {
       breed: breed.value || null,
       sex: sex.value,
       birth_date: birthDate.value || null,
+      birth_date_is_estimated: !!birthDate.value && birthDateIsEstimated.value,
+      species_id: speciesId.value,
+      breed_id: breedId.value,
       is_sterilized: isSterilized.value,
       grooming_notes: groomingNotes.value || null,
       medical_alerts: medicalAlerts.value || null,
@@ -309,13 +323,10 @@ async function handleVaccinationSaved(): Promise<void> {
           </div>
 
           <v-form ref="formRef" :disabled="!canEdit" @submit.prevent="handleSubmit">
-            <!-- Nombre · raza · sexo · ícono de esterilización (provisional). -->
+            <!-- Nombre · sexo · ícono de esterilización (provisional). -->
             <v-row dense align="center">
-              <v-col cols="12" sm="4">
+              <v-col cols="12" sm="7">
                 <v-text-field v-model="name" label="Nombre*" :rules="[required]" />
-              </v-col>
-              <v-col cols="12" sm="3">
-                <v-text-field v-model="breed" label="Raza" />
               </v-col>
               <v-col cols="9" sm="4">
                 <v-select v-model="sex" :items="sexOptions" label="Sexo" />
@@ -333,23 +344,33 @@ async function handleVaccinationSaved(): Promise<void> {
               </v-col>
             </v-row>
 
-            <v-row dense>
-              <v-col cols="12" sm="6">
-                <v-select
-                  v-model="species"
-                  :items="speciesOptions"
-                  label="Especie*"
-                  :rules="[required]"
-                />
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field :model-value="ownerName" label="Dueño" readonly />
-              </v-col>
-            </v-row>
+            <PetSpeciesFields
+              v-model:species-id="speciesId"
+              v-model:breed-id="breedId"
+              v-model:breed-text="breed"
+              v-model:legacy-species="species"
+              v-model:birth-date="birthDate"
+              v-model:birth-date-is-estimated="birthDateIsEstimated"
+              :groups="speciesCatalog.groups"
+              :species="speciesCatalog.species"
+              :breeds="speciesCatalog.breeds"
+              :today="today"
+              :require-species="!!pet?.species_id"
+              :disabled="!canEdit"
+            />
+            <v-alert
+              v-if="catalogError"
+              type="warning"
+              density="compact"
+              variant="tonal"
+              class="mb-2"
+            >
+              {{ catalogError }}
+            </v-alert>
 
             <v-row dense>
               <v-col cols="12" sm="6">
-                <v-text-field v-model="birthDate" label="Nacimiento" type="date" />
+                <v-text-field :model-value="ownerName" label="Dueño" readonly />
               </v-col>
               <v-col cols="12" sm="6">
                 <v-text-field
