@@ -4,8 +4,15 @@
 // existencia directo. Las reglas (cantidad entera, motivo obligatorio en
 // ajustes, no sacar más de lo que hay) viven en lib/inventory.ts y las aplica
 // el store; la base las vuelve a exigir.
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
+import {
+  baseUnits,
+  formatStock,
+  isFractional,
+  presentationOf,
+  type SaleUnit,
+} from '@/lib/fractional'
 import type { ManualMovementType } from '@/lib/inventory'
 import { useInventoryStore, type InventoryRow } from '@/stores/inventory'
 import { isFormValid, required } from '@/lib/validation'
@@ -26,6 +33,22 @@ const inventory = useInventoryStore()
 const quantity = ref<number | null>(null)
 const direction = ref<'in' | 'out'>('in')
 const reason = ref('')
+// Producto fraccionado (fase 29C): la cantidad puede ser de envases o de unidades sueltas.
+// Una compra llega en envases; un ajuste suele ser de unidades.
+const unit = ref<SaleUnit>('package')
+const presentation = computed(() =>
+  props.row ? presentationOf(props.row.product) : null,
+)
+const fractional = computed(() =>
+  presentation.value ? isFractional(presentation.value) : false,
+)
+const quantityLabel = computed(() => {
+  if (!fractional.value || !presentation.value) return 'Cantidad (piezas)*'
+  const p = presentation.value
+  return unit.value === 'package'
+    ? `Cantidad (${p.packageName ?? 'envases'})*`
+    : `Cantidad (${p.unitName ?? 'unidades'})*`
+})
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -36,6 +59,7 @@ watch(
     quantity.value = null
     direction.value = 'in'
     reason.value = ''
+    unit.value = props.type === 'purchase' ? 'package' : 'unit'
     errorMessage.value = null
   },
 )
@@ -54,7 +78,15 @@ async function handleSubmit(): Promise<void> {
   const error = await inventory.registerMovement({
     productId: props.row.product.id,
     type: props.type,
-    quantity: quantity.value ?? NaN,
+    // La existencia siempre está en unidades base: un envase son N de ellas.
+    quantity:
+      quantity.value === null || !presentation.value
+        ? NaN
+        : baseUnits(
+            quantity.value,
+            fractional.value ? unit.value : 'package',
+            presentation.value,
+          ),
     direction: props.type === 'adjustment' ? direction.value : undefined,
     reason: reason.value,
   })
@@ -78,7 +110,10 @@ async function handleSubmit(): Promise<void> {
       <v-card-title>{{
         type === 'purchase' ? 'Entrada de compra' : 'Ajuste de inventario'
       }}</v-card-title>
-      <v-card-subtitle>{{ row.product.name }} · hay {{ row.stock }}</v-card-subtitle>
+      <v-card-subtitle>
+        {{ row.product.name }} · hay
+        {{ presentation ? formatStock(row.stock, presentation) : row.stock }}
+      </v-card-subtitle>
 
       <v-card-text class="pt-4">
         <v-form ref="formRef" @submit.prevent="handleSubmit">
@@ -95,9 +130,22 @@ async function handleSubmit(): Promise<void> {
             <v-btn value="out">Resta</v-btn>
           </v-btn-toggle>
 
+          <v-btn-toggle
+            v-if="fractional && presentation"
+            v-model="unit"
+            mandatory
+            density="comfortable"
+            color="primary"
+            variant="outlined"
+            class="mb-4"
+          >
+            <v-btn value="package">{{ presentation.packageName ?? 'Envases' }}</v-btn>
+            <v-btn value="unit">{{ presentation.unitName ?? 'Unidades' }}</v-btn>
+          </v-btn-toggle>
+
           <v-text-field
             v-model.number="quantity"
-            label="Cantidad (piezas)*"
+            :label="quantityLabel"
             :rules="[required]"
             type="number"
             min="1"

@@ -9,6 +9,7 @@
 // services/appointments.ts, fase 3).
 import { supabase } from './supabase'
 import { sumLineItems, applyDiscount, type LineItem } from '@/lib/money'
+import type { SaleUnit } from '@/lib/fractional'
 import type { Database } from '@/types/database'
 
 export type Sale = Database['public']['Tables']['sales']['Row']
@@ -32,10 +33,22 @@ export interface CheckoutSupplyItem extends LineItem {
 
 /** Un producto en el resumen de cobro, con la existencia que había al agregarlo. */
 export interface CheckoutProductItem extends LineItem {
+  /** Identifica la partida en el ticket: producto + unidad (un envase y unidades sueltas pueden convivir). */
+  key: string
   productId: string
   description: string
-  /** Existencia de la sucursal al agregarlo: tope de la cantidad en pantalla. */
+  /** Existencia de la sucursal al agregarlo, en UNIDADES BASE (fase 29C): tope en pantalla. */
   stock: number
+  /** Qué se vende: el envase completo o una unidad suelta. `quantity` va en esta unidad. */
+  unit: SaleUnit
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
+  /** Precio que se cobraría sin corrección (envase o unidad); si `unitPriceCents` es otro, se corrigió. */
+  defaultUnitPriceCents: number
+  /** Precio del envase y de la unidad fijado en el producto, para recalcular al cambiar de unidad. */
+  packagePriceCents: number
+  fixedUnitPriceCents: number | null
 }
 
 /** Un producto que se puede vender hoy en una sucursal (activo y con existencia). */
@@ -45,7 +58,14 @@ export interface SellableProduct {
   sku: string | null
   priceCents: number
   taxRateBp: number
+  /** Existencia en UNIDADES BASE (tableta, ml); igual al número de piezas si no se fracciona. */
   stock: number
+  /** Unidades base por envase (fase 29C); 1 = no se fracciona. */
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
+  /** Precio de la unidad suelta fijado en el producto; nulo = se calcula del envase. */
+  unitPriceCents: number | null
   /** Categoría del producto (13G); null si no tiene. Una desactivada se trata como "sin categoría" en lib/. */
   categoryId: string | null
 }
@@ -81,7 +101,12 @@ export interface NewPayment {
 
 export interface ProductSaleLine {
   productId: string
+  /** En la unidad vendida (`unit`). */
   quantity: number
+  /** 'package' (por defecto) o 'unit'. Solo un producto fraccionado se vende por unidad. */
+  unit?: SaleUnit
+  /** Corrección del precio de la unidad vendida en esta venta; ausente = el del producto. */
+  unitPriceCents?: number
 }
 
 export interface ChargeArgs {
@@ -180,7 +205,13 @@ function paymentsPayload(payments: NewPayment[]) {
 }
 
 function productsPayload(products: ProductSaleLine[] = []) {
-  return products.map((p) => ({ product_id: p.productId, quantity: p.quantity }))
+  return products.map((p) => ({
+    product_id: p.productId,
+    quantity: p.quantity,
+    unit: p.unit ?? 'package',
+    // Solo se manda si se corrigió: así el precio lo sigue decidiendo la base.
+    ...(p.unitPriceCents !== undefined ? { unit_price_cents: p.unitPriceCents } : {}),
+  }))
 }
 
 /** Cobra una cita atendida (con productos opcionales) y devuelve el ticket completo. */
@@ -224,7 +255,9 @@ export async function listSellableProducts(
   const [productsResult, stockResult] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name, sku, price_cents, tax_rate_bp, category_id')
+      .select(
+        'id, name, sku, price_cents, tax_rate_bp, category_id, units_per_package, package_name, unit_name, unit_price_cents',
+      )
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -250,6 +283,10 @@ export async function listSellableProducts(
       priceCents: p.price_cents,
       taxRateBp: p.tax_rate_bp,
       stock: stockByProduct.get(p.id) ?? 0,
+      unitsPerPackage: p.units_per_package,
+      packageName: p.package_name,
+      unitName: p.unit_name,
+      unitPriceCents: p.unit_price_cents,
       categoryId: p.category_id,
     }))
     .filter((p) => p.stock > 0)

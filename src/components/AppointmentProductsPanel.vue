@@ -5,6 +5,8 @@
 // interno. Las reglas las impone la base (RPC); aquí solo se captura y se muestra.
 import { onMounted, ref } from 'vue'
 
+import { baseUnits, formatStock, isFractional, type SaleUnit } from '@/lib/fractional'
+
 import * as appointmentProductsService from '@/services/appointmentProducts'
 import type { AppointmentProduct, AvailableProduct } from '@/services/appointmentProducts'
 import IconButton from '@/components/IconButton.vue'
@@ -22,6 +24,8 @@ const lines = ref<AppointmentProduct[]>([])
 const available = ref<AvailableProduct[]>([])
 const productToAdd = ref<AvailableProduct | null>(null)
 const quantity = ref(1)
+// Envase o unidad suelta, solo para productos fraccionados (fase 29C).
+const unit = ref<SaleUnit>('package')
 const isBillable = ref(true)
 
 const loading = ref(false)
@@ -51,8 +55,11 @@ async function handleAdd(): Promise<void> {
     errorMessage.value = 'La cantidad debe ser un número entero mayor a cero.'
     return
   }
-  if (quantity.value > productToAdd.value.stock) {
-    errorMessage.value = `Solo hay ${productToAdd.value.stock} pieza(s) de "${productToAdd.value.name}".`
+  const chosenUnit: SaleUnit = isFractional(productToAdd.value) ? unit.value : 'package'
+  if (
+    baseUnits(quantity.value, chosenUnit, productToAdd.value) > productToAdd.value.stock
+  ) {
+    errorMessage.value = `Solo hay ${formatStock(productToAdd.value.stock, productToAdd.value)} de "${productToAdd.value.name}".`
     return
   }
 
@@ -64,9 +71,11 @@ async function handleAdd(): Promise<void> {
       productId: productToAdd.value.id,
       quantity: quantity.value,
       isBillable: isBillable.value,
+      unit: chosenUnit,
     })
     productToAdd.value = null
     quantity.value = 1
+    unit.value = 'package'
     isBillable.value = true
     await load()
     emit('changed')
@@ -135,9 +144,26 @@ defineExpose({ reload: load })
         no-data-text="No hay productos con existencia"
       >
         <template #item="{ props: itemProps, item }">
-          <v-list-item v-bind="itemProps" :subtitle="`Hay ${item.raw.stock}`" />
+          <v-list-item
+            v-bind="itemProps"
+            :subtitle="`Hay ${formatStock(item.raw.stock, item.raw)}`"
+          />
         </template>
       </v-autocomplete>
+      <v-btn-toggle
+        v-if="productToAdd && isFractional(productToAdd)"
+        v-model="unit"
+        mandatory
+        density="compact"
+        color="primary"
+        variant="outlined"
+        divided
+      >
+        <v-btn value="package" size="small">{{
+          productToAdd.packageName ?? 'Envase'
+        }}</v-btn>
+        <v-btn value="unit" size="small">{{ productToAdd.unitName ?? 'Unidad' }}</v-btn>
+      </v-btn-toggle>
       <v-text-field
         v-model.number="quantity"
         label="Cant.*"

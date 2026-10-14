@@ -274,6 +274,10 @@ const ALIMENTO: SellableProduct = {
   priceCents: 10000,
   taxRateBp: 1600,
   stock: 3,
+  unitsPerPackage: 1,
+  packageName: null,
+  unitName: null,
+  unitPriceCents: null,
   categoryId: null,
 }
 
@@ -314,12 +318,12 @@ describe('productos en el ticket (tarea 11.11)', () => {
     const cart = useCartStore()
     cart.addProduct(ALIMENTO, 1)
 
-    expect(cart.setProductQuantity(ALIMENTO.id, 4)).toBe(false)
-    expect(cart.setProductQuantity(ALIMENTO.id, 0)).toBe(false)
-    expect(cart.setProductQuantity(ALIMENTO.id, 2)).toBe(true)
+    expect(cart.setProductQuantity(`${ALIMENTO.id}:package`, 4)).toBe(false)
+    expect(cart.setProductQuantity(`${ALIMENTO.id}:package`, 0)).toBe(false)
+    expect(cart.setProductQuantity(`${ALIMENTO.id}:package`, 2)).toBe(true)
     expect(cart.totalCents).toBe(20000)
 
-    cart.removeProduct(ALIMENTO.id)
+    cart.removeProduct(`${ALIMENTO.id}:package`)
     expect(cart.totalCents).toBe(0)
   })
 
@@ -337,7 +341,7 @@ describe('productos en el ticket (tarea 11.11)', () => {
     expect(chargeCounterSale).toHaveBeenCalledWith({
       branchId: 'branch-1',
       customerId: 'customer-1',
-      products: [{ productId: 'product-alimento', quantity: 2 }],
+      products: [{ productId: 'product-alimento', quantity: 2, unit: 'package' }],
       payments: [{ method: 'cash', amountCents: 20000 }],
       discountCents: 0,
     })
@@ -390,7 +394,7 @@ describe('productos en el ticket (tarea 11.11)', () => {
     expect(charge).toHaveBeenCalledWith(
       expect.objectContaining({
         appointmentId: 'appt-1',
-        products: [{ productId: 'product-alimento', quantity: 1 }],
+        products: [{ productId: 'product-alimento', quantity: 1, unit: 'package' }],
         payments: [{ method: 'card', amountCents: 35000, paymentFormCode: '28' }],
       }),
     )
@@ -478,5 +482,113 @@ describe('loadCatalog (categorías y últimos vendidos)', () => {
 
     expect(cart.catalog).toEqual([])
     expect(cart.errorMessage).toMatch(/productos/)
+  })
+})
+
+// Amoxicilina: caja de 20 tabletas de $145.00 (la tableta sale en $7.25), 2 cajas y 5 sueltas
+// en existencia = 45 tabletas.
+const AMOXICILINA: SellableProduct = {
+  id: 'product-amox',
+  name: 'Amoxicilina',
+  sku: null,
+  priceCents: 14500,
+  taxRateBp: 1600,
+  stock: 45,
+  unitsPerPackage: 20,
+  packageName: 'caja',
+  unitName: 'tableta',
+  unitPriceCents: null,
+  categoryId: null,
+}
+
+describe('productos fraccionados en el ticket (fase 29C)', () => {
+  // Qué prueba: vender 3 tabletas cobra el precio de la tableta y no el de la caja.
+  // Qué se rompería: el cliente pagaría $145.00 por tres tabletas.
+  it('una unidad suelta cobra el precio de la unidad', () => {
+    const cart = useCartStore()
+    expect(cart.addProduct(AMOXICILINA, 3, 'unit')).toBe(true)
+    expect(cart.productItems[0]).toMatchObject({
+      unit: 'unit',
+      quantity: 3,
+      unitPriceCents: 725,
+    })
+    expect(cart.totalCents).toBe(2175)
+  })
+
+  // Qué prueba: el tope de existencia se compara en unidades base y contando lo que el
+  // ticket ya lleva en envases: 2 cajas son 40 de 45, así que 6 tabletas ya no caben.
+  // Qué se rompería: se podría vender más de lo que hay mezclando cajas y tabletas.
+  it('compara la existencia en unidades base contando envases y sueltas juntos', () => {
+    const cart = useCartStore()
+    expect(cart.addProduct(AMOXICILINA, 2, 'package')).toBe(true) // 40
+    expect(cart.addProduct(AMOXICILINA, 5, 'unit')).toBe(true) // 45
+    expect(cart.addProduct(AMOXICILINA, 1, 'unit')).toBe(false) // 46 > 45
+    expect(cart.unitsInTicket(AMOXICILINA.id)).toBe(45)
+  })
+
+  // Qué prueba: un envase y unidades sueltas son dos partidas distintas del mismo producto.
+  it('un envase y unidades sueltas son partidas separadas', () => {
+    const cart = useCartStore()
+    cart.addProduct(AMOXICILINA, 1, 'package')
+    cart.addProduct(AMOXICILINA, 4, 'unit')
+    expect(cart.productItems.map((p) => p.key)).toEqual([
+      'product-amox:package',
+      'product-amox:unit',
+    ])
+  })
+
+  // Qué prueba: un producto sin presentación no se agrega por unidad.
+  it('un producto sin fraccionar no se agrega por unidad', () => {
+    const cart = useCartStore()
+    expect(cart.addProduct(ALIMENTO, 1, 'unit')).toBe(false)
+  })
+
+  // Qué prueba: pasar una partida de envase a unidad conserva la cantidad, cambia el precio,
+  // y si ya había una de sueltas se suman.
+  it('cambiar de envase a unidad recalcula el precio y suma con la partida existente', () => {
+    const cart = useCartStore()
+    cart.addProduct(AMOXICILINA, 1, 'package')
+    expect(cart.setProductUnit('product-amox:package', 'unit')).toBe(true)
+    expect(cart.productItems[0]).toMatchObject({
+      key: 'product-amox:unit',
+      quantity: 1,
+      unitPriceCents: 725,
+    })
+
+    cart.addProduct(AMOXICILINA, 1, 'package')
+    expect(cart.setProductUnit('product-amox:package', 'unit')).toBe(true)
+    expect(cart.productItems).toHaveLength(1)
+    expect(cart.productItems[0].quantity).toBe(2)
+  })
+
+  // Qué prueba: cambiar de unidad no puede pasar de la existencia (60 tabletas piden 3 cajas
+  // de 20 con solo 45 en existencia).
+  it('no deja pasar a una unidad que excede la existencia', () => {
+    const cart = useCartStore()
+    cart.addProduct(AMOXICILINA, 2, 'unit')
+    expect(cart.setProductQuantity('product-amox:unit', 46)).toBe(false)
+  })
+
+  // Qué prueba: el precio corregido en la venta se manda a la base; sin corrección, no.
+  it('manda el precio solo cuando se corrigió en la venta', async () => {
+    const cart = useCartStore()
+    cart.loadCounterSale('branch-1')
+    cart.addProduct(AMOXICILINA, 2, 'unit')
+    cart.addPayment({ method: 'cash', amountCents: 5000 })
+    vi.mocked(chargeCounterSale).mockResolvedValue({} as never)
+
+    await cart.checkout()
+    expect(vi.mocked(chargeCounterSale).mock.calls[0][0].products).toEqual([
+      { productId: 'product-amox', quantity: 2, unit: 'unit' },
+    ])
+
+    cart.loadCounterSale('branch-1')
+    cart.addProduct(AMOXICILINA, 2, 'unit')
+    cart.setProductUnitPrice('product-amox:unit', 600)
+    cart.addPayment({ method: 'cash', amountCents: 5000 })
+    await cart.checkout()
+    expect(vi.mocked(chargeCounterSale).mock.calls[1][0].products).toEqual([
+      { productId: 'product-amox', quantity: 2, unit: 'unit', unitPriceCents: 600 },
+    ])
   })
 })

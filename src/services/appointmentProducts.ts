@@ -15,7 +15,11 @@ export type AppointmentProduct =
 export interface AvailableProduct {
   id: string
   name: string
+  /** Existencia en UNIDADES BASE (fase 29C); igual a piezas si el producto no se fracciona. */
   stock: number
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
 }
 
 /** Insumos registrados en una cita, en el orden en que se anotaron. */
@@ -47,7 +51,7 @@ export async function listAvailable(
   const [productsResult, stockResult] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name')
+      .select('id, name, units_per_package, package_name, unit_name')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -66,7 +70,14 @@ export async function listAvailable(
     (stockResult.data ?? []).map((r) => [r.product_id, r.stock]),
   )
   return (productsResult.data ?? [])
-    .map((p) => ({ id: p.id, name: p.name, stock: stockByProduct.get(p.id) ?? 0 }))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      stock: stockByProduct.get(p.id) ?? 0,
+      unitsPerPackage: p.units_per_package,
+      packageName: p.package_name,
+      unitName: p.unit_name,
+    }))
     .filter((p) => p.stock > 0)
 }
 
@@ -76,6 +87,8 @@ export interface AddAppointmentProductArgs {
   quantity: number
   /** true: se cobra al cliente; false: uso interno (guantes, gasas). */
   isBillable: boolean
+  /** Envase completo (por defecto) o unidad suelta de un producto fraccionado (fase 29C). */
+  unit?: 'package' | 'unit'
 }
 
 /** Registra un insumo y baja la existencia. Devuelve el id de la línea. */
@@ -85,6 +98,7 @@ export async function add(args: AddAppointmentProductArgs): Promise<string> {
     p_product_id: args.productId,
     p_quantity: args.quantity,
     p_is_billable: args.isBillable,
+    p_unit: args.unit ?? 'package',
   })
 
   if (error) throw error
@@ -111,7 +125,9 @@ export function errorMessage(err: unknown): string {
       ? String((err as { message: unknown }).message)
       : ''
 
-  if (/no tiene existencia|no hay existencia suficiente/i.test(message)) {
+  if (
+    /no tiene existencia|no hay existencia suficiente/i.test(message)
+  ) {
     return 'No hay existencia suficiente de ese producto.'
   }
   if (/ya fue cobrada/i.test(message))
@@ -120,6 +136,8 @@ export function errorMessage(err: unknown): string {
     return 'Esta pieza corresponde a una vacuna ya registrada.'
   if (/permiso/i.test(message))
     return 'No tienes permiso para registrar productos usados.'
+  if (/no se usa por unidad/i.test(message))
+    return 'Ese producto no se usa por unidad: elige el envase.'
   if (/no existe o no está disponible/i.test(message))
     return 'Ese producto ya no está disponible.'
   return 'No se pudo completar la acción. Revisa tu conexión.'
