@@ -521,4 +521,23 @@ join (values
 where m.tenant_id = 'b0000000-0000-4000-8000-000000000001'
 on conflict (membership_id) do update set professional_license = excluded.professional_license;
 
--- (fase 29B) Proveedores de ejemplo de Patitas Felices.
+-- (fase 29B) Proveedores de ejemplo de Patitas Felices (ficticios) y a quién surte cada uno.
+-- Alimento y shampoo (productos de la semilla) tienen más de un proveedor a propósito, para
+-- que la demo muestre que un producto puede tener varios.
+insert into suppliers (id, tenant_id, name, supplier_type, contact_name, phone, email, notes)
+values
+  ('31000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+   'Distribuidora Veterinaria del Centro', 'medication', 'Lic. Marcela Ibarra', '5555501100',
+   'ventas@dvcentro.example.mx', 'Entrega los martes y jueves.'),
+  ('31000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+   'Alimentos Premium para Mascotas', 'food', 'Ing. Rodrigo Salas', '5555502200',
+   'pedidos@alimentospremium.example.mx', null),
+  ('31000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001',
+   'Accesorios y Más', 'accessories', null, '5555503300', null, 'Pedido mínimo de 10 piezas.');
+
+insert into product_suppliers (tenant_id, product_id, supplier_id)
+values
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000002'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000003'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000003');
