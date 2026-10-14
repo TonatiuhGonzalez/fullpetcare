@@ -11,6 +11,7 @@ import CardSkeleton from '@/components/CardSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import NewAppointmentDialog from '@/components/NewAppointmentDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import UnregisteredMedicationsCard from '@/components/UnregisteredMedicationsCard.vue'
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import WalkInDialog from '@/components/WalkInDialog.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
@@ -101,6 +102,13 @@ const pendingShown = computed(() => home.pending.slice(0, 5))
     >
       {{ home.errorMessage }}
     </v-alert>
+
+    <!-- Aviso de medicamentos recetados a mano que no están en el catálogo (fase 28): solo
+         el dueño del negocio; la función de la base lo revalida. -->
+    <UnregisteredMedicationsCard
+      v-if="session.role === 'owner' && session.activeTenantId"
+      :tenant-id="session.activeTenantId"
+    />
 
     <CardSkeleton v-if="loading && showSkeleton" :count="4" :columns="2" :lines="3" />
 

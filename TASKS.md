@@ -2647,7 +2647,7 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
 - [ ] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
 - [ ] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
 
-## Fase 28 — Receta médica imprimible (propuesta)
+## Fase 28 — Receta médica imprimible (construida en rama, pendiente de integrar)
 
 **Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
 
@@ -2660,20 +2660,40 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   La cédula va en `employee_details` y la receta guarda una copia al emitirse.
 
 ### 28B. Base de datos
-- [ ] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
+- [x] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
   `lib/validation.ts`). _Verificar:_ test; solo quien tiene permiso de empleados la edita.
-- [ ] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
+  **Hecho:** `employee_details.professional_license` (migración `20261021120000_prescriptions.sql`), campo "Cédula
+  profesional" en el formulario de empleado (solo veterinario y dueño; 7 u 8 dígitos, `isValidProfessionalLicense`) y
+  cédulas ficticias en la semilla. La cédula no viaja en la RPC de alta de empleado (su firma no cambia): se guarda
+  en la ficha que la RPC crea.
+- [x] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
   duración) ligadas a la consulta; es **expediente**: sin borrado y con bitácora. Emitirla solo la hace veterinario o
   dueño **con cédula**; la RPC lo revalida. _Verificar:_ test de RLS (recepción y groomer no la crean; groomer no la
   lee) y de que sin cédula se rechaza.
-- [ ] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
+  **Hecho:** `prescriptions` y `prescription_items` (expediente: sin DELETE, con bitácora, solo lectura para dueño y
+  veterinario) y la RPC `save_prescription()`: dueño o el veterinario de la cita, con cédula; copia nombre y cédula;
+  folio consecutivo por negocio; reemplaza renglones (los anteriores quedan ocultos). 16 tests en
+  `prescriptions-rpc.spec.ts`.
+- [x] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
   crear el producto. _Verificar:_ test; solo lo ve el dueño.
+  **Hecho:** `list_unregistered_medications()` y `resolve_unregistered_medication()` (solo dueño; agrupa sin acentos ni
+  mayúsculas) y la tarjeta "Medicamentos por registrar" en Inicio (`UnregisteredMedicationsCard`), que liga a un
+  producto existente o descarta. Para un producto nuevo se registra antes en Inventario (no se tocó el formulario de
+  producto, que es de la rama 29B).
 
 ### 28C. Interfaz
-- [ ] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
+- [x] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
   Encabezado: empresa y sucursal, veterinario y cédula, fecha, mascota y dueño; cuerpo: tabla de medicamentos; pie:
   espacio de firma. _Verificar:_ imprimir a PDF desde el navegador y revisar una hoja carta.
+  **Hecho:** `PrescriptionPanel` en la atención de la consulta y `PrescriptionPrintPage` (`/app/citas/:id/receta`,
+  carta vertical con `@media print`). **Verificado en navegador** (Chromium): el veterinario emite con un medicamento
+  de texto libre, la hoja muestra empresa, sucursal, folio, cédula, paciente, propietario y tabla; el dueño ve el aviso
+  en Inicio. **No verificado:** impresión real a PDF, más de una hoja, tema oscuro y celular.
+  **Pendiente al integrar con la fase 27:** la hoja muestra la fecha de nacimiento; con `lib/petAge` debe mostrar la
+  edad ("3 años 2 meses", con "aprox." si es estimada).
 - [ ] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+  **Parcial (2026-10-14):** `lint`, `vue-tsc`, 748 tests unitarios y 869 de `test:db` pasan en esta rama. **Falta**
+  `CLAUDE.md` y `database.ts`: van en el cierre de la oleada.
 
 ## Fase 29 — Proveedores y medicamentos fraccionados (propuesta)
 

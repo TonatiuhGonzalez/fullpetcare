@@ -7,6 +7,7 @@ import {
   isFormValid,
   isValidCURP,
   isValidEmail,
+  isValidProfessionalLicense,
   isValidPhone,
   isValidPostalCode,
   isValidRFC,
@@ -117,6 +118,26 @@ describe('isValidPhone', () => {
 
   it('rechaza texto que no son dígitos', () => {
     expect(isValidPhone('llamar-por-favor')).toBe(false)
+  })
+})
+
+describe('isValidProfessionalLicense', () => {
+  // Qué prueba: que 7 y 8 dígitos son válidos y que se tolera el formato con espacios.
+  // Qué se rompería: no se podría guardar la cédula de un veterinario, y sin cédula la
+  // receta no se puede emitir (la base lo exige).
+  it('acepta 7 u 8 dígitos, con o sin separadores', () => {
+    expect(isValidProfessionalLicense('1234567')).toBe(true)
+    expect(isValidProfessionalLicense('12345678')).toBe(true)
+    expect(isValidProfessionalLicense('1 234 567')).toBe(true)
+  })
+
+  // Qué prueba: los bordes (6 y 9 dígitos), letras y vacío.
+  // Qué se rompería: una cédula con una letra o recortada saldría impresa en la receta.
+  it('rechaza largos incorrectos, letras y vacío', () => {
+    expect(isValidProfessionalLicense('123456')).toBe(false)
+    expect(isValidProfessionalLicense('123456789')).toBe(false)
+    expect(isValidProfessionalLicense('12A4567')).toBe(false)
+    expect(isValidProfessionalLicense('')).toBe(false)
   })
 })
 

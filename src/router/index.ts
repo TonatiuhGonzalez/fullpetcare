@@ -91,6 +91,14 @@ export const router = createRouter({
           props: true,
         },
         {
+          // Receta de una consulta, lista para imprimir (fase 28, PLAN.md D30).
+          path: 'citas/:id/receta',
+          name: 'cita-receta',
+          component: () => import('@/pages/agenda/PrescriptionPrintPage.vue'),
+          props: true,
+          meta: { requiresRoles: ['owner', 'vet'] },
+        },
+        {
           path: 'citas/:id/cobrar',
           name: 'cita-cobrar',
           component: () => import('@/pages/agenda/CheckoutPage.vue'),
