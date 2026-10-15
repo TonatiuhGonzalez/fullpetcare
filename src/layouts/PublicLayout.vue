@@ -17,6 +17,7 @@
 import { computed, ref } from 'vue'
 
 import BrandLogo from '@/components/BrandLogo.vue'
+import InstallAppBanner from '@/components/InstallAppBanner.vue'
 import { initialsOf } from '@/lib/initials'
 
 const businessName = ref('')
@@ -35,6 +36,11 @@ const initials = computed(() => initialsOf(businessName.value))
   </v-app-bar>
 
   <v-main>
+    <!-- Aviso "Agregar a inicio" (fase 16A): solo sale si hay algo que sugerir. -->
+    <v-container max-width="480" class="pb-0 pt-4">
+      <InstallAppBanner />
+    </v-container>
+
     <router-view v-slot="{ Component }">
       <component :is="Component" @business-name="businessName = $event" />
     </router-view>

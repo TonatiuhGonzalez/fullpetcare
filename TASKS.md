@@ -1832,21 +1832,39 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
 8. **Superadmin** con la misma identidad.
 
-## Fase 16 — Acceso del cliente: PWA y cuenta propia (propuesta)
+## Fase 16 — Acceso del cliente: PWA y cuenta propia (16A construida en rama; 16B planeada para la oleada 3)
 
 **Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
-Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta, trabajo a futuro; no se construye hasta
-que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: 16A construida en rama (2026-10-14, paquete D30); 16B
+planeada para la oleada 3.** Decisiones y alternativas en `PLAN.md` D21.
 
 ### 16A. PWA sobre la vista actual
 
-- [ ] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
+- [x] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
   y aprobar `PLAN.md` D21. _Verificar:_ el usuario aprobó por escrito; D21 sin "propuesta".
-- [ ] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
+  **Hecho (2026-10-14):** D21 ya estaba aprobada; el usuario aprobó construir la 16A dentro del paquete D30
+  (oleada 1). Se confirmó que no había manifest ni service worker.
+- [x] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
   nunca de datos de la mascota. _Verificar:_ Lighthouse "instalable"; en el teléfono se agrega a inicio y abre sin barra
   del navegador; un token revocado sigue sin mostrar nada aun con caché.
-- [ ] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
+  **Hecho:** `public/manifest.webmanifest`, íconos en `public/icons/` (192, 512 y maskable, generados con
+  `scripts/gen-pwa-icons.mjs` desde el isotipo), `public/sw.js` escrito a mano (sin dependencia), `plugins/pwa.ts` y
+  cabeceras `no-cache` para `sw.js`, el manifiesto y `offline.html`. El worker **ignora todo lo de otro dominio** (ahí
+  viven los datos de la mascota), no guarda pantallas y solo guarda los archivos con hash de `/assets/`. 7 tests del
+  worker real (`serviceWorker.spec.ts`). **Verificado en navegador** (Chromium, build de producción en `vite preview`):
+  manifiesto enlazado, worker activo y, sin red, una navegación muestra "Sin conexión". **No verificado:** Lighthouse
+  "instalable" ni instalación en un teléfono real, ni con Cloudflare (cabeceras `_headers`).
+  **Decisión nueva (a confirmar):** `start_url` es `/c`: el manifiesto es uno solo y no puede llevar el token de cada
+  mascota. La vista pública recuerda en el teléfono el último token abierto (`lib/lastPetLink.ts`, `localStorage`,
+  solo con forma de token y borrado si el link deja de servir) y `/c` lleva a esa mascota; sin token, explica que hay
+  que abrir el link de la clínica. El acceso sigue siendo el link con token.
+- [x] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
   modo avión se ve el aviso, no datos viejos de otra mascota.
+  **Hecho:** `InstallAppBanner` en el layout público: en Android un botón que lanza el diálogo del navegador; en
+  iPhone y iPad la instrucción de Compartir → Agregar a pantalla de inicio. "Ahora no" y "Entendido" lo ocultan 30 días
+  en este teléfono. Pantalla `offline.html` estática, sin datos. **Verificado en navegador:** con un agente de usuario
+  de iPhone sale la instrucción y no vuelve tras "Entendido", ni al recargar. **No verificado:** el botón de Android
+  (`beforeinstallprompt`) en un teléfono real ni el modo avión de un dispositivo.
 
 ### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
 
@@ -2609,10 +2627,24 @@ el orden de construcción sí.
 
    Un rango es de **una** rama: si una migración necesita pasar a otro rango, es señal de que toca tablas de otra fase.
 
-**Antes de la oleada 1** (bloquean): aprobación escrita de D30; 27.1 (lista de grandes grupos de especies y si perro y
-gato son grupos); 28.1 (formato de la receta y dónde va la cédula). 16B pasa a la oleada 3, después de 31.
+**Avance de la oleada 1 (2026-10-14).** Construida en cuatro ramas desde `chore/d30-wave0` —`feat/d30-species-breeds`
+(27), `feat/d30-prescriptions` (28), `feat/d30-suppliers` (29B) y `feat/d30-pwa` (16A)— y probada junta en
+`integration/d30-wave1` (sin push ni PR). **Verificado en la rama combinada:** `vue-tsc -b` limpio, ESLint sin
+errores, 804 tests unitarios en verde, `db:reset` con todas las migraciones y la semilla, y `test:db` con las Edge
+Functions sirviéndose: 897 de 898 (falla solo `delete-customer-pet-rpc`, el que ya fallaba: cuenta el expediente de
+Rocky y crece con lo que dejan otros tests). Las cuatro ramas se fusionaron sin conflictos de texto (las secciones
+reservadas de la oleada 0 funcionaron). `database.ts` se regeneró una sola vez, aquí: el generador del CLI instalado
+(2.120) cambió su formato respecto al archivo anterior y se normalizó con Prettier sin comillas simples ni punto y coma
+para reducir el diff. **Verificado en navegador por fase** (ver cada una). **El E2E (agendar → atender → cobrar)
+pasa con las cuatro ramas.** **No verificado en conjunto:** tema oscuro, 390 y 768 px de las pantallas nuevas, ni nada en un
+teléfono real. **Decisión a confirmar:** `start_url` de la PWA en `/c` con el último link recordado (ver PLAN.md D30).
 
-## Fase 27 — Catálogos de especies y razas, y edad de la mascota (propuesta)
+**Qué se puede demostrar:** como dueño, abrir Especies y razas en Configuración, escribir "xolo" al registrar una
+mascota y calcular la fecha por edad; asignar proveedores a un producto; como veterinario, emitir e imprimir una receta
+con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
+agregarla a inicio y verla sin red.
+
+## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
 Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
@@ -2623,31 +2655,57 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   Roedores y conejos, y Otros; "perro" y "gato" son grupos con una especie cada uno (así el grupo sirve de dato genérico
   de estadística). Solo Perro y Gato llevan razas. Cada raza lleva nombre oficial y **variantes de búsqueda** opcionales
   ("xolo", "teckel", "dachshund"). `dog` pasa a Perro, `cat` a Gato y `other` queda sin especie con su texto intacto.
-- [ ] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
+- [x] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
   vacunas por especie, importador). _Verificar:_ la lista queda anotada aquí.
+  **Hecho:** `pet_species` y `breed` se leen en `PetEditDialog`, `PetFormDialog`, `CustomerWithPetDialog` (los tres se
+  cambiaron), `PetDetailDialog`, `AppointmentDialog`, `WalkInDialog`, `VaccinationDialog`, `CustomersPage`/`CustomerPage`,
+  `PublicPetPage`, `lib/petSearch.ts`, `lib/customerPets.ts` y `services/vaccines.ts`. Ninguno cambia: el enum y el texto
+  se conservan y el formulario los mantiene al elegir del catálogo.
 
 ### 27B. Base de datos
-- [ ] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
+- [x] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
   DELETE, y escritura de dueño y veterinario (patrón de `vaccines`, D29). _Verificar:_ test de aislamiento; recepción y
   groomer leen y no escriben; otro negocio no ve nada.
-- [ ] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
+  **Hecho:** `20261020120000_species_breeds_catalog.sql`; 14 tests en `species-breeds-rls.spec.ts`. Una raza solo
+  combina con su especie (llave compuesta + `check`), y el nombre no se repite por negocio.
+- [x] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
   anteriores se conservan. _Verificar:_ las mascotas existentes siguen funcionando sin tocarlas.
-- [ ] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
+  **Hecho** (misma migración): columnas nulas con llave compuesta que impide mezclar una raza con otra especie;
+  `birth_date_is_estimated` por defecto `false`. Los perros y gatos existentes se enlazan a su especie; el texto de la
+  raza no se toca. Las mascotas `other` quedan sin especie de catálogo. `create_customer_with_pet()` se reemplazó
+  (`drop` + `create`, tres parámetros nuevos con valor por defecto) y tiene 3 tests nuevos.
+- [x] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
   `seed.sql`. _Verificar:_ un negocio creado después ya lo trae; `demo:reset` lo restaura.
+  **Hecho:** `app.seed_species_catalog()` (idempotente) la llaman un trigger sobre `tenants` y la propia migración; no
+  se tocó `platform_create_tenant`. 6 grupos, 31 especies y 38 razas por negocio, con variantes de búsqueda. `seed.sql`
+  enlaza las mascotas de la semilla. `demo_reset.sql` vuelve a mostrar lo que se ocultó en una demo; **no** quita lo
+  que se agregó (sin una marca `is_base` no se distingue de lo base).
 
 ### 27C. Reglas y servicios
-- [ ] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
+- [x] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
   bordes (cumpleaños hoy, 29 de febrero, 0 meses, mes de 31 días). _Verificar:_ tests unitarios con su explicación.
-- [ ] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
+- [x] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
   acentos, ñ aparte. _Verificar:_ test de servicio.
+  **Hecho:** más `stores/speciesCatalog.ts` (carga una vez por negocio) y `lib/speciesCatalog.ts` (duplicados y
+  búsqueda por variante). 21 tests unitarios (`petAge`, `speciesCatalog`), 4 del store y 2 de servicio con sesión real.
 
 ### 27D. Interfaz
-- [ ] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
+- [x] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
   años/meses que propone una fecha editable y marcada como estimada. _Verificar:_ en navegador, claro y oscuro, 390 y 768 px.
-- [ ] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
-- [ ] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+  **Hecho:** `components/PetSpeciesFields.vue`, compartido por `CustomerWithPetDialog`, `PetFormDialog` y
+  `PetEditDialog`. **Verificado en navegador** (Chromium, dueño, tema claro, 1280 px): al escribir "xolo" el selector
+  deja solo Xoloitzcuintle; "No sé la fecha" con 3 años propone 2023-10-14, marcada como aproximada; el alta guarda
+  especie, raza, fecha y la marca (`pets`: Perro / Xoloitzcuintle / t). **No verificado:** tema oscuro, 390 y 768 px,
+  y la edición de una mascota existente desde la pantalla.
+- [x] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
+  **Hecho:** `SpeciesSettingsPage` con `SpeciesFormDialog`, `BreedsDialog` y `SpeciesGroupsDialog`. **Verificado en
+  navegador** (dueño): la lista carga las 31 especies y el ícono de razas solo aparece en Perro y Gato. **No verificado:**
+  agregar, editar y ocultar desde la pantalla (solo por servicio), el veterinario y el groomer en la ruta.
+- [x] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** `lint`, `vue-tsc`, 804 tests unitarios y `test:db` (897 de
+  898; falla solo `delete-customer-pet-rpc`, el de siempre) pasan con las cuatro ramas juntas. `CLAUDE.md` actualizado.
 
-## Fase 28 — Receta médica imprimible (propuesta)
+## Fase 28 — Receta médica imprimible (construida; integrada en la oleada 1)
 
 **Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
 
@@ -2660,22 +2718,42 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   La cédula va en `employee_details` y la receta guarda una copia al emitirse.
 
 ### 28B. Base de datos
-- [ ] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
+- [x] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
   `lib/validation.ts`). _Verificar:_ test; solo quien tiene permiso de empleados la edita.
-- [ ] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
+  **Hecho:** `employee_details.professional_license` (migración `20261021120000_prescriptions.sql`), campo "Cédula
+  profesional" en el formulario de empleado (solo veterinario y dueño; 7 u 8 dígitos, `isValidProfessionalLicense`) y
+  cédulas ficticias en la semilla. La cédula no viaja en la RPC de alta de empleado (su firma no cambia): se guarda
+  en la ficha que la RPC crea.
+- [x] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
   duración) ligadas a la consulta; es **expediente**: sin borrado y con bitácora. Emitirla solo la hace veterinario o
   dueño **con cédula**; la RPC lo revalida. _Verificar:_ test de RLS (recepción y groomer no la crean; groomer no la
   lee) y de que sin cédula se rechaza.
-- [ ] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
+  **Hecho:** `prescriptions` y `prescription_items` (expediente: sin DELETE, con bitácora, solo lectura para dueño y
+  veterinario) y la RPC `save_prescription()`: dueño o el veterinario de la cita, con cédula; copia nombre y cédula;
+  folio consecutivo por negocio; reemplaza renglones (los anteriores quedan ocultos). 16 tests en
+  `prescriptions-rpc.spec.ts`.
+- [x] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
   crear el producto. _Verificar:_ test; solo lo ve el dueño.
+  **Hecho:** `list_unregistered_medications()` y `resolve_unregistered_medication()` (solo dueño; agrupa sin acentos ni
+  mayúsculas) y la tarjeta "Medicamentos por registrar" en Inicio (`UnregisteredMedicationsCard`), que liga a un
+  producto existente o descarta. Para un producto nuevo se registra antes en Inventario (no se tocó el formulario de
+  producto, que es de la rama 29B).
 
 ### 28C. Interfaz
-- [ ] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
+- [x] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
   Encabezado: empresa y sucursal, veterinario y cédula, fecha, mascota y dueño; cuerpo: tabla de medicamentos; pie:
   espacio de firma. _Verificar:_ imprimir a PDF desde el navegador y revisar una hoja carta.
-- [ ] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+  **Hecho:** `PrescriptionPanel` en la atención de la consulta y `PrescriptionPrintPage` (`/app/citas/:id/receta`,
+  carta vertical con `@media print`). **Verificado en navegador** (Chromium): el veterinario emite con un medicamento
+  de texto libre, la hoja muestra empresa, sucursal, folio, cédula, paciente, propietario y tabla; el dueño ve el aviso
+  en Inicio. **No verificado:** impresión real a PDF, más de una hoja, tema oscuro y celular.
+  **Pendiente al integrar con la fase 27:** la hoja muestra la fecha de nacimiento; con `lib/petAge` debe mostrar la
+  edad ("3 años 2 meses", con "aprox." si es estimada).
+- [x] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
+  ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
 
-## Fase 29 — Proveedores y medicamentos fraccionados (propuesta)
+## Fase 29 — Proveedores y medicamentos fraccionados (29B construida en rama; 29C pendiente)
 
 **Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
 Decisiones: D30 puntos 4 y 5.
@@ -2685,9 +2763,19 @@ Decisiones: D30 puntos 4 y 5.
   y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
 
 ### 29B. Proveedores
-- [ ] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
+- [x] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
   suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
-- [ ] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `20261022120000_suppliers.sql`: `suppliers` (nombre, tipo, contacto, teléfono, correo, notas,
+  `is_active`) y `product_suppliers` (varios por producto), con llaves compuestas, RLS bajo `inventory` y sin DELETE.
+  Agrega el índice único `products(tenant_id, id)` (solo índice, para la llave compuesta). 8 tests en
+  `suppliers-rls.spec.ts`. **Para la oleada 2 (29C):** ese índice ya existe; no hay que crearlo otra vez.
+- [x] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `SuppliersPage` (`/app/proveedores`, ruta y menú de la oleada 0), `SupplierFormDialog`, `stores/suppliers.ts`
+  y selector múltiple de proveedores en `ProductFormDialog` (`inventory.saveProduct` recibe `supplierIds`; si fallan solo
+  los proveedores, el producto ya queda guardado y se avisa). **Verificado en navegador** (Chromium, dueño): lista de 3,
+  teléfono corto marca error, alta, y el alimento muestra sus 2 proveedores de la semilla. **No verificado:** guardar
+  desde el selector, el veterinario (solo lectura) y celular. Semilla y `demo_reset` con 3 proveedores y 4 vínculos
+  (ids `31000000-…`); 2 tests en `demo-reset.spec.ts`.
 
 ### 29C. Fraccionados
 - [ ] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se

@@ -9,6 +9,7 @@ import { pesosToCents } from '@/lib/money'
 import { isFormValid, isValidSatProductCode, isValidSatUnitCode, required } from '@/lib/validation'
 import type { Product } from '@/services/products'
 import { useInventoryStore } from '@/stores/inventory'
+import { useSuppliersStore } from '@/stores/suppliers'
 import type { FormHandle } from '@/lib/validation'
 
 const props = defineProps<{
@@ -21,6 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const inventory = useInventoryStore()
+const suppliers = useSuppliersStore()
 
 const name = ref('')
 const priceInPesos = ref<number | null>(null)
@@ -31,6 +33,8 @@ const minStock = ref<number | null>(0)
 const satProductCode = ref('01010101')
 const satUnitCode = ref('H87')
 const categoryId = ref<string | null>(null)
+// Proveedores del producto (fase 29B): puede tener varios.
+const supplierIds = ref<string[]>([])
 
 // Categorías para elegir: las activas y, al editar, la actual aunque esté desactivada
 // (si no, el selector la mostraría vacía y guardar la dejaría sin categoría sin avisar).
@@ -41,6 +45,14 @@ const categoryOptions = computed(() =>
       value: c.id,
       title: c.is_active ? c.name : `${c.name} (desactivada)`,
     })),
+)
+
+// Proveedores para elegir: los activos y, al editar, los que ya tiene aunque estén
+// desactivados (mismo criterio que las categorías).
+const supplierOptions = computed(() =>
+  suppliers.suppliers
+    .filter((s) => s.is_active || supplierIds.value.includes(s.id))
+    .map((s) => ({ value: s.id, title: s.is_active ? s.name : `${s.name} (desactivado)` })),
 )
 
 const satProductRules = [
@@ -66,6 +78,11 @@ watch(
     satUnitCode.value = p?.sat_unit_code ?? 'H87'
     categoryId.value = p?.category_id ?? null
     errorMessage.value = null
+    // Los vínculos se leen al abrir: así el formulario no depende de que la pantalla de
+    // Proveedores se haya visitado antes.
+    suppliers.load().then(() => {
+      supplierIds.value = p ? suppliers.supplierIdsOf(p.id) : []
+    })
   },
 )
 
@@ -92,6 +109,7 @@ async function handleSubmit(): Promise<void> {
       categoryId: categoryId.value,
     },
     props.product?.id,
+    supplierIds.value,
   )
   saving.value = false
 
@@ -123,6 +141,22 @@ async function handleSubmit(): Promise<void> {
             clearable
             hint="Agrupa el producto en el punto de venta. Sin categoría, aparece en «Sin categoría»."
             persistent-hint
+            class="mb-2"
+          />
+
+          <v-autocomplete
+            v-model="supplierIds"
+            :items="supplierOptions"
+            label="Proveedores"
+            multiple
+            chips
+            closable-chips
+            clearable
+            variant="outlined"
+            density="comfortable"
+            hint="Quién surte este producto. Puede tener varios."
+            persistent-hint
+            no-data-text="Aún no hay proveedores. Agrégalos en Proveedores."
             class="mb-2"
           />
 

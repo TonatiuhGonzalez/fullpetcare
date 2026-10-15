@@ -489,6 +489,55 @@ end $$;
 -- Cada rama llena SU sección y no toca las de las demás, para que dos ramas no editen
 -- las mismas líneas al integrarse.
 --
--- (fase 27) Catálogo base de grupos, especies y razas de Patitas Felices y Huellitas Spa.
+-- (fase 27) Catálogo de grupos, especies y razas: lo siembra el trigger de `tenants` (y la
+-- migración, para los negocios existentes), así que aquí solo se ENLAZAN las mascotas de
+-- la semilla, que se insertan después de la migración, a su especie y raza del catálogo.
+-- La raza se busca por nombre exacto (sin mayúsculas); las que no coinciden (p. ej.
+-- "Doméstico de pelo corto") quedan con el texto y sin raza del catálogo, como las
+-- mascotas reales que ya existían.
+update pets p
+set species_id = s.id
+from species s
+where s.tenant_id = p.tenant_id and s.deleted_at is null
+  and s.has_breeds and s.legacy_kind = p.species
+  and p.species in ('dog', 'cat') and p.species_id is null;
 
--- (fase 29B) Proveedores de ejemplo de Patitas Felices.
+update pets p
+set breed_id = b.id
+from breeds b
+where b.tenant_id = p.tenant_id and b.species_id = p.species_id and b.deleted_at is null
+  and lower(btrim(b.name)) = lower(btrim(p.breed)) and p.breed_id is null;
+
+-- (fase 28) Cédula profesional (ficticia) del veterinario y del dueño de Patitas Felices: sin
+-- ella no pueden emitir recetas (save_prescription la exige). La fila de employee_details
+-- puede no existir todavía para los usuarios de demo, por eso es un upsert.
+insert into employee_details (tenant_id, membership_id, professional_license)
+select m.tenant_id, m.id, v.license
+from memberships m
+join (values
+  ('a0000000-0000-4000-8000-000000000004'::uuid, '1234567'),
+  ('a0000000-0000-4000-8000-000000000001'::uuid, '7654321')
+) as v(user_id, license) on v.user_id = m.user_id
+where m.tenant_id = 'b0000000-0000-4000-8000-000000000001'
+on conflict (membership_id) do update set professional_license = excluded.professional_license;
+
+-- (fase 29B) Proveedores de ejemplo de Patitas Felices (ficticios) y a quién surte cada uno.
+-- Alimento y shampoo (productos de la semilla) tienen más de un proveedor a propósito, para
+-- que la demo muestre que un producto puede tener varios.
+insert into suppliers (id, tenant_id, name, supplier_type, contact_name, phone, email, notes)
+values
+  ('31000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+   'Distribuidora Veterinaria del Centro', 'medication', 'Lic. Marcela Ibarra', '5555501100',
+   'ventas@dvcentro.example.mx', 'Entrega los martes y jueves.'),
+  ('31000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+   'Alimentos Premium para Mascotas', 'food', 'Ing. Rodrigo Salas', '5555502200',
+   'pedidos@alimentospremium.example.mx', null),
+  ('31000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001',
+   'Accesorios y Más', 'accessories', null, '5555503300', null, 'Pedido mínimo de 10 piezas.');
+
+insert into product_suppliers (tenant_id, product_id, supplier_id)
+values
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000002'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000003'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000003');

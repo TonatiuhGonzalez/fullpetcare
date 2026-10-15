@@ -396,3 +396,63 @@ describe('demo_reset.sql — ventas y caja de demostración (12.14)', () => {
     })
   })
 })
+
+describe('demo_reset.sql — proveedores de demostración (fase 29B)', () => {
+  const supplierRows = async (client: PoolClient) =>
+    (
+      await client.query(
+        `select s.name, s.is_active, s.deleted_at is not null as hidden,
+                (select count(*)::int from product_suppliers ps
+                  where ps.supplier_id = s.id and ps.deleted_at is null) as products
+           from suppliers s where s.tenant_id = $1 order by s.name`,
+        [TENANT_PATITAS],
+      )
+    ).rows
+
+  it('restaura los proveedores de ejemplo y oculta los que se agregaron en una demo', async () => {
+    // Qué prueba: que después de una demo (un proveedor nuevo, uno de ejemplo desactivado y
+    // un vínculo quitado) el reset deja el catálogo como la semilla.
+    // Qué se rompería: la siguiente presentación arrancaría con proveedores de la anterior
+    // o con el catálogo de ejemplo incompleto.
+    await withTransaction(async (client) => {
+      await client.query(
+        "insert into suppliers (tenant_id, name) values ($1, 'Proveedor de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update suppliers set is_active = false where name = 'Accesorios y Más' and tenant_id = $1",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        'update product_suppliers set deleted_at = now() where tenant_id = $1',
+        [TENANT_PATITAS],
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const rows = await supplierRows(client)
+      const visible = rows.filter((r) => !r.hidden)
+      expect(visible.map((r) => r.name)).toEqual([
+        'Accesorios y Más',
+        'Alimentos Premium para Mascotas',
+        'Distribuidora Veterinaria del Centro',
+      ])
+      expect(visible.every((r) => r.is_active)).toBe(true)
+      expect(rows.find((r) => r.name === 'Proveedor de una demo')?.hidden).toBe(true)
+      // 4 vínculos de ejemplo: alimento (2 proveedores) y shampoo (2 proveedores).
+      expect(visible.reduce((sum, r) => sum + r.products, 0)).toBe(4)
+    })
+  })
+
+  it('repetir el reset deja los mismos vínculos, sin duplicarlos', async () => {
+    await withTransaction(async (client) => {
+      await client.query(DEMO_RESET_SQL)
+      await client.query(DEMO_RESET_SQL)
+      const { rows } = await client.query(
+        'select count(*)::int as n from product_suppliers where tenant_id = $1 and deleted_at is null',
+        [TENANT_PATITAS],
+      )
+      expect(rows[0].n).toBe(4)
+    })
+  })
+})
