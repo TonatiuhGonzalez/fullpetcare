@@ -2644,6 +2644,19 @@ mascota y calcular la fecha por edad; asignar proveedores a un producto; como ve
 con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
 agregarla a inicio y verla sin red.
 
+**Avance de la oleada 2 (2026-10-14).** Construida en dos ramas desde `integration/d30-wave1` —`feat/d30-fractional`
+(29C) y `feat/d30-families` (31)— y probada junta en `integration/d30-wave2` (sin push ni PR). **Verificado en la
+rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 831 tests unitarios, `test:db` 934 de 934 (con las Edge
+Functions sirviéndose y la base recién reseteada) y el E2E (agendar → atender → cobrar). Las dos ramas se fusionaron
+sin conflictos de texto; `database.ts` se regeneró una sola vez, en la integración. **No verificado en conjunto:**
+tema oscuro, 390 y 768 px de las pantallas nuevas, el cobro de cita con productos por unidad desde la pantalla, ni un
+teléfono real. **Pendiente de la oleada 2:** nada de código; la cuenta del cliente (16B) es quien usa las reglas de
+visibilidad por periodo de la 31.
+
+**Qué se puede demostrar (oleada 2):** como dueño, en Inventario convertir un producto en "caja de 20 tabletas" y ver
+"60 tabletas · 3 cajas"; en el punto de venta vender 3 tabletas a $7.25 cada una; en la página de un cliente crear una
+familia ("Familia Ramírez – Michi, Rocky, Luna") y transferir una mascota a otro cliente con su lista de dueños.
+
 ## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
 
 **Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
@@ -2753,15 +2766,22 @@ Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio ex
   **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
   ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
 
-## Fase 29 — Proveedores y medicamentos fraccionados (29B construida en rama; 29C pendiente)
+## Fase 29 — Proveedores y medicamentos fraccionados (construida; 29B en la oleada 1 y 29C en la 2)
 
 **Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
 Decisiones: D30 puntos 4 y 5.
 
 ### 29A. Preparación
-- [ ] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
+- [x] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
   y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
 
+  **Decidido (2026-10-14):** la existencia se guarda en la **unidad base** (tableta, ml), siempre entera;
+  `products.units_per_package` dice cuántas hay por envase y con 1 el producto no se fracciona (todo como antes, sin
+  tocar existencias). Se vende o se consume por **envase** (por defecto) o por **unidad**. El envase abierto **se deriva**
+  (`existencia mod unidades por envase`), no es otra tabla. La `ClaveUnidad` de la unidad suelta es
+  `products.unit_sat_code` y se copia a la partida (`sale_items.sat_unit_code_snapshot`); la Edge Function `invoicing`
+  la usa en lugar de la del producto. Cambiar la presentación reescala la existencia con un ajuste por sucursal y se
+  rechaza si no da enteros. `report_top_items` ya no mezcla envases con unidades.
 ### 29B. Proveedores
 - [x] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
   suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
@@ -2778,19 +2798,39 @@ Decisiones: D30 puntos 4 y 5.
   (ids `31000000-…`); 2 tests en `demo-reset.spec.ts`.
 
 ### 29C. Fraccionados
-- [ ] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
+- [x] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
   guarda en unidad base (entera). Migración aditiva: los productos actuales quedan con factor 1. _Verificar:_ test de
   que nada cambia en los productos existentes.
-- [ ] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
+  **Hecho:** `20261023120000_fractional_products.sql`: columnas de presentación en `products`, `sold_unit` y
+  snapshots en `sale_items` y `appointment_products`, y `set_product_presentation()` (reescala la existencia).
+  Los productos existentes quedan con factor 1: ninguna existencia cambia.
+- [x] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
   límites (precio 0, 1 unidad, centavos sobrantes). _Verificar:_ tests de redondeo.
-- [ ] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
+  **Hecho:** `lib/fractional.ts` (precio de la unidad, unidades base, existencia por envases y sueltas, envase abierto y
+  validación); 15 tests, con el borde del redondeo ($100.00 entre 3 = $33.33).
+- [x] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
   el producto y en la venta; el snapshot conserva la unidad. _Verificar:_ test de que vender 3 tabletas descuenta 3 y no
   1 caja, y de que cancelar la venta las devuelve.
-- [ ] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
+  **Hecho:** `app.add_product_items()` y `add_appointment_product()` (nuevo parámetro `p_unit`) aceptan `unit` y
+  `unit_price_cents`; el insumo cobrable llega al ticket con su unidad por un trigger sobre `sale_items`. 17 tests en
+  `fractional-products-rpc.spec.ts` (3 tabletas bajan 3 y no 1 caja, envase + sueltas cuadran, el precio corregido,
+  cancelar devuelve las unidades, consumo y reporte). Cart: partidas por producto + unidad y existencia en unidades
+  base (7 tests nuevos).
+- [x] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
   abierto no descuenta uno nuevo hasta agotarlo.
-- [ ] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
+  **Hecho (derivado, sin tabla):** el envase abierto sale de la existencia; se muestra en Inventario ("Caja abierta:
+  quedan 3 de 20"). 3 tests en `fractional.spec.ts`.
+- [x] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
   navegador.
-- [ ] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+  **Hecho:** presentación en el formulario de producto, entrada de compra/ajuste en envases o unidades
+  (`StockMovementDialog`), selector envase/unidad en el punto de venta (con el precio de la unidad corregible), en el
+  cobro de cita y en los productos usados en consulta. **Verificado en navegador** (Chromium, dueño): 3 cajas se
+  convierten en "60 tabletas · 3 cajas"; en el punto de venta, 3 tabletas cuestan $7.25 × 3 = $21.75. **No verificado:**
+  cobro completo desde la pantalla, el cobro de cita y los insumos en consulta (solo por pruebas de base), tema oscuro
+  y celular. **Sin semilla:** no se agregó un producto fraccionado a la demo (habría que tocar `demo_reset` y varias
+  pruebas); para mostrarlo se edita un producto desde Inventario.
+- [x] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2):** ver el avance de la oleada 2. Sin dependencias nuevas (§3).
 
 ## Fase 30 — Cobro de paso (propuesta)
 
@@ -2806,22 +2846,43 @@ Decisiones: D30 puntos 4 y 5.
   _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
 - [ ] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
 
-## Fase 31 — Familias y transferencia de mascota (propuesta)
+## Fase 31 — Familias y transferencia de mascota (construida; integrada en la oleada 2)
 
 **Meta: varios dueños de una misma mascota dentro de una familia, y poder cambiar de dueño sin perder el historial.**
 Decisiones: D30 puntos 7 y 8.
 
-- [ ] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
-- [ ] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
+- [x] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
+  **Decidido (2026-10-14):** la familia es un hogar con **un titular** (el único que ve montos) y miembros de acceso
+  básico; un cliente pertenece a **una sola** familia. La mascota sigue teniendo un dueño (`pets.customer_id`) y la
+  familia accede a las mascotas de todos sus miembros. La **visibilidad por periodo** se resuelve en SQL
+  (`app.customer_can_view_pet()` y `..._money()`), pero **hoy nadie las consulta**: la cuenta del cliente es la 16B y
+  el link con token es por mascota y se revoca al transferir. Los links `customer` no los usa la vista pública.
+- [x] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
   aislamiento y de que un cliente no entra a dos familias.
-- [ ] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
-- [ ] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
+  **Hecho:** `20261024120000_families_and_pet_transfer.sql`: `families` y `family_members` (un titular por familia, un
+  cliente en una sola; llaves compuestas), solo se escriben con `save_family()` / `delete_family()`. Agrega el índice
+  único `customers(tenant_id, id)`. 7 tests en `families-and-transfer.spec.ts`.
+- [x] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
+  **Hecho:** `pet_ownerships` (periodos, un dueño actual por mascota, sin política de DELETE), alimentada por un trigger sobre
+  `pets` al crear y al cambiar `customer_id`; las mascotas existentes quedan con su dueño desde `created_at`.
+- [x] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
   ventas, revoca los links y cierra el periodo anterior. _Verificar:_ test de cada efecto y de que otro negocio no puede.
-- [ ] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
+  **Hecho:** `transfer_pet()` (`SECURITY DEFINER`, solo dueño y recepción): pasa las citas `scheduled`, deja las ventas
+  y las citas atendidas, revoca los links `pet`. 6 tests (incluye los rechazos y que un UPDATE directo también deja
+  historial).
+- [x] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
   montos; el no titular no ve montos. _Verificar:_ tests de aislamiento propios (el riesgo mayor del paquete).
-- [ ] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
+  **Hecho:** `app.customer_can_view_pet()` y `app.customer_can_view_pet_money()` (solo `service_role`). 5 tests: el dueño
+  anterior ve solo su periodo, el nuevo ve todo el historial pero solo sus montos, la familia ve la mascota y solo el
+  titular ve montos, un ajeno no ve nada, y un usuario autenticado no puede llamarlas.
+- [x] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
   _Verificar:_ en navegador, 390 y 768 px.
-- [ ] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+  **Hecho:** `FamilyCard` ("Familia Ramírez – Michi, Rocky, Luna" con miembros y titular), `FamilyFormDialog`,
+  `TransferPetDialog` y la lista de dueños con sus periodos en la página del cliente. **Verificado en navegador**
+  (Chromium, dueño): crear familia con otro cliente, la etiqueta con las mascotas de los miembros y transferir una
+  mascota a otro cliente. **No verificado:** disolver y editar desde la pantalla, tema oscuro, 390 y 768 px.
+- [x] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2).**
 
 ## Fase 32 — Catálogo de cirugías y costos (propuesta)
 

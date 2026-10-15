@@ -1326,6 +1326,17 @@ al final**, porque depende de la 16B.
 - **Proveedores (29B):** el tipo de proveedor es un enum corto (medicamentos, alimento, accesorios, otro). Se agregó un
   índice único `products(tenant_id, id)` solo para la llave compuesta del vínculo.
 
+**Decisiones surgidas al construir la oleada 2 (2026-10-14).**
+- **Fraccionados (29C):** la existencia está en **unidad base** y el envase abierto se **deriva** (no hay tabla de
+  envases abiertos); cambiar la presentación **reescala** la existencia con un ajuste por sucursal y se rechaza si no da
+  enteros. La unidad suelta factura con su propia clave de unidad del SAT. La demo **no** trae un producto
+  fraccionado de semilla (habría que tocar `demo_reset` y varias pruebas).
+- **Familias (31):** la familia accede a las mascotas de todos sus miembros; el dueño sigue siendo uno
+  (`pets.customer_id`). Se construyó el modelo y las reglas de visibilidad por periodo en SQL, pero **no hay quién las
+  use todavía**: se conectan en la cuenta del cliente (16B). Mientras tanto, la transferencia revoca los links y el
+  personal ve todo como siempre.
+- **Dependencias entre ramas:** 29C y 31 no tocaron las mismas tablas y se fusionaron sin conflictos de texto.
+
 **Contras y riesgos.**
 - **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.
 - **Hospitalización y 16B:** si la 16B se retrasa, la 33 se puede construir con el dueño del negocio como único lector y

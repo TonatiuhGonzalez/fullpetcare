@@ -14,11 +14,13 @@ import { useRoute, useRouter } from 'vue-router'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog.vue'
 import CustomerEditDialog from '@/components/CustomerEditDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import FamilyCard from '@/components/FamilyCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import PetEditDialog from '@/components/PetEditDialog.vue'
 import PetFormDialog from '@/components/PetFormDialog.vue'
 import ShareLinkManager from '@/components/ShareLinkManager.vue'
+import TransferPetDialog from '@/components/TransferPetDialog.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import WeightChart from '@/components/WeightChart.vue'
 import { useFirstLoad } from '@/composables/useFirstLoad'
@@ -30,7 +32,7 @@ import { buildVaccineTableRows } from '@/lib/vaccination'
 import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
-import type { Pet, PetWeight } from '@/services/pets'
+import type { Pet, PetOwnership, PetWeight } from '@/services/pets'
 import * as recordsService from '@/services/records'
 import type { VaccinationWithName } from '@/services/records'
 import * as vaccinesService from '@/services/vaccines'
@@ -56,6 +58,8 @@ const weights = ref<PetWeight[]>([])
 const vaccinations = ref<VaccinationWithName[]>([])
 const catalog = ref<Vaccine[]>([])
 const photoUrl = ref<string | null>(null)
+// Dueños anteriores y actual de la mascota elegida (fase 31).
+const ownerships = ref<PetOwnership[]>([])
 const detailLoading = ref(false)
 // Número de la última petición de detalle: si el usuario cambia de mascota antes de que
 // termine la anterior, la respuesta vieja no debe pisar a la nueva.
@@ -65,6 +69,7 @@ const showCustomerDialog = ref(false)
 const showPetEditDialog = ref(false)
 const showNewPetDialog = ref(false)
 const showVaccinationDialog = ref(false)
+const showTransferDialog = ref(false)
 const petToDelete = ref<Pet | null>(null)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
@@ -110,18 +115,21 @@ async function loadPetDetail(): Promise<void> {
     vaccinations.value = []
     catalog.value = []
     photoUrl.value = null
+    ownerships.value = []
     detailLoading.value = false
     return
   }
   detailLoading.value = true
   try {
-    const [weightHistory, applied, vaccineCatalog, photo] = await Promise.all([
+    const [weightHistory, applied, vaccineCatalog, photo, owners] = await Promise.all([
       petsService.listWeights(pet.tenant_id, pet.id),
       recordsService.listVaccinationsByPet(pet.tenant_id, pet.id),
       vaccinesService.listForSpecies(pet.tenant_id, pet.species),
       pet.photo_path ? petsService.getPhotoUrl(pet.photo_path) : Promise.resolve(null),
+      petsService.listOwnerships(pet.tenant_id, pet.id),
     ])
     if (request !== detailRequest) return
+    ownerships.value = owners
     weights.value = weightHistory
     vaccinations.value = applied
     catalog.value = vaccineCatalog
@@ -300,6 +308,15 @@ async function handleVaccinationSaved(): Promise<void> {
           </div>
         </v-card>
 
+        <!-- Familia del cliente (fase 31): mascotas de todos sus miembros y el titular. -->
+        <FamilyCard
+          v-if="session.activeTenantId"
+          :tenant-id="session.activeTenantId"
+          :customer-id="customer.id"
+          :can-edit="canEdit"
+          @changed="load"
+        />
+
         <!-- Fila 2: mascotas | información de la elegida | cartilla. -->
         <v-row>
           <!-- Columna 1: tarjetas de mascotas. -->
@@ -420,6 +437,13 @@ async function handleVaccinationSaved(): Promise<void> {
                     aria-label="Editar mascota"
                     @click="showPetEditDialog = true"
                   />
+                  <IconButton
+                    v-if="canEdit"
+                    icon="mdi-account-switch-outline"
+                    variant="text"
+                    aria-label="Transferir mascota"
+                    @click="showTransferDialog = true"
+                  />
                 </div>
 
                 <dl class="pet-facts">
@@ -454,6 +478,18 @@ async function handleVaccinationSaved(): Promise<void> {
                 </dl>
 
                 <WeightChart :weights="weights" class="mt-4" />
+
+                <!-- Dueños: el actual y los anteriores, con sus periodos (fase 31). -->
+                <div v-if="ownerships.length > 1" class="mt-4">
+                  <p class="text-subtitle-2 mb-1">Dueños</p>
+                  <ul class="text-body-2 pl-4">
+                    <li v-for="owner in ownerships" :key="owner.id">
+                      {{ owner.customerName }} ·
+                      {{ formatDate(owner.startedAt, displayTimezone) }} –
+                      {{ owner.endedAt ? formatDate(owner.endedAt, displayTimezone) : 'actual' }}
+                    </li>
+                  </ul>
+                </div>
 
                 <ShareLinkManager
                   v-if="session.activeTenantId && canEdit"
@@ -542,6 +578,12 @@ async function handleVaccinationSaved(): Promise<void> {
       :applied-by-user-id="session.user.id"
       :branch-timezone="displayTimezone"
       @saved="handleVaccinationSaved"
+    />
+    <TransferPetDialog
+      v-model="showTransferDialog"
+      :tenant-id="session.activeTenantId ?? ''"
+      :pet="selectedPet"
+      @transferred="load"
     />
     <ConfirmDeleteDialog
       v-model="showDeleteConfirm"

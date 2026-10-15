@@ -260,7 +260,7 @@ async function stamp({ caller, admin, tenantId }: Ctx, form: FormData): Promise<
   // Partidas con sus claves del SAT (que viven en el servicio o producto, no en la partida).
   const { data: lines } = await caller
     .from("sale_items")
-    .select("description, quantity, unit_price_cents, tax_rate_bp, service_id, product_id")
+    .select("description, quantity, unit_price_cents, tax_rate_bp, service_id, product_id, sat_unit_code_snapshot")
     .eq("sale_id", saleId)
     .is("deleted_at", null);
   const serviceIds = (lines ?? []).map((l) => l.service_id).filter(Boolean) as string[];
@@ -286,7 +286,8 @@ async function stamp({ caller, admin, tenantId }: Ctx, form: FormData): Promise<
       unitPriceCents: line.unit_price_cents,
       taxRateBp: line.tax_rate_bp,
       satProductCode: code.sat_product_code,
-      satUnitCode: code.sat_unit_code,
+      // Una unidad suelta (fase 29C) lleva su propia clave de unidad; si no, la del producto.
+      satUnitCode: line.sat_unit_code_snapshot ?? code.sat_unit_code,
     });
   }
 

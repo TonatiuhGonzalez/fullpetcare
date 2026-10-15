@@ -66,3 +66,35 @@ export async function setActive(id: string, isActive: boolean): Promise<void> {
 
   if (error) throw error
 }
+
+export interface ProductPresentationInput {
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
+  /** Precio de la unidad suelta en centavos; nulo = se calcula del precio del envase. */
+  unitPriceCents: number | null
+  unitSatCode: string | null
+}
+
+/**
+ * Cambia la presentación fraccionada de un producto (fase 29C). La RPC reescala la existencia
+ * ya contada (movimiento de ajuste por sucursal) y lo rechaza, con su mensaje, si no da
+ * unidades enteras. Los tipos generados marcan los argumentos opcionales como no nulos: de
+ * ahí los `as string`.
+ */
+export async function setPresentation(
+  productId: string,
+  input: ProductPresentationInput,
+): Promise<Product> {
+  const { data, error } = await supabase.rpc('set_product_presentation', {
+    p_product_id: productId,
+    p_units_per_package: input.unitsPerPackage,
+    p_package_name: input.packageName as string,
+    p_unit_name: input.unitName as string,
+    p_unit_price_cents: input.unitPriceCents as number,
+    p_unit_sat_code: input.unitSatCode as string,
+  })
+
+  if (error) throw error
+  return data as Product
+}

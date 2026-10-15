@@ -45,8 +45,9 @@ veterinario, búsqueda de clientes por nombre de mascota, tooltips con retraso y
 pantallas chicas y agenda en lista en celular; §5.6, §6.1, §6.2, §6.4). **Ya construido (oleada 1 del
 paquete D30, 2026-10-14, PLAN.md D30): catálogo de especies y razas con edad estimada (fase 27, §6.2), receta médica
 imprimible con cédula (fase 28, §6.4 y §6.7), catálogo de proveedores (fase 29B, §6.5) y la PWA de la vista pública
-(fase 16A, §7.4).** Siguen en la lista del paquete D30, sin construir: fraccionados (29C), cobro de paso (30), familias
-y transferencia (31), cirugías (32), cuenta del cliente y push (16B) y hospitalización (33).
+(fase 16A, §7.4).** **Ya construido (oleada 2, 2026-10-14): medicamentos fraccionados (fase 29C, §6.5) y familias y transferencia de
+mascota (fase 31, §6.2).** Siguen en la lista del paquete D30, sin construir: cobro de paso (30), cirugías (32), cuenta
+del cliente y push (16B) y hospitalización (33).
 
 Reglas de esta etapa:
 
@@ -246,13 +247,15 @@ FullPetCare/
     │   ├── speciesCatalog.ts    #   duplicados y búsqueda de razas por variante (§6.2)
     │   ├── prescription.ts      #   reglas y formato de la receta (§6.4)
     │   ├── suppliers.ts         #   tipos y validación de proveedores (§6.5)
+    │   ├── fractional.ts        #   unidad base, precio de la unidad, envase abierto (§6.5)
+    │   ├── family.ts            #   etiqueta y validación de la familia (§6.2)
     │   ├── pwaInstall.ts  lastPetLink.ts   #   aviso "Agregar a inicio" y último link abierto (§7.4)
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     │   ├── tenantLogo.ts  vaccines.ts   #   imagen de la empresa (bucket `tenant-logos`) y catálogo de vacunas
-    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts   #   catálogos de especies y razas, receta y proveedores (D30)
+    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts   #   catálogos de especies y razas, receta, proveedores y familias (D30)
     ├── stores/                  # Pinia: session, tenant, agenda, cart, speciesCatalog, suppliers
     ├── types/database.ts        # GENERADO. No editar a mano.
     ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas); usePetCatalog (catálogo de especies y razas para los formularios de mascota); usePwaInstall (aviso de instalar la app)
@@ -519,6 +522,19 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 - **Edad estimada (fase 27):** "tiene 3 años" propone una fecha de nacimiento (`lib/petAge.ts`, sin leer el reloj: el
   "hoy" es el de la sucursal) y queda marcada `birth_date_is_estimated`; el veterinario puede ajustarla. Escribirla a
   mano la vuelve dato capturado.
+- **Familias (fase 31, PLAN.md D30 punto 7):** `families` (nombre propio, "Familia Pérez") y `family_members` (un
+  **titular** por familia, y un cliente pertenece a **una sola** familia). Se escriben solo con `save_family()` y
+  `delete_family()` (dueño y recepción). La etiqueta que se muestra es "Familia Pérez – Nube, Toby" (`lib/family.ts`,
+  `FamilyCard` en la página del cliente). La mascota sigue teniendo un dueño (`pets.customer_id`); la familia accede a
+  las mascotas de todos sus miembros. El titular es el único que verá montos; los demás miembros solo ven la mascota,
+  su cartilla, sus citas y la bitácora de hospitalización, y reciben avisos.
+- **Transferencia de mascota (fase 31, D30 punto 8):** `transfer_pet()` (dueño y recepción) la pasa a **un cliente
+  suelto**: sus citas `scheduled` se van con ella, las ventas y las citas ya atendidas **se quedan** con el dueño
+  anterior y sus links `pet` se revocan. `pet_ownerships` guarda los periodos de cada dueño (la alimenta un trigger
+  sobre `pets`, también ante un UPDATE directo). **Visibilidad por periodo**, en SQL y solo para `service_role`:
+  `app.customer_can_view_pet()` (el dueño anterior ve solo su periodo; el nuevo y su familia ven todo el historial) y
+  `app.customer_can_view_pet_money()` (los montos, solo el dueño de ese momento o el titular de su familia). **Hoy nadie
+  las consulta**: la cuenta del cliente (16B) es quien las usará.
 - **Eliminar es borrado suave en cascada, en la base:** las RPC `delete_customer()` y `delete_pet()` (`SECURITY
   DEFINER`, revalidan membresía y rol dueño o recepción) ocultan al cliente, a sus mascotas y **solo sus citas
   `scheduled`**. Las demás citas, las ventas y el expediente no se tocan (§8.5). Se llaman desde `softDelete()` de
@@ -633,6 +649,16 @@ mismo nombre y especie (`lib/vaccineCatalog.ts`).
   **varios** proveedores; llaves compuestas `(tenant_id, …)` para no cruzar negocios). Mismos permisos que Inventario
   (módulo `inventory`). **Solo catálogo:** no hay órdenes de compra ni cuentas por pagar. Pantalla `/app/proveedores`;
   el selector vive en el formulario de producto (`inventory.saveProduct(input, id, supplierIds)`).
+- **Medicamentos fraccionados (fase 29C, PLAN.md D30 punto 5):** la existencia se guarda **siempre en la unidad base**
+  (tableta, ml), entera. `products.units_per_package` dice cuántas hay por envase y con **1 el producto no se fracciona**
+  (todo como antes). `package_name`, `unit_name`, `unit_price_cents` (nulo = se calcula: precio del envase / unidades,
+  redondeado al centavo) y `unit_sat_code`. Al vender o consumir se elige **envase** (por defecto) o **unidad**:
+  `sale_items` y `appointment_products` guardan `sold_unit` y `units_per_package_snapshot`, `quantity` va en la unidad
+  vendida y el movimiento de existencia siempre va en unidades base. El precio de la unidad se corrige en el producto y
+  en cada venta (`unit_price_cents` en el elemento de `p_products`). El **envase abierto se deriva** (`existencia mod
+  unidades por envase`), no es otra tabla. `set_product_presentation()` cambia la presentación y **reescala la
+  existencia** con un ajuste por sucursal (se rechaza si no da enteros). Una unidad suelta factura con su propia
+  `ClaveUnidad` (`sale_items.sat_unit_code_snapshot`). `report_top_items` no mezcla envases con unidades.
 - **Captura del punto de venta (13F y 13G, PLAN.md D18 puntos 6 y 7):** un solo campo "código de barras o nombre"
   (Enter con código exacto agrega; escribir reemplaza la fila de arriba por las coincidencias) y **dos filas** de
   tarjetas (`components/PosProductTile.vue`): arriba, **categorías** (ícono y nombre) en una fila con scroll
@@ -1164,7 +1190,8 @@ de caja cerrado de ejemplo** en Centro y **oculta cualquier caja abierta**. Los 
 ocultar (§6.5): el de ejemplo se crea una sola vez (y envejece), y los que se cierren durante una demo se quedan en
 el historial de Caja. Desde la fase 27 también vuelve a mostrar lo que se ocultó del catálogo de especies y razas de
 Patitas Felices (lo que se agregó en una demo se queda), y desde la 29B restaura sus 3 proveedores de ejemplo y sus
-vínculos y oculta los proveedores que se agregaron. Aun así, ese paso sigue tocando producción: no marques como demo una
+vínculos y oculta los proveedores que se agregaron. Las familias y las transferencias hechas en una demo no se deshacen con el
+reset (los periodos de dueño son historial). Aun así, ese paso sigue tocando producción: no marques como demo una
 empresa real.
 
 ### Git

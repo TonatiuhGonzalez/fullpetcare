@@ -40,9 +40,11 @@ export type Database = {
           name_snapshot: string
           product_id: string
           quantity: number
+          sold_unit: string
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot: number
           updated_at: string
         }
         ComputedFields: never
@@ -56,9 +58,11 @@ export type Database = {
           name_snapshot: string
           product_id: string
           quantity: number
+          sold_unit?: string
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Update: {
@@ -71,9 +75,11 @@ export type Database = {
           name_snapshot?: string
           product_id?: string
           quantity?: number
+          sold_unit?: string
           tax_rate_bp?: number
           tenant_id?: string
           unit_price_cents?: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Relationships: [
@@ -773,6 +779,98 @@ export type Database = {
           },
         ]
       }
+      families: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "families_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          created_at: string
+          customer_id: string
+          deleted_at: string | null
+          family_id: string
+          id: string
+          is_holder: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          customer_id: string
+          deleted_at?: string | null
+          family_id: string
+          id?: string
+          is_holder?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          deleted_at?: string | null
+          family_id?: string
+          id?: string
+          is_holder?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_members_customer_fkey"
+            columns: ["tenant_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "family_members_family_fkey"
+            columns: ["tenant_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "family_members_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback_reports: {
         Row: {
           created_at: string
@@ -1214,6 +1312,59 @@ export type Database = {
           },
           {
             foreignKeyName: "payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pet_ownerships: {
+        Row: {
+          created_at: string
+          customer_id: string
+          ended_at: string | null
+          id: string
+          pet_id: string
+          started_at: string
+          tenant_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          customer_id: string
+          ended_at?: string | null
+          id?: string
+          pet_id: string
+          started_at?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          ended_at?: string | null
+          id?: string
+          pet_id?: string
+          started_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_ownerships_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_ownerships_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_ownerships_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1746,12 +1897,17 @@ export type Database = {
           is_active: boolean
           min_stock: number
           name: string
+          package_name: string | null
           price_cents: number
           sat_product_code: string
           sat_unit_code: string
           sku: string | null
           tax_rate_bp: number
           tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
           updated_at: string
         }
         ComputedFields: never
@@ -1764,12 +1920,17 @@ export type Database = {
           is_active?: boolean
           min_stock?: number
           name: string
+          package_name?: string | null
           price_cents: number
           sat_product_code?: string
           sat_unit_code?: string
           sku?: string | null
           tax_rate_bp?: number
           tenant_id: string
+          unit_name?: string | null
+          unit_price_cents?: number | null
+          unit_sat_code?: string | null
+          units_per_package?: number
           updated_at?: string
         }
         Update: {
@@ -1781,12 +1942,17 @@ export type Database = {
           is_active?: boolean
           min_stock?: number
           name?: string
+          package_name?: string | null
           price_cents?: number
           sat_product_code?: string
           sat_unit_code?: string
           sku?: string | null
           tax_rate_bp?: number
           tenant_id?: string
+          unit_name?: string | null
+          unit_price_cents?: number | null
+          unit_sat_code?: string | null
+          units_per_package?: number
           updated_at?: string
         }
         Relationships: [
@@ -1895,11 +2061,14 @@ export type Database = {
           product_id: string | null
           quantity: number
           sale_id: string
+          sat_unit_code_snapshot: string | null
           service_id: string | null
+          sold_unit: string
           tax_cents: number
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot: number
           updated_at: string
         }
         ComputedFields: never
@@ -1915,11 +2084,14 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id: string
+          sat_unit_code_snapshot?: string | null
           service_id?: string | null
+          sold_unit?: string
           tax_cents: number
           tax_rate_bp: number
           tenant_id: string
           unit_price_cents: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Update: {
@@ -1934,11 +2106,14 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id?: string
+          sat_unit_code_snapshot?: string | null
           service_id?: string | null
+          sold_unit?: string
           tax_cents?: number
           tax_rate_bp?: number
           tenant_id?: string
           unit_price_cents?: number
+          units_per_package_snapshot?: number
           updated_at?: string
         }
         Relationships: [
@@ -2769,6 +2944,7 @@ export type Database = {
           p_is_billable?: boolean
           p_product_id: string
           p_quantity: number
+          p_unit?: string
         }
         Returns: string
       }
@@ -2974,6 +3150,7 @@ export type Database = {
       }
       delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
       delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
+      delete_family: { Args: { p_family_id: string }; Returns: undefined }
       delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
       list_unregistered_medications: {
         Args: Record<PropertyKey, never>
@@ -3334,6 +3511,16 @@ export type Database = {
         Returns: number
       }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      save_family: {
+        Args: {
+          p_family_id: string
+          p_holder_customer_id: string
+          p_member_customer_ids: string[]
+          p_name: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       save_prescription: {
         Args: { p_appointment_id: string; p_items: Json }
         Returns: string
@@ -3405,12 +3592,17 @@ export type Database = {
           is_active: boolean
           min_stock: number
           name: string
+          package_name: string | null
           price_cents: number
           sat_product_code: string
           sat_unit_code: string
           sku: string | null
           tax_rate_bp: number
           tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
           updated_at: string
         }[]
         SetofOptions: {
@@ -3420,9 +3612,76 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_product_presentation: {
+        Args: {
+          p_package_name?: string
+          p_product_id: string
+          p_unit_name?: string
+          p_unit_price_cents?: number
+          p_unit_sat_code?: string
+          p_units_per_package: number
+        }
+        Returns: {
+          category_id: string | null
+          cost_cents: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          min_stock: number
+          name: string
+          package_name: string | null
+          price_cents: number
+          sat_product_code: string
+          sat_unit_code: string
+          sku: string | null
+          tax_rate_bp: number
+          tenant_id: string
+          unit_name: string | null
+          unit_price_cents: number | null
+          unit_sat_code: string | null
+          units_per_package: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "products"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_tenant_logo: {
         Args: { p_logo_path: string; p_tenant_id: string }
         Returns: undefined
+      }
+      transfer_pet: {
+        Args: { p_new_customer_id: string; p_pet_id: string }
+        Returns: {
+          birth_date: string | null
+          birth_date_is_estimated: boolean
+          breed: string | null
+          breed_id: string | null
+          created_at: string
+          customer_id: string
+          deleted_at: string | null
+          grooming_notes: string | null
+          id: string
+          is_sterilized: boolean
+          medical_alerts: string | null
+          name: string
+          photo_path: string | null
+          sex: Database["public"]["Enums"]["pet_sex"] | null
+          species: Database["public"]["Enums"]["pet_species"]
+          species_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_tenant_fiscal_data: {
         Args: {
