@@ -1091,6 +1091,388 @@ export type Database = {
           },
         ]
       }
+      hospital_medications: {
+        Row: {
+          administered_at: string
+          administered_by: string
+          billed_sale_id: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_billable: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          sold_unit: string
+          stay_id: string
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          units_per_package_snapshot: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          administered_at?: string
+          administered_by: string
+          billed_sale_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot: string
+          product_id: string
+          quantity: number
+          sold_unit?: string
+          stay_id: string
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          units_per_package_snapshot?: number
+          updated_at?: string
+        }
+        Update: {
+          administered_at?: string
+          administered_by?: string
+          billed_sale_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          name_snapshot?: string
+          product_id?: string
+          quantity?: number
+          sold_unit?: string
+          stay_id?: string
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit_price_cents?: number
+          units_per_package_snapshot?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_medications_billed_sale_id_fkey"
+            columns: ["billed_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_medications_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "hospital_medications_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_medications_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_medications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hospital_notes: {
+        Row: {
+          author_user_id: string
+          content: string | null
+          created_at: string
+          elimination: string | null
+          heart_rate_bpm: number | null
+          id: string
+          mood: string | null
+          mucous_color: string | null
+          noted_at: string
+          stay_id: string
+          temperature_deci_c: number | null
+          tenant_id: string
+          weight_grams: number | null
+        }
+        ComputedFields: never
+        Insert: {
+          author_user_id: string
+          content?: string | null
+          created_at?: string
+          elimination?: string | null
+          heart_rate_bpm?: number | null
+          id?: string
+          mood?: string | null
+          mucous_color?: string | null
+          noted_at?: string
+          stay_id: string
+          temperature_deci_c?: number | null
+          tenant_id: string
+          weight_grams?: number | null
+        }
+        Update: {
+          author_user_id?: string
+          content?: string | null
+          created_at?: string
+          elimination?: string | null
+          heart_rate_bpm?: number | null
+          id?: string
+          mood?: string | null
+          mucous_color?: string | null
+          noted_at?: string
+          stay_id?: string
+          temperature_deci_c?: number | null
+          tenant_id?: string
+          weight_grams?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_notes_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hospital_settings: {
+        Row: {
+          created_at: string
+          day_rule: string
+          default_daily_rate_cents: number | null
+          default_stay_rate_cents: number | null
+          deleted_at: string | null
+          id: string
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          day_rule?: string
+          default_daily_rate_cents?: number | null
+          default_stay_rate_cents?: number | null
+          deleted_at?: string | null
+          id?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_rule?: string
+          default_daily_rate_cents?: number | null
+          default_stay_rate_cents?: number | null
+          deleted_at?: string | null
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hospital_spaces: {
+        Row: {
+          branch_id: string
+          created_at: string
+          daily_rate_cents: number | null
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          space_type: string | null
+          stay_rate_cents: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          branch_id: string
+          created_at?: string
+          daily_rate_cents?: number | null
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          space_type?: string | null
+          stay_rate_cents?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          daily_rate_cents?: number | null
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          space_type?: string | null
+          stay_rate_cents?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_spaces_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_spaces_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "hospital_spaces_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hospital_stays: {
+        Row: {
+          admitted_at: string
+          admitted_by: string
+          billed_sale_id: string | null
+          branch_id: string
+          created_at: string
+          customer_id: string | null
+          day_rule: string
+          discharged_at: string | null
+          discharged_by: string | null
+          id: string
+          pet_id: string
+          rate_cents: number
+          rate_mode: string
+          reason: string | null
+          space_id: string
+          tax_rate_bp: number
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          admitted_at?: string
+          admitted_by: string
+          billed_sale_id?: string | null
+          branch_id: string
+          created_at?: string
+          customer_id?: string | null
+          day_rule: string
+          discharged_at?: string | null
+          discharged_by?: string | null
+          id?: string
+          pet_id: string
+          rate_cents: number
+          rate_mode: string
+          reason?: string | null
+          space_id: string
+          tax_rate_bp?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          admitted_at?: string
+          admitted_by?: string
+          billed_sale_id?: string | null
+          branch_id?: string
+          created_at?: string
+          customer_id?: string | null
+          day_rule?: string
+          discharged_at?: string | null
+          discharged_by?: string | null
+          id?: string
+          pet_id?: string
+          rate_cents?: number
+          rate_mode?: string
+          reason?: string | null
+          space_id?: string
+          tax_rate_bp?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_stays_billed_sale_id_fkey"
+            columns: ["billed_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_stays_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_requests: {
         Row: {
           cancellation_reason_code: string | null
@@ -2609,6 +2991,7 @@ export type Database = {
           branch_id: string
           created_at: string
           created_by: string
+          hospital_medication_id: string | null
           id: string
           movement_type: Database["public"]["Enums"]["stock_movement_type"]
           product_id: string
@@ -2623,6 +3006,7 @@ export type Database = {
           branch_id: string
           created_at?: string
           created_by: string
+          hospital_medication_id?: string | null
           id?: string
           movement_type: Database["public"]["Enums"]["stock_movement_type"]
           product_id: string
@@ -2636,6 +3020,7 @@ export type Database = {
           branch_id?: string
           created_at?: string
           created_by?: string
+          hospital_medication_id?: string | null
           id?: string
           movement_type?: Database["public"]["Enums"]["stock_movement_type"]
           product_id?: string
@@ -2665,6 +3050,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "product_stock"
             referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_hospital_medication_id_fkey"
+            columns: ["hospital_medication_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_medications"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "stock_movements_product_id_fkey"
@@ -3197,9 +3589,47 @@ export type Database = {
         }
         Returns: string
       }
+      add_hospital_note: {
+        Args: {
+          p_content?: string
+          p_elimination?: string
+          p_heart_rate_bpm?: number
+          p_mood?: string
+          p_mucous_color?: string
+          p_noted_at?: string
+          p_stay_id: string
+          p_temperature_deci_c?: number
+          p_weight_grams?: number
+        }
+        Returns: string
+      }
+      administer_hospital_medication: {
+        Args: {
+          p_is_billable?: boolean
+          p_product_id: string
+          p_quantity: number
+          p_stay_id: string
+          p_unit?: string
+        }
+        Returns: string
+      }
+      admit_pet: {
+        Args: {
+          p_pet_id: string
+          p_rate_cents: number
+          p_rate_mode: string
+          p_reason?: string
+          p_space_id: string
+        }
+        Returns: string
+      }
       apply_surgery_lines: {
         Args: { p_appointment_id: string; p_lines: Json; p_package_id: string }
         Returns: number
+      }
+      bill_hospital_stay: {
+        Args: { p_discount_cents?: number; p_payments: Json; p_stay_id: string }
+        Returns: string
       }
       can_invoice: { Args: { p_tenant_id: string }; Returns: boolean }
       can_manage_invoicing: { Args: { p_tenant_id: string }; Returns: boolean }
@@ -3417,6 +3847,7 @@ export type Database = {
       delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
       delete_family: { Args: { p_family_id: string }; Returns: undefined }
       delete_pet: { Args: { p_pet_id: string }; Returns: undefined }
+      discharge_pet: { Args: { p_stay_id: string }; Returns: undefined }
       list_unregistered_medications: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3725,6 +4156,10 @@ export type Database = {
         }
       }
       remove_appointment_product: { Args: { p_line_id: string }; Returns: undefined }
+      remove_hospital_medication: {
+        Args: { p_medication_id: string }
+        Returns: undefined
+      }
       remove_surgery_line: { Args: { p_line_id: string }; Returns: undefined }
       report_sales_by_species_group: {
         Args: { p_branch_id?: string; p_from: string; p_tenant_id: string; p_to: string }

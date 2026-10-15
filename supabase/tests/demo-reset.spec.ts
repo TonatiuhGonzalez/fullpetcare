@@ -17,6 +17,7 @@ import { closePool, setRole, withTransaction } from './helpers'
 import {
   BRANCH_CENTRO,
   BRANCH_DEL_VALLE,
+  PET_ROCKY,
   PRODUCT_ALIMENTO,
   PRODUCT_SHAMPOO,
   TENANT_HUELLITAS,
@@ -490,6 +491,44 @@ describe('demo_reset.sql — paquetes de cirugía de demostración (fase 32)', (
         "select unit_price_cents from surgery_package_items where id = '33000000-0000-4000-8000-000000000001'",
       )
       expect(fee.rows[0].unit_price_cents).toBe(180000)
+    })
+  })
+})
+
+describe('demo_reset.sql — hospitalización de demostración (fase 33)', () => {
+  it('da de alta las estancias abiertas y restaura los espacios de ejemplo', async () => {
+    // Qué prueba: que después de una demo (una mascota hospitalizada, un espacio nuevo y uno
+    // de ejemplo desactivado) el reset deja el tablero sin hospitalizados y los espacios
+    // como la semilla.
+    // Qué se rompería: la siguiente presentación empezaría con una mascota "hospitalizada"
+    // de la anterior, o sin las jaulas de ejemplo.
+    await withTransaction(async (client) => {
+      await client.query(
+        `insert into hospital_stays (tenant_id, branch_id, pet_id, space_id, admitted_by, rate_mode, rate_cents, day_rule)
+         values ($1, 'c0000000-0000-4000-8000-000000000001', $2, '34000000-0000-4000-8000-000000000001', $3, 'per_day', 35000, 'natural')`,
+        [TENANT_PATITAS, PET_ROCKY, USER_DUENO],
+      )
+      await client.query(
+        "insert into hospital_spaces (tenant_id, branch_id, name) values ($1, 'c0000000-0000-4000-8000-000000000001', 'Jaula de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update hospital_spaces set is_active = false where id = '34000000-0000-4000-8000-000000000002'",
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const open = await client.query(
+        'select count(*)::int as n from hospital_stays where tenant_id = $1 and discharged_at is null',
+        [TENANT_PATITAS],
+      )
+      expect(open.rows[0].n).toBe(0)
+      const spaces = await client.query(
+        `select count(*)::int as n from hospital_spaces
+          where tenant_id = $1 and deleted_at is null and is_active`,
+        [TENANT_PATITAS],
+      )
+      expect(spaces.rows[0].n).toBe(4)
     })
   })
 })

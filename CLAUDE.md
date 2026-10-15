@@ -47,8 +47,10 @@ paquete D30, 2026-10-14, PLAN.md D30): catálogo de especies y razas con edad es
 imprimible con cédula (fase 28, §6.4 y §6.7), catálogo de proveedores (fase 29B, §6.5) y la PWA de la vista pública
 (fase 16A, §7.4).** **Ya construido (oleada 2, 2026-10-14): medicamentos fraccionados (fase 29C, §6.5) y familias y transferencia de
 mascota (fase 31, §6.2).** **Ya construido (oleada 3, 2026-10-14): cobro rápido sin cita ni cliente (fase 30, §6.5) y catálogo de cirugías con su
-cobro (fase 32, §6.3).** Siguen en la lista del paquete D30, sin construir: cuenta del cliente y notificaciones (16B,
-que pide un servicio de correo y una librería de Web Push: se justifica antes, §3) y hospitalización (33).
+cobro (fase 32, §6.3).** **Ya construido (oleada 4, 2026-10-14): hospitalización con bitácora, medicamentos y cobro, con el personal como único
+lector (fase 33, §6.4).** Sigue sin construir, del paquete D30: la cuenta del cliente y las notificaciones (16B), que
+pide un servicio de correo y una librería de Web Push (se justifica antes, §3) y con la que el dueño de la mascota leerá
+la bitácora.
 
 Reglas de esta etapa:
 
@@ -251,13 +253,14 @@ FullPetCare/
     │   ├── fractional.ts        #   unidad base, precio de la unidad, envase abierto (§6.5)
     │   ├── family.ts            #   etiqueta y validación de la familia (§6.2)
     │   ├── surgery.ts           #   renglones, totales y validación de una cirugía (§6.3)
+    │   ├── hospitalization.ts   #   días y costo de la estancia, opciones y validación de la bitácora (§6.4)
     │   ├── pwaInstall.ts  lastPetLink.ts   #   aviso "Agregar a inicio" y último link abierto (§7.4)
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     │   ├── tenantLogo.ts  vaccines.ts   #   imagen de la empresa (bucket `tenant-logos`) y catálogo de vacunas
-    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts  surgeries.ts   #   catálogos de especies y razas, receta, proveedores, familias y cirugías (D30)
+    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts  surgeries.ts  hospitalization.ts   #   catálogos de especies y razas, receta, proveedores, familias y cirugías (D30)
     ├── stores/                  # Pinia: session, tenant, agenda, cart, speciesCatalog, suppliers
     ├── types/database.ts        # GENERADO. No editar a mano.
     ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas); usePetCatalog (catálogo de especies y razas para los formularios de mascota); usePwaInstall (aviso de instalar la app)
@@ -598,6 +601,23 @@ y tener cédula capturada (`employee_details.professional_license`); los leen du
 navegador (`/app/citas/:id/receta`, carta vertical, `@media print`, sin PDF ni dependencia). Los medicamentos de texto
 libre le llegan al **dueño del negocio** como aviso en Inicio (`list_unregistered_medications()`), que los liga a un
 producto o los descarta (`resolve_unregistered_medication()`).
+
+**Hospitalización (fase 33, PLAN.md D30 punto 10):** estancia **y** control. `hospital_spaces` (jaulas por sucursal, sin
+tope de mascotas por jaula; el dueño los administra), `hospital_settings` (regla de días y tarifas por defecto),
+`hospital_stays` (ingreso, alta, espacio y una **copia** de la tarifa y de la regla de días del ingreso),
+`hospital_notes` (la bitácora: hora, lo realizado y biometrías opcionales —temperatura en décimas de grado, peso en
+gramos, frecuencia cardiaca, mucosas, ánimo y micción/defecación con opciones fijas—) y `hospital_medications`
+(administrados, con inventario). La bitácora es **expediente**: sin UPDATE ni borrado, se corrige con otra nota y todo
+queda en `audit_log`. Todo se escribe con RPC (`admit_pet`, `add_hospital_note`, `administer_hospital_medication`,
+`remove_hospital_medication`, `discharge_pet`, `bill_hospital_stay`); leen y escriben **dueño, recepción y veterinario**
+(el groomer nada); cobrar, solo dueño y recepción. **Días:** `natural` (cada día calendario tocado en la zona de la
+sucursal; entrar y salir el mismo día es 1) o `24h` (bloques de 24 horas hacia arriba), mínimo 1; la misma regla vive en
+`app.hospital_stay_days()` y `lib/hospitalization.ts`. **Tarifa:** por día o por estancia, a elegir al ingresar, con la
+del espacio y si no la del negocio como sugerencia. **Cobro:** exige el alta; una venta ligada al dueño del ingreso con
+la estancia y los medicamentos cobrables (que ya bajaron del inventario al administrarse). El aviso al abrir el cobro de
+una cita (`CheckoutPage`) dice si la mascota sigue hospitalizada. **Lo que NO hay todavía:** que el dueño de la mascota
+lea la bitácora y la notificación (dependen de la cuenta del cliente, 16B); las reglas de visibilidad por periodo ya
+existen en SQL (fase 31).
 
 **Catálogo de vacunas (fase 26, PLAN.md D29):** `vaccines` es configuración, no expediente. Lo **leen** todos los
 miembros y lo **editan dueño y veterinario** (políticas `vaccines_insert` y `vaccines_update`; recepción y groomer

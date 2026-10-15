@@ -91,6 +91,17 @@ const menuItems = computed<SideMenuItem[]>(() => [
         },
       ]
     : []),
+  // Hospitalización (fase 33): dueño, recepción y veterinario.
+  ...(session.role === 'owner' || session.role === 'receptionist' || session.role === 'vet'
+    ? [
+        {
+          title: 'Hospitalización',
+          icon: 'mdi-hospital-box-outline',
+          to: '/app/hospitalizacion',
+          group: 'Operación',
+        },
+      ]
+    : []),
   ...(isFrontDesk(session.role)
     ? [
         {

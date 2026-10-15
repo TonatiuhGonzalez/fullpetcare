@@ -1347,6 +1347,16 @@ al final**, porque depende de la 16B.
   para Web Push, y CLAUDE.md §3 exige justificarlos con el usuario antes. La 33 puede construirse sin la 16B con el
   personal como único lector (ver los riesgos de abajo); falta decidirlo.
 
+**Decisiones surgidas al construir la oleada 4 (2026-10-14).**
+- **Hospitalización sin la 16B:** se construyó con el personal como único lector (lo recomendado en D30). La lectura
+  del dueño y la notificación se suman cuando exista la cuenta del cliente; no hace falta tocar las tablas.
+- **Cobro:** una estancia se cobra **dada de alta** (los días se cuentan hasta el alta) y a nombre del dueño del
+  ingreso, aunque después se transfiera la mascota.
+- **Medicamentos:** bajan del inventario al administrarse (`stock_movements.hospital_medication_id`) y se cobran con la
+  estancia; uno ya cobrado no se puede quitar.
+- **Demo:** `demo:reset` da de alta las estancias abiertas de Patitas Felices (no las borra: son expediente) y
+  restaura los 4 espacios de ejemplo.
+
 **Contras y riesgos.**
 - **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.
 - **Hospitalización y 16B:** si la 16B se retrasa, la 33 se puede construir con el dueño del negocio como único lector y
