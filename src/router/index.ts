@@ -172,6 +172,14 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Cobro rápido (fase 30, PLAN.md D30): cobrar un servicio y/o productos sin cita y sin
+          // registrar al cliente. Solo dueño y recepción, como la venta de mostrador.
+          path: 'cobro-rapido',
+          name: 'cobro-rapido',
+          component: () => import('@/pages/ventas/QuickSalePage.vue'),
+          meta: { requiresRoles: ['owner', 'receptionist'] },
+        },
+        {
           // Reportes (tarea 12.12): gateado por PERMISO; por defecto solo el dueño.
           path: 'reportes',
           name: 'reportes',
@@ -218,6 +226,13 @@ export const router = createRouter({
               path: 'vacunas',
               name: 'configuracion-vacunas',
               component: () => import('@/pages/configuracion/VaccinesSettingsPage.vue'),
+              meta: { requiresRoles: ['owner', 'vet'] },
+            },
+            {
+              // Catálogo de cirugías (fase 32, PLAN.md D30): paquetes de renglones con su precio.
+              path: 'cirugias',
+              name: 'configuracion-cirugias',
+              component: () => import('@/pages/configuracion/SurgeriesSettingsPage.vue'),
               meta: { requiresRoles: ['owner', 'vet'] },
             },
             {

@@ -178,6 +178,116 @@ export type Database = {
           },
         ]
       }
+      appointment_surgery_lines: {
+        Row: {
+          appointment_id: string
+          appointment_product_id: string | null
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string
+          id: string
+          is_billable: boolean
+          kind: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id: string | null
+          product_id: string | null
+          quantity: number
+          sat_product_code: string
+          sat_unit_code: string
+          sold_unit: string
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          appointment_id: string
+          appointment_product_id?: string | null
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          is_billable?: boolean
+          kind: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id?: string | null
+          product_id?: string | null
+          quantity: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sold_unit?: string
+          tax_rate_bp: number
+          tenant_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          appointment_product_id?: string | null
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          is_billable?: boolean
+          kind?: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id?: string | null
+          product_id?: string | null
+          quantity?: number
+          sat_product_code?: string
+          sat_unit_code?: string
+          sold_unit?: string
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_surgery_lines_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_surgery_lines_appointment_product_id_fkey"
+            columns: ["appointment_product_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_surgery_lines_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "surgery_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_surgery_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "appointment_surgery_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_surgery_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           branch_id: string
@@ -2061,6 +2171,7 @@ export type Database = {
           product_id: string | null
           quantity: number
           sale_id: string
+          sat_product_code_snapshot: string | null
           sat_unit_code_snapshot: string | null
           service_id: string | null
           sold_unit: string
@@ -2084,6 +2195,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id: string
+          sat_product_code_snapshot?: string | null
           sat_unit_code_snapshot?: string | null
           service_id?: string | null
           sold_unit?: string
@@ -2106,6 +2218,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_id?: string
+          sat_product_code_snapshot?: string | null
           sat_unit_code_snapshot?: string | null
           service_id?: string | null
           sold_unit?: string
@@ -2170,6 +2283,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          attended_by_user_id: string | null
           branch_id: string
           closed_by: string | null
           created_at: string
@@ -2179,6 +2293,7 @@ export type Database = {
           folio: number
           id: string
           paid_at: string | null
+          species_group_id: string | null
           status: Database["public"]["Enums"]["sale_status"]
           subtotal_cents: number
           tax_cents: number
@@ -2188,6 +2303,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          attended_by_user_id?: string | null
           branch_id: string
           closed_by?: string | null
           created_at?: string
@@ -2197,6 +2313,7 @@ export type Database = {
           folio: number
           id?: string
           paid_at?: string | null
+          species_group_id?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           subtotal_cents?: number
           tax_cents?: number
@@ -2205,6 +2322,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attended_by_user_id?: string | null
           branch_id?: string
           closed_by?: string | null
           created_at?: string
@@ -2214,6 +2332,7 @@ export type Database = {
           folio?: number
           id?: string
           paid_at?: string | null
+          species_group_id?: string | null
           status?: Database["public"]["Enums"]["sale_status"]
           subtotal_cents?: number
           tax_cents?: number
@@ -2242,6 +2361,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_species_group_fkey"
+            columns: ["tenant_id", "species_group_id"]
+            isOneToOne: false
+            referencedRelation: "species_groups"
+            referencedColumns: ["tenant_id", "id"]
           },
           {
             foreignKeyName: "sales_tenant_id_fkey"
@@ -2624,6 +2750,129 @@ export type Database = {
           },
         ]
       }
+      surgery_package_items: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          description: string
+          id: string
+          kind: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id: string
+          position: number
+          product_id: string | null
+          quantity: number
+          tax_rate_bp: number
+          tenant_id: string
+          unit: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          kind: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id: string
+          position?: number
+          product_id?: string | null
+          quantity?: number
+          tax_rate_bp?: number
+          tenant_id: string
+          unit?: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["surgery_item_kind"]
+          package_id?: string
+          position?: number
+          product_id?: string | null
+          quantity?: number
+          tax_rate_bp?: number
+          tenant_id?: string
+          unit?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "surgery_package_items_package_fkey"
+            columns: ["tenant_id", "package_id"]
+            isOneToOne: false
+            referencedRelation: "surgery_packages"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "surgery_package_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "surgery_package_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "surgery_package_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      surgery_packages: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "surgery_packages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_invoicing_settings: {
         Row: {
           created_at: string
@@ -2948,6 +3197,10 @@ export type Database = {
         }
         Returns: string
       }
+      apply_surgery_lines: {
+        Args: { p_appointment_id: string; p_lines: Json; p_package_id: string }
+        Returns: number
+      }
       can_invoice: { Args: { p_tenant_id: string }; Returns: boolean }
       can_manage_invoicing: { Args: { p_tenant_id: string }; Returns: boolean }
       cancel_my_tenant: {
@@ -2983,6 +3236,18 @@ export type Database = {
           p_discount_cents?: number
           p_payments: Json
           p_products: Json
+        }
+        Returns: string
+      }
+      checkout_quick_sale: {
+        Args: {
+          p_attended_by?: string
+          p_branch_id: string
+          p_discount_cents?: number
+          p_payments: Json
+          p_products: Json
+          p_services: Json
+          p_species_group_id?: string
         }
         Returns: string
       }
@@ -3460,6 +3725,11 @@ export type Database = {
         }
       }
       remove_appointment_product: { Args: { p_line_id: string }; Returns: undefined }
+      remove_surgery_line: { Args: { p_line_id: string }; Returns: undefined }
+      report_sales_by_species_group: {
+        Args: { p_branch_id?: string; p_from: string; p_tenant_id: string; p_to: string }
+        Returns: Json
+      }
       report_sales_summary: {
         Args: { p_branch_id?: string; p_from: string; p_tenant_id: string; p_to: string }
         Returns: Json
@@ -3523,6 +3793,16 @@ export type Database = {
       }
       save_prescription: {
         Args: { p_appointment_id: string; p_items: Json }
+        Returns: string
+      }
+      save_surgery_package: {
+        Args: {
+          p_items: Json
+          p_name: string
+          p_notes: string
+          p_package_id: string
+          p_tenant_id: string
+        }
         Returns: string
       }
       search_customers: {
@@ -3650,6 +3930,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_surgery_package_active: {
+        Args: { p_is_active: boolean; p_package_id: string }
+        Returns: undefined
+      }
       set_tenant_logo: {
         Args: { p_logo_path: string; p_tenant_id: string }
         Returns: undefined
@@ -3722,6 +4006,7 @@ export type Database = {
         | "adjustment"
         | "loss"
       supplier_type: "medication" | "food" | "accessories" | "other"
+      surgery_item_kind: "consumable" | "medication" | "fee"
       tenant_status: "active" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -3877,6 +4162,7 @@ export const Constants = {
         "loss",
       ],
       supplier_type: ["medication", "food", "accessories", "other"],
+      surgery_item_kind: ["consumable", "medication", "fee"],
       tenant_status: ["active", "suspended", "closed"],
     },
   },

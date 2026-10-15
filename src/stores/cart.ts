@@ -20,6 +20,8 @@ import type {
   CheckoutLineItem,
   CheckoutProductItem,
   CheckoutSupplyItem,
+  CheckoutSurgeryItem,
+  QuickServiceLine,
   NewPayment,
   SellableProduct,
 } from '@/services/checkout'
@@ -33,6 +35,8 @@ export const useCartStore = defineStore('cart', () => {
   const lineItems = ref<CheckoutLineItem[]>([])
   /** Insumos cobrables de la consulta: ya salieron del inventario, solo se cobran. */
   const supplyItems = ref<CheckoutSupplyItem[]>([])
+  /** Honorarios y renglones de cirugía sin producto de la consulta (fase 32): solo se cobran. */
+  const surgeryItems = ref<CheckoutSurgeryItem[]>([])
   /** Productos agregados al ticket (de la cita o de una venta de mostrador). */
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
@@ -41,6 +45,12 @@ export const useCartStore = defineStore('cart', () => {
   const categories = ref<ProductCategory[]>([])
   /** Ids de los productos vendidos hace poco en la sucursal, del más reciente al más antiguo (con repetidos). */
   const recentSoldProductIds = ref<string[]>([])
+  /** Servicios de un cobro rápido (fase 30): sin cita, con el precio del catálogo. */
+  const quickServices = ref<Array<CheckoutLineItem>>([])
+  /** Es un cobro rápido (servicios y productos sin cita ni cliente). */
+  const isQuickSale = ref(false)
+  const quickAttendedBy = ref<string | null>(null)
+  const quickSpeciesGroupId = ref<string | null>(null)
   /** Solo en venta de mostrador (sin cita). El cliente es opcional: venta libre = null. */
   const counterBranchId = ref<string | null>(null)
   const counterCustomerId = ref<string | null>(null)
@@ -53,6 +63,7 @@ export const useCartStore = defineStore('cart', () => {
   // (lib/money.ts), igual que la base: el IVA nunca se calcula sobre el total.
   const allItems = computed(() => [
     ...lineItems.value,
+    ...quickServices.value,
     ...supplyItems.value,
     ...productItems.value,
   ])
@@ -97,6 +108,7 @@ export const useCartStore = defineStore('cart', () => {
       const summary = await checkoutService.buildSummary(id)
       lineItems.value = summary.lineItems
       supplyItems.value = summary.supplyItems
+      surgeryItems.value = summary.surgeryItems
       status.value = 'ready'
     } catch {
       status.value = 'error'
@@ -110,6 +122,45 @@ export const useCartStore = defineStore('cart', () => {
     counterBranchId.value = branchId
     counterCustomerId.value = customerId
     status.value = 'ready'
+  }
+
+  /** Prepara un cobro rápido: servicios y/o productos, sin cita ni cliente (fase 30). */
+  function loadQuickSale(branchId: string): void {
+    reset()
+    counterBranchId.value = branchId
+    isQuickSale.value = true
+    status.value = 'ready'
+  }
+
+  /** Suma un servicio del catálogo al cobro rápido (si ya estaba, suma a su cantidad). */
+  function addService(
+    service: { id: string; name: string; price_cents: number; tax_rate_bp: number },
+    quantity = 1,
+  ): void {
+    const existing = quickServices.value.find((s) => s.serviceId === service.id)
+    if (existing) {
+      existing.quantity += quantity
+      return
+    }
+    quickServices.value.push({
+      serviceId: service.id,
+      description: service.name,
+      quantity,
+      unitPriceCents: service.price_cents,
+      taxRateBp: service.tax_rate_bp,
+    })
+  }
+
+  /** Cambia la cantidad de un servicio del cobro rápido; false si no es un entero mayor a 0. */
+  function setServiceQuantity(serviceId: string, quantity: number): boolean {
+    const item = quickServices.value.find((s) => s.serviceId === serviceId)
+    if (!item || !Number.isInteger(quantity) || quantity < 1) return false
+    item.quantity = quantity
+    return true
+  }
+
+  function removeService(serviceId: string): void {
+    quickServices.value = quickServices.value.filter((s) => s.serviceId !== serviceId)
   }
 
   /** Liga (o quita) el cliente de una venta de mostrador ya abierta; p. ej. el que se da de alta para facturar. */
@@ -297,7 +348,21 @@ export const useCartStore = defineStore('cart', () => {
     }))
 
     let ticket: checkoutService.Ticket
-    if (appointmentId.value) {
+    if (isQuickSale.value && counterBranchId.value) {
+      const services: QuickServiceLine[] = quickServices.value.map((s) => ({
+        serviceId: s.serviceId,
+        quantity: s.quantity,
+      }))
+      ticket = await checkoutService.chargeQuickSale({
+        branchId: counterBranchId.value,
+        services,
+        products,
+        payments: payments.value,
+        discountCents: discountCents.value,
+        attendedBy: quickAttendedBy.value,
+        speciesGroupId: quickSpeciesGroupId.value,
+      })
+    } else if (appointmentId.value) {
       ticket = await checkoutService.charge({
         appointmentId: appointmentId.value,
         payments: payments.value,
@@ -323,12 +388,17 @@ export const useCartStore = defineStore('cart', () => {
     appointmentId.value = null
     counterBranchId.value = null
     counterCustomerId.value = null
+    quickServices.value = []
+    isQuickSale.value = false
+    quickAttendedBy.value = null
+    quickSpeciesGroupId.value = null
     productItems.value = []
     catalog.value = []
     categories.value = []
     recentSoldProductIds.value = []
     lineItems.value = []
     supplyItems.value = []
+    surgeryItems.value = []
     discountCents.value = 0
     payments.value = []
     status.value = 'idle'
@@ -339,12 +409,21 @@ export const useCartStore = defineStore('cart', () => {
     appointmentId,
     lineItems,
     supplyItems,
+    surgeryItems,
     productItems,
     catalog,
     categories,
     recentSoldProductIds,
     counterBranchId,
     counterCustomerId,
+    quickServices,
+    isQuickSale,
+    quickAttendedBy,
+    quickSpeciesGroupId,
+    loadQuickSale,
+    addService,
+    setServiceQuantity,
+    removeService,
     discountCents,
     payments,
     status,

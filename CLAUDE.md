@@ -46,8 +46,9 @@ pantallas chicas y agenda en lista en celular; §5.6, §6.1, §6.2, §6.4). **Ya
 paquete D30, 2026-10-14, PLAN.md D30): catálogo de especies y razas con edad estimada (fase 27, §6.2), receta médica
 imprimible con cédula (fase 28, §6.4 y §6.7), catálogo de proveedores (fase 29B, §6.5) y la PWA de la vista pública
 (fase 16A, §7.4).** **Ya construido (oleada 2, 2026-10-14): medicamentos fraccionados (fase 29C, §6.5) y familias y transferencia de
-mascota (fase 31, §6.2).** Siguen en la lista del paquete D30, sin construir: cobro de paso (30), cirugías (32), cuenta
-del cliente y push (16B) y hospitalización (33).
+mascota (fase 31, §6.2).** **Ya construido (oleada 3, 2026-10-14): cobro rápido sin cita ni cliente (fase 30, §6.5) y catálogo de cirugías con su
+cobro (fase 32, §6.3).** Siguen en la lista del paquete D30, sin construir: cuenta del cliente y notificaciones (16B,
+que pide un servicio de correo y una librería de Web Push: se justifica antes, §3) y hospitalización (33).
 
 Reglas de esta etapa:
 
@@ -249,13 +250,14 @@ FullPetCare/
     │   ├── suppliers.ts         #   tipos y validación de proveedores (§6.5)
     │   ├── fractional.ts        #   unidad base, precio de la unidad, envase abierto (§6.5)
     │   ├── family.ts            #   etiqueta y validación de la familia (§6.2)
+    │   ├── surgery.ts           #   renglones, totales y validación de una cirugía (§6.3)
     │   ├── pwaInstall.ts  lastPetLink.ts   #   aviso "Agregar a inicio" y último link abierto (§7.4)
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     │   ├── tenantLogo.ts  vaccines.ts   #   imagen de la empresa (bucket `tenant-logos`) y catálogo de vacunas
-    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts   #   catálogos de especies y razas, receta, proveedores y familias (D30)
+    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts  surgeries.ts   #   catálogos de especies y razas, receta, proveedores, familias y cirugías (D30)
     ├── stores/                  # Pinia: session, tenant, agenda, cart, speciesCatalog, suppliers
     ├── types/database.ts        # GENERADO. No editar a mano.
     ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas); usePetCatalog (catálogo de especies y razas para los formularios de mascota); usePwaInstall (aviso de instalar la app)
@@ -567,6 +569,14 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   suben el precio del baño, las citas viejas conservan el suyo. Un ticket histórico
   nunca cambia de monto.
 - `tax_rate_bp` en _basis points_: 1600 = 16.00 %. Entero, otra vez.
+- **Cirugías (fase 32, PLAN.md D30 punto 9):** `surgery_packages` y `surgery_package_items` son el catálogo (un
+  paquete con renglones: **honorario**, **consumible** o **medicamento**, con precio con IVA incluido; el producto
+  ligado es opcional) y solo se escriben con `save_surgery_package()` (dueño y veterinario). Al atender una cita de
+  veterinaria se **aplica** un paquete con `apply_surgery_lines()` (ajustable renglón por renglón o armado desde
+  cero): los renglones **con producto** se registran como insumo de la consulta (bajan existencia, al precio y IVA del
+  paquete) y los **sin producto** quedan en `appointment_surgery_lines` y `checkout_appointment()` los copia a
+  `sale_items` con sus claves del SAT (`sat_product_code_snapshot`; la factura las usa). Lo de uso interno no llega al
+  ticket. `appointment_services` no se reutiliza (exige `service_id`).
 
 ### 6.4 Atención
 
@@ -659,6 +669,12 @@ mismo nombre y especie (`lib/vaccineCatalog.ts`).
   unidades por envase`), no es otra tabla. `set_product_presentation()` cambia la presentación y **reescala la
   existencia** con un ajuste por sucursal (se rechaza si no da enteros). Una unidad suelta factura con su propia
   `ClaveUnidad` (`sale_items.sat_unit_code_snapshot`). `report_top_items` no mezcla envases con unidades.
+- **Cobro rápido (fase 30, PLAN.md D30 punto 6):** `checkout_quick_sale()` cobra un **servicio y/o productos sin cita y
+  sin cliente** (dueño y recepción; `/app/cobro-rapido`). Lleva `sales.attended_by_user_id` (quién atendió) y
+  `sales.species_group_id` (perro, gato, ave, reptil: **solo estadística**); entra a Caja y Reportes como cualquier
+  venta y reutiliza `app.add_product_items` y `app.finalize_sale`. `report_staff_activity` atribuye el servicio a quien
+  atendió y `report_sales_by_species_group()` agrupa por especie (el resto sale como "Sin dato"). **No ofrece
+  factura**: para facturar se usa el punto de venta, que sí captura al cliente.
 - **Captura del punto de venta (13F y 13G, PLAN.md D18 puntos 6 y 7):** un solo campo "código de barras o nombre"
   (Enter con código exacto agrega; escribir reemplaza la fila de arriba por las coincidencias) y **dos filas** de
   tarjetas (`components/PosProductTile.vue`): arriba, **categorías** (ícono y nombre) en una fila con scroll

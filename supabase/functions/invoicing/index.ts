@@ -260,7 +260,7 @@ async function stamp({ caller, admin, tenantId }: Ctx, form: FormData): Promise<
   // Partidas con sus claves del SAT (que viven en el servicio o producto, no en la partida).
   const { data: lines } = await caller
     .from("sale_items")
-    .select("description, quantity, unit_price_cents, tax_rate_bp, service_id, product_id, sat_unit_code_snapshot")
+    .select("description, quantity, unit_price_cents, tax_rate_bp, service_id, product_id, sat_unit_code_snapshot, sat_product_code_snapshot")
     .eq("sale_id", saleId)
     .is("deleted_at", null);
   const serviceIds = (lines ?? []).map((l) => l.service_id).filter(Boolean) as string[];
@@ -278,7 +278,17 @@ async function stamp({ caller, admin, tenantId }: Ctx, form: FormData): Promise<
 
   const items: CfdiSaleItem[] = [];
   for (const line of lines ?? []) {
-    const code = codes.get((line.service_id ?? line.product_id) as string);
+    // Un honorario de cirugía (fase 32) no es un servicio ni un producto del catálogo: lleva sus
+    // propias claves guardadas en la partida.
+    const code =
+      line.service_id || line.product_id
+        ? codes.get((line.service_id ?? line.product_id) as string)
+        : line.sat_product_code_snapshot && line.sat_unit_code_snapshot
+          ? {
+              sat_product_code: line.sat_product_code_snapshot,
+              sat_unit_code: line.sat_unit_code_snapshot,
+            }
+          : undefined;
     if (!code) return json("No se encontraron las claves del SAT de una partida de la venta.", 422);
     items.push({
       description: line.description,

@@ -359,6 +359,35 @@ function exportStaff(): void {
         </p>
       </v-card>
 
+      <!-- Por especie (fase 30): solo las ventas de cobro rápido llevan el dato; el resto va en
+           "Sin dato". Se muestra si hay al menos una con especie. -->
+      <v-card
+        v-if="reports.speciesGroups.some((g) => g.groupId !== null)"
+        variant="outlined"
+        class="pa-4 mb-4"
+      >
+        <h2 class="text-subtitle-1 mb-2">Por especie</h2>
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>Especie</th>
+              <th class="text-right">Ventas</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="g in reports.speciesGroups" :key="g.groupId ?? 'sin-dato'">
+              <td>{{ g.name }}</td>
+              <td class="text-right">{{ g.salesCount }}</td>
+              <td class="text-right">{{ formatMXN(g.totalCents) }}</td>
+            </tr>
+          </tbody>
+        </v-table>
+        <p class="text-caption text-medium-emphasis mt-2">
+          La especie solo se captura en el cobro rápido; las demás ventas salen en "Sin dato".
+        </p>
+      </v-card>
+
       <v-card v-if="summary.byBranch.length > 1" variant="outlined" class="pa-4 mb-4">
         <div class="d-flex flex-wrap align-center ga-2 mb-2">
           <h2 class="text-subtitle-1">Por sucursal</h2>
@@ -432,7 +461,7 @@ function exportStaff(): void {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in group.rows" :key="item.itemId">
+            <tr v-for="item in group.rows" :key="`${item.itemId}:${item.soldUnit}`">
               <td>{{ item.name }}</td>
               <td class="text-right">{{ item.quantity }}</td>
               <td class="text-right">{{ formatMXN(item.revenueCents) }}</td>

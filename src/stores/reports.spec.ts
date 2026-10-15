@@ -34,6 +34,7 @@ vi.mock('@/services/reports', () => ({
   getSalesSummary: vi.fn(),
   getTopItems: vi.fn(),
   getStaffActivity: vi.fn(),
+  getSalesBySpeciesGroup: vi.fn(),
 }))
 
 import * as reportsService from '@/services/reports'
@@ -51,6 +52,7 @@ beforeEach(() => {
   } as never)
   vi.mocked(reportsService.getTopItems).mockResolvedValue({ services: [], products: [] })
   vi.mocked(reportsService.getStaffActivity).mockResolvedValue([])
+  vi.mocked(reportsService.getSalesBySpeciesGroup).mockResolvedValue([])
 })
 
 afterEach(() => {
