@@ -1208,6 +1208,121 @@ aditivas, borrado suave).
 
 ---
 
+### D30 — Observaciones del veterinario: catálogos, receta, cobro de paso, familias, cirugías y hospitalización
+
+**Estado:** propuesta del 2026-10-14, pendiente de aprobación. Sale de la visita a un veterinario (12 observaciones) y de
+una ronda de preguntas con el usuario. Se construye en las fases **27 a 33** (más la 16B, ya propuesta). Ninguna fase
+arranca sin que se apruebe esta decisión.
+
+**Las 12 observaciones y dónde cae cada una.**
+
+| # | Observación | Fase |
+| - | ----------- | ---- |
+| 1 | Catálogo de razas (y de especies, ampliado a aves y reptiles) | 27 |
+| 2 | Edad y cálculo de fecha de nacimiento | 27 |
+| 3 | Formato de receta médica | 28 |
+| 10 | Proveedores de insumos | 29 |
+| 12 | Medicamentos a medias (fraccionados) | 29 |
+| 8 | Comprobante rápido sin registrar | 30 |
+| 5 | Familias | 31 |
+| 4 | Transferencia de dueños | 31 |
+| 6 | Costos de cirugía | 32 |
+| 7 | Costos de hospitalización (y su control) | 33 |
+| 11 | Contacto directo con el cliente | 16B y 33: el aviso dentro del sistema |
+| 9 | Mensajes por WhatsApp | **Ya existe como propuesta: fase 22 (D24).** Es un aviso de eventos, no comunicación directa |
+
+El orden pedido por el usuario es: razas, especies, edad, receta, proveedores y fraccionados primero; **hospitalización
+al final**, porque depende de la 16B.
+
+**Decisiones del usuario (2026-10-14).**
+1. **Razas y especies:** catálogos **editables**. Especie = gran grupo (aves, reptiles…) + especie común dentro del grupo.
+   Las razas cuelgan de la especie; en aves y reptiles el nivel es la especie común, sin razas. Hoy `pets.species` es el
+   enum `dog | cat | other`.
+2. **Edad:** si el dueño dice "tiene 3 años" (o "3 años y 2 meses"), el sistema **calcula una fecha aproximada** y el
+   veterinario puede proponerle otra al cliente. La fecha queda marcada como **estimada**.
+3. **Receta:** se **imprime desde el navegador**; sin dependencia de PDF. Lleva datos del veterinario con **cédula**, de la
+   empresa y la sucursal, fecha, mascota y dueño, y debajo una tabla con medicamento, dosis, frecuencia y duración, más
+   espacio de **firma**. El medicamento sale del catálogo de productos o es **texto libre**; los de texto libre generan un
+   **aviso al dueño del negocio** para que decida registrarlos. La receta queda **ligada a la consulta**. La emiten solo
+   **veterinario y dueño**, y solo si tienen cédula (un dueño puede ser veterinario). La cédula se captura al dar de alta
+   al veterinario.
+4. **Proveedores:** solo **catálogo** (nombre, contacto, teléfono, correo, tipo y notas). Un producto puede tener
+   **varios** proveedores. **Sin órdenes de compra ni cuentas por pagar.**
+5. **Fraccionados:** el inventario registra la **presentación** (caja de N blísters, frasco de N ml). Al vender se elige
+   **unidad o producto** (por defecto, producto). Un envase **abierto** se indica y lleva cuánto se ha usado. El precio de
+   la unidad **se calcula** y se puede modificar **en el producto y en cada venta**, por veterinario, dueño y recepción.
+6. **Cobro de paso:** un servicio (y productos en el mismo ticket) **sin cita y sin cliente**. Lleva servicio, precio,
+   fecha, **quién atendió** y el **grupo de especie** (genérico: perro, gato, ave, reptil; solo estadística). Entra a
+   reportes y caja como cualquier venta. Se imprime desde el navegador.
+7. **Familias:** una familia tiene **nombre propio** y **varias mascotas**; se muestra como "Familia X – Nube, Toby…".
+   Un cliente pertenece a **una sola** familia. Hay un **titular** y los demás miembros solo **ven la mascota, la cartilla,
+   las citas y la bitácora de hospitalización, y reciben avisos**. Los miembros no titulares **no ven montos**.
+8. **Transferencia:** la mascota pasa a un **cliente suelto**; si ese cliente pertenece a una familia, la familia accede.
+   Las **citas programadas se transfieren**, las **ventas se quedan** con el dueño anterior y los **links compartidos se
+   revocan**. El nuevo dueño ve **todo el historial** (cartilla, medicamentos, expediente, estética, hospitalización) **sin
+   montos**. El dueño o familia anterior solo ve **lo ocurrido mientras fue dueño**.
+9. **Cirugías:** catálogo propio del negocio (el Excel del veterinario no se comparte). Cada cirugía es un **paquete con
+   renglones** de tipo consumible, honorario o medicamento, cada uno con su precio. Consumibles y medicamentos se ligan a
+   productos y **descuentan inventario**; los honorarios no. El veterinario puede **ajustar los renglones** de una cirugía
+   concreta y también **armar una desde cero** con renglones del catálogo.
+10. **Hospitalización:** estancia **y** control. Ingreso, alta, días, **medicamentos administrados** (descuentan inventario
+    y se cobran), **espacio** y **bitácora**. La bitácora la escriben veterinario, dueño del negocio y recepción; cada nota
+    lleva hora, lo realizado, biometrías **opcionales** y texto libre. Las biometrías son: temperatura, peso, frecuencia
+    cardiaca, color de mucosas, estado de ánimo y micción/defecación (las tres últimas con **opciones fijas**).
+    - **Espacios:** jaulas definidas por el negocio **por sucursal**, **sin tope** de mascotas por jaula.
+    - **Tarifa:** por **día** o por **estancia**, a elegir al ingresar. El negocio **configura** cómo cuenta el día
+      (natural o 24 horas) y si la tarifa es única o por tipo de espacio. *(Lectura mía de "El negocio lo configura"; se
+      corrige si no era eso.)*
+    - **El dueño de la mascota** ve salud, bitácora **y costo**, solo lectura y **en cuanto llega al servidor**. Los
+      miembros no titulares de la familia ven salud y bitácora, **no el costo**.
+    - **Aviso al abrir el cobro** de una mascota que sigue hospitalizada ("¿ya se le dio de alta?").
+11. **Contacto directo:** el dueño se entera **dentro del sistema**, sin WhatsApp, mediante la PWA con cuenta del cliente
+    y notificaciones push (16B). Es requisito de la fase 33.
+
+**Decisiones técnicas propuestas (a confirmar al construir).**
+- **Catálogos (27):** tablas `species_groups`, `species` y `breeds`, con `tenant_id`, borrado suave y edición por dueño y
+  veterinario (mismo patrón que `vaccines`, D29). `pets` gana `species_id` y `breed_id` **nulos**; el enum `pet_species`
+  y el texto `breed` **se conservan** (migración aditiva, §8.1) y se rellenan al editar la mascota. Un catálogo base se
+  siembra por negocio con razas en español y la ortografía correcta (Xoloitzcuintle, Pastor alemán, Schnauzer…).
+  *Alternativa descartada:* un catálogo global de plataforma, porque cada negocio querrá agregar el suyo.
+- **Edad (27):** función pura en `lib/` (años y meses → fecha aproximada) y columna `pets.birth_date_is_estimated`.
+  Sin dependencia nueva.
+- **Cédula (28):** va en `employee_details`, que ya guarda datos personales por membresía (§6.7).
+  *Alternativa:* `profiles` (global), descartada porque el dueño que también es veterinario no siempre tiene detalle de
+  empleado; **a confirmar**.
+- **Fraccionados (29):** la existencia se guarda en la **unidad base** (tableta, ml), siempre entera (§8.2), con un factor
+  de conversión por producto. *Alternativa descartada:* dos productos (caja y suelta), porque la existencia se
+  descuadra al recortar un blíster. El redondeo del precio de la unidad usa `lib/money.ts` y tiene tests de borde.
+- **Cobro de paso (30):** RPC nueva (como `checkout_counter_sale`) que cobra servicios y productos sin cita ni cliente.
+  `sales.customer_id` ya admite nulo. Revalida permiso y sucursal (§7.3).
+- **Familias y transferencia (31):** `families`, `family_members` y `pet_ownerships` (historial de titulares con
+  fechas), con RLS y bitácora. La visibilidad por periodo la impone la base, no la interfaz. El dato monetario nunca sale
+  en el DTO del nuevo dueño.
+- **Cirugías (32) y hospitalización (33):** reutilizan lo que ya hay (`appointment_products` para el consumo con
+  inventario, `appointment_services` para honorarios) en lugar de tablas paralelas; se decide al inventariar en 32.1 y
+  33.1. La bitácora de hospitalización es **expediente**: nunca se borra y todo cambio queda en `audit_log` (§8.5, §8.6).
+- **16B (cuenta del cliente y push), inferido a petición del usuario:** alternativa A de D21 (Edge Function que emite
+  una sesión corta; el cliente nunca toca Postgres), código de un solo uso por **correo**, service worker escrito **a
+  mano**, y notificaciones con **Web Push estándar** (sin servicio de terceros). Si una librería de cifrado en la Edge
+  Function resulta necesaria, se justifica antes de agregarla (§3). El aviso de la fase 33 **no** manda datos clínicos en
+  el cuerpo de la notificación: solo "Hay novedades de <mascota>".
+
+**Contras y riesgos.**
+- **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.
+- **Hospitalización y 16B:** si la 16B se retrasa, la 33 se puede construir con el dueño del negocio como único lector y
+  sumar al dueño de la mascota después; es lo primero que se pregunta en 33.1.
+- **Privacidad:** un expediente que ve el nuevo dueño, la familia y el dueño anterior por periodo es la regla más fina de
+  este paquete; por eso tiene tests de aislamiento propios (31) y es la primera en revisarse.
+- **Fraccionados y CFDI:** vender por unidad cambia la `ClaveUnidad` de la factura (§1, CFDI). 29.1 revisa cómo
+  declarar la unidad suelta antes de construir.
+- **Cobro de paso:** sin cliente no hay a quién facturar; si piden factura, el flujo del punto de venta (cliente nuevo
+  o existente) ya cubre ese caso y no se duplica.
+- **Excel del veterinario:** al no compartirse, el catálogo de cirugías empieza vacío y se llena a mano; una importación
+  sería una mejora aparte (fase 23 ya propone un importador de clientes).
+- Respeta §7 y §8: RLS, dinero entero, fechas en UTC, borrado suave y migraciones aditivas.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |

@@ -734,3 +734,12 @@ begin
     raise notice 'demo_reset: se ocultaron las empresas de demostración: %', v_hidden_names;
   end if;
 end $$;
+
+-- =============================================================================
+-- Oleada 1 del paquete D30 (PLAN.md D30): secciones reservadas
+-- =============================================================================
+-- Cada rama agrega aquí SU restauración y no toca la de las demás.
+--
+-- (fase 27) Restaurar el catálogo de grupos, especies y razas de Patitas Felices.
+
+-- (fase 29B) Restaurar los proveedores de ejemplo de Patitas Felices.

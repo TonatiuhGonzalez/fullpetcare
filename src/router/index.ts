@@ -151,6 +151,14 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Proveedores (fase 29B, PLAN.md D30): catálogo de a quién se le compra. Mismo
+          // permiso que Inventario (`inventory`): quien administra el inventario lo ve.
+          path: 'proveedores',
+          name: 'proveedores',
+          component: () => import('@/pages/proveedores/SuppliersPage.vue'),
+          meta: { requiresPermission: 'inventory' },
+        },
+        {
           // Reportes (tarea 12.12): gateado por PERMISO; por defecto solo el dueño.
           path: 'reportes',
           name: 'reportes',
@@ -197,6 +205,13 @@ export const router = createRouter({
               path: 'vacunas',
               name: 'configuracion-vacunas',
               component: () => import('@/pages/configuracion/VaccinesSettingsPage.vue'),
+              meta: { requiresRoles: ['owner', 'vet'] },
+            },
+            {
+              // Especies y razas (fase 27, PLAN.md D30): catálogo editable por dueño y veterinario.
+              path: 'especies',
+              name: 'configuracion-especies',
+              component: () => import('@/pages/configuracion/SpeciesSettingsPage.vue'),
               meta: { requiresRoles: ['owner', 'vet'] },
             },
             {

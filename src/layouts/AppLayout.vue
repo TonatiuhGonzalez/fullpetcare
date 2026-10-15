@@ -81,6 +81,16 @@ const menuItems = computed<SideMenuItem[]>(() => [
         },
       ]
     : []),
+  ...(session.canView('inventory')
+    ? [
+        {
+          title: 'Proveedores',
+          icon: 'mdi-truck-delivery-outline',
+          to: '/app/proveedores',
+          group: 'Catálogo',
+        },
+      ]
+    : []),
   ...(session.canView('cash_register')
     ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja', group: 'Operación' }]
     : []),
