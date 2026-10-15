@@ -48,9 +48,10 @@ imprimible con cédula (fase 28, §6.4 y §6.7), catálogo de proveedores (fase 
 (fase 16A, §7.4).** **Ya construido (oleada 2, 2026-10-14): medicamentos fraccionados (fase 29C, §6.5) y familias y transferencia de
 mascota (fase 31, §6.2).** **Ya construido (oleada 3, 2026-10-14): cobro rápido sin cita ni cliente (fase 30, §6.5) y catálogo de cirugías con su
 cobro (fase 32, §6.3).** **Ya construido (oleada 4, 2026-10-14): hospitalización con bitácora, medicamentos y cobro, con el personal como único
-lector (fase 33, §6.4).** Sigue sin construir, del paquete D30: la cuenta del cliente y las notificaciones (16B), que
-pide un servicio de correo y una librería de Web Push (se justifica antes, §3) y con la que el dueño de la mascota leerá
-la bitácora.
+lector (fase 33, §6.4).** **Ya construido (fase 16B, 2026-10-14, PLAN.md D31): la cuenta del dueño de la mascota** (§7.4): entra con un código
+que le llega al correo, ve sus mascotas, cartilla, historial y la bitácora de hospitalización (§6.4). Sigue sin construir:
+el **envío real de correo** (16.7: hoy solo funciona con la bandeja local; falta dominio remitente y SMTP) y las
+notificaciones push (fase 35, que pide una librería de Web Push, §3).
 
 Reglas de esta etapa:
 
@@ -215,6 +216,7 @@ FullPetCare/
 │   │   ├── public-pet-view/     # Edge Function de la vista cliente
 │   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
 │   │   ├── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   ├── customer-account/    # cuenta del dueño de la mascota: código por correo, mis mascotas (fase 16B)
 │   │   └── invoicing/           # único que habla con el PAC (Facturapi); configurar el negocio y su certificado (11.15), timbrar, cancelar y bajar facturas (11.18)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
@@ -987,6 +989,21 @@ caché: no hay copia que enseñar (lo prueba `lib/serviceWorker.spec.ts`). La ap
 negocio; se borra si el link deja de servir). El acceso **sigue siendo el link con token**; la cuenta propia del cliente
 es la 16B. El aviso "Agregar a inicio" (`InstallAppBanner`) explica Compartir en iPhone y ofrece un botón en Android.
 `sw.js`, el manifiesto y `offline.html` van con `Cache-Control: no-cache` en `_headers`.
+
+**Cuenta del dueño (fase 16B, PLAN.md D31):** `/mi-cuenta` (ruta pública, **sesión propia**: `services/customerSupabase.ts` usa
+`storageKey: 'fpc-customer-auth'`, aparte de la del personal). Entra con un **código de 6 dígitos por correo**
+(`signInWithOtp`; la plantilla vive en `supabase/templates/access-code.html`; `[auth] enable_signup` sigue en falso). La
+cuenta es un usuario de Auth **sin membresía** con `app_metadata.customer_account = true`, así que toda política del
+personal lo niega. **Se vincula solo con un link `/c/:token`** ("Guardar en mi cuenta"), con la RPC `claim_customer_link()`
+(`customer_accounts`: una cuenta por cliente y una por negocio por persona; mensaje genérico si el token no sirve),
+nunca por coincidencia de correo o teléfono. Lo que ve lo decide la Edge Function `customer-account` (`verify_jwt = false`
+porque `request_code` es sin sesión; valida el JWT a mano): `request_code` **siempre responde `{ok:true}`**, solo envía
+código a cuentas de dueño o a un correo nuevo con un link vigente, y nunca al personal; `overview`, `pet` y
+`delete_account` sacan el id del JWT verificado y llaman a funciones SQL **solo para `service_role`**
+(`customer_account_overview`, `customer_account_pet_detail`, con las reglas de periodo y familia de la fase 31; el
+costo solo para el titular). El personal ve "cuenta vinculada" y puede **desvincular** en la página del cliente
+(`unlink_customer_account`). Eliminar la cuenta borra el usuario de Auth (y suelta su `actor_user_id` en `audit_log`);
+el expediente del negocio no se toca.
 
 Sus pruebas son explícitas y obligatorias: token de otro tenant, token revocado, token
 expirado, token válido pidiendo otra mascota, token inexistente, y que `anon` no pueda

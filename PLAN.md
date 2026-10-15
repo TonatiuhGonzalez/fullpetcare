@@ -1373,6 +1373,81 @@ al final**, porque depende de la 16B.
 
 ---
 
+### D31 — Cuenta del dueño de la mascota: entrar, ver lo suyo y, después, su clínica
+
+**Estado:** propuesta (2026-10-14); no se construye hasta que el usuario la apruebe. **Reemplaza la 16B de D21**
+(código de un solo uso con tabla propia y vista aislada) y es la base de la lectura del dueño de la fase 33.
+
+**Problema.** Hoy el cliente solo tiene un link por mascota (D21, §7.4): no puede volver a "su" información, ver sus
+próximas citas ni enterarse de nada. Se pidió una cuenta propia donde vea sus mascotas, sus citas, promociones y,
+más adelante, recomendaciones, horarios y veterinarias cercanas.
+
+**Decisiones del usuario (2026-10-14).**
+1. **Una cuenta por negocio, de momento.** La cuenta ve lo de **un negocio a la vez**. Ver mascotas de varias
+   clínicas bajo una sola cuenta queda para después (ver "Supabase Auth" abajo: el modelo no lo impide).
+2. **Promociones:** las publica cada negocio y **solo las ven sus clientes vinculados**.
+3. **Directorio de veterinarias cercanas:** en una **etapa posterior**.
+4. **Acceso con el correo personal** del dueño de la mascota (Gmail, etc.): el código le llega ahí.
+
+**1. Autenticación: Supabase Auth con código por correo, no una tabla propia.**
+- El dueño inicia sesión con un **código de un solo uso por correo** (OTP de Supabase Auth). No hay contraseña y no se
+  mantiene tabla de códigos ni intentos: lo hace Auth. **Alternativa descartada (la 16B de D21):** Edge Function con
+  tabla propia de códigos; es más código de seguridad a mantener sin ganar nada.
+- La persona es un `auth.users` **sin membresía en ningún negocio**. Las políticas RLS del personal (`is_member_of`,
+  `has_permission`…) la **niegan solas**: no hay forma de que lea una tabla de negocio por la API directa.
+- **Consecuencia que hay que saber:** Auth identifica por correo, así que la cuenta es técnicamente **una por correo**.
+  "Una cuenta por negocio" se cumple en lo que **ve** (un negocio a la vez), no impidiendo vincular otros: el modelo ya
+  admite varios vínculos y abrirlo después no es una migración.
+- Hace falta un **servicio de correo** (SMTP) para producción: el de Supabase por defecto no sirve más que para pruebas.
+  Y un **dominio remitente** con SPF y DKIM, para que el código no caiga en spam. El destinatario es el correo personal.
+
+**2. Vínculo cuenta ↔ cliente: el link con token es la prueba.**
+- Tabla `customer_accounts` (`user_id`, `tenant_id`, `customer_id`, `linked_at`; único por `(user_id, tenant_id)`).
+- El dueño abre su link `/c/:token` (el que ya entrega el negocio) y toca **"Guardar en mi cuenta"**: una RPC
+  (`SECURITY DEFINER`, revalida que el token sea vigente) vincula a esa persona con el **cliente** de la mascota.
+- **Nunca por coincidencia de correo o teléfono**: sería filtrar datos de una persona a otra. Sin link, no hay vínculo.
+- Un negocio también puede **desvincular** (ya no es su cliente), y la persona puede **eliminar su cuenta** sin que se
+  borre el expediente del negocio (§8.5).
+
+**3. Qué lee la cuenta: funciones de servidor con lista blanca, no tablas.**
+- `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()` y, con la 33, `my_hospital_stays()`: devuelven **solo**
+  los campos de la vista pública (§7.4) y aplican las reglas de la fase 31 (`app.customer_can_view_pet*`): el dueño
+  anterior ve su periodo, los montos solo el titular, la familia accede a las mascotas de sus miembros.
+- **Nunca** devuelven teléfonos u otros clientes, notas internas ni identificadores de otros registros.
+
+**4. Capas, en orden (cada una se aprueba y se construye por separado).**
+
+| Capa | Qué entrega | Fase propuesta | Dependencia nueva |
+| ---- | ----------- | -------------- | ----------------- |
+| **A. Cuenta y mis mascotas** | Entrar con código, vincular con el link, ver mascotas, cartilla, historial, próximas citas y la bitácora de hospitalización | **16B** | Servicio de correo (SMTP) y dominio remitente |
+| **B. Mi clínica** | Perfil del negocio (dirección, teléfono, horarios por sucursal) y **promociones** que publica el negocio para sus clientes vinculados | **34** | Ninguna |
+| **C. Avisos** | Notificación en el teléfono ("Hay novedades de Nube") y recordatorios de vacunas y citas | **35** | Librería de Web Push (PushForge o `@negrel/webpush`, tras un spike) |
+| **D. Más adelante** | Pedir cita en línea; recomendaciones; **directorio de veterinarias cercanas** (opt-in por negocio, coordenadas por sucursal) | sin fase | Por decidir (geolocalización) |
+
+**Contras y riesgos.**
+- **Privacidad (LFPDPPP):** una cuenta que junta datos del dueño exige **aviso de privacidad**, consentimiento al vincular
+  y derecho a eliminar la cuenta. Hay que redactarlo antes de abrir la 16B a usuarios reales.
+- **Superficie:** se habilitan altas por correo en Auth (hoy solo se invita al personal). Una cuenta sin vínculo no ve
+  nada; aun así, el login del personal debe tratar bien a un usuario sin negocios (mandarlo a `/mi-cuenta`).
+- **Correo en producción:** sin un SMTP propio el producto no puede mandar códigos a más de un par de personas por hora.
+- **Soporte:** aparece un tipo de usuario nuevo ("no veo mi cita"). Conviene un mensaje claro de "pídele a tu
+  veterinaria un link" cuando la cuenta no tiene vínculos.
+- **Promociones:** el negocio puede publicar de más. Se limitan a texto y vigencia (sin imágenes ni precios) en la
+  primera versión.
+
+**Qué NO cambia.** El link con token por mascota (§7.4) sigue funcionando sin cuenta; la cuenta es opcional para el
+dueño. La vista pública, el PWA (16A) y la cartilla actual no se tocan.
+
+**Pendientes antes de construir.** Aprobar esta decisión y redactar el aviso de privacidad.
+
+**Pendiente (2026-10-14, a petición del usuario): correo de salida.** Todavía **no existe un correo ni un dominio
+remitente** del negocio. Queda como pendiente: el dominio con SPF y DKIM y el proveedor de SMTP (recomendación: Resend,
+con `sendEmail()` aislado para poder cambiarlo). **No bloquea el desarrollo:** el Supabase local entrega los códigos
+a una bandeja de pruebas (Inbucket), así que cuenta, vínculo, funciones de lectura y pantallas se construyen y prueban
+completos. Lo que **sí** queda bloqueado es la tarea 16.7 (envío real) y, por tanto, abrir la cuenta a usuarios reales.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |

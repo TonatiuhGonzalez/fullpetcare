@@ -163,6 +163,18 @@ onMounted(load)
         </div>
       </v-card>
 
+      <!-- Fase 16B: guardar la mascota en la cuenta del dueño (el link se vincula al entrar). -->
+      <v-btn
+        :to="{ name: 'mi-cuenta', query: { link: token } }"
+        variant="tonal"
+        color="primary"
+        block
+        prepend-icon="mdi-account-heart-outline"
+        class="mb-4"
+      >
+        Guardar en mi cuenta
+      </v-btn>
+
       <v-card v-if="data.upcomingAppointments.length > 0" class="pa-4 mb-4">
         <h2 class="section-title">
           <v-icon icon="mdi-calendar-clock-outline" color="primary" class="mr-2" />

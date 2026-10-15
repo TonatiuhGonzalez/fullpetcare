@@ -710,6 +710,68 @@ export type Database = {
           },
         ]
       }
+      customer_accounts: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          linked_at: string
+          linked_via_link_id: string | null
+          tenant_id: string
+          unlinked_at: string | null
+          unlinked_by: string | null
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          linked_at?: string
+          linked_via_link_id?: string | null
+          tenant_id: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          linked_at?: string
+          linked_via_link_id?: string | null
+          tenant_id?: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_accounts_customer_fkey"
+            columns: ["tenant_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "customer_accounts_linked_via_link_id_fkey"
+            columns: ["linked_via_link_id"]
+            isOneToOne: false
+            referencedRelation: "share_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           cfdi_use: string | null
@@ -3681,6 +3743,7 @@ export type Database = {
         }
         Returns: string
       }
+      claim_customer_link: { Args: { p_token: string }; Returns: Json }
       close_cash_session: {
         Args: { p_counted_cents: number; p_note?: string; p_session_id: string }
         Returns: {
@@ -3842,6 +3905,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      customer_account_overview: { Args: { p_user_id: string }; Returns: Json }
+      customer_account_pet_detail: {
+        Args: { p_pet_id: string; p_user_id: string }
+        Returns: Json
+      }
+      customer_account_user_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          is_customer_account: boolean
+          user_id: string
+        }[]
       }
       delete_customer: { Args: { p_customer_id: string }; Returns: undefined }
       delete_employee: { Args: { p_membership_id: string }; Returns: undefined }
@@ -4402,6 +4477,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      unlink_customer_account: { Args: { p_customer_id: string }; Returns: undefined }
       update_tenant_fiscal_data: {
         Args: {
           p_legal_name: string
