@@ -6,7 +6,18 @@ import { useCustomerAccountStore } from './customerAccount'
 
 // Se simula el servicio completo: aquí solo se prueba qué hace la store con sus respuestas
 // (si el acceso o el vínculo fallan, qué mensaje ve la persona), no la red.
-vi.mock('@/services/customerAccount')
+// Con fábrica explícita: un `vi.mock` sin ella importa el módulo real para copiar su forma, y eso
+// crearía el cliente de Supabase, que en CI no tiene VITE_SUPABASE_URL y truena al importar.
+vi.mock('@/services/customerAccount', () => ({
+  requestCode: vi.fn(),
+  verifyCode: vi.fn(),
+  hasSession: vi.fn(),
+  signOut: vi.fn(),
+  claimLink: vi.fn(),
+  loadOverview: vi.fn(),
+  loadPet: vi.fn(),
+  deleteAccount: vi.fn(),
+}))
 
 describe('useCustomerAccountStore', () => {
   beforeEach(() => {
