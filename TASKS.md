@@ -940,6 +940,10 @@ HMH Four: tareas #2036 a #2048.
 - [ ] **11.21** 📚🧪 Extender el E2E: agendar → atender → cobrar **con un producto** → facturar en
   sandbox. Sigue siendo **un solo** test (D12). _Verificar:_ verde en local y en CI (el CI usa el
   sandbox; la llave va en GitHub Secrets, nunca en el repo).
+  **Parcial (2026-10-20, #2048):** el E2E ya da entrada de compra a un producto en Inventario y lo vende en el punto de
+  venta (ticket de $145.00); pasa en local. **Desviación:** el cobro dentro del diálogo de la Agenda no ofrece productos
+  (solo `/app/citas/:id/cobrar` y el mostrador), por eso la venta va en el mostrador y no en el mismo ticket de la cita.
+  **Falta** el paso de facturar en el sandbox: espera la cuenta de Facturapi y su llave (#2068, #2069). Por correr en CI.
 - [x] **11.22** Semilla y reset: productos ficticios y existencias para Patitas Felices en `seed.sql`
   y `demo-reset.sh`; el reset **no** toca nada fiscal real ni llama al PAC. _Verificar:_ `db:reset` y
   `demo:reset` dejan el inventario limpio. **Hecho 2026-10-06 (#2048, parte de semilla; el E2E con sandbox y la
@@ -955,6 +959,8 @@ HMH Four: tareas #2036 a #2048.
   en §6.7/§7.2, la Edge Function `invoicing` en §3/§4/§10 y la dependencia (si el PAC trae SDK); quitar
   "Venta de productos e inventario" y "CFDI real" de la lista de "Aún no construido" (§1); `.env.example`
   con las llaves del PAC (vacías). _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Parcial (2026-10-20, #2048):** `CLAUDE.md` §1 ya no lista el inventario como pendiente y dice que la facturación está
+  construida pero sin probar con el proveedor. **Falta** cerrarla del todo cuando 11.15, 11.18 y 11.19 se marquen.
 
 **Riesgos de la fase:**
 

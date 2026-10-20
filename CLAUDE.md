@@ -90,12 +90,12 @@ El flujo completo de principio a fin, ya construido:
 Esto estaba "fuera de alcance en v1". Ya no está prohibido, pero **sigue sin existir** y
 no se construye por iniciativa propia: necesita su fase y su aprobación.
 
-- **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
-  `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
-  mostrador (§6.5; el mostrador es un punto de venta desde la fase 13). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
-- **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
-  mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
-  `services` y los futuros productos deberán llevarlas.
+- **Factura global al público en general** (11.20): sin construir. La facturación individual (Edge Function
+  `invoicing`, §6.5) y el inventario con venta de productos, consumo de insumos y existencias por sucursal (fase 11)
+  ya existen; **la facturación no se ha probado de punta a punta con el proveedor real** (Facturapi, modo de pruebas;
+  tareas 11.15, 11.18 y 11.19 sin marcar en `TASKS.md`) y el E2E aún no emite una factura (11.21 solo cubre la venta
+  con producto). Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto; `services` y `products` ya las
+  llevan, y deben revisarse con un contador antes de abrir la facturación a negocios reales.
 - Pasarela de pago real (SPEI/OpenPay simulados)
 - Lotes y caducidades de medicamento
 - Reportes financieros avanzados (la fase 12 trae reportes **de ventas** básicos; siguen fuera la utilidad, los reportes de inventario, la facturación en los reportes y la exportación a Excel nativo: solo hay CSV)
