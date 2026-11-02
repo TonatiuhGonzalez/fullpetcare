@@ -81,6 +81,37 @@ const menuItems = computed<SideMenuItem[]>(() => [
         },
       ]
     : []),
+  ...(session.canView('inventory')
+    ? [
+        {
+          title: 'Proveedores',
+          icon: 'mdi-truck-delivery-outline',
+          to: '/app/proveedores',
+          group: 'Catálogo',
+        },
+      ]
+    : []),
+  // Hospitalización (fase 33): dueño, recepción y veterinario.
+  ...(session.role === 'owner' || session.role === 'receptionist' || session.role === 'vet'
+    ? [
+        {
+          title: 'Hospitalización',
+          icon: 'mdi-hospital-box-outline',
+          to: '/app/hospitalizacion',
+          group: 'Operación',
+        },
+      ]
+    : []),
+  ...(isFrontDesk(session.role)
+    ? [
+        {
+          title: 'Cobro rápido',
+          icon: 'mdi-receipt-text-plus-outline',
+          to: '/app/cobro-rapido',
+          group: 'Operación',
+        },
+      ]
+    : []),
   ...(session.canView('cash_register')
     ? [{ title: 'Caja', icon: 'mdi-cash-multiple', to: '/app/caja', group: 'Operación' }]
     : []),

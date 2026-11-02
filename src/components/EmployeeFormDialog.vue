@@ -15,7 +15,12 @@ import type { EmployeeDocument, EmployeeDocumentType } from '@/services/employee
 import type { Branch } from '@/services/branches'
 import type { MemberRole } from '@/services/memberships'
 import { roleLabel } from '@/lib/roles'
-import { isValidCURP, isValidEmail, isValidRFC } from '@/lib/validation'
+import {
+  isValidCURP,
+  isValidEmail,
+  isValidProfessionalLicense,
+  isValidRFC,
+} from '@/lib/validation'
 
 const props = defineProps<{
   modelValue: boolean
@@ -55,6 +60,7 @@ const tab = ref<TabName>('personal')
 const fullName = ref('')
 const birthDate = ref('')
 const curp = ref('')
+const professionalLicense = ref('')
 const rfc = ref('')
 const voterIdNumber = ref('')
 
@@ -75,7 +81,7 @@ const errorMessage = ref<string | null>(null)
 
 interface Problem {
   tab: TabName
-  field: 'fullName' | 'curp' | 'rfc' | 'email'
+  field: 'fullName' | 'curp' | 'rfc' | 'email' | 'license'
   message: string
 }
 
@@ -104,6 +110,16 @@ const problems = computed<Problem[]>(() => {
       tab: 'personal',
       field: 'rfc',
       message: 'El RFC debe tener 12 o 13 caracteres (ej. RUCS850312AB1).',
+    })
+  }
+  if (
+    professionalLicense.value.trim() !== '' &&
+    !isValidProfessionalLicense(professionalLicense.value)
+  ) {
+    list.push({
+      tab: 'personal',
+      field: 'license',
+      message: 'La cédula debe tener 7 u 8 dígitos (ej. 1234567).',
     })
   }
   // El correo solo se pide al dar de alta: es lo que usa la invitación.
@@ -160,6 +176,7 @@ watch(
     fullName.value = e?.fullName ?? ''
     birthDate.value = e?.birthDate ?? ''
     curp.value = e?.curp ?? ''
+    professionalLicense.value = e?.professionalLicense ?? ''
     rfc.value = e?.rfc ?? ''
     voterIdNumber.value = e?.voterIdNumber ?? ''
     email.value = ''
@@ -208,6 +225,11 @@ async function handleSubmit(): Promise<void> {
       curp: curp.value || null,
       rfc: rfc.value || null,
       voterIdNumber: voterIdNumber.value || null,
+      // Solo quien puede emitir recetas la lleva; a los demás roles se les guarda vacía.
+      professionalLicense:
+        (role.value === 'vet' || role.value === 'owner') && professionalLicense.value.trim() !== ''
+          ? professionalLicense.value.replace(/[\s.]/g, '')
+          : null,
     }
     // El dueño ve todas las sucursales del tenant por rol, sin filas en
     // membership_branches (CLAUDE.md §6.1) — no tiene caso mandar una
@@ -286,6 +308,15 @@ async function handleSubmit(): Promise<void> {
               <v-text-field v-model="curp" label="CURP" :error-messages="fieldErrors('curp')" />
               <v-text-field v-model="rfc" label="RFC" :error-messages="fieldErrors('rfc')" />
               <v-text-field v-model="voterIdNumber" label="Clave de elector (INE)" />
+              <!-- Solo veterinario y dueño emiten recetas: es la cédula que sale impresa en ellas. -->
+              <v-text-field
+                v-if="role === 'vet' || role === 'owner'"
+                v-model="professionalLicense"
+                label="Cédula profesional"
+                :error-messages="fieldErrors('license')"
+                hint="Aparece en las recetas que emita. Sin ella no puede emitirlas."
+                persistent-hint
+              />
             </v-window-item>
 
             <v-window-item value="acceso">

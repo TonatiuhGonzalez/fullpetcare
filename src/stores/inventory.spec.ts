@@ -46,11 +46,13 @@ vi.mock('@/services/productCategories', () => ({
   setActive: vi.fn(),
 }))
 vi.mock('@/services/inventory', () => ({ listStock: vi.fn(), registerMovement: vi.fn() }))
+vi.mock('@/services/suppliers', () => ({ setProductSuppliers: vi.fn() }))
 
 import type { ProductInput } from '@/lib/inventory'
 import * as inventoryService from '@/services/inventory'
 import * as categoriesService from '@/services/productCategories'
 import * as productsService from '@/services/products'
+import * as suppliersService from '@/services/suppliers'
 import type { Product } from '@/services/products'
 
 function product(id: string, over: Partial<Product> = {}): Product {
@@ -230,6 +232,8 @@ describe('saveProduct', () => {
     vi.mocked(productsService.list).mockResolvedValue([])
     vi.mocked(inventoryService.listStock).mockResolvedValue([])
     vi.mocked(categoriesService.list).mockResolvedValue([])
+    // `create` devuelve la fila creada; el store usa su id para ligar proveedores.
+    vi.mocked(productsService.create).mockResolvedValue({ id: 'p-new' } as never)
   })
 
   it('un alta se crea con el negocio activo, datos limpios, y recarga', async () => {
@@ -251,6 +255,41 @@ describe('saveProduct', () => {
       tenant_id: 'tenant-a',
     })
     expect(productsService.list).toHaveBeenCalledTimes(1) // recargó
+  })
+
+  it('liga los proveedores al producto recién creado', async () => {
+    // Qué prueba: que el alta usa el id del producto creado para ligar a sus proveedores.
+    // Qué se rompería: el producto se guardaría pero sin quién lo surte.
+    const store = useInventoryStore()
+
+    const error = await store.saveProduct(input, undefined, ['s1', 's2'])
+
+    expect(error).toBeNull()
+    expect(suppliersService.setProductSuppliers).toHaveBeenCalledWith('tenant-a', 'p-new', [
+      's1',
+      's2',
+    ])
+  })
+
+  it('sin lista de proveedores no toca los vínculos existentes', async () => {
+    // Qué prueba: que editar un producto desde un lugar que no maneja proveedores no los
+    // borra (una lista ausente no es lo mismo que una lista vacía).
+    const store = useInventoryStore()
+
+    await store.saveProduct(input, 'p1')
+
+    expect(suppliersService.setProductSuppliers).not.toHaveBeenCalled()
+  })
+
+  it('si fallan los proveedores avisa, pero el producto ya quedó guardado', async () => {
+    const store = useInventoryStore()
+    vi.mocked(suppliersService.setProductSuppliers).mockRejectedValue(new Error('network'))
+
+    const error = await store.saveProduct(input, undefined, ['s1'])
+
+    expect(error).toMatch(/se guardó, pero no se pudieron guardar sus proveedores/i)
+    expect(productsService.create).toHaveBeenCalled()
+    expect(productsService.list).toHaveBeenCalledTimes(1) // recargó para mostrar el producto
   })
 
   it('con productId edita en vez de crear', async () => {

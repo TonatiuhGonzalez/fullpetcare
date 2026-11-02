@@ -940,6 +940,10 @@ HMH Four: tareas #2036 a #2048.
 - [ ] **11.21** 📚🧪 Extender el E2E: agendar → atender → cobrar **con un producto** → facturar en
   sandbox. Sigue siendo **un solo** test (D12). _Verificar:_ verde en local y en CI (el CI usa el
   sandbox; la llave va en GitHub Secrets, nunca en el repo).
+  **Parcial (2026-10-20, #2048):** el E2E ya da entrada de compra a un producto en Inventario y lo vende en el punto de
+  venta (ticket de $145.00); pasa en local. **Desviación:** el cobro dentro del diálogo de la Agenda no ofrece productos
+  (solo `/app/citas/:id/cobrar` y el mostrador), por eso la venta va en el mostrador y no en el mismo ticket de la cita.
+  **Falta** el paso de facturar en el sandbox: espera la cuenta de Facturapi y su llave (#2068, #2069). Por correr en CI.
 - [x] **11.22** Semilla y reset: productos ficticios y existencias para Patitas Felices en `seed.sql`
   y `demo-reset.sh`; el reset **no** toca nada fiscal real ni llama al PAC. _Verificar:_ `db:reset` y
   `demo:reset` dejan el inventario limpio. **Hecho 2026-10-06 (#2048, parte de semilla; el E2E con sandbox y la
@@ -955,6 +959,8 @@ HMH Four: tareas #2036 a #2048.
   en §6.7/§7.2, la Edge Function `invoicing` en §3/§4/§10 y la dependencia (si el PAC trae SDK); quitar
   "Venta de productos e inventario" y "CFDI real" de la lista de "Aún no construido" (§1); `.env.example`
   con las llaves del PAC (vacías). _Verificar:_ `CLAUDE.md`, `PLAN.md` y `TASKS.md` coinciden.
+  **Parcial (2026-10-20, #2048):** `CLAUDE.md` §1 ya no lista el inventario como pendiente y dice que la facturación está
+  construida pero sin probar con el proveedor. **Falta** cerrarla del todo cuando 11.15, 11.18 y 11.19 se marquen.
 
 **Riesgos de la fase:**
 
@@ -1832,30 +1838,88 @@ Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). Sin servicio externo. 
 7. **Estados vacíos** con ilustración (buscar algo que no existe en Clientes, Mascotas o Inventario).
 8. **Superadmin** con la misma identidad.
 
-## Fase 16 — Acceso del cliente: PWA y cuenta propia (propuesta)
+## Fase 16 — Acceso del cliente: PWA y cuenta propia (16A construida en rama; 16B planeada para la oleada 3)
 
 **Meta: que el cliente consulte a su mascota desde su teléfono sin depender de un link, con una app web instalable.**
-Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: propuesta, trabajo a futuro; no se construye hasta
-que el usuario la apruebe.** Decisiones y alternativas en `PLAN.md` D21.
+Quinta fase de la **etapa de mejoras** (`CLAUDE.md` §1). **Estado: 16A construida (2026-10-14, paquete D30); 16B
+rediseñada en `PLAN.md` D31 (cuenta del dueño), pendiente de aprobación.** Decisiones y alternativas en `PLAN.md` D21.
 
 ### 16A. PWA sobre la vista actual
 
-- [ ] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
+- [x] **16.1** 📚 Revisar el estado actual (hoy no hay manifest ni service worker; solo `theme-color` en `index.html`)
   y aprobar `PLAN.md` D21. _Verificar:_ el usuario aprobó por escrito; D21 sin "propuesta".
-- [ ] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
+  **Hecho (2026-10-14):** D21 ya estaba aprobada; el usuario aprobó construir la 16A dentro del paquete D30
+  (oleada 1). Se confirmó que no había manifest ni service worker.
+- [x] **16.2** Manifest, íconos (incluido el maskable) y registro del service worker; caché solo del cascarón de la app,
   nunca de datos de la mascota. _Verificar:_ Lighthouse "instalable"; en el teléfono se agrega a inicio y abre sin barra
   del navegador; un token revocado sigue sin mostrar nada aun con caché.
-- [ ] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
+  **Hecho:** `public/manifest.webmanifest`, íconos en `public/icons/` (192, 512 y maskable, generados con
+  `scripts/gen-pwa-icons.mjs` desde el isotipo), `public/sw.js` escrito a mano (sin dependencia), `plugins/pwa.ts` y
+  cabeceras `no-cache` para `sw.js`, el manifiesto y `offline.html`. El worker **ignora todo lo de otro dominio** (ahí
+  viven los datos de la mascota), no guarda pantallas y solo guarda los archivos con hash de `/assets/`. 7 tests del
+  worker real (`serviceWorker.spec.ts`). **Verificado en navegador** (Chromium, build de producción en `vite preview`):
+  manifiesto enlazado, worker activo y, sin red, una navegación muestra "Sin conexión". **No verificado:** Lighthouse
+  "instalable" ni instalación en un teléfono real, ni con Cloudflare (cabeceras `_headers`).
+  **Decisión nueva (a confirmar):** `start_url` es `/c`: el manifiesto es uno solo y no puede llevar el token de cada
+  mascota. La vista pública recuerda en el teléfono el último token abierto (`lib/lastPetLink.ts`, `localStorage`,
+  solo con forma de token y borrado si el link deja de servir) y `/c` lleva a esa mascota; sin token, explica que hay
+  que abrir el link de la clínica. El acceso sigue siendo el link con token.
+- [x] **16.3** Aviso "Agregar a inicio" (Android y la instrucción manual de iOS) y pantalla sin conexión. _Verificar:_ en
   modo avión se ve el aviso, no datos viejos de otra mascota.
+  **Hecho:** `InstallAppBanner` en el layout público: en Android un botón que lanza el diálogo del navegador; en
+  iPhone y iPad la instrucción de Compartir → Agregar a pantalla de inicio. "Ahora no" y "Entendido" lo ocultan 30 días
+  en este teléfono. Pantalla `offline.html` estática, sin datos. **Verificado en navegador:** con un agente de usuario
+  de iPhone sale la instrucción y no vuelve tras "Entendido", ni al recargar. **No verificado:** el botón de Android
+  (`beforeinstallprompt`) en un teléfono real ni el modo avión de un dispositivo.
 
-### 16B. Cuenta del cliente (requiere aprobar A/B y canal del código en D21)
+### 16B. Cuenta del dueño de la mascota (capa A de `PLAN.md` D31; reemplaza el plan anterior)
 
-- [ ] **16.4** 📚 Elegir alternativa (Edge Function o Auth con RLS), canal del código y regla de vínculo persona↔cliente.
-- [ ] **16.5** 🧪 Backend del acceso con código de un solo uso (caducidad corta, intentos limitados). _Verificar:_ tests de
-  código caducado, reutilizado, de otro cliente y de otro negocio.
-- [ ] **16.6** Pantalla de entrada del cliente y lista de sus mascotas. _Verificar:_ solo ve las suyas; el DTO sigue en
-  lista blanca (§7.4).
-- [ ] **16.7** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase.
+**Estado: propuesta; no se construye hasta que el usuario apruebe D31.** El plan anterior (código de un solo uso con
+tabla propia) queda descartado a favor de Supabase Auth con código por correo (D31 punto 1).
+
+- [x] **16.4** 📚 Aprobar D31 (el dominio remitente y el SMTP quedan pendientes: ver 16.7). _Verificar:_ el usuario
+  aprobó por escrito; D31 sin "propuesta".
+- [x] **16.5** 🧪 Migración: `customer_accounts` (vínculo `user_id` ↔ `customer_id` por negocio, único por negocio) con RLS,
+  y la RPC `claim_customer_link()` que vincula con un token vigente (no revocado ni vencido, de la mascota del cliente).
+  _Verificar:_ tests de token revocado, vencido, inexistente, de otro negocio y reutilizado por otra cuenta.
+- [x] **16.6** 🧪 Funciones de lectura con lista blanca: `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()`.
+  _Verificar:_ solo ve lo vinculado; sin teléfonos de otros ni notas internas; reglas de la fase 31 (dueño anterior,
+  titular y familia); un usuario del personal no obtiene nada por esta vía.
+- [ ] **16.7** ⏸ **PENDIENTE: no hay correo de salida todavía** (decisión del usuario, 2026-10-14). Configurar el envío
+  de correo (SMTP) y habilitar el acceso con código para cuentas de dueño. _Verificar:_ el código llega a un correo
+  personal y caduca; el login del personal sigue igual. Hasta entonces el código se prueba con la bandeja local
+  (Inbucket) y la cuenta no se abre a usuarios reales.
+- [x] **16.8** Pantalla `/mi-cuenta`: entrar con código, lista de mascotas, detalle (cartilla, historial, próximas citas) y
+  "Guardar en mi cuenta" en la vista pública. Sin vínculos, un mensaje claro. _Verificar:_ en navegador, 390 y 768 px.
+- [x] **16.9** Eliminar mi cuenta y desvincular desde el negocio. _Verificar:_ el expediente del negocio no cambia.
+- [x] **16.10** 🧪 Lectura de la **bitácora de hospitalización** por el dueño (cierra 33.5): salud y bitácora para la
+  familia, costo solo para el titular. _Verificar:_ tests de aislamiento y de visibilidad por periodo.
+- [x] **16.11** 📚 Cierre: actualizar `CLAUDE.md` (§1, §7.4) y marcar la fase. _Construido (2026-10-14):_ funciones de lectura
+  en SQL (`customer_account_overview/pet_detail`, solo `service_role`) llamadas por la Edge Function `customer-account`
+  (código por correo con `signInWithOtp`, plantilla `supabase/templates/access-code.html`); pruebas en
+  `customer-accounts.spec.ts` y `customer-account-function.spec.ts` (recorrido completo con la bandeja local). **16.7 sigue
+  pendiente** (correo de salida real).
+
+## Fase 34 — Mi clínica: perfil y promociones (propuesta; capa B de `PLAN.md` D31)
+
+**Meta: que el dueño de la mascota vea los datos de su clínica y sus promociones.** Requiere la 16B. Sin dependencia nueva.
+
+- [ ] **34.1** 📚 Aprobar el alcance: perfil con dirección, teléfono y horarios de cada sucursal (ya existen) y promociones
+  solo de texto y vigencia, visibles únicamente para clientes vinculados.
+- [ ] **34.2** 🧪 `promotions` (título, texto, vigencia, publicada) con RLS; las administra el dueño; función de lectura
+  `my_promotions()` con lista blanca. _Verificar:_ solo ve las vigentes de su negocio; nadie de otro negocio.
+- [ ] **34.3** Pantalla de promociones en Configuración (dueño) y bloque "Mi clínica" y promociones en `/mi-cuenta`.
+  _Verificar:_ en navegador.
+
+## Fase 35 — Avisos en el teléfono (propuesta; capa C de `PLAN.md` D31)
+
+**Meta: notificar sin pasar por WhatsApp.** Requiere la 16B y una librería de Web Push (spike y autorización antes, §3).
+
+- [ ] **35.1** 📚 Spike: PushForge o `@negrel/webpush` corriendo en una Edge Function local; decidir y fijar la versión.
+- [ ] **35.2** 🧪 `push_subscriptions` por dispositivo y por cuenta, con RLS; alta y baja desde `/mi-cuenta`.
+- [ ] **35.3** 🧪 Envío de "Hay novedades de <mascota>" **sin datos clínicos**, al registrarse una nota de bitácora y para
+  recordatorios de cita y vacuna (fase 22). _Verificar:_ el cuerpo no lleva contenido clínico; un dispositivo
+  revocado no recibe.
 
 ## Fase 17 — Estados de carga: skeletons y aviso de navegación
 
@@ -2560,3 +2624,418 @@ empresa (columna y bucket nuevos) y el permiso de escritura del catálogo de vac
   §6.2 y §6.4). **Qué se puede demostrar:** como dueño, subir la imagen de la empresa y verla en el menú; como
   veterinario, agregar una vacuna y ocultarla; buscar un cliente por el nombre de su mascota; y abrir el sistema en un
   celular: tarjetas en lugar de tablas y la agenda como lista del día.
+
+---
+
+# Paquete D30 — Observaciones del veterinario (fases 27 a 33)
+
+**Estado: propuesta (2026-10-14); ninguna fase se construye hasta que el usuario apruebe `PLAN.md` D30.** Etapa de
+mejoras (`CLAUDE.md` §1). Una fase a la vez, en este orden. La **16B** (cuenta del cliente y push) es requisito de la 33.
+Simbología: 📚 documentación, 🧪 con prueba obligatoria.
+
+### Oleadas (acordadas con el usuario, 2026-10-14)
+
+Se trabaja por oleadas, como en Correcciones 1: una rama por fase desde `develop`, una rama de integración por oleada
+(`integration/d30-waveN`) donde se prueba todo junto, sin push ni PR hasta pedirlo. **Máximo 4 ramas a la vez.** Las
+ramas se construyen una tras otra en el mismo repositorio (no hay agentes en paralelo). La numeración de fases no cambia;
+el orden de construcción sí.
+
+| Oleada | Ramas | Por qué no chocan |
+| ------ | ----- | ----------------- |
+| **0** (secuencial, corta) | Preparación: rangos de migración reservados, rutas y entradas de menú vacías, secciones de `seed.sql` | Quita de en medio los archivos compartidos |
+| **1** | **27** especies, razas y edad · **28** receta · **29B** proveedores · **16A** PWA | Tablas nuevas y pantallas distintas |
+| **2** | **29C** fraccionados · **31** familias y transferencia | Una toca inventario y ventas; la otra, clientes y mascotas |
+| **3** | **30** cobro de paso · **32** cirugías · **16B** cuenta del cliente y push | Con 29C integrada; 16B ya con la visibilidad de 31 |
+| **4** | **33** hospitalización, sola | Depende de 29C, 31, 32 y 16B |
+
+**Reglas para que no choquen:**
+1. Cada rama es **dueña de sus tablas**; una migración solo altera tablas de su fase. Si necesita otra, esa tarea pasa
+   a una oleada posterior.
+2. **Migraciones con rango de fecha reservado por rama** (se fija en la oleada 0), para que el orden sea el mismo sin
+   importar quién se integre primero.
+3. **`src/types/database.ts` no se versiona en las ramas:** se regenera una sola vez en la rama de integración.
+4. **`CLAUDE.md` y `PLAN.md` solo se tocan en el cierre de la oleada.** Cada rama marca solo las tareas de su sección
+   de `TASKS.md`; la tarea 📚 "actualizar `CLAUDE.md`" de cada fase se hace en el cierre.
+5. **`test:db` y el E2E se corren en la rama de integración**, no por rama (la base local acumula datos de los tests).
+6. **Dentro de una fase no se paraleliza:** migración → servicio → pantalla van en orden.
+7. `router/index.ts`, `AppLayout`, `SettingsPage`, `seed.sql` y `seed/demo_reset.sql` los prepara la oleada 0 **para las
+   oleadas 1 y 2**; las ramas solo llenan sus páginas y secciones. Cada oleada posterior abre con su propia
+   preparación corta (rutas y secciones que le toquen), en lugar de inventarlas hoy.
+8. **Rangos de migración reservados** (`AAAAMMDD` + hora; dentro del rango la rama elige libremente):
+
+   | Rama | Rango | Rama | Rango |
+   | ---- | ----- | ---- | ----- |
+   | 27 especies y razas | `20261020…` | 31 familias y transferencia | `20261024…` |
+   | 28 receta | `20261021…` | 30 cobro de paso | `20261025…` |
+   | 29B proveedores | `20261022…` | 32 cirugías | `20261026…` |
+   | 29C fraccionados | `20261023…` | 16B cuenta del cliente | `20261027…` |
+   | | | 33 hospitalización | `20261028…` |
+
+   Un rango es de **una** rama: si una migración necesita pasar a otro rango, es señal de que toca tablas de otra fase.
+
+**Avance de la oleada 1 (2026-10-14).** Construida en cuatro ramas desde `chore/d30-wave0` —`feat/d30-species-breeds`
+(27), `feat/d30-prescriptions` (28), `feat/d30-suppliers` (29B) y `feat/d30-pwa` (16A)— y probada junta en
+`integration/d30-wave1` (sin push ni PR). **Verificado en la rama combinada:** `vue-tsc -b` limpio, ESLint sin
+errores, 804 tests unitarios en verde, `db:reset` con todas las migraciones y la semilla, y `test:db` con las Edge
+Functions sirviéndose: 897 de 898 (falla solo `delete-customer-pet-rpc`, el que ya fallaba: cuenta el expediente de
+Rocky y crece con lo que dejan otros tests). Las cuatro ramas se fusionaron sin conflictos de texto (las secciones
+reservadas de la oleada 0 funcionaron). `database.ts` se regeneró una sola vez, aquí: el generador del CLI instalado
+(2.120) cambió su formato respecto al archivo anterior y se normalizó con Prettier sin comillas simples ni punto y coma
+para reducir el diff. **Verificado en navegador por fase** (ver cada una). **El E2E (agendar → atender → cobrar)
+pasa con las cuatro ramas.** **No verificado en conjunto:** tema oscuro, 390 y 768 px de las pantallas nuevas, ni nada en un
+teléfono real. **Decisión a confirmar:** `start_url` de la PWA en `/c` con el último link recordado (ver PLAN.md D30).
+
+**Qué se puede demostrar:** como dueño, abrir Especies y razas en Configuración, escribir "xolo" al registrar una
+mascota y calcular la fecha por edad; asignar proveedores a un producto; como veterinario, emitir e imprimir una receta
+con su cédula y, como dueño, ver en Inicio el medicamento escrito a mano; y abrir la vista pública en un teléfono,
+agregarla a inicio y verla sin red.
+
+**Preparación de la oleada 3 (2026-10-14).** Antes de las fases 30 y 32: rutas `/app/cobro-rapido` (dueño y recepción) y
+`/app/configuracion/cirugias` (dueño y veterinario), sus entradas de menú, páginas vacías y secciones reservadas en las
+semillas. **16B** (cuenta del cliente y notificaciones) queda fuera de esta preparación: pide un servicio de correo y
+una librería de cifrado para Web Push, y se justifica con el usuario antes (§3).
+
+**Avance de la oleada 2 (2026-10-14).** Construida en dos ramas desde `integration/d30-wave1` —`feat/d30-fractional`
+(29C) y `feat/d30-families` (31)— y probada junta en `integration/d30-wave2` (sin push ni PR). **Verificado en la
+rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 831 tests unitarios, `test:db` 934 de 934 (con las Edge
+Functions sirviéndose y la base recién reseteada) y el E2E (agendar → atender → cobrar). Las dos ramas se fusionaron
+sin conflictos de texto; `database.ts` se regeneró una sola vez, en la integración. **No verificado en conjunto:**
+tema oscuro, 390 y 768 px de las pantallas nuevas, el cobro de cita con productos por unidad desde la pantalla, ni un
+teléfono real. **Pendiente de la oleada 2:** nada de código; la cuenta del cliente (16B) es quien usa las reglas de
+visibilidad por periodo de la 31.
+
+**Qué se puede demostrar (oleada 2):** como dueño, en Inventario convertir un producto en "caja de 20 tabletas" y ver
+"60 tabletas · 3 cajas"; en el punto de venta vender 3 tabletas a $7.25 cada una; en la página de un cliente crear una
+familia ("Familia Ramírez – Michi, Rocky, Luna") y transferir una mascota a otro cliente con su lista de dueños.
+
+**Avance de la oleada 3 (2026-10-14).** Construida en dos ramas desde `chore/d30-wave3-prep` —`feat/d30-quick-sale` (30) y
+`feat/d30-surgeries` (32)— y probada junta en `integration/d30-wave3` (sin push ni PR). **16B no se construyó** (ver
+abajo). **Verificado en la rama combinada:** `vue-tsc -b` limpio, ESLint sin errores, 839 tests unitarios, `test:db`
+954 de 954 y el E2E. Las dos ramas chocaron en un solo `import` de `stores/cart.ts` (cada una agregó un tipo), resuelto
+conservando ambos; `database.ts` se regeneró una sola vez, en la integración. **No verificado en conjunto:** tema
+oscuro, 390 y 768 px de las pantallas nuevas, el cobro de una cita con cirugía desde la pantalla de cobro, ni un
+teléfono real.
+
+**Qué se puede demostrar (oleada 3):** en "Cobro rápido", cobrar un servicio con quién atendió y la especie sin dar de
+alta al cliente y ver el ticket; en Reportes, la tabla "Por especie"; en Configuración, el catálogo de cirugías; y en la
+atención de una consulta, aplicar "Esterilización de hembra", ajustar un renglón y cobrarla con sus honorarios.
+
+**Pendiente del paquete D30 (requiere decisión del usuario):** la **16B** (cuenta del cliente y notificaciones: servicio
+de correo y librería de Web Push, §3) y la **33** (hospitalización), que depende de ella para que el dueño lea la
+bitácora; o se construye la 33 con el personal como único lector y el dueño se suma después.
+
+## Fase 27 — Catálogos de especies y razas, y edad de la mascota (construida; integrada en la oleada 1)
+
+**Meta: que registrar una mascota no dependa de escribir bien "Xoloitzcuintle", y que "tiene 3 años" baste.**
+Decisiones en `PLAN.md` D30 (puntos 1 y 2). Sin dependencia nueva ni servicio externo.
+
+### 27A. Preparación
+- [x] **27.1** 📚 Aprobar D30 y confirmar la lista inicial de grandes grupos de especies. _Verificar:_ el usuario aprobó
+  por escrito. **Aprobada (2026-10-14).** Estructura grupo → especie → raza. Grupos: Perros, Gatos, Aves, Reptiles,
+  Roedores y conejos, y Otros; "perro" y "gato" son grupos con una especie cada uno (así el grupo sirve de dato genérico
+  de estadística). Solo Perro y Gato llevan razas. Cada raza lleva nombre oficial y **variantes de búsqueda** opcionales
+  ("xolo", "teckel", "dachshund"). `dog` pasa a Perro, `cat` a Gato y `other` queda sin especie con su texto intacto.
+- [x] **27.2** 📚 Inventariar dónde se usa hoy `pet_species` y `breed` (formularios, búsqueda, vista pública, cartilla,
+  vacunas por especie, importador). _Verificar:_ la lista queda anotada aquí.
+  **Hecho:** `pet_species` y `breed` se leen en `PetEditDialog`, `PetFormDialog`, `CustomerWithPetDialog` (los tres se
+  cambiaron), `PetDetailDialog`, `AppointmentDialog`, `WalkInDialog`, `VaccinationDialog`, `CustomersPage`/`CustomerPage`,
+  `PublicPetPage`, `lib/petSearch.ts`, `lib/customerPets.ts` y `services/vaccines.ts`. Ninguno cambia: el enum y el texto
+  se conservan y el formulario los mantiene al elegir del catálogo.
+
+### 27B. Base de datos
+- [x] **27.3** 🧪 Migración aditiva: `species_groups`, `species` y `breeds` con RLS, `tenant_id`, borrado suave, sin
+  DELETE, y escritura de dueño y veterinario (patrón de `vaccines`, D29). _Verificar:_ test de aislamiento; recepción y
+  groomer leen y no escriben; otro negocio no ve nada.
+  **Hecho:** `20261020120000_species_breeds_catalog.sql`; 14 tests en `species-breeds-rls.spec.ts`. Una raza solo
+  combina con su especie (llave compuesta + `check`), y el nombre no se repite por negocio.
+- [x] **27.4** 🧪 `pets.species_id`, `pets.breed_id` (nulos) y `pets.birth_date_is_estimated`. El enum y el texto
+  anteriores se conservan. _Verificar:_ las mascotas existentes siguen funcionando sin tocarlas.
+  **Hecho** (misma migración): columnas nulas con llave compuesta que impide mezclar una raza con otra especie;
+  `birth_date_is_estimated` por defecto `false`. Los perros y gatos existentes se enlazan a su especie; el texto de la
+  raza no se toca. Las mascotas `other` quedan sin especie de catálogo. `create_customer_with_pet()` se reemplazó
+  (`drop` + `create`, tres parámetros nuevos con valor por defecto) y tiene 3 tests nuevos.
+- [x] **27.5** 🧪 Catálogo base sembrado por negocio (nuevo y existentes), con razas en español y su ortografía, y en
+  `seed.sql`. _Verificar:_ un negocio creado después ya lo trae; `demo:reset` lo restaura.
+  **Hecho:** `app.seed_species_catalog()` (idempotente) la llaman un trigger sobre `tenants` y la propia migración; no
+  se tocó `platform_create_tenant`. 6 grupos, 31 especies y 38 razas por negocio, con variantes de búsqueda. `seed.sql`
+  enlaza las mascotas de la semilla. `demo_reset.sql` vuelve a mostrar lo que se ocultó en una demo; **no** quita lo
+  que se agregó (sin una marca `is_base` no se distingue de lo base).
+
+### 27C. Reglas y servicios
+- [x] **27.6** 🧪 `lib/petAge.ts`: años y meses → fecha aproximada, y fecha → edad escrita ("3 años 2 meses"), con
+  bordes (cumpleaños hoy, 29 de febrero, 0 meses, mes de 31 días). _Verificar:_ tests unitarios con su explicación.
+- [x] **27.7** 🧪 `services/species.ts` y `services/breeds.ts` (listar, crear, editar, ocultar). Reglas de duplicados sin
+  acentos, ñ aparte. _Verificar:_ test de servicio.
+  **Hecho:** más `stores/speciesCatalog.ts` (carga una vez por negocio) y `lib/speciesCatalog.ts` (duplicados y
+  búsqueda por variante). 21 tests unitarios (`petAge`, `speciesCatalog`), 4 del store y 2 de servicio con sesión real.
+
+### 27D. Interfaz
+- [x] **27.8** Formulario de mascota: especie y raza de catálogo (con "Otra" abierta para no bloquear), edad por
+  años/meses que propone una fecha editable y marcada como estimada. _Verificar:_ en navegador, claro y oscuro, 390 y 768 px.
+  **Hecho:** `components/PetSpeciesFields.vue`, compartido por `CustomerWithPetDialog`, `PetFormDialog` y
+  `PetEditDialog`. **Verificado en navegador** (Chromium, dueño, tema claro, 1280 px): al escribir "xolo" el selector
+  deja solo Xoloitzcuintle; "No sé la fecha" con 3 años propone 2023-10-14, marcada como aproximada; el alta guarda
+  especie, raza, fecha y la marca (`pets`: Perro / Xoloitzcuintle / t). **No verificado:** tema oscuro, 390 y 768 px,
+  y la edición de una mascota existente desde la pantalla.
+- [x] **27.9** Pantalla "Especies y razas" en Configuración (dueño y veterinario). _Verificar:_ en navegador.
+  **Hecho:** `SpeciesSettingsPage` con `SpeciesFormDialog`, `BreedsDialog` y `SpeciesGroupsDialog`. **Verificado en
+  navegador** (dueño): la lista carga las 31 especies y el ícono de razas solo aparece en Perro y Gato. **No verificado:**
+  agregar, editar y ocultar desde la pantalla (solo por servicio), el veterinario y el groomer en la ruta.
+- [x] **27.10** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§1, §4, §6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** `lint`, `vue-tsc`, 804 tests unitarios y `test:db` (897 de
+  898; falla solo `delete-customer-pet-rpc`, el de siempre) pasan con las cuatro ramas juntas. `CLAUDE.md` actualizado.
+
+## Fase 28 — Receta médica imprimible (construida; integrada en la oleada 1)
+
+**Meta: imprimir una receta con cédula, firma y medicamentos desde la consulta.** Decisiones: D30 punto 3.
+
+### 28A. Preparación
+- [x] **28.1** 📚 Confirmar con el usuario el formato y dónde va la cédula. _Verificar:_ aprobado por escrito.
+  **Aprobada (2026-10-14).** Hoja carta vertical: encabezado (imagen y nombre de la empresa, sucursal con dirección y
+  teléfono), folio consecutivo por negocio y fecha, veterinario con cédula, paciente (nombre, especie, raza, sexo, edad y
+  último peso), propietario (nombre y teléfono), diagnóstico opcional, tabla de medicamentos (medicamento, dosis,
+  frecuencia, duración), indicaciones adicionales, próxima visita y línea de firma con nombre y cédula. Sin precios.
+  La cédula va en `employee_details` y la receta guarda una copia al emitirse.
+
+### 28B. Base de datos
+- [x] **28.2** 🧪 Cédula profesional en el alta del veterinario y del dueño que ejerce (columna aditiva, validada en
+  `lib/validation.ts`). _Verificar:_ test; solo quien tiene permiso de empleados la edita.
+  **Hecho:** `employee_details.professional_license` (migración `20261021120000_prescriptions.sql`), campo "Cédula
+  profesional" en el formulario de empleado (solo veterinario y dueño; 7 u 8 dígitos, `isValidProfessionalLicense`) y
+  cédulas ficticias en la semilla. La cédula no viaja en la RPC de alta de empleado (su firma no cambia): se guarda
+  en la ficha que la RPC crea.
+- [x] **28.3** 🧪 `prescriptions` y `prescription_items` (producto de catálogo o texto libre, dosis, frecuencia,
+  duración) ligadas a la consulta; es **expediente**: sin borrado y con bitácora. Emitirla solo la hace veterinario o
+  dueño **con cédula**; la RPC lo revalida. _Verificar:_ test de RLS (recepción y groomer no la crean; groomer no la
+  lee) y de que sin cédula se rechaza.
+  **Hecho:** `prescriptions` y `prescription_items` (expediente: sin DELETE, con bitácora, solo lectura para dueño y
+  veterinario) y la RPC `save_prescription()`: dueño o el veterinario de la cita, con cédula; copia nombre y cédula;
+  folio consecutivo por negocio; reemplaza renglones (los anteriores quedan ocultos). 16 tests en
+  `prescriptions-rpc.spec.ts`.
+- [x] **28.4** 🧪 Aviso al dueño del negocio de medicamentos de texto libre sin registrar, con acceso directo a
+  crear el producto. _Verificar:_ test; solo lo ve el dueño.
+  **Hecho:** `list_unregistered_medications()` y `resolve_unregistered_medication()` (solo dueño; agrupa sin acentos ni
+  mayúsculas) y la tarjeta "Medicamentos por registrar" en Inicio (`UnregisteredMedicationsCard`), que liga a un
+  producto existente o descarta. Para un producto nuevo se registra antes en Inventario (no se tocó el formulario de
+  producto, que es de la rama 29B).
+
+### 28C. Interfaz
+- [x] **28.5** Editor de receta en la atención de la consulta y vista de impresión (`@media print`, sin dependencia).
+  Encabezado: empresa y sucursal, veterinario y cédula, fecha, mascota y dueño; cuerpo: tabla de medicamentos; pie:
+  espacio de firma. _Verificar:_ imprimir a PDF desde el navegador y revisar una hoja carta.
+  **Hecho:** `PrescriptionPanel` en la atención de la consulta y `PrescriptionPrintPage` (`/app/citas/:id/receta`,
+  carta vertical con `@media print`). **Verificado en navegador** (Chromium): el veterinario emite con un medicamento
+  de texto libre, la hoja muestra empresa, sucursal, folio, cédula, paciente, propietario y tabla; el dueño ve el aviso
+  en Inicio. **No verificado:** impresión real a PDF, más de una hoja, tema oscuro y celular.
+  **Pendiente al integrar con la fase 27:** la hoja muestra la fecha de nacimiento; con `lib/petAge` debe mostrar la
+  edad ("3 años 2 meses", con "aprox." si es estimada).
+- [x] **28.6** 📚 Correr `lint`, `test:unit` y `test:db`; actualizar `CLAUDE.md` (§6.4, §6.7) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 1):** ver 27.10. Con la fase 27 integrada, la hoja de la receta
+  ya muestra la **edad** de la mascota ("aprox." si es estimada) en lugar de la fecha de nacimiento.
+
+## Fase 29 — Proveedores y medicamentos fraccionados (construida; 29B en la oleada 1 y 29C en la 2)
+
+**Meta: saber a quién se le compra cada insumo y poder vender un blíster recortado sin descuadrar el inventario.**
+Decisiones: D30 puntos 4 y 5.
+
+### 29A. Preparación
+- [x] **29.1** 📚 Revisar el modelo de existencias (`stock_movements`, `product_stock`), el POS, el consumo en consulta
+  y la `ClaveUnidad` del CFDI (`lib/cfdi.ts`) para fijar cómo se declara una unidad suelta. _Verificar:_ decisión anotada.
+
+  **Decidido (2026-10-14):** la existencia se guarda en la **unidad base** (tableta, ml), siempre entera;
+  `products.units_per_package` dice cuántas hay por envase y con 1 el producto no se fracciona (todo como antes, sin
+  tocar existencias). Se vende o se consume por **envase** (por defecto) o por **unidad**. El envase abierto **se deriva**
+  (`existencia mod unidades por envase`), no es otra tabla. La `ClaveUnidad` de la unidad suelta es
+  `products.unit_sat_code` y se copia a la partida (`sale_items.sat_unit_code_snapshot`); la Edge Function `invoicing`
+  la usa en lugar de la del producto. Cambiar la presentación reescala la existencia con un ajuste por sucursal y se
+  rechaza si no da enteros. `report_top_items` ya no mezcla envases con unidades.
+### 29B. Proveedores
+- [x] **29.2** 🧪 `suppliers` y `product_suppliers` (varios por producto) con RLS bajo el permiso `inventory`, borrado
+  suave y sin DELETE. _Verificar:_ test de aislamiento y de permisos por rol.
+  **Hecho:** `20261022120000_suppliers.sql`: `suppliers` (nombre, tipo, contacto, teléfono, correo, notas,
+  `is_active`) y `product_suppliers` (varios por producto), con llaves compuestas, RLS bajo `inventory` y sin DELETE.
+  Agrega el índice único `products(tenant_id, id)` (solo índice, para la llave compuesta). 8 tests en
+  `suppliers-rls.spec.ts`. **Para la oleada 2 (29C):** ese índice ya existe; no hay que crearlo otra vez.
+- [x] **29.3** Pantalla de Proveedores (catálogo) y selector en el producto. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `SuppliersPage` (`/app/proveedores`, ruta y menú de la oleada 0), `SupplierFormDialog`, `stores/suppliers.ts`
+  y selector múltiple de proveedores en `ProductFormDialog` (`inventory.saveProduct` recibe `supplierIds`; si fallan solo
+  los proveedores, el producto ya queda guardado y se avisa). **Verificado en navegador** (Chromium, dueño): lista de 3,
+  teléfono corto marca error, alta, y el alimento muestra sus 2 proveedores de la semilla. **No verificado:** guardar
+  desde el selector, el veterinario (solo lectura) y celular. Semilla y `demo_reset` con 3 proveedores y 4 vínculos
+  (ids `31000000-…`); 2 tests en `demo-reset.spec.ts`.
+
+### 29C. Fraccionados
+- [x] **29.4** 🧪 Presentación del producto: unidad base, unidades por envase y nombre de la unidad. La existencia se
+  guarda en unidad base (entera). Migración aditiva: los productos actuales quedan con factor 1. _Verificar:_ test de
+  que nada cambia en los productos existentes.
+  **Hecho:** `20261023120000_fractional_products.sql`: columnas de presentación en `products`, `sold_unit` y
+  snapshots en `sale_items` y `appointment_products`, y `set_product_presentation()` (reescala la existencia).
+  Los productos existentes quedan con factor 1: ninguna existencia cambia.
+- [x] **29.5** 🧪 `lib/fractionalPricing.ts`: precio de la unidad = precio del envase ÷ unidades, redondeo al centavo y
+  límites (precio 0, 1 unidad, centavos sobrantes). _Verificar:_ tests de redondeo.
+  **Hecho:** `lib/fractional.ts` (precio de la unidad, unidades base, existencia por envases y sueltas, envase abierto y
+  validación); 15 tests, con el borde del redondeo ($100.00 entre 3 = $33.33).
+- [x] **29.6** 🧪 Venta y consumo por unidad o por envase (por defecto, envase) con el precio de la unidad modificable en
+  el producto y en la venta; el snapshot conserva la unidad. _Verificar:_ test de que vender 3 tabletas descuenta 3 y no
+  1 caja, y de que cancelar la venta las devuelve.
+  **Hecho:** `app.add_product_items()` y `add_appointment_product()` (nuevo parámetro `p_unit`) aceptan `unit` y
+  `unit_price_cents`; el insumo cobrable llega al ticket con su unidad por un trigger sobre `sale_items`. 17 tests en
+  `fractional-products-rpc.spec.ts` (3 tabletas bajan 3 y no 1 caja, envase + sueltas cuadran, el precio corregido,
+  cancelar devuelve las unidades, consumo y reporte). Cart: partidas por producto + unidad y existencia en unidades
+  base (7 tests nuevos).
+- [x] **29.7** 🧪 Envase **abierto**: marca de abierto y cantidad usada. _Verificar:_ test de que el consumo del envase
+  abierto no descuenta uno nuevo hasta agotarlo.
+  **Hecho (derivado, sin tabla):** el envase abierto sale de la existencia; se muestra en Inventario ("Caja abierta:
+  quedan 3 de 20"). 3 tests en `fractional.spec.ts`.
+- [x] **29.8** Interfaz: presentación en Inventario, selector unidad/producto en el POS y el cobro. _Verificar:_ en
+  navegador.
+  **Hecho:** presentación en el formulario de producto, entrada de compra/ajuste en envases o unidades
+  (`StockMovementDialog`), selector envase/unidad en el punto de venta (con el precio de la unidad corregible), en el
+  cobro de cita y en los productos usados en consulta. **Verificado en navegador** (Chromium, dueño): 3 cajas se
+  convierten en "60 tabletas · 3 cajas"; en el punto de venta, 3 tabletas cuestan $7.25 × 3 = $21.75. **No verificado:**
+  cobro completo desde la pantalla, el cobro de cita y los insumos en consulta (solo por pruebas de base), tema oscuro
+  y celular. **Sin semilla:** no se agregó un producto fraccionado a la demo (habría que tocar `demo_reset` y varias
+  pruebas); para mostrarlo se edita un producto desde Inventario.
+- [x] **29.9** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§6.5, §3 si cambia algo) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2):** ver el avance de la oleada 2. Sin dependencias nuevas (§3).
+
+## Fase 30 — Cobro de paso (construida; integrada en la oleada 3)
+
+**Meta: cobrar un servicio sin cita y sin registrar al cliente.** Decisiones: D30 punto 6.
+
+- [x] **30.1** 📚 Inventariar `checkout_counter_sale`, `create_walk_in_appointment` y el POS para ubicar dónde entra.
+  _Verificar:_ anotado.
+  **Decidido (2026-10-14):** `checkout_counter_sale` solo vende productos y `create_walk_in_appointment` exige cliente y
+  mascota, así que el cobro rápido es una RPC nueva (`checkout_quick_sale`) con su propia pantalla; reutiliza
+  `app.add_product_items` y `app.finalize_sale` (misma existencia, mismo cierre de pagos y misma regla de cambio).
+- [x] **30.2** 🧪 RPC que cobra servicios y productos sin cita ni cliente, con quién atendió y el grupo de especie
+  (`sales.species_group_id`, nulo en ventas anteriores). _Verificar:_ test de permisos, de IVA por partida y de que
+  entra a caja y a reportes.
+  **Hecho:** `20261025120000_quick_sale.sql`: `sales.attended_by_user_id` y `sales.species_group_id` (nulos) y
+  `checkout_quick_sale()` (dueño y recepción; servicios del catálogo con su IVA por partida, productos por envase o
+  unidad). 8 tests en `quick-sale-rpc.spec.ts` (sin cita ni cliente, servicio + producto en un ticket, roles, otro
+  negocio, pago insuficiente sin dejar nada).
+- [x] **30.3** 🧪 `report_*`: dato de grupo de especie en el resumen. _Verificar:_ test.
+  **Hecho:** `report_staff_activity` atribuye el servicio de un cobro rápido a quien atendió (si no, a quien cobró) y
+  `report_sales_by_species_group()` agrupa por especie (lo demás va en "Sin dato"); Reportes lo muestra en "Por
+  especie". Además, "Lo más vendido" ya no mezcla envases con unidades (`sold_unit` en la llave de la fila).
+- [x] **30.4** Interfaz: acción "Cobro rápido" con servicios y productos, ticket imprimible desde el navegador.
+  _Verificar:_ en navegador; un cobro de paso aparece en Caja y en Reportes.
+  **Hecho:** `/app/cobro-rapido` (`QuickSalePage`, entrada "Cobro rápido" del menú para dueño y recepción): servicio
+  y/o producto, quién atendió, especie, descuento, pagos y el ticket imprimible. **Verificado en navegador** (Chromium,
+  dueño): servicio + quién atendió + Gatos, cobro en efectivo y ticket; la venta queda `paid`, sin cliente, con su
+  atendió y su grupo. **No verificado:** el producto fraccionado desde esta pantalla, el veterinario/recepción en la
+  ruta, tema oscuro y celular. **No ofrece factura** (sin cliente no hay a quién); para facturar se usa el punto de
+  venta, que sí captura al cliente.
+- [x] **30.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§1, §6.5) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 3).**
+
+## Fase 31 — Familias y transferencia de mascota (construida; integrada en la oleada 2)
+
+**Meta: varios dueños de una misma mascota dentro de una familia, y poder cambiar de dueño sin perder el historial.**
+Decisiones: D30 puntos 7 y 8.
+
+- [x] **31.1** 📚 Confirmar el efecto en citas, ventas, links, cartilla y la vista pública, y qué ve cada rol.
+  **Decidido (2026-10-14):** la familia es un hogar con **un titular** (el único que ve montos) y miembros de acceso
+  básico; un cliente pertenece a **una sola** familia. La mascota sigue teniendo un dueño (`pets.customer_id`) y la
+  familia accede a las mascotas de todos sus miembros. La **visibilidad por periodo** se resuelve en SQL
+  (`app.customer_can_view_pet()` y `..._money()`), pero **hoy nadie las consulta**: la cuenta del cliente es la 16B y
+  el link con token es por mascota y se revoca al transferir. Los links `customer` no los usa la vista pública.
+- [x] **31.2** 🧪 `families` y `family_members` (un cliente en una sola familia, un titular). _Verificar:_ test de
+  aislamiento y de que un cliente no entra a dos familias.
+  **Hecho:** `20261024120000_families_and_pet_transfer.sql`: `families` y `family_members` (un titular por familia, un
+  cliente en una sola; llaves compuestas), solo se escriben con `save_family()` / `delete_family()`. Agrega el índice
+  único `customers(tenant_id, id)`. 7 tests en `families-and-transfer.spec.ts`.
+- [x] **31.3** 🧪 `pet_ownerships` (historial de titulares con fecha de inicio y fin). _Verificar:_ test.
+  **Hecho:** `pet_ownerships` (periodos, un dueño actual por mascota, sin política de DELETE), alimentada por un trigger sobre
+  `pets` al crear y al cambiar `customer_id`; las mascotas existentes quedan con su dueño desde `created_at`.
+- [x] **31.4** 🧪 RPC `transfer_pet()` (`SECURITY DEFINER`, revalida membresía): pasa las citas programadas, deja las
+  ventas, revoca los links y cierra el periodo anterior. _Verificar:_ test de cada efecto y de que otro negocio no puede.
+  **Hecho:** `transfer_pet()` (`SECURITY DEFINER`, solo dueño y recepción): pasa las citas `scheduled`, deja las ventas
+  y las citas atendidas, revoca los links `pet`. 6 tests (incluye los rechazos y que un UPDATE directo también deja
+  historial).
+- [x] **31.5** 🧪 Visibilidad por periodo: el dueño anterior solo ve lo ocurrido mientras lo fue; el nuevo ve todo sin
+  montos; el no titular no ve montos. _Verificar:_ tests de aislamiento propios (el riesgo mayor del paquete).
+  **Hecho:** `app.customer_can_view_pet()` y `app.customer_can_view_pet_money()` (solo `service_role`). 5 tests: el dueño
+  anterior ve solo su periodo, el nuevo ve todo el historial pero solo sus montos, la familia ve la mascota y solo el
+  titular ve montos, un ajeno no ve nada, y un usuario autenticado no puede llamarlas.
+- [x] **31.6** Interfaz: familia en la página del cliente, "Transferir mascota" y la etiqueta "Familia X – Nube, Toby".
+  _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `FamilyCard` ("Familia Ramírez – Michi, Rocky, Luna" con miembros y titular), `FamilyFormDialog`,
+  `TransferPetDialog` y la lista de dueños con sus periodos en la página del cliente. **Verificado en navegador**
+  (Chromium, dueño): crear familia con otro cliente, la etiqueta con las mascotas de los miembros y transferir una
+  mascota a otro cliente. **No verificado:** disolver y editar desde la pantalla, tema oscuro, 390 y 768 px.
+- [x] **31.7** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.2) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 2).**
+
+## Fase 32 — Catálogo de cirugías y costos (construida; integrada en la oleada 3)
+
+**Meta: cobrar una cirugía con sus consumibles, medicamentos y honorarios, partiendo de un paquete.** D30 punto 9.
+
+- [x] **32.1** 📚 Inventariar `services`, `appointment_services` y `appointment_products` para decidir qué se reutiliza.
+  **Decidido (2026-10-14):** `appointment_products` lleva los renglones con producto (existencia y cobro ya
+  resueltos); `appointment_services` NO se reutiliza (exige `service_id` y lo leen la agenda, el cobro y los reportes).
+  Los honorarios y consumibles sin producto van en una tabla propia `appointment_surgery_lines`, que
+  `checkout_appointment()` copia a `sale_items` con sus claves del SAT (`sat_product_code_snapshot`); la Edge Function
+  `invoicing` usa esas claves cuando la partida no es de un servicio ni de un producto.
+- [x] **32.2** 🧪 `surgery_packages` y `surgery_package_items` (consumible, honorario o medicamento; producto ligado u
+  opcional) con RLS y borrado suave. _Verificar:_ test de aislamiento y permisos.
+  **Hecho:** `20261026120000_surgeries.sql`: `surgery_packages`, `surgery_package_items` y
+  `appointment_surgery_lines`; el catálogo solo se escribe con `save_surgery_package()` (dueño y veterinario, nombre
+  único con mensaje claro) y lo leen dueño, recepción y veterinario. 5 tests de paquetes.
+- [x] **32.3** 🧪 Aplicar un paquete a una cita veterinaria con snapshot de precios, ajustable renglón por renglón, o
+  armar uno desde cero. Consumibles y medicamentos descuentan inventario; honorarios no. _Verificar:_ test de
+  inventario, de IVA por partida y de que cambiar el catálogo no altera una cita ya cobrada.
+  **Hecho:** `apply_surgery_lines()` (mismas reglas que los insumos: dueño o veterinario, cita veterinaria no cobrada)
+  y `remove_surgery_line()`. Un renglón con producto baja existencia por `add_appointment_product` (por envase o por
+  unidad, con el **precio y el IVA del paquete**); los demás se cobran directo en `checkout_appointment()`. Uso interno
+  no llega al ticket. 6 tests: baja y devolución, ticket con honorario y consumible, sin existencia no queda nada y
+  las negativas.
+- [x] **32.4** Interfaz: catálogo en Configuración (dueño y veterinario) y selector en la atención. _Verificar:_ en
+  navegador.
+  **Hecho:** `/app/configuracion/cirugias` (catálogo con editor de renglones y totales), `SurgeryPanel` en la atención de
+  la consulta (elegir paquete, ajustar renglón por renglón, armar desde cero, quitar) y los honorarios en el resumen de
+  cobro. **Verificado en navegador** (Chromium, veterinario): el catálogo de la semilla muestra $2,750.00 y
+  $1,050.00, y aplicar "Esterilización de hembra" a una cita deja sus 3 renglones y el total. **No verificado:** cobrar
+  esa cita desde la pantalla de cobro (solo por pruebas de base), tema oscuro y celular.
+- [x] **32.5** 📚 `lint`, `test:unit`, `test:db`; `CLAUDE.md` (§6.3, §6.5) y marcar la fase.
+  **Hecho (2026-10-14, en la integración de la oleada 3).**
+
+## Fase 33 — Hospitalización con bitácora y aviso al dueño (construida sin la 16B; la lectura del dueño queda pendiente)
+
+**Meta: controlar la estancia de un paciente, cobrarla y mantener al dueño al tanto dentro del sistema.** D30
+puntos 10 y 11. **Depende de la 16B** (cuenta del cliente y notificaciones push).
+
+- [x] **33.1** 📚 Confirmar el orden con la 16B y qué se entrega si ésta se retrasa (ver riesgos de D30).
+  **Decidido (2026-10-14, con el usuario):** se construye **sin** la 16B, con el personal como único lector. La
+  lectura del dueño de la mascota y la notificación (33.5) quedan para cuando exista la cuenta del cliente.
+- [x] **33.2** 🧪 `hospital_spaces` (por sucursal) y configuración del negocio: día natural o 24 horas, tarifa única o
+  por tipo de espacio. _Verificar:_ test.
+  **Hecho:** `20261028120000_hospitalization.sql`: `hospital_settings` (regla de días y tarifas por defecto) y
+  `hospital_spaces` por sucursal (varias mascotas por espacio; tarifa propia opcional). Los administra el dueño. 3 tests.
+- [x] **33.3** 🧪 `hospital_stays` (ingreso, alta, espacio, tarifa por día o por estancia con snapshot). Varias mascotas
+  por espacio. _Verificar:_ test de cálculo de días en ambas reglas, con zona horaria de sucursal (§8.3).
+  **Hecho:** `hospital_stays` con copia de tarifa y regla de días, una abierta por mascota, `app.hospital_stay_days()`
+  (mismo cálculo que `lib/hospitalization.ts`, con tests espejo) y `admit_pet()` / `discharge_pet()`. Tests de ambas
+  reglas, de la zona de la sucursal y de los bordes de 24 horas.
+- [x] **33.4** 🧪 `hospital_notes` (hora, lo realizado, temperatura, peso, frecuencia cardiaca, mucosas, ánimo,
+  micción/defecación, todo opcional, y texto libre) y medicamentos administrados con inventario y cobro. Es expediente:
+  sin borrado, con bitácora. _Verificar:_ test de roles (veterinario, dueño y recepción escriben; groomer no).
+  **Hecho:** `hospital_notes` (expediente: sin UPDATE ni borrado, una nota vacía no existe) y
+  `hospital_medications` con inventario (`administer_hospital_medication`, por envase o unidad) y cobro
+  (`bill_hospital_stay`). 15 tests de la RPC: roles (el groomer nada), existencia, devolución y cobro.
+- [ ] **33.5** 🧪 **PENDIENTE (requiere 16B).** Lectura del dueño de la mascota por la 16B: salud, bitácora y costo para el titular; sin costo para
+  miembros no titulares; notificación "Hay novedades de <mascota>" sin datos clínicos. _Verificar:_ tests de
+  aislamiento y de que la notificación no lleva contenido clínico.
+- [x] **33.6** 🧪 Aviso al abrir el cobro de una mascota con estancia abierta. _Verificar:_ test.
+  **Hecho (sin pantalla de rol sin permiso):** `CheckoutPage` consulta la estancia abierta de la mascota de la cita y
+  muestra un aviso que no bloquea el cobro. La consulta respeta RLS; un rol sin permiso simplemente no ve el aviso.
+- [x] **33.7** Interfaz: tablero de espacios, ficha de estancia con bitácora, formulario de nota y cobro de la
+  estancia. _Verificar:_ en navegador, 390 y 768 px.
+  **Hecho:** `/app/hospitalizacion` (tablero con días y costo en curso, y "Por cobrar"), la ficha de la estancia
+  (bitácora con biometrías, medicamentos, alta y cobro) y `/app/configuracion/hospitalizacion` (dueño). **Verificado en
+  navegador** (Chromium, dueño): ingresar a Rocky, una nota con temperatura, peso, pulso y ánimo, administrar un
+  medicamento, dar de alta y cobrar. **No verificado:** 390 y 768 px, tema oscuro, el veterinario y la recepción en las
+  pantallas, y el aviso al cobrar desde la pantalla.
+- [x] **33.8** 📚 `lint`, `test:unit`, `test:db`, E2E; `CLAUDE.md` (§6 y §7) y marcar la fase.
+  **Hecho (2026-10-14):** `lint`, `vue-tsc`, 849 tests unitarios y `test:db` pasan; `CLAUDE.md` actualizado (§1, §4, §6.4).

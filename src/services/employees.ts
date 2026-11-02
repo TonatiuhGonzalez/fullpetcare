@@ -37,6 +37,8 @@ export interface Employee {
   curp: string | null
   rfc: string | null
   voterIdNumber: string | null
+  /** Cédula profesional (la que lleva la receta); nulo si no se ha capturado. */
+  professionalLicense: string | null
 }
 
 interface EmployeeRow {
@@ -51,6 +53,7 @@ interface EmployeeRow {
     curp: string | null
     rfc: string | null
     voter_id_number: string | null
+    professional_license: string | null
   } | null
 }
 
@@ -66,6 +69,7 @@ function mapRow(row: EmployeeRow): Employee {
     curp: row.employee_details?.curp ?? null,
     rfc: row.employee_details?.rfc ?? null,
     voterIdNumber: row.employee_details?.voter_id_number ?? null,
+    professionalLicense: row.employee_details?.professional_license ?? null,
   }
 }
 
@@ -76,7 +80,7 @@ const SELECT_COLUMNS = `
   is_active,
   profiles ( full_name ),
   membership_branches ( branch_id ),
-  employee_details ( birth_date, curp, rfc, voter_id_number )
+  employee_details ( birth_date, curp, rfc, voter_id_number, professional_license )
 `
 
 /**
@@ -115,6 +119,7 @@ export interface NewEmployeeInput {
   curp: string | null
   rfc: string | null
   voterIdNumber: string | null
+  professionalLicense?: string | null
 }
 
 /**
@@ -207,6 +212,16 @@ export async function inviteAndCreate(input: NewEmployeeInput): Promise<{ member
   )
 
   if (rpcError) throw new Error(friendlyRpcMessage(rpcError))
+
+  // La cédula no viaja en la RPC de alta (su firma no cambia en esta fase): se guarda en la
+  // ficha que la RPC acaba de crear.
+  if (input.professionalLicense) {
+    const { error: licenseError } = await supabase
+      .from('employee_details')
+      .update({ professional_license: input.professionalLicense })
+      .eq('membership_id', membership.id)
+    if (licenseError) throw licenseError
+  }
   return { membershipId: membership.id }
 }
 
@@ -302,6 +317,7 @@ export interface EmployeeUpdateInput {
   curp: string | null
   rfc: string | null
   voterIdNumber: string | null
+  professionalLicense?: string | null
 }
 
 /**
@@ -407,6 +423,7 @@ export async function update(
       curp: input.curp,
       rfc: input.rfc,
       voter_id_number: input.voterIdNumber,
+      professional_license: input.professionalLicense ?? null,
     },
     { onConflict: 'membership_id' },
   )

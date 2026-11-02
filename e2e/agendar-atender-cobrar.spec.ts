@@ -10,6 +10,9 @@
 //
 // 1. Login — si esto falla, nada de lo demás importa: es la puerta de
 //    entrada a toda la app.
+// 1b. Entrada de compra de un producto — la semilla no trae existencias y el cobro
+//    paso 7 vende ese producto en el punto de venta (tarea 11.21; el paso de
+//    facturar en el sandbox del PAC falta, ver TASKS.md).
 // 2. Agendar una cita de estética — prueba el formulario completo de
 //    NewAppointmentDialog.vue (fase 3, rediseñado a un solo dialog) y la
 //    función create_appointment().
@@ -80,6 +83,23 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
     await page.locator('.v-list-item').first().click()
     await page.waitForURL(/\/app\//)
   }
+
+  // 1b. Dar entrada a un producto (tarea 11.21, #2048). La semilla deja TODAS las existencias
+  // en 0 a propósito (21 tests de inventario lo asumen; las existencias de demo viven en
+  // demo_reset.sql), y el mostrador solo ofrece productos con existencia. Sin esta entrada, el
+  // paso 7 no tendría nada que vender. Es además el único recorrido de punta a punta de la
+  // "entrada de compra": si StockMovementDialog o la RPC que mueve existencias se rompen,
+  // este paso falla antes de llegar a la venta.
+  await page.goto('/app/inventario')
+  // getByRole y no getByLabel: el ícono "Borrar" del campo también lleva ese texto en su aria-label.
+  await page.getByRole('textbox', { name: 'Buscar por nombre o clave' }).fill('Shampoo')
+  await page.getByRole('button', { name: /Acciones de Shampoo hipoalergénico/ }).click()
+  // Las opciones del v-menu son v-list-item (listitem), no role="menuitem".
+  await page.locator('.v-list-item', { hasText: 'Entrada de compra' }).click()
+  const stockDialog = page.getByRole('dialog')
+  await stockDialog.getByLabel(/Cantidad/).fill('3')
+  await stockDialog.getByRole('button', { name: 'Registrar' }).click()
+  await expect(stockDialog).toBeHidden()
 
   // 2. Agendar una cita de estética para Rocky — todo en un solo dialog,
   // sin pasos intermedios (NewAppointmentDialog.vue).
@@ -193,6 +213,7 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   // resolver "button:has(.mdi-plus)" al del encabezado, que además queda
   // bloqueado por el scrim del diálogo.
   const checkoutDialog = page.getByRole('dialog')
+
   await checkoutDialog.locator('button', { hasText: 'Todo' }).first().click()
   await checkoutDialog.locator('button:has(.mdi-plus)').click()
   await checkoutDialog.locator('button', { hasText: /Cobrar \$/ }).click()
@@ -218,4 +239,25 @@ test('agendar → atender → cobrar, y que la visita quede en el historial de l
   await page.locator('.pet-card', { hasText: 'Rocky' }).click()
   await page.getByLabel('Editar mascota').click()
   await expect(page.getByText(groomerNotes)).toBeVisible()
+
+  // 7. Vender el producto en el punto de venta (tarea 11.21, #2048). El cobro dentro del
+  // diálogo de la Agenda no ofrece productos (solo /app/citas/:id/cobrar y el mostrador), así
+  // que la venta del shampoo del paso 1b se hace aquí. Prueba la captura por código exacto
+  // (SHA-250, seed.sql), que el cobro acepte el producto con existencia y que el total sea
+  // $145.00, IVA incluido: si la existencia o el RPC de mostrador fallan, el ticket no sale.
+  await page.goto('/app/venta-mostrador')
+  const barcodeField = page.getByRole('textbox', {
+    name: 'Código de barras o nombre (F2)',
+  })
+  await barcodeField.fill('SHA-250')
+  await barcodeField.press('Enter')
+  await page.getByRole('button', { name: /Cobrar \(F9\)/ }).click()
+  const posDialog = page.getByRole('dialog')
+  await posDialog.locator('button', { hasText: 'Todo' }).first().click()
+  await posDialog.locator('button:has(.mdi-plus)').click()
+  await posDialog.locator('button', { hasText: /Cobrar \$/ }).click()
+  const posTicket = page.locator('.ticket-print')
+  await expect(posTicket).toBeVisible()
+  await expect(posTicket).toContainText('Shampoo hipoalergénico')
+  await expect(posTicket).toContainText('$145.00')
 })

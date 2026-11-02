@@ -42,7 +42,16 @@ acentos, validaciones de correo y de fecha, acciones de empleados y tooltips (§
 identidad visual** (bloques tonales, marco de tarjeta, barra de fecha única, §5.6). **Ya construido
 (fase 26, PLAN.md D29): Correcciones 2** — imagen de la empresa, catálogo de vacunas editable por dueño y
 veterinario, búsqueda de clientes por nombre de mascota, tooltips con retraso y vista responsiva (tarjetas en
-pantallas chicas y agenda en lista en celular; §5.6, §6.1, §6.2, §6.4).
+pantallas chicas y agenda en lista en celular; §5.6, §6.1, §6.2, §6.4). **Ya construido (oleada 1 del
+paquete D30, 2026-10-14, PLAN.md D30): catálogo de especies y razas con edad estimada (fase 27, §6.2), receta médica
+imprimible con cédula (fase 28, §6.4 y §6.7), catálogo de proveedores (fase 29B, §6.5) y la PWA de la vista pública
+(fase 16A, §7.4).** **Ya construido (oleada 2, 2026-10-14): medicamentos fraccionados (fase 29C, §6.5) y familias y transferencia de
+mascota (fase 31, §6.2).** **Ya construido (oleada 3, 2026-10-14): cobro rápido sin cita ni cliente (fase 30, §6.5) y catálogo de cirugías con su
+cobro (fase 32, §6.3).** **Ya construido (oleada 4, 2026-10-14): hospitalización con bitácora, medicamentos y cobro, con el personal como único
+lector (fase 33, §6.4).** **Ya construido (fase 16B, 2026-10-14, PLAN.md D31): la cuenta del dueño de la mascota** (§7.4): entra con un código
+que le llega al correo, ve sus mascotas, cartilla, historial y la bitácora de hospitalización (§6.4). Sigue sin construir:
+el **envío real de correo** (16.7: hoy solo funciona con la bandeja local; falta dominio remitente y SMTP) y las
+notificaciones push (fase 35, que pide una librería de Web Push, §3).
 
 Reglas de esta etapa:
 
@@ -81,12 +90,12 @@ El flujo completo de principio a fin, ya construido:
 Esto estaba "fuera de alcance en v1". Ya no está prohibido, pero **sigue sin existir** y
 no se construye por iniciativa propia: necesita su fase y su aprobación.
 
-- **Venta de productos e inventario.** En construcción (fase 11): ya existen `products`,
-  `stock_movements`, la pantalla de Inventario y la venta de productos en el cobro y en
-  mostrador (§6.5; el mostrador es un punto de venta desde la fase 13). El consumo de insumos en la consulta ya existe (`appointment_products`, 11.12 a 11.14); faltan el CFDI y su pantalla (11.15 en adelante).
-- **CFDI real** (solo campos y `invoice_requests` listos). **Candidato de la etapa de
-  mejoras.** Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto;
-  `services` y los futuros productos deberán llevarlas.
+- **Factura global al público en general** (11.20): sin construir. La facturación individual (Edge Function
+  `invoicing`, §6.5) y el inventario con venta de productos, consumo de insumos y existencias por sucursal (fase 11)
+  ya existen; **la facturación no se ha probado de punta a punta con el proveedor real** (Facturapi, modo de pruebas;
+  tareas 11.15, 11.18 y 11.19 sin marcar en `TASKS.md`) y el E2E aún no emite una factura (11.21 solo cubre la venta
+  con producto). Ojo: el CFDI pide `ClaveProdServ` y `ClaveUnidad` del SAT por concepto; `services` y `products` ya las
+  llevan, y deben revisarse con un contador antes de abrir la facturación a negocios reales.
 - Pasarela de pago real (SPEI/OpenPay simulados)
 - Lotes y caducidades de medicamento
 - Reportes financieros avanzados (la fase 12 trae reportes **de ventas** básicos; siguen fuera la utilidad, los reportes de inventario, la facturación en los reportes y la exportación a Excel nativo: solo hay CSV)
@@ -207,12 +216,14 @@ FullPetCare/
 │   │   ├── public-pet-view/     # Edge Function de la vista cliente
 │   │   ├── invite-employee/     # alta de acceso de un empleado (fase 9)
 │   │   ├── platform-admin/      # panel de superadmin: crear dueños, contraseñas (fase 10)
+│   │   ├── customer-account/    # cuenta del dueño de la mascota: código por correo, mis mascotas (fase 16B)
 │   │   └── invoicing/           # único que habla con el PAC (Facturapi); configurar el negocio y su certificado (11.15), timbrar, cancelar y bajar facturas (11.18)
 │   └── tests/                   # tests de RLS y de RPCs (Vitest + pg)
 │
 ├── scripts/
 │   ├── demo-reset.sh            # restaura datos demo limpios
 │   ├── create-superadmin.mjs    # crea el PRIMER superadmin de un ambiente (fase 10)
+│   ├── gen-pwa-icons.mjs        # genera los íconos de la PWA (public/icons) desde el isotipo
 │   └── gen-types.sh             # regenera src/types/database.ts
 │
 ├── e2e/                         # Playwright: un solo test de flujo completo
@@ -237,14 +248,24 @@ FullPetCare/
     │   ├── tenantLogo.ts        #   imagen de la empresa: tipos admitidos, tope de 2 MB y ruta (§6.1)
     │   ├── vaccineCatalog.ts    #   reglas del catálogo de vacunas: refuerzo, duplicados y etiquetas (§6.4)
     │   ├── agendaList.ts        #   citas por día y por hora para la lista de la agenda en celular (§5.6)
+    │   ├── petAge.ts            #   edad ↔ fecha de nacimiento aproximada (§6.2)
+    │   ├── speciesCatalog.ts    #   duplicados y búsqueda de razas por variante (§6.2)
+    │   ├── prescription.ts      #   reglas y formato de la receta (§6.4)
+    │   ├── suppliers.ts         #   tipos y validación de proveedores (§6.5)
+    │   ├── fractional.ts        #   unidad base, precio de la unidad, envase abierto (§6.5)
+    │   ├── family.ts            #   etiqueta y validación de la familia (§6.2)
+    │   ├── surgery.ts           #   renglones, totales y validación de una cirugía (§6.3)
+    │   ├── hospitalization.ts   #   días y costo de la estancia, opciones y validación de la bitácora (§6.4)
+    │   ├── pwaInstall.ts  lastPetLink.ts   #   aviso "Agregar a inicio" y último link abierto (§7.4)
     │   └── themeMode.ts         #   claro / oscuro / sistema
     ├── services/                # ACCESO A DATOS + reglas. Única capa que habla con Supabase.
     │   ├── supabase.ts          #   cliente único
     │   ├── customers.ts  pets.ts  appointments.ts  records.ts  checkout.ts  shareLinks.ts
     │   ├── tenantLogo.ts  vaccines.ts   #   imagen de la empresa (bucket `tenant-logos`) y catálogo de vacunas
-    ├── stores/                  # Pinia: session, tenant, agenda, cart
+    │   ├── species.ts  breeds.ts  prescriptions.ts  suppliers.ts  families.ts  surgeries.ts  hospitalization.ts   #   catálogos de especies y razas, receta, proveedores, familias y cirugías (D30)
+    ├── stores/                  # Pinia: session, tenant, agenda, cart, speciesCatalog, suppliers
     ├── types/database.ts        # GENERADO. No editar a mano.
-    ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas)
+    ├── composables/             # useThemeMode (modo de color, §5.6); useDelayedLoading, useFirstLoad y useNavigationProgress (estados de carga, §5.6); useServerSearch (búsqueda en la base con retraso y sin respuestas viejas); usePetCatalog (catálogo de especies y razas para los formularios de mascota); usePwaInstall (aviso de instalar la app)
     ├── components/              # tontos: reciben props, emiten eventos
     ├── layouts/
     ├── pages/                   # una carpeta por área: auth, inicio, agenda, clientes, atencion, cobro, ventas, publico, superadmin
@@ -464,7 +485,7 @@ cuenta como relevo.
 | Tabla         | Campos clave                                                                                                                                                     |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `customers`   | `tenant_id`, `first_name`, `last_name`, `phone`, `email`, `notes`, + CFDI: `rfc`, `legal_name`, `tax_regime_code`, `cfdi_use`, `postal_code`, `requires_invoice` |
-| `pets`        | `tenant_id`, `customer_id`, `name`, `species`, `breed`, `sex`, `birth_date`, `is_sterilized`, `photo_path`, `grooming_notes`, `medical_alerts`                   |
+| `pets`        | `tenant_id`, `customer_id`, `name`, `species`, `species_id`, `breed`, `breed_id`, `sex`, `birth_date`, `birth_date_is_estimated`, `is_sterilized`, `photo_path`, `grooming_notes`, `medical_alerts` |
 | `pet_weights` | `tenant_id`, `pet_id`, `appointment_id`, `weight_grams int`, `measured_at`                                                                                       |
 
 `weight_grams` es entero (12 400 = 12.4 kg). Misma razón que el dinero: nada de
@@ -495,6 +516,32 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   (solo el nombre, no la especie). Se resuelve en el navegador con las mascotas que la pantalla ya carga
   (`lib/customerPets.ts#customerIdsByPetName`, misma normalización que `lib/searchText.ts`) y se suman los dueños
   con `customers.listByIds()`; no hay función nueva en la base.
+- **Especies y razas (fase 27, PLAN.md D30):** tres catálogos **por negocio** — `species_groups` (Perros, Gatos, Aves,
+  Reptiles, Roedores y conejos, Otros: el dato genérico de estadística), `species` (cuelga de un grupo) y `breeds` (solo
+  de las especies con `has_breeds`, hoy Perro y Gato; cada raza lleva `search_aliases`: "xolo", "teckel"). Los lee todo el
+  negocio y los editan **dueño y veterinario** (`/app/configuracion/especies`); se oculta, no se borra. Un negocio nuevo
+  recibe el catálogo base por un trigger sobre `tenants` (`app.seed_species_catalog()`). `pets.species_id` y `breed_id`
+  son nulos a propósito: **el enum `species` y el texto `breed` se conservan** (vacunas por especie, búsqueda y vista
+  pública los siguen leyendo) y la interfaz los mantiene al elegir del catálogo (`species.legacy_kind` dice a qué valor
+  del enum corresponde). La base impide combinar una raza con otra especie. Los tres formularios de mascota comparten
+  `PetSpeciesFields.vue`. `create_customer_with_pet()` acepta `p_pet_species_id`, `p_pet_breed_id` y
+  `p_pet_birth_date_is_estimated`.
+- **Edad estimada (fase 27):** "tiene 3 años" propone una fecha de nacimiento (`lib/petAge.ts`, sin leer el reloj: el
+  "hoy" es el de la sucursal) y queda marcada `birth_date_is_estimated`; el veterinario puede ajustarla. Escribirla a
+  mano la vuelve dato capturado.
+- **Familias (fase 31, PLAN.md D30 punto 7):** `families` (nombre propio, "Familia Pérez") y `family_members` (un
+  **titular** por familia, y un cliente pertenece a **una sola** familia). Se escriben solo con `save_family()` y
+  `delete_family()` (dueño y recepción). La etiqueta que se muestra es "Familia Pérez – Nube, Toby" (`lib/family.ts`,
+  `FamilyCard` en la página del cliente). La mascota sigue teniendo un dueño (`pets.customer_id`); la familia accede a
+  las mascotas de todos sus miembros. El titular es el único que verá montos; los demás miembros solo ven la mascota,
+  su cartilla, sus citas y la bitácora de hospitalización, y reciben avisos.
+- **Transferencia de mascota (fase 31, D30 punto 8):** `transfer_pet()` (dueño y recepción) la pasa a **un cliente
+  suelto**: sus citas `scheduled` se van con ella, las ventas y las citas ya atendidas **se quedan** con el dueño
+  anterior y sus links `pet` se revocan. `pet_ownerships` guarda los periodos de cada dueño (la alimenta un trigger
+  sobre `pets`, también ante un UPDATE directo). **Visibilidad por periodo**, en SQL y solo para `service_role`:
+  `app.customer_can_view_pet()` (el dueño anterior ve solo su periodo; el nuevo y su familia ven todo el historial) y
+  `app.customer_can_view_pet_money()` (los montos, solo el dueño de ese momento o el titular de su familia). **Hoy nadie
+  las consulta**: la cuenta del cliente (16B) es quien las usará.
 - **Eliminar es borrado suave en cascada, en la base:** las RPC `delete_customer()` y `delete_pet()` (`SECURITY
   DEFINER`, revalidan membresía y rol dueño o recepción) ocultan al cliente, a sus mascotas y **solo sus citas
   `scheduled`**. Las demás citas, las ventas y el expediente no se tocan (§8.5). Se llaman desde `softDelete()` de
@@ -527,6 +574,14 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
   suben el precio del baño, las citas viejas conservan el suyo. Un ticket histórico
   nunca cambia de monto.
 - `tax_rate_bp` en _basis points_: 1600 = 16.00 %. Entero, otra vez.
+- **Cirugías (fase 32, PLAN.md D30 punto 9):** `surgery_packages` y `surgery_package_items` son el catálogo (un
+  paquete con renglones: **honorario**, **consumible** o **medicamento**, con precio con IVA incluido; el producto
+  ligado es opcional) y solo se escriben con `save_surgery_package()` (dueño y veterinario). Al atender una cita de
+  veterinaria se **aplica** un paquete con `apply_surgery_lines()` (ajustable renglón por renglón o armado desde
+  cero): los renglones **con producto** se registran como insumo de la consulta (bajan existencia, al precio y IVA del
+  paquete) y los **sin producto** quedan en `appointment_surgery_lines` y `checkout_appointment()` los copia a
+  `sale_items` con sus claves del SAT (`sat_product_code_snapshot`; la factura las usa). Lo de uso interno no llega al
+  ticket. `appointment_services` no se reutiliza (exige `service_id`).
 
 ### 6.4 Atención
 
@@ -539,6 +594,32 @@ flotantes en ningún lado (§8.2). Igual `temperature_deci_c` (385 = 38.5 °C).
 
 `grooming_records` y `medical_records` son **expediente**: nunca se borran físicamente
 (§8.5) y todo cambio queda en la bitácora (§8.6).
+
+**Receta médica (fase 28, PLAN.md D30):** `prescriptions` (una por cita de veterinaria, con folio consecutivo por negocio
+y **copia** del nombre y la cédula de quien la emitió) y `prescription_items` (medicamento, dosis, frecuencia y duración;
+`product_id` nulo = texto libre). Es **expediente**: sin DELETE, con bitácora, y una corrección oculta los renglones
+anteriores. **Solo se escribe con `save_prescription()`**, que exige ser el dueño o el veterinario **asignado** a la cita
+y tener cédula capturada (`employee_details.professional_license`); los leen dueño y veterinario. Se imprime desde el
+navegador (`/app/citas/:id/receta`, carta vertical, `@media print`, sin PDF ni dependencia). Los medicamentos de texto
+libre le llegan al **dueño del negocio** como aviso en Inicio (`list_unregistered_medications()`), que los liga a un
+producto o los descarta (`resolve_unregistered_medication()`).
+
+**Hospitalización (fase 33, PLAN.md D30 punto 10):** estancia **y** control. `hospital_spaces` (jaulas por sucursal, sin
+tope de mascotas por jaula; el dueño los administra), `hospital_settings` (regla de días y tarifas por defecto),
+`hospital_stays` (ingreso, alta, espacio y una **copia** de la tarifa y de la regla de días del ingreso),
+`hospital_notes` (la bitácora: hora, lo realizado y biometrías opcionales —temperatura en décimas de grado, peso en
+gramos, frecuencia cardiaca, mucosas, ánimo y micción/defecación con opciones fijas—) y `hospital_medications`
+(administrados, con inventario). La bitácora es **expediente**: sin UPDATE ni borrado, se corrige con otra nota y todo
+queda en `audit_log`. Todo se escribe con RPC (`admit_pet`, `add_hospital_note`, `administer_hospital_medication`,
+`remove_hospital_medication`, `discharge_pet`, `bill_hospital_stay`); leen y escriben **dueño, recepción y veterinario**
+(el groomer nada); cobrar, solo dueño y recepción. **Días:** `natural` (cada día calendario tocado en la zona de la
+sucursal; entrar y salir el mismo día es 1) o `24h` (bloques de 24 horas hacia arriba), mínimo 1; la misma regla vive en
+`app.hospital_stay_days()` y `lib/hospitalization.ts`. **Tarifa:** por día o por estancia, a elegir al ingresar, con la
+del espacio y si no la del negocio como sugerencia. **Cobro:** exige el alta; una venta ligada al dueño del ingreso con
+la estancia y los medicamentos cobrables (que ya bajaron del inventario al administrarse). El aviso al abrir el cobro de
+una cita (`CheckoutPage`) dice si la mascota sigue hospitalizada. **Lo que NO hay todavía:** que el dueño de la mascota
+lea la bitácora y la notificación (dependen de la cuenta del cliente, 16B); las reglas de visibilidad por periodo ya
+existen en SQL (fase 31).
 
 **Catálogo de vacunas (fase 26, PLAN.md D29):** `vaccines` es configuración, no expediente. Lo **leen** todos los
 miembros y lo **editan dueño y veterinario** (políticas `vaccines_insert` y `vaccines_update`; recepción y groomer
@@ -595,6 +676,27 @@ mismo nombre y especie (`lib/vaccineCatalog.ts`).
   (selector de clientes; si le faltan datos fiscales se le piden al momento). La forma de los datos fiscales
   se valida en `lib/validation.ts` (`fiscalReceiverProblems`, `customerFiscalProblems`); que exista en el
   catálogo del SAT lo decide el PAC. El cobro de una cita sigue en `pages/agenda/CheckoutPage.vue`.
+- **Proveedores (fase 29B, PLAN.md D30 punto 4):** `suppliers` (nombre, `supplier_type` medicamentos | alimento |
+  accesorios | otro, contacto, teléfono, correo, notas, `is_active`) y `product_suppliers` (un producto puede tener
+  **varios** proveedores; llaves compuestas `(tenant_id, …)` para no cruzar negocios). Mismos permisos que Inventario
+  (módulo `inventory`). **Solo catálogo:** no hay órdenes de compra ni cuentas por pagar. Pantalla `/app/proveedores`;
+  el selector vive en el formulario de producto (`inventory.saveProduct(input, id, supplierIds)`).
+- **Medicamentos fraccionados (fase 29C, PLAN.md D30 punto 5):** la existencia se guarda **siempre en la unidad base**
+  (tableta, ml), entera. `products.units_per_package` dice cuántas hay por envase y con **1 el producto no se fracciona**
+  (todo como antes). `package_name`, `unit_name`, `unit_price_cents` (nulo = se calcula: precio del envase / unidades,
+  redondeado al centavo) y `unit_sat_code`. Al vender o consumir se elige **envase** (por defecto) o **unidad**:
+  `sale_items` y `appointment_products` guardan `sold_unit` y `units_per_package_snapshot`, `quantity` va en la unidad
+  vendida y el movimiento de existencia siempre va en unidades base. El precio de la unidad se corrige en el producto y
+  en cada venta (`unit_price_cents` en el elemento de `p_products`). El **envase abierto se deriva** (`existencia mod
+  unidades por envase`), no es otra tabla. `set_product_presentation()` cambia la presentación y **reescala la
+  existencia** con un ajuste por sucursal (se rechaza si no da enteros). Una unidad suelta factura con su propia
+  `ClaveUnidad` (`sale_items.sat_unit_code_snapshot`). `report_top_items` no mezcla envases con unidades.
+- **Cobro rápido (fase 30, PLAN.md D30 punto 6):** `checkout_quick_sale()` cobra un **servicio y/o productos sin cita y
+  sin cliente** (dueño y recepción; `/app/cobro-rapido`). Lleva `sales.attended_by_user_id` (quién atendió) y
+  `sales.species_group_id` (perro, gato, ave, reptil: **solo estadística**); entra a Caja y Reportes como cualquier
+  venta y reutiliza `app.add_product_items` y `app.finalize_sale`. `report_staff_activity` atribuye el servicio a quien
+  atendió y `report_sales_by_species_group()` agrupa por especie (el resto sale como "Sin dato"). **No ofrece
+  factura**: para facturar se usa el punto de venta, que sí captura al cliente.
 - **Captura del punto de venta (13F y 13G, PLAN.md D18 puntos 6 y 7):** un solo campo "código de barras o nombre"
   (Enter con código exacto agrega; escribir reemplaza la fila de arriba por las coincidencias) y **dos filas** de
   tarjetas (`components/PosProductTile.vue`): arriba, **categorías** (ícono y nombre) en una fila con scroll
@@ -646,7 +748,7 @@ mismo nombre y especie (`lib/vaccineCatalog.ts`).
 | Tabla               | Campos clave                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `role_permissions`  | `tenant_id`, `role`, `module` (enum `permission_module`, hoy `'employees'`, `'inventory'`, `'invoicing'`, `'cash_register'` y `'reports'`), `can_view`, `can_edit`               |
-| `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`                            |
+| `employee_details`  | `tenant_id`, `membership_id` (único, 1 a 1), `birth_date`, `curp`, `rfc`, `voter_id_number`, `professional_license` (cédula, fase 28) |
 | `employee_documents`| `tenant_id`, `membership_id`, `document_type` (enum: `voter_id`\|`address_proof`\|`employment_contract`), `storage_path`, `uploaded_by`, `uploaded_at` |
 
 Permisos por defecto de los módulos de la fase 12 (se ajustan con filas, no con código): `cash_register` →
@@ -876,6 +978,32 @@ política.
 Lo que la vista pública **nunca** devuelve: teléfonos y correos de otros clientes,
 montos y tickets, notas internas del personal, nombres de empleados fuera del que
 atendió, ni identificadores de otros registros.
+
+**PWA (fase 16A, PLAN.md D21):** la vista pública se puede instalar en el teléfono. `public/manifest.webmanifest`,
+íconos de `public/icons/` y un service worker escrito a mano (`public/sw.js`, registrado en `plugins/pwa.ts` solo en
+producción). **El worker ignora toda petición a otro dominio** (ahí viven los datos de la mascota: la Edge Function),
+no guarda pantallas y solo guarda los archivos con hash de `/assets/`; sin red una navegación cae en
+`public/offline.html`, que no lleva datos. Así un token revocado deja de mostrar información aunque el teléfono tenga
+caché: no hay copia que enseñar (lo prueba `lib/serviceWorker.spec.ts`). La app instalada abre en `/c`, que lleva al
+último link abierto en ese teléfono (`lib/lastPetLink.ts`, comodidad del navegador en `localStorage`, no un dato de
+negocio; se borra si el link deja de servir). El acceso **sigue siendo el link con token**; la cuenta propia del cliente
+es la 16B. El aviso "Agregar a inicio" (`InstallAppBanner`) explica Compartir en iPhone y ofrece un botón en Android.
+`sw.js`, el manifiesto y `offline.html` van con `Cache-Control: no-cache` en `_headers`.
+
+**Cuenta del dueño (fase 16B, PLAN.md D31):** `/mi-cuenta` (ruta pública, **sesión propia**: `services/customerSupabase.ts` usa
+`storageKey: 'fpc-customer-auth'`, aparte de la del personal). Entra con un **código de 6 dígitos por correo**
+(`signInWithOtp`; la plantilla vive en `supabase/templates/access-code.html`; `[auth] enable_signup` sigue en falso). La
+cuenta es un usuario de Auth **sin membresía** con `app_metadata.customer_account = true`, así que toda política del
+personal lo niega. **Se vincula solo con un link `/c/:token`** ("Guardar en mi cuenta"), con la RPC `claim_customer_link()`
+(`customer_accounts`: una cuenta por cliente y una por negocio por persona; mensaje genérico si el token no sirve),
+nunca por coincidencia de correo o teléfono. Lo que ve lo decide la Edge Function `customer-account` (`verify_jwt = false`
+porque `request_code` es sin sesión; valida el JWT a mano): `request_code` **siempre responde `{ok:true}`**, solo envía
+código a cuentas de dueño o a un correo nuevo con un link vigente, y nunca al personal; `overview`, `pet` y
+`delete_account` sacan el id del JWT verificado y llaman a funciones SQL **solo para `service_role`**
+(`customer_account_overview`, `customer_account_pet_detail`, con las reglas de periodo y familia de la fase 31; el
+costo solo para el titular). El personal ve "cuenta vinculada" y puede **desvincular** en la página del cliente
+(`unlink_customer_account`). Eliminar la cuenta borra el usuario de Auth (y suelta su `actor_user_id` en `audit_log`);
+el expediente del negocio no se toca.
 
 Sus pruebas son explícitas y obligatorias: token de otro tenant, token revocado, token
 expirado, token válido pidiendo otra mascota, token inexistente, y que `anon` no pueda
@@ -1113,7 +1241,11 @@ bitácora de inventario es inmutable) y no toca la configuración fiscal. Desde 
 de los últimos 6 días** (para que Reportes tenga datos; "hoy" queda vacío, lo llena el cobro en vivo), **un corte
 de caja cerrado de ejemplo** en Centro y **oculta cualquier caja abierta**. Los cortes **cerrados** no se pueden
 ocultar (§6.5): el de ejemplo se crea una sola vez (y envejece), y los que se cierren durante una demo se quedan en
-el historial de Caja. Aun así, ese paso sigue tocando producción: no marques como demo una empresa real.
+el historial de Caja. Desde la fase 27 también vuelve a mostrar lo que se ocultó del catálogo de especies y razas de
+Patitas Felices (lo que se agregó en una demo se queda), y desde la 29B restaura sus 3 proveedores de ejemplo y sus
+vínculos y oculta los proveedores que se agregaron. Las familias y las transferencias hechas en una demo no se deshacen con el
+reset (los periodos de dueño son historial). Aun así, ese paso sigue tocando producción: no marques como demo una
+empresa real.
 
 ### Git
 

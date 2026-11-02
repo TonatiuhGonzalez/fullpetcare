@@ -26,6 +26,11 @@ declare module 'vue-router' {
   }
 }
 
+/** Rutas de la vista pública del cliente: sin sesión y sin gateos del personal. */
+function isPublicPath(path: string): boolean {
+  return path === '/c' || path.startsWith('/c/') || path === '/mi-cuenta'
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -91,6 +96,14 @@ export const router = createRouter({
           props: true,
         },
         {
+          // Receta de una consulta, lista para imprimir (fase 28, PLAN.md D30).
+          path: 'citas/:id/receta',
+          name: 'cita-receta',
+          component: () => import('@/pages/agenda/PrescriptionPrintPage.vue'),
+          props: true,
+          meta: { requiresRoles: ['owner', 'vet'] },
+        },
+        {
           path: 'citas/:id/cobrar',
           name: 'cita-cobrar',
           component: () => import('@/pages/agenda/CheckoutPage.vue'),
@@ -151,6 +164,37 @@ export const router = createRouter({
           meta: { requiresPermission: 'inventory' },
         },
         {
+          // Proveedores (fase 29B, PLAN.md D30): catálogo de a quién se le compra. Mismo
+          // permiso que Inventario (`inventory`): quien administra el inventario lo ve.
+          path: 'proveedores',
+          name: 'proveedores',
+          component: () => import('@/pages/proveedores/SuppliersPage.vue'),
+          meta: { requiresPermission: 'inventory' },
+        },
+        {
+          // Hospitalización (fase 33, PLAN.md D30): tablero y ficha de cada estancia. Dueño,
+          // recepción y veterinario; el groomer no. La base lo impone con RLS y las RPC.
+          path: 'hospitalizacion',
+          name: 'hospitalizacion',
+          component: () => import('@/pages/hospitalizacion/HospitalizationPage.vue'),
+          meta: { requiresRoles: ['owner', 'receptionist', 'vet'] },
+        },
+        {
+          path: 'hospitalizacion/:id',
+          name: 'hospitalizacion-estancia',
+          component: () => import('@/pages/hospitalizacion/HospitalStayPage.vue'),
+          props: true,
+          meta: { requiresRoles: ['owner', 'receptionist', 'vet'] },
+        },
+        {
+          // Cobro rápido (fase 30, PLAN.md D30): cobrar un servicio y/o productos sin cita y sin
+          // registrar al cliente. Solo dueño y recepción, como la venta de mostrador.
+          path: 'cobro-rapido',
+          name: 'cobro-rapido',
+          component: () => import('@/pages/ventas/QuickSalePage.vue'),
+          meta: { requiresRoles: ['owner', 'receptionist'] },
+        },
+        {
           // Reportes (tarea 12.12): gateado por PERMISO; por defecto solo el dueño.
           path: 'reportes',
           name: 'reportes',
@@ -197,6 +241,27 @@ export const router = createRouter({
               path: 'vacunas',
               name: 'configuracion-vacunas',
               component: () => import('@/pages/configuracion/VaccinesSettingsPage.vue'),
+              meta: { requiresRoles: ['owner', 'vet'] },
+            },
+            {
+              // Hospitalización (fase 33, PLAN.md D30): reglas de días, tarifas y espacios. Dueño.
+              path: 'hospitalizacion',
+              name: 'configuracion-hospitalizacion',
+              component: () => import('@/pages/configuracion/HospitalSettingsPage.vue'),
+              meta: { requiresOwner: true },
+            },
+            {
+              // Catálogo de cirugías (fase 32, PLAN.md D30): paquetes de renglones con su precio.
+              path: 'cirugias',
+              name: 'configuracion-cirugias',
+              component: () => import('@/pages/configuracion/SurgeriesSettingsPage.vue'),
+              meta: { requiresRoles: ['owner', 'vet'] },
+            },
+            {
+              // Especies y razas (fase 27, PLAN.md D30): catálogo editable por dueño y veterinario.
+              path: 'especies',
+              name: 'configuracion-especies',
+              component: () => import('@/pages/configuracion/SpeciesSettingsPage.vue'),
               meta: { requiresRoles: ['owner', 'vet'] },
             },
             {
@@ -249,6 +314,31 @@ export const router = createRouter({
     // Vista pública (tarea 7.12): NO va dentro de /app — no exige sesión
     // y usa su propio layout, sin nada de la navegación interna (el
     // guard de abajo solo revisa rutas que empiecen con "/app").
+    // Inicio de la app instalada (fase 16A, PLAN.md D21): el manifiesto abre aquí. Sin token en
+    // la dirección, lleva a la última mascota consultada en este teléfono.
+    {
+      path: '/c',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'cliente-inicio',
+          component: () => import('@/pages/publico/ClientHomePage.vue'),
+        },
+      ],
+    },
+    // Cuenta del dueño de la mascota (fase 16B, PLAN.md D31): sesión propia, aparte de la del personal.
+    {
+      path: '/mi-cuenta',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'mi-cuenta',
+          component: () => import('@/pages/publico/CustomerAccountPage.vue'),
+        },
+      ],
+    },
     {
       path: '/c/:token',
       component: () => import('@/layouts/PublicLayout.vue'),
@@ -315,7 +405,7 @@ router.beforeEach(async (to) => {
   // los demás gateos porque para esta persona aún no se cargaron ni negocios
   // ni rol de plataforma. Quien ya la cambió y entra a mano a esa pantalla
   // se manda a su casa.
-  if (session.isAuthenticated && !to.path.startsWith('/c/')) {
+  if (session.isAuthenticated && !isPublicPath(to.path)) {
     if (session.mustChangePassword && !isForcePasswordRoute) {
       return { path: '/cambiar-contrasena' }
     }
@@ -327,7 +417,7 @@ router.beforeEach(async (to) => {
   // Todos sus negocios están suspendidos, dados de baja o vencidos: no hay
   // nada que mostrarle salvo el aviso, que vive en /login (LoginPage abre el
   // diálogo solo). Se le deja ahí, y la vista pública /c/:token no se toca.
-  if (session.isBlockedOnly && !to.path.startsWith('/c/')) {
+  if (session.isBlockedOnly && !isPublicPath(to.path)) {
     return to.path === '/login' ? true : { path: '/login' }
   }
 

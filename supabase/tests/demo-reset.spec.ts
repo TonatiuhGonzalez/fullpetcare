@@ -17,6 +17,7 @@ import { closePool, setRole, withTransaction } from './helpers'
 import {
   BRANCH_CENTRO,
   BRANCH_DEL_VALLE,
+  PET_ROCKY,
   PRODUCT_ALIMENTO,
   PRODUCT_SHAMPOO,
   TENANT_HUELLITAS,
@@ -393,6 +394,141 @@ describe('demo_reset.sql — ventas y caja de demostración (12.14)', () => {
 
       const first = await one(client, 'select folio from sales where id = $1', [saleId(1)])
       expect(first.folio).toBeGreaterThan(50)
+    })
+  })
+})
+
+describe('demo_reset.sql — proveedores de demostración (fase 29B)', () => {
+  const supplierRows = async (client: PoolClient) =>
+    (
+      await client.query(
+        `select s.name, s.is_active, s.deleted_at is not null as hidden,
+                (select count(*)::int from product_suppliers ps
+                  where ps.supplier_id = s.id and ps.deleted_at is null) as products
+           from suppliers s where s.tenant_id = $1 order by s.name`,
+        [TENANT_PATITAS],
+      )
+    ).rows
+
+  it('restaura los proveedores de ejemplo y oculta los que se agregaron en una demo', async () => {
+    // Qué prueba: que después de una demo (un proveedor nuevo, uno de ejemplo desactivado y
+    // un vínculo quitado) el reset deja el catálogo como la semilla.
+    // Qué se rompería: la siguiente presentación arrancaría con proveedores de la anterior
+    // o con el catálogo de ejemplo incompleto.
+    await withTransaction(async (client) => {
+      await client.query(
+        "insert into suppliers (tenant_id, name) values ($1, 'Proveedor de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update suppliers set is_active = false where name = 'Accesorios y Más' and tenant_id = $1",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        'update product_suppliers set deleted_at = now() where tenant_id = $1',
+        [TENANT_PATITAS],
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const rows = await supplierRows(client)
+      const visible = rows.filter((r) => !r.hidden)
+      expect(visible.map((r) => r.name)).toEqual([
+        'Accesorios y Más',
+        'Alimentos Premium para Mascotas',
+        'Distribuidora Veterinaria del Centro',
+      ])
+      expect(visible.every((r) => r.is_active)).toBe(true)
+      expect(rows.find((r) => r.name === 'Proveedor de una demo')?.hidden).toBe(true)
+      // 4 vínculos de ejemplo: alimento (2 proveedores) y shampoo (2 proveedores).
+      expect(visible.reduce((sum, r) => sum + r.products, 0)).toBe(4)
+    })
+  })
+
+  it('repetir el reset deja los mismos vínculos, sin duplicarlos', async () => {
+    await withTransaction(async (client) => {
+      await client.query(DEMO_RESET_SQL)
+      await client.query(DEMO_RESET_SQL)
+      const { rows } = await client.query(
+        'select count(*)::int as n from product_suppliers where tenant_id = $1 and deleted_at is null',
+        [TENANT_PATITAS],
+      )
+      expect(rows[0].n).toBe(4)
+    })
+  })
+})
+
+describe('demo_reset.sql — paquetes de cirugía de demostración (fase 32)', () => {
+  it('restaura los paquetes de ejemplo y sus precios, y oculta los que se agregaron', async () => {
+    // Qué prueba: que después de una demo (un paquete nuevo, un precio cambiado y un paquete
+    // de ejemplo desactivado) el reset deja el catálogo como la semilla.
+    // Qué se rompería: la siguiente presentación arrancaría con precios de cirugía de la
+    // anterior, o con el catálogo de ejemplo incompleto.
+    await withTransaction(async (client) => {
+      await client.query(
+        "insert into surgery_packages (tenant_id, name) values ($1, 'Cirugía de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update surgery_package_items set unit_price_cents = 1 where id = '33000000-0000-4000-8000-000000000001'",
+      )
+      await client.query(
+        "update surgery_packages set is_active = false where id = '32000000-0000-4000-8000-000000000002'",
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const packages = await client.query(
+        `select name, is_active from surgery_packages
+          where tenant_id = $1 and deleted_at is null order by name`,
+        [TENANT_PATITAS],
+      )
+      expect(packages.rows).toEqual([
+        { name: 'Esterilización de hembra', is_active: true },
+        { name: 'Limpieza dental', is_active: true },
+      ])
+      const fee = await client.query(
+        "select unit_price_cents from surgery_package_items where id = '33000000-0000-4000-8000-000000000001'",
+      )
+      expect(fee.rows[0].unit_price_cents).toBe(180000)
+    })
+  })
+})
+
+describe('demo_reset.sql — hospitalización de demostración (fase 33)', () => {
+  it('da de alta las estancias abiertas y restaura los espacios de ejemplo', async () => {
+    // Qué prueba: que después de una demo (una mascota hospitalizada, un espacio nuevo y uno
+    // de ejemplo desactivado) el reset deja el tablero sin hospitalizados y los espacios
+    // como la semilla.
+    // Qué se rompería: la siguiente presentación empezaría con una mascota "hospitalizada"
+    // de la anterior, o sin las jaulas de ejemplo.
+    await withTransaction(async (client) => {
+      await client.query(
+        `insert into hospital_stays (tenant_id, branch_id, pet_id, space_id, admitted_by, rate_mode, rate_cents, day_rule)
+         values ($1, 'c0000000-0000-4000-8000-000000000001', $2, '34000000-0000-4000-8000-000000000001', $3, 'per_day', 35000, 'natural')`,
+        [TENANT_PATITAS, PET_ROCKY, USER_DUENO],
+      )
+      await client.query(
+        "insert into hospital_spaces (tenant_id, branch_id, name) values ($1, 'c0000000-0000-4000-8000-000000000001', 'Jaula de una demo')",
+        [TENANT_PATITAS],
+      )
+      await client.query(
+        "update hospital_spaces set is_active = false where id = '34000000-0000-4000-8000-000000000002'",
+      )
+
+      await client.query(DEMO_RESET_SQL)
+
+      const open = await client.query(
+        'select count(*)::int as n from hospital_stays where tenant_id = $1 and discharged_at is null',
+        [TENANT_PATITAS],
+      )
+      expect(open.rows[0].n).toBe(0)
+      const spaces = await client.query(
+        `select count(*)::int as n from hospital_spaces
+          where tenant_id = $1 and deleted_at is null and is_active`,
+        [TENANT_PATITAS],
+      )
+      expect(spaces.rows[0].n).toBe(4)
     })
   })
 })

@@ -244,6 +244,14 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
+# Correo del código de acceso del dueño de la mascota (fase 16B, PLAN.md D31): la función
+# `customer-account` pide un OTP con signInWithOtp y Supabase lo manda con esta plantilla.
+# En el proyecto hospedado la plantilla se configura en el panel (Authentication → Email
+# Templates → Magic Link) con el mismo contenido.
+[auth.email.template.magic_link]
+subject = "Tu código de acceso a FullPetCare"
+content_path = "./supabase/templates/access-code.html"
+
 # Use a production-ready SMTP server
 # [auth.email.smtp]
 # enabled = true
@@ -458,6 +466,15 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/platform-admin/deno.json"
 entrypoint = "./functions/platform-admin/index.ts"
+
+[functions.customer-account]
+enabled = true
+# `request_code` lo llama alguien SIN sesión (aún no tiene cuenta): con verify_jwt = true la
+# plataforma lo rechazaría antes de ejecutar nada. La función valida la sesión a mano en las
+# acciones que la necesitan (ver el encabezado de index.ts).
+verify_jwt = false
+import_map = "./functions/customer-account/deno.json"
+entrypoint = "./functions/customer-account/index.ts"
 
 [functions.invoicing]
 enabled = true

@@ -482,3 +482,100 @@ begin
       internal_notes = 'Empresa de ejemplo para la demo. Se puede reactivar desde el detalle.'
   where tenant_id = v_tenant_mimos;
 end $$;
+
+-- ===========================================================================
+-- Oleada 1 del paquete D30 (PLAN.md D30): secciones reservadas
+-- ===========================================================================
+-- Cada rama llena SU sección y no toca las de las demás, para que dos ramas no editen
+-- las mismas líneas al integrarse.
+--
+-- (fase 27) Catálogo de grupos, especies y razas: lo siembra el trigger de `tenants` (y la
+-- migración, para los negocios existentes), así que aquí solo se ENLAZAN las mascotas de
+-- la semilla, que se insertan después de la migración, a su especie y raza del catálogo.
+-- La raza se busca por nombre exacto (sin mayúsculas); las que no coinciden (p. ej.
+-- "Doméstico de pelo corto") quedan con el texto y sin raza del catálogo, como las
+-- mascotas reales que ya existían.
+update pets p
+set species_id = s.id
+from species s
+where s.tenant_id = p.tenant_id and s.deleted_at is null
+  and s.has_breeds and s.legacy_kind = p.species
+  and p.species in ('dog', 'cat') and p.species_id is null;
+
+update pets p
+set breed_id = b.id
+from breeds b
+where b.tenant_id = p.tenant_id and b.species_id = p.species_id and b.deleted_at is null
+  and lower(btrim(b.name)) = lower(btrim(p.breed)) and p.breed_id is null;
+
+-- (fase 28) Cédula profesional (ficticia) del veterinario y del dueño de Patitas Felices: sin
+-- ella no pueden emitir recetas (save_prescription la exige). La fila de employee_details
+-- puede no existir todavía para los usuarios de demo, por eso es un upsert.
+insert into employee_details (tenant_id, membership_id, professional_license)
+select m.tenant_id, m.id, v.license
+from memberships m
+join (values
+  ('a0000000-0000-4000-8000-000000000004'::uuid, '1234567'),
+  ('a0000000-0000-4000-8000-000000000001'::uuid, '7654321')
+) as v(user_id, license) on v.user_id = m.user_id
+where m.tenant_id = 'b0000000-0000-4000-8000-000000000001'
+on conflict (membership_id) do update set professional_license = excluded.professional_license;
+
+-- (fase 29B) Proveedores de ejemplo de Patitas Felices (ficticios) y a quién surte cada uno.
+-- Alimento y shampoo (productos de la semilla) tienen más de un proveedor a propósito, para
+-- que la demo muestre que un producto puede tener varios.
+insert into suppliers (id, tenant_id, name, supplier_type, contact_name, phone, email, notes)
+values
+  ('31000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+   'Distribuidora Veterinaria del Centro', 'medication', 'Lic. Marcela Ibarra', '5555501100',
+   'ventas@dvcentro.example.mx', 'Entrega los martes y jueves.'),
+  ('31000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+   'Alimentos Premium para Mascotas', 'food', 'Ing. Rodrigo Salas', '5555502200',
+   'pedidos@alimentospremium.example.mx', null),
+  ('31000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001',
+   'Accesorios y Más', 'accessories', null, '5555503300', null, 'Pedido mínimo de 10 piezas.');
+
+insert into product_suppliers (tenant_id, product_id, supplier_id)
+values
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000002'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000003'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000003');
+
+-- =============================================================================
+-- Oleada 3 del paquete D30 (PLAN.md D30): secciones reservadas
+-- =============================================================================
+-- Cada rama llena SU sección y no toca la de la otra.
+--
+-- (fase 30) Sin semilla: el cobro rápido no trae datos de ejemplo.
+
+-- (fase 32) Paquetes de cirugía de ejemplo de Patitas Felices (ficticios). Sin producto ligado
+-- a propósito: así no dependen de las existencias de la semilla. Precios con IVA incluido.
+insert into surgery_packages (id, tenant_id, name, notes)
+values
+  ('32000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+   'Esterilización de hembra', 'Incluye anestesia y material de sutura.'),
+  ('32000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+   'Limpieza dental', null);
+
+insert into surgery_package_items
+  (id, tenant_id, package_id, position, kind, description, quantity, unit_price_cents, tax_rate_bp)
+values
+  ('33000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 1, 'fee', 'Honorarios del cirujano', 1, 180000, 1600),
+  ('33000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 2, 'medication', 'Anestesia', 1, 60000, 1600),
+  ('33000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 3, 'consumable', 'Material de sutura', 1, 35000, 1600),
+  ('33000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002', 1, 'fee', 'Honorarios', 1, 90000, 1600),
+  ('33000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000002', 2, 'consumable', 'Material', 1, 15000, 1600);
+
+-- =============================================================================
+-- Hospitalización (fase 33, PLAN.md D30): espacios de ejemplo de Patitas Felices
+-- =============================================================================
+-- Dos jaulas en cada sucursal con tarifa por día, para poder ingresar una mascota desde la
+-- demo. Las reglas del negocio no se siembran: usan los valores por defecto (día natural).
+insert into hospital_spaces (id, tenant_id, branch_id, name, space_type, daily_rate_cents)
+values
+  ('34000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'Jaula 1', 'Jaula chica', 35000),
+  ('34000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'Jaula 2', 'Jaula grande', 50000),
+  ('34000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002', 'Jaula 1', 'Jaula chica', 35000),
+  ('34000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002', 'Jaula 2', 'Jaula grande', 50000);
+

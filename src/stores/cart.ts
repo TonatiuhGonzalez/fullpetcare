@@ -20,10 +20,13 @@ import type {
   CheckoutLineItem,
   CheckoutProductItem,
   CheckoutSupplyItem,
+  CheckoutSurgeryItem,
+  QuickServiceLine,
   NewPayment,
   SellableProduct,
 } from '@/services/checkout'
 import { applyDiscount, sumLineItems } from '@/lib/money'
+import { baseUnits, priceForUnit, type SaleUnit } from '@/lib/fractional'
 import { canRemove } from '@/lib/inventory'
 import { paymentChange } from '@/lib/paymentChange'
 
@@ -32,6 +35,8 @@ export const useCartStore = defineStore('cart', () => {
   const lineItems = ref<CheckoutLineItem[]>([])
   /** Insumos cobrables de la consulta: ya salieron del inventario, solo se cobran. */
   const supplyItems = ref<CheckoutSupplyItem[]>([])
+  /** Honorarios y renglones de cirugía sin producto de la consulta (fase 32): solo se cobran. */
+  const surgeryItems = ref<CheckoutSurgeryItem[]>([])
   /** Productos agregados al ticket (de la cita o de una venta de mostrador). */
   const productItems = ref<CheckoutProductItem[]>([])
   /** Productos que se pueden ofrecer: activos y con existencia en la sucursal. */
@@ -40,6 +45,12 @@ export const useCartStore = defineStore('cart', () => {
   const categories = ref<ProductCategory[]>([])
   /** Ids de los productos vendidos hace poco en la sucursal, del más reciente al más antiguo (con repetidos). */
   const recentSoldProductIds = ref<string[]>([])
+  /** Servicios de un cobro rápido (fase 30): sin cita, con el precio del catálogo. */
+  const quickServices = ref<Array<CheckoutLineItem>>([])
+  /** Es un cobro rápido (servicios y productos sin cita ni cliente). */
+  const isQuickSale = ref(false)
+  const quickAttendedBy = ref<string | null>(null)
+  const quickSpeciesGroupId = ref<string | null>(null)
   /** Solo en venta de mostrador (sin cita). El cliente es opcional: venta libre = null. */
   const counterBranchId = ref<string | null>(null)
   const counterCustomerId = ref<string | null>(null)
@@ -52,6 +63,7 @@ export const useCartStore = defineStore('cart', () => {
   // (lib/money.ts), igual que la base: el IVA nunca se calcula sobre el total.
   const allItems = computed(() => [
     ...lineItems.value,
+    ...quickServices.value,
     ...supplyItems.value,
     ...productItems.value,
   ])
@@ -96,6 +108,7 @@ export const useCartStore = defineStore('cart', () => {
       const summary = await checkoutService.buildSummary(id)
       lineItems.value = summary.lineItems
       supplyItems.value = summary.supplyItems
+      surgeryItems.value = summary.surgeryItems
       status.value = 'ready'
     } catch {
       status.value = 'error'
@@ -109,6 +122,45 @@ export const useCartStore = defineStore('cart', () => {
     counterBranchId.value = branchId
     counterCustomerId.value = customerId
     status.value = 'ready'
+  }
+
+  /** Prepara un cobro rápido: servicios y/o productos, sin cita ni cliente (fase 30). */
+  function loadQuickSale(branchId: string): void {
+    reset()
+    counterBranchId.value = branchId
+    isQuickSale.value = true
+    status.value = 'ready'
+  }
+
+  /** Suma un servicio del catálogo al cobro rápido (si ya estaba, suma a su cantidad). */
+  function addService(
+    service: { id: string; name: string; price_cents: number; tax_rate_bp: number },
+    quantity = 1,
+  ): void {
+    const existing = quickServices.value.find((s) => s.serviceId === service.id)
+    if (existing) {
+      existing.quantity += quantity
+      return
+    }
+    quickServices.value.push({
+      serviceId: service.id,
+      description: service.name,
+      quantity,
+      unitPriceCents: service.price_cents,
+      taxRateBp: service.tax_rate_bp,
+    })
+  }
+
+  /** Cambia la cantidad de un servicio del cobro rápido; false si no es un entero mayor a 0. */
+  function setServiceQuantity(serviceId: string, quantity: number): boolean {
+    const item = quickServices.value.find((s) => s.serviceId === serviceId)
+    if (!item || !Number.isInteger(quantity) || quantity < 1) return false
+    item.quantity = quantity
+    return true
+  }
+
+  function removeService(serviceId: string): void {
+    quickServices.value = quickServices.value.filter((s) => s.serviceId !== serviceId)
   }
 
   /** Liga (o quita) el cliente de una venta de mostrador ya abierta; p. ej. el que se da de alta para facturar. */
@@ -140,42 +192,130 @@ export const useCartStore = defineStore('cart', () => {
       recentResult.status === 'fulfilled' ? recentResult.value : []
   }
 
+  /** Unidades base de un producto que el ticket ya lleva (todas sus partidas), sin contar `exceptKey`. */
+  function unitsInTicket(productId: string, exceptKey?: string): number {
+    return productItems.value
+      .filter((p) => p.productId === productId && p.key !== exceptKey)
+      .reduce((sum, p) => sum + baseUnits(p.quantity, p.unit, p), 0)
+  }
+
+  function itemKey(productId: string, unit: SaleUnit): string {
+    return `${productId}:${unit}`
+  }
+
+  /** Lo mismo que `PresentationLike` pero desde un producto vendible. */
+  function presentationOfProduct(product: SellableProduct) {
+    return {
+      unitsPerPackage: product.unitsPerPackage,
+      unitPriceCents: product.unitPriceCents,
+    }
+  }
+
   /**
-   * Suma `quantity` piezas de un producto al ticket. Devuelve false si no hay
-   * existencia suficiente (con 0 no se agrega, decisión #2): la pantalla avisa.
-   * Si ya estaba en el ticket, suma a su cantidad. La base vuelve a validar al cobrar.
+   * Suma `quantity` del producto al ticket, en `unit` (por defecto el envase; solo un producto
+   * fraccionado admite 'unit'). Devuelve false si no hay existencia suficiente (con 0 no se
+   * agrega, decisión #2): la pantalla avisa. La existencia se compara en UNIDADES BASE contra
+   * todo lo que el ticket ya lleva de ese producto, venga en envases o en sueltas. Si la
+   * partida ya estaba, suma a su cantidad. La base vuelve a validar al cobrar.
    */
-  function addProduct(product: SellableProduct, quantity = 1): boolean {
-    const existing = productItems.value.find((p) => p.productId === product.id)
+  function addProduct(
+    product: SellableProduct,
+    quantity = 1,
+    unit: SaleUnit = 'package',
+  ): boolean {
+    if (unit === 'unit' && product.unitsPerPackage <= 1) return false
+    const key = itemKey(product.id, unit)
+    const existing = productItems.value.find((p) => p.key === key)
     const nextQuantity = (existing?.quantity ?? 0) + quantity
-    if (!canRemove(product.stock, nextQuantity)) return false
+    const needed = unitsInTicket(product.id, key) + baseUnits(nextQuantity, unit, product)
+    if (!canRemove(product.stock, needed)) return false
 
     if (existing) {
       existing.quantity = nextQuantity
       existing.stock = product.stock
     } else {
+      const defaultPrice = priceForUnit(
+        unit,
+        product.priceCents,
+        presentationOfProduct(product),
+      )
       productItems.value.push({
+        key,
         productId: product.id,
         description: product.name,
         quantity: nextQuantity,
-        unitPriceCents: product.priceCents,
+        unitPriceCents: defaultPrice,
+        defaultUnitPriceCents: defaultPrice,
+        packagePriceCents: product.priceCents,
+        fixedUnitPriceCents: product.unitPriceCents,
         taxRateBp: product.taxRateBp,
         stock: product.stock,
+        unit,
+        unitsPerPackage: product.unitsPerPackage,
+        packageName: product.packageName,
+        unitName: product.unitName,
       })
     }
     return true
   }
 
-  /** Cambia la cantidad de un producto del ticket; false si es inválida o excede la existencia. */
-  function setProductQuantity(productId: string, quantity: number): boolean {
-    const item = productItems.value.find((p) => p.productId === productId)
-    if (!item || !canRemove(item.stock, quantity)) return false
+  /** Cambia la cantidad de una partida del ticket; false si es inválida o excede la existencia. */
+  function setProductQuantity(key: string, quantity: number): boolean {
+    const item = productItems.value.find((p) => p.key === key)
+    if (!item) return false
+    const needed =
+      unitsInTicket(item.productId, key) + baseUnits(quantity, item.unit, item)
+    if (!Number.isInteger(quantity) || !canRemove(item.stock, needed)) return false
     item.quantity = quantity
     return true
   }
 
-  function removeProduct(productId: string): void {
-    productItems.value = productItems.value.filter((p) => p.productId !== productId)
+  /**
+   * Pasa una partida de envase a unidad suelta (o al revés), conservando la cantidad. Si ya
+   * hay otra partida del mismo producto en la unidad destino, se suman. false si no se puede
+   * (producto sin fraccionar o no alcanza la existencia).
+   */
+  function setProductUnit(key: string, unit: SaleUnit): boolean {
+    const item = productItems.value.find((p) => p.key === key)
+    if (!item || item.unit === unit) return !!item
+    if (unit === 'unit' && item.unitsPerPackage <= 1) return false
+
+    const targetKey = itemKey(item.productId, unit)
+    const target = productItems.value.find((p) => p.key === targetKey)
+    const mergedQuantity = item.quantity + (target?.quantity ?? 0)
+    const needed =
+      unitsInTicket(item.productId, key) -
+      (target ? baseUnits(target.quantity, target.unit, target) : 0) +
+      baseUnits(mergedQuantity, unit, item)
+    if (!canRemove(item.stock, needed)) return false
+
+    const defaultPrice = priceForUnit(unit, item.packagePriceCents, {
+      unitsPerPackage: item.unitsPerPackage,
+      unitPriceCents: item.fixedUnitPriceCents,
+    })
+    if (target) {
+      target.quantity = mergedQuantity
+      productItems.value = productItems.value.filter((p) => p.key !== key)
+    } else {
+      item.key = targetKey
+      item.unit = unit
+      item.quantity = mergedQuantity
+      item.defaultUnitPriceCents = defaultPrice
+      item.unitPriceCents = defaultPrice
+    }
+    return true
+  }
+
+  /** Corrige el precio de la unidad de una partida en ESTA venta (no cambia el del producto). */
+  function setProductUnitPrice(key: string, cents: number): boolean {
+    const item = productItems.value.find((p) => p.key === key)
+    if (!item || !Number.isInteger(cents) || cents < 0) return false
+    item.unitPriceCents = cents
+    return true
+  }
+
+  function removeProduct(key: string): void {
+    productItems.value = productItems.value.filter((p) => p.key !== key)
   }
 
   function setDiscount(cents: number): void {
@@ -200,10 +340,29 @@ export const useCartStore = defineStore('cart', () => {
     const products = productItems.value.map((p) => ({
       productId: p.productId,
       quantity: p.quantity,
+      unit: p.unit,
+      // Solo si se corrigió el precio en esta venta.
+      ...(p.unitPriceCents !== p.defaultUnitPriceCents
+        ? { unitPriceCents: p.unitPriceCents }
+        : {}),
     }))
 
     let ticket: checkoutService.Ticket
-    if (appointmentId.value) {
+    if (isQuickSale.value && counterBranchId.value) {
+      const services: QuickServiceLine[] = quickServices.value.map((s) => ({
+        serviceId: s.serviceId,
+        quantity: s.quantity,
+      }))
+      ticket = await checkoutService.chargeQuickSale({
+        branchId: counterBranchId.value,
+        services,
+        products,
+        payments: payments.value,
+        discountCents: discountCents.value,
+        attendedBy: quickAttendedBy.value,
+        speciesGroupId: quickSpeciesGroupId.value,
+      })
+    } else if (appointmentId.value) {
       ticket = await checkoutService.charge({
         appointmentId: appointmentId.value,
         payments: payments.value,
@@ -229,12 +388,17 @@ export const useCartStore = defineStore('cart', () => {
     appointmentId.value = null
     counterBranchId.value = null
     counterCustomerId.value = null
+    quickServices.value = []
+    isQuickSale.value = false
+    quickAttendedBy.value = null
+    quickSpeciesGroupId.value = null
     productItems.value = []
     catalog.value = []
     categories.value = []
     recentSoldProductIds.value = []
     lineItems.value = []
     supplyItems.value = []
+    surgeryItems.value = []
     discountCents.value = 0
     payments.value = []
     status.value = 'idle'
@@ -245,12 +409,21 @@ export const useCartStore = defineStore('cart', () => {
     appointmentId,
     lineItems,
     supplyItems,
+    surgeryItems,
     productItems,
     catalog,
     categories,
     recentSoldProductIds,
     counterBranchId,
     counterCustomerId,
+    quickServices,
+    isQuickSale,
+    quickAttendedBy,
+    quickSpeciesGroupId,
+    loadQuickSale,
+    addService,
+    setServiceQuantity,
+    removeService,
     discountCents,
     payments,
     status,
@@ -269,6 +442,9 @@ export const useCartStore = defineStore('cart', () => {
     setCounterCustomer,
     loadCatalog,
     addProduct,
+    unitsInTicket,
+    setProductUnit,
+    setProductUnitPrice,
     setProductQuantity,
     removeProduct,
     setDiscount,

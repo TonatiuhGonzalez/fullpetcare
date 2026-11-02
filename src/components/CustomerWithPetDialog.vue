@@ -15,7 +15,8 @@ import type { Customer } from '@/services/customers'
 import type { Pet } from '@/services/pets'
 import { buildCustomerPayload } from '@/lib/customerForm'
 import { customerSaveErrorMessage, isEmailTakenError } from '@/lib/customerErrors'
-import { speciesLabel } from '@/lib/petLabels'
+import PetSpeciesFields from '@/components/PetSpeciesFields.vue'
+import { usePetCatalog } from '@/composables/usePetCatalog'
 import {
   fiscalReceiverProblems,
   isFormValid,
@@ -45,10 +46,6 @@ const emit = defineEmits<{
   saved: [result: { customer: Customer; pet: Pet }]
 }>()
 
-const speciesOptions = (['dog', 'cat', 'other'] as PetSpecies[]).map((value) => ({
-  value,
-  title: speciesLabel(value),
-}))
 const sexOptions: Array<{ value: PetSex | null; title: string }> = [
   { value: null, title: 'No especificado' },
   { value: 'male', title: 'Macho' },
@@ -70,6 +67,10 @@ const postalCode = ref('')
 const petName = ref('')
 const petSpecies = ref<PetSpecies>('dog')
 const petBreed = ref('')
+const petSpeciesId = ref<string | null>(null)
+const petBreedId = ref<string | null>(null)
+const petBirthDateEstimated = ref(false)
+const { catalog, today, loadError, ensureLoaded } = usePetCatalog()
 const petSex = ref<PetSex | null>(null)
 const petBirthDate = ref('')
 const petSterilized = ref(false)
@@ -100,6 +101,10 @@ watch(
     petName.value = ''
     petSpecies.value = 'dog'
     petBreed.value = ''
+    petSpeciesId.value = null
+    petBreedId.value = null
+    petBirthDateEstimated.value = false
+    ensureLoaded(props.tenantId)
     petSex.value = null
     petBirthDate.value = ''
     petSterilized.value = false
@@ -185,6 +190,9 @@ async function handleSubmit(): Promise<void> {
         breed: petBreed.value.trim() || null,
         sex: petSex.value,
         birth_date: petBirthDate.value || null,
+        birth_date_is_estimated: petBirthDateEstimated.value,
+        species_id: petSpeciesId.value,
+        breed_id: petBreedId.value,
         is_sterilized: petSterilized.value,
         grooming_notes: petGroomingNotes.value.trim() || null,
         medical_alerts: petMedicalAlerts.value.trim() || null,
@@ -284,25 +292,25 @@ async function handleSubmit(): Promise<void> {
           <v-divider class="my-3" />
           <p class="text-overline text-medium-emphasis">Mascota</p>
           <v-text-field v-model="petName" label="Nombre de la mascota*" :rules="[required]" />
+          <PetSpeciesFields
+            v-model:species-id="petSpeciesId"
+            v-model:breed-id="petBreedId"
+            v-model:breed-text="petBreed"
+            v-model:legacy-species="petSpecies"
+            v-model:birth-date="petBirthDate"
+            v-model:birth-date-is-estimated="petBirthDateEstimated"
+            :groups="catalog.groups"
+            :species="catalog.species"
+            :breeds="catalog.breeds"
+            :today="today"
+            require-species
+          />
+          <v-alert v-if="loadError" type="warning" density="compact" variant="tonal" class="mb-2">
+            {{ loadError }}
+          </v-alert>
           <v-row dense>
-            <v-col cols="6">
-              <v-select
-                v-model="petSpecies"
-                :items="speciesOptions"
-                label="Especie*"
-                :rules="[required]"
-              />
-            </v-col>
-            <v-col cols="6">
-              <v-text-field v-model="petBreed" label="Raza" />
-            </v-col>
-          </v-row>
-          <v-row dense>
-            <v-col cols="6">
+            <v-col cols="12" sm="6">
               <v-select v-model="petSex" :items="sexOptions" label="Sexo" />
-            </v-col>
-            <v-col cols="6">
-              <v-text-field v-model="petBirthDate" label="Fecha de nacimiento" type="date" />
             </v-col>
           </v-row>
           <v-checkbox v-model="petSterilized" label="Esterilizado(a)" density="compact" />

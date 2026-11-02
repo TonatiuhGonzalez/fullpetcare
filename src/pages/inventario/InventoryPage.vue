@@ -13,6 +13,7 @@ import {
   type InventoryTableRow,
   type StockStatus,
 } from '@/lib/inventory'
+import { formatStock, openPackage, presentationOf } from '@/lib/fractional'
 import { formatMXN } from '@/lib/money'
 import * as productsService from '@/services/products'
 import type { Product } from '@/services/products'
@@ -106,8 +107,17 @@ function rowProps({ item }: { item: InventoryTableRow<InventoryRow> }): Record<s
 }
 
 // "Sin inventario" cuando hay 0 (lo pide la tarea); si no, el número de piezas.
-function stockLabel(row: { status: StockStatus; stock: number }): string {
-  return row.status === 'out' ? STOCK_STATUS_LABEL.out : `${row.stock} en existencia`
+function stockLabel(row: InventoryTableRow<InventoryRow>): string {
+  if (row.status === 'out') return STOCK_STATUS_LABEL.out
+  return formatStock(row.stock, presentationOf(row.source.product))
+}
+
+// Envase abierto de un producto fraccionado (fase 29C): se deriva de la existencia.
+function openPackageLabel(row: InventoryTableRow<InventoryRow>): string | null {
+  const presentation = presentationOf(row.source.product)
+  const open = openPackage(row.stock, presentation)
+  if (!open.isOpen) return null
+  return `${presentation.packageName ?? 'Envase'} abierta: quedan ${open.remaining} de ${presentation.unitsPerPackage}`
 }
 
 onMounted(() => inventory.load())
@@ -256,6 +266,9 @@ async function handleToggleActive(row: InventoryRow, value: boolean | null): Pro
         <v-chip :color="statusColor[item.status]" size="small" variant="tonal">
           {{ stockLabel(item) }}
         </v-chip>
+        <div v-if="openPackageLabel(item)" class="text-caption text-medium-emphasis mt-1">
+          {{ openPackageLabel(item) }}
+        </div>
       </template>
       <template #[`item.actions`]="{ item }">
         <div class="d-flex align-center justify-center">

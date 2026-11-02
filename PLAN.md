@@ -1208,6 +1208,246 @@ aditivas, borrado suave).
 
 ---
 
+### D30 — Observaciones del veterinario: catálogos, receta, cobro de paso, familias, cirugías y hospitalización
+
+**Estado:** aprobada por el usuario el 2026-10-14. Sale de la visita a un veterinario (12 observaciones) y de
+una ronda de preguntas con el usuario. Construida la oleada 1 (fases 27, 28, 29B y 16A). Se construye en las fases **27 a 33** (más la 16B, ya propuesta). Ninguna fase
+arranca sin que se apruebe esta decisión.
+
+**Las 12 observaciones y dónde cae cada una.**
+
+| # | Observación | Fase |
+| - | ----------- | ---- |
+| 1 | Catálogo de razas (y de especies, ampliado a aves y reptiles) | 27 |
+| 2 | Edad y cálculo de fecha de nacimiento | 27 |
+| 3 | Formato de receta médica | 28 |
+| 10 | Proveedores de insumos | 29 |
+| 12 | Medicamentos a medias (fraccionados) | 29 |
+| 8 | Comprobante rápido sin registrar | 30 |
+| 5 | Familias | 31 |
+| 4 | Transferencia de dueños | 31 |
+| 6 | Costos de cirugía | 32 |
+| 7 | Costos de hospitalización (y su control) | 33 |
+| 11 | Contacto directo con el cliente | 16B y 33: el aviso dentro del sistema |
+| 9 | Mensajes por WhatsApp | **Ya existe como propuesta: fase 22 (D24).** Es un aviso de eventos, no comunicación directa |
+
+El orden pedido por el usuario es: razas, especies, edad, receta, proveedores y fraccionados primero; **hospitalización
+al final**, porque depende de la 16B.
+
+**Decisiones del usuario (2026-10-14).**
+1. **Razas y especies:** catálogos **editables**. Especie = gran grupo (aves, reptiles…) + especie común dentro del grupo.
+   Las razas cuelgan de la especie; en aves y reptiles el nivel es la especie común, sin razas. Hoy `pets.species` es el
+   enum `dog | cat | other`.
+2. **Edad:** si el dueño dice "tiene 3 años" (o "3 años y 2 meses"), el sistema **calcula una fecha aproximada** y el
+   veterinario puede proponerle otra al cliente. La fecha queda marcada como **estimada**.
+3. **Receta:** se **imprime desde el navegador**; sin dependencia de PDF. Lleva datos del veterinario con **cédula**, de la
+   empresa y la sucursal, fecha, mascota y dueño, y debajo una tabla con medicamento, dosis, frecuencia y duración, más
+   espacio de **firma**. El medicamento sale del catálogo de productos o es **texto libre**; los de texto libre generan un
+   **aviso al dueño del negocio** para que decida registrarlos. La receta queda **ligada a la consulta**. La emiten solo
+   **veterinario y dueño**, y solo si tienen cédula (un dueño puede ser veterinario). La cédula se captura al dar de alta
+   al veterinario.
+4. **Proveedores:** solo **catálogo** (nombre, contacto, teléfono, correo, tipo y notas). Un producto puede tener
+   **varios** proveedores. **Sin órdenes de compra ni cuentas por pagar.**
+5. **Fraccionados:** el inventario registra la **presentación** (caja de N blísters, frasco de N ml). Al vender se elige
+   **unidad o producto** (por defecto, producto). Un envase **abierto** se indica y lleva cuánto se ha usado. El precio de
+   la unidad **se calcula** y se puede modificar **en el producto y en cada venta**, por veterinario, dueño y recepción.
+6. **Cobro de paso:** un servicio (y productos en el mismo ticket) **sin cita y sin cliente**. Lleva servicio, precio,
+   fecha, **quién atendió** y el **grupo de especie** (genérico: perro, gato, ave, reptil; solo estadística). Entra a
+   reportes y caja como cualquier venta. Se imprime desde el navegador.
+7. **Familias:** una familia tiene **nombre propio** y **varias mascotas**; se muestra como "Familia X – Nube, Toby…".
+   Un cliente pertenece a **una sola** familia. Hay un **titular** y los demás miembros solo **ven la mascota, la cartilla,
+   las citas y la bitácora de hospitalización, y reciben avisos**. Los miembros no titulares **no ven montos**.
+8. **Transferencia:** la mascota pasa a un **cliente suelto**; si ese cliente pertenece a una familia, la familia accede.
+   Las **citas programadas se transfieren**, las **ventas se quedan** con el dueño anterior y los **links compartidos se
+   revocan**. El nuevo dueño ve **todo el historial** (cartilla, medicamentos, expediente, estética, hospitalización) **sin
+   montos**. El dueño o familia anterior solo ve **lo ocurrido mientras fue dueño**.
+9. **Cirugías:** catálogo propio del negocio (el Excel del veterinario no se comparte). Cada cirugía es un **paquete con
+   renglones** de tipo consumible, honorario o medicamento, cada uno con su precio. Consumibles y medicamentos se ligan a
+   productos y **descuentan inventario**; los honorarios no. El veterinario puede **ajustar los renglones** de una cirugía
+   concreta y también **armar una desde cero** con renglones del catálogo.
+10. **Hospitalización:** estancia **y** control. Ingreso, alta, días, **medicamentos administrados** (descuentan inventario
+    y se cobran), **espacio** y **bitácora**. La bitácora la escriben veterinario, dueño del negocio y recepción; cada nota
+    lleva hora, lo realizado, biometrías **opcionales** y texto libre. Las biometrías son: temperatura, peso, frecuencia
+    cardiaca, color de mucosas, estado de ánimo y micción/defecación (las tres últimas con **opciones fijas**).
+    - **Espacios:** jaulas definidas por el negocio **por sucursal**, **sin tope** de mascotas por jaula.
+    - **Tarifa:** por **día** o por **estancia**, a elegir al ingresar. El negocio **configura** cómo cuenta el día
+      (natural o 24 horas) y si la tarifa es única o por tipo de espacio. *(Lectura mía de "El negocio lo configura"; se
+      corrige si no era eso.)*
+    - **El dueño de la mascota** ve salud, bitácora **y costo**, solo lectura y **en cuanto llega al servidor**. Los
+      miembros no titulares de la familia ven salud y bitácora, **no el costo**.
+    - **Aviso al abrir el cobro** de una mascota que sigue hospitalizada ("¿ya se le dio de alta?").
+11. **Contacto directo:** el dueño se entera **dentro del sistema**, sin WhatsApp, mediante la PWA con cuenta del cliente
+    y notificaciones push (16B). Es requisito de la fase 33.
+
+**Decisiones técnicas propuestas (a confirmar al construir).**
+- **Catálogos (27):** tablas `species_groups`, `species` y `breeds`, con `tenant_id`, borrado suave y edición por dueño y
+  veterinario (mismo patrón que `vaccines`, D29). `pets` gana `species_id` y `breed_id` **nulos**; el enum `pet_species`
+  y el texto `breed` **se conservan** (migración aditiva, §8.1) y se rellenan al editar la mascota. Un catálogo base se
+  siembra por negocio con razas en español y la ortografía correcta (Xoloitzcuintle, Pastor alemán, Schnauzer…).
+  *Alternativa descartada:* un catálogo global de plataforma, porque cada negocio querrá agregar el suyo.
+- **Edad (27):** función pura en `lib/` (años y meses → fecha aproximada) y columna `pets.birth_date_is_estimated`.
+  Sin dependencia nueva.
+- **Cédula (28):** va en `employee_details`, que ya guarda datos personales por membresía (§6.7).
+  *Alternativa:* `profiles` (global), descartada porque el dueño que también es veterinario no siempre tiene detalle de
+  empleado; **a confirmar**.
+- **Fraccionados (29):** la existencia se guarda en la **unidad base** (tableta, ml), siempre entera (§8.2), con un factor
+  de conversión por producto. *Alternativa descartada:* dos productos (caja y suelta), porque la existencia se
+  descuadra al recortar un blíster. El redondeo del precio de la unidad usa `lib/money.ts` y tiene tests de borde.
+- **Cobro de paso (30):** RPC nueva (como `checkout_counter_sale`) que cobra servicios y productos sin cita ni cliente.
+  `sales.customer_id` ya admite nulo. Revalida permiso y sucursal (§7.3).
+- **Familias y transferencia (31):** `families`, `family_members` y `pet_ownerships` (historial de titulares con
+  fechas), con RLS y bitácora. La visibilidad por periodo la impone la base, no la interfaz. El dato monetario nunca sale
+  en el DTO del nuevo dueño.
+- **Cirugías (32) y hospitalización (33):** reutilizan lo que ya hay (`appointment_products` para el consumo con
+  inventario, `appointment_services` para honorarios) en lugar de tablas paralelas; se decide al inventariar en 32.1 y
+  33.1. La bitácora de hospitalización es **expediente**: nunca se borra y todo cambio queda en `audit_log` (§8.5, §8.6).
+- **16B (cuenta del cliente y push), inferido a petición del usuario:** alternativa A de D21 (Edge Function que emite
+  una sesión corta; el cliente nunca toca Postgres), código de un solo uso por **correo**, service worker escrito **a
+  mano**, y notificaciones con **Web Push estándar** (sin servicio de terceros). Si una librería de cifrado en la Edge
+  Function resulta necesaria, se justifica antes de agregarla (§3). El aviso de la fase 33 **no** manda datos clínicos en
+  el cuerpo de la notificación: solo "Hay novedades de <mascota>".
+
+**Decisiones surgidas al construir la oleada 1 (2026-10-14).**
+- **Cédula (28):** quedó en `employee_details.professional_license` (no en `profiles`). La receta guarda una **copia**
+  del nombre y la cédula al emitirse, así que corregir la ficha después no cambia recetas viejas.
+- **Quién emite y quién lee (28):** emite el dueño o el veterinario **asignado a la cita** (misma regla que
+  `medical_records`) y solo con cédula; la leen dueño y veterinario. Recepción y groomer no la ven. Cuando llegue la
+  fase 31, el nuevo dueño y la familia la ven por la misma regla de visibilidad que el resto del expediente.
+- **Aviso de medicamentos de texto libre (28):** vive en **Inicio** del dueño, no en Inventario (para no tocar el
+  formulario de producto de la 29B). Ligar a un producto nuevo exige registrarlo antes en Inventario.
+- **Especie y raza (27):** el enum `pet_species` y el texto `breed` se conservan y la interfaz los mantiene al elegir del
+  catálogo (`species.legacy_kind`). Las vacunas "por especie" siguen distinguiendo solo perro y gato; ampliarlas a aves
+  y reptiles queda como mejora aparte.
+- **`demo:reset` (27):** vuelve a mostrar lo que se ocultó del catálogo, pero **no quita** lo que se agregó durante una
+  demo (sin una marca `is_base` no se distingue de lo base).
+- **PWA (16A):** el manifiesto es uno solo y no puede llevar el token de cada mascota, así que `start_url` es `/c` y la
+  vista pública **recuerda en el teléfono el último link abierto** (`localStorage`). Es el único cambio al
+  comportamiento del acceso; el acceso sigue siendo el link con token. **A confirmar con el usuario.**
+- **Proveedores (29B):** el tipo de proveedor es un enum corto (medicamentos, alimento, accesorios, otro). Se agregó un
+  índice único `products(tenant_id, id)` solo para la llave compuesta del vínculo.
+
+**Decisiones surgidas al construir la oleada 2 (2026-10-14).**
+- **Fraccionados (29C):** la existencia está en **unidad base** y el envase abierto se **deriva** (no hay tabla de
+  envases abiertos); cambiar la presentación **reescala** la existencia con un ajuste por sucursal y se rechaza si no da
+  enteros. La unidad suelta factura con su propia clave de unidad del SAT. La demo **no** trae un producto
+  fraccionado de semilla (habría que tocar `demo_reset` y varias pruebas).
+- **Familias (31):** la familia accede a las mascotas de todos sus miembros; el dueño sigue siendo uno
+  (`pets.customer_id`). Se construyó el modelo y las reglas de visibilidad por periodo en SQL, pero **no hay quién las
+  use todavía**: se conectan en la cuenta del cliente (16B). Mientras tanto, la transferencia revoca los links y el
+  personal ve todo como siempre.
+- **Dependencias entre ramas:** 29C y 31 no tocaron las mismas tablas y se fusionaron sin conflictos de texto.
+
+**Decisiones surgidas al construir la oleada 3 (2026-10-14).**
+- **Cobro rápido (30):** es una pantalla y una RPC propias (`checkout_quick_sale`), no una extensión del punto de venta
+  ni de la llegada sin cita (ambos exigen cliente o solo venden productos). Sin factura.
+- **Cirugías (32):** `appointment_services` no se reutiliza; los renglones sin producto van en
+  `appointment_surgery_lines` y `checkout_appointment()` se reemplazó agregando un bloque. El precio del paquete manda
+  sobre el del catálogo del día (un medicamento puede cobrarse distinto dentro de una cirugía).
+- **16B y 33 siguen sin construirse:** la 16B pide un servicio de correo (código de acceso) y una librería de cifrado
+  para Web Push, y CLAUDE.md §3 exige justificarlos con el usuario antes. La 33 puede construirse sin la 16B con el
+  personal como único lector (ver los riesgos de abajo); falta decidirlo.
+
+**Decisiones surgidas al construir la oleada 4 (2026-10-14).**
+- **Hospitalización sin la 16B:** se construyó con el personal como único lector (lo recomendado en D30). La lectura
+  del dueño y la notificación se suman cuando exista la cuenta del cliente; no hace falta tocar las tablas.
+- **Cobro:** una estancia se cobra **dada de alta** (los días se cuentan hasta el alta) y a nombre del dueño del
+  ingreso, aunque después se transfiera la mascota.
+- **Medicamentos:** bajan del inventario al administrarse (`stock_movements.hospital_medication_id`) y se cobran con la
+  estancia; uno ya cobrado no se puede quitar.
+- **Demo:** `demo:reset` da de alta las estancias abiertas de Patitas Felices (no las borra: son expediente) y
+  restaura los 4 espacios de ejemplo.
+
+**Contras y riesgos.**
+- **Tamaño:** son siete fases. Se aprueban y construyen **una a la vez**; esta decisión no autoriza construir ninguna.
+- **Hospitalización y 16B:** si la 16B se retrasa, la 33 se puede construir con el dueño del negocio como único lector y
+  sumar al dueño de la mascota después; es lo primero que se pregunta en 33.1.
+- **Privacidad:** un expediente que ve el nuevo dueño, la familia y el dueño anterior por periodo es la regla más fina de
+  este paquete; por eso tiene tests de aislamiento propios (31) y es la primera en revisarse.
+- **Fraccionados y CFDI:** vender por unidad cambia la `ClaveUnidad` de la factura (§1, CFDI). 29.1 revisa cómo
+  declarar la unidad suelta antes de construir.
+- **Cobro de paso:** sin cliente no hay a quién facturar; si piden factura, el flujo del punto de venta (cliente nuevo
+  o existente) ya cubre ese caso y no se duplica.
+- **Excel del veterinario:** al no compartirse, el catálogo de cirugías empieza vacío y se llena a mano; una importación
+  sería una mejora aparte (fase 23 ya propone un importador de clientes).
+- Respeta §7 y §8: RLS, dinero entero, fechas en UTC, borrado suave y migraciones aditivas.
+
+---
+
+### D31 — Cuenta del dueño de la mascota: entrar, ver lo suyo y, después, su clínica
+
+**Estado:** propuesta (2026-10-14); no se construye hasta que el usuario la apruebe. **Reemplaza la 16B de D21**
+(código de un solo uso con tabla propia y vista aislada) y es la base de la lectura del dueño de la fase 33.
+
+**Problema.** Hoy el cliente solo tiene un link por mascota (D21, §7.4): no puede volver a "su" información, ver sus
+próximas citas ni enterarse de nada. Se pidió una cuenta propia donde vea sus mascotas, sus citas, promociones y,
+más adelante, recomendaciones, horarios y veterinarias cercanas.
+
+**Decisiones del usuario (2026-10-14).**
+1. **Una cuenta por negocio, de momento.** La cuenta ve lo de **un negocio a la vez**. Ver mascotas de varias
+   clínicas bajo una sola cuenta queda para después (ver "Supabase Auth" abajo: el modelo no lo impide).
+2. **Promociones:** las publica cada negocio y **solo las ven sus clientes vinculados**.
+3. **Directorio de veterinarias cercanas:** en una **etapa posterior**.
+4. **Acceso con el correo personal** del dueño de la mascota (Gmail, etc.): el código le llega ahí.
+
+**1. Autenticación: Supabase Auth con código por correo, no una tabla propia.**
+- El dueño inicia sesión con un **código de un solo uso por correo** (OTP de Supabase Auth). No hay contraseña y no se
+  mantiene tabla de códigos ni intentos: lo hace Auth. **Alternativa descartada (la 16B de D21):** Edge Function con
+  tabla propia de códigos; es más código de seguridad a mantener sin ganar nada.
+- La persona es un `auth.users` **sin membresía en ningún negocio**. Las políticas RLS del personal (`is_member_of`,
+  `has_permission`…) la **niegan solas**: no hay forma de que lea una tabla de negocio por la API directa.
+- **Consecuencia que hay que saber:** Auth identifica por correo, así que la cuenta es técnicamente **una por correo**.
+  "Una cuenta por negocio" se cumple en lo que **ve** (un negocio a la vez), no impidiendo vincular otros: el modelo ya
+  admite varios vínculos y abrirlo después no es una migración.
+- Hace falta un **servicio de correo** (SMTP) para producción: el de Supabase por defecto no sirve más que para pruebas.
+  Y un **dominio remitente** con SPF y DKIM, para que el código no caiga en spam. El destinatario es el correo personal.
+
+**2. Vínculo cuenta ↔ cliente: el link con token es la prueba.**
+- Tabla `customer_accounts` (`user_id`, `tenant_id`, `customer_id`, `linked_at`; único por `(user_id, tenant_id)`).
+- El dueño abre su link `/c/:token` (el que ya entrega el negocio) y toca **"Guardar en mi cuenta"**: una RPC
+  (`SECURITY DEFINER`, revalida que el token sea vigente) vincula a esa persona con el **cliente** de la mascota.
+- **Nunca por coincidencia de correo o teléfono**: sería filtrar datos de una persona a otra. Sin link, no hay vínculo.
+- Un negocio también puede **desvincular** (ya no es su cliente), y la persona puede **eliminar su cuenta** sin que se
+  borre el expediente del negocio (§8.5).
+
+**3. Qué lee la cuenta: funciones de servidor con lista blanca, no tablas.**
+- `my_pets()`, `my_pet_detail()`, `my_upcoming_appointments()` y, con la 33, `my_hospital_stays()`: devuelven **solo**
+  los campos de la vista pública (§7.4) y aplican las reglas de la fase 31 (`app.customer_can_view_pet*`): el dueño
+  anterior ve su periodo, los montos solo el titular, la familia accede a las mascotas de sus miembros.
+- **Nunca** devuelven teléfonos u otros clientes, notas internas ni identificadores de otros registros.
+
+**4. Capas, en orden (cada una se aprueba y se construye por separado).**
+
+| Capa | Qué entrega | Fase propuesta | Dependencia nueva |
+| ---- | ----------- | -------------- | ----------------- |
+| **A. Cuenta y mis mascotas** | Entrar con código, vincular con el link, ver mascotas, cartilla, historial, próximas citas y la bitácora de hospitalización | **16B** | Servicio de correo (SMTP) y dominio remitente |
+| **B. Mi clínica** | Perfil del negocio (dirección, teléfono, horarios por sucursal) y **promociones** que publica el negocio para sus clientes vinculados | **34** | Ninguna |
+| **C. Avisos** | Notificación en el teléfono ("Hay novedades de Nube") y recordatorios de vacunas y citas | **35** | Librería de Web Push (PushForge o `@negrel/webpush`, tras un spike) |
+| **D. Más adelante** | Pedir cita en línea; recomendaciones; **directorio de veterinarias cercanas** (opt-in por negocio, coordenadas por sucursal) | sin fase | Por decidir (geolocalización) |
+
+**Contras y riesgos.**
+- **Privacidad (LFPDPPP):** una cuenta que junta datos del dueño exige **aviso de privacidad**, consentimiento al vincular
+  y derecho a eliminar la cuenta. Hay que redactarlo antes de abrir la 16B a usuarios reales.
+- **Superficie:** se habilitan altas por correo en Auth (hoy solo se invita al personal). Una cuenta sin vínculo no ve
+  nada; aun así, el login del personal debe tratar bien a un usuario sin negocios (mandarlo a `/mi-cuenta`).
+- **Correo en producción:** sin un SMTP propio el producto no puede mandar códigos a más de un par de personas por hora.
+- **Soporte:** aparece un tipo de usuario nuevo ("no veo mi cita"). Conviene un mensaje claro de "pídele a tu
+  veterinaria un link" cuando la cuenta no tiene vínculos.
+- **Promociones:** el negocio puede publicar de más. Se limitan a texto y vigencia (sin imágenes ni precios) en la
+  primera versión.
+
+**Qué NO cambia.** El link con token por mascota (§7.4) sigue funcionando sin cuenta; la cuenta es opcional para el
+dueño. La vista pública, el PWA (16A) y la cartilla actual no se tocan.
+
+**Pendientes antes de construir.** Aprobar esta decisión y redactar el aviso de privacidad.
+
+**Pendiente (2026-10-14, a petición del usuario): correo de salida.** Todavía **no existe un correo ni un dominio
+remitente** del negocio. Queda como pendiente: el dominio con SPF y DKIM y el proveedor de SMTP (recomendación: Resend,
+con `sendEmail()` aislado para poder cambiarlo). **No bloquea el desarrollo:** el Supabase local entrega los códigos
+a una bandeja de pruebas (Inbucket), así que cuenta, vínculo, funciones de lectura y pantallas se construyen y prueban
+completos. Lo que **sí** queda bloqueado es la tarea 16.7 (envío real) y, por tanto, abrir la cuenta a usuarios reales.
+
+---
+
 ## Parte 4 — Riesgos conocidos
 
 | Riesgo                                             | Cómo se atiende                                                                            |

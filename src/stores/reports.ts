@@ -12,7 +12,7 @@ import {
   type PeriodPreset,
 } from '@/lib/reports'
 import * as reportsService from '@/services/reports'
-import type { SalesSummary, StaffRow, TopItems } from '@/services/reports'
+import type { SalesSummary, SpeciesGroupRow, StaffRow, TopItems } from '@/services/reports'
 import { useSessionStore } from './session'
 
 export const useReportsStore = defineStore('reports', () => {
@@ -24,6 +24,7 @@ export const useReportsStore = defineStore('reports', () => {
   const summary = ref<SalesSummary | null>(null)
   const topItems = ref<TopItems | null>(null)
   const staff = ref<StaffRow[]>([])
+  const speciesGroups = ref<SpeciesGroupRow[]>([])
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const errorMessage = ref<string | null>(null)
 
@@ -56,14 +57,16 @@ export const useReportsStore = defineStore('reports', () => {
     const { from, to } = range.value
     try {
       // Las tres consultas juntas: la pantalla muestra los tres reportes del mismo periodo.
-      const [s, t, st] = await Promise.all([
+      const [s, t, st, sg] = await Promise.all([
         reportsService.getSalesSummary(session.activeTenantId, from, to, branchId.value),
         reportsService.getTopItems(session.activeTenantId, from, to, branchId.value),
         reportsService.getStaffActivity(session.activeTenantId, from, to, branchId.value),
+        reportsService.getSalesBySpeciesGroup(session.activeTenantId, from, to, branchId.value),
       ])
       summary.value = s
       topItems.value = t
       staff.value = st
+      speciesGroups.value = sg
       status.value = 'ready'
     } catch (e) {
       status.value = 'error'
@@ -87,6 +90,7 @@ export const useReportsStore = defineStore('reports', () => {
     summary.value = null
     topItems.value = null
     staff.value = []
+    speciesGroups.value = []
     branchId.value = null
     preset.value = 'month'
     customRange.value = { from: '', to: '' }
@@ -101,6 +105,7 @@ export const useReportsStore = defineStore('reports', () => {
     summary,
     topItems,
     staff,
+    speciesGroups,
     status,
     errorMessage,
     range,

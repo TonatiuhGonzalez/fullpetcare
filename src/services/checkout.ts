@@ -9,6 +9,7 @@
 // services/appointments.ts, fase 3).
 import { supabase } from './supabase'
 import { sumLineItems, applyDiscount, type LineItem } from '@/lib/money'
+import type { SaleUnit } from '@/lib/fractional'
 import type { Database } from '@/types/database'
 
 export type Sale = Database['public']['Tables']['sales']['Row']
@@ -30,12 +31,30 @@ export interface CheckoutSupplyItem extends LineItem {
   description: string
 }
 
+/** Un renglón de cirugía sin producto (honorario, fase 32): ya aplicado en la consulta, solo se cobra. */
+export interface CheckoutSurgeryItem extends LineItem {
+  surgeryLineId: string
+  description: string
+}
+
 /** Un producto en el resumen de cobro, con la existencia que había al agregarlo. */
 export interface CheckoutProductItem extends LineItem {
+  /** Identifica la partida en el ticket: producto + unidad (un envase y unidades sueltas pueden convivir). */
+  key: string
   productId: string
   description: string
-  /** Existencia de la sucursal al agregarlo: tope de la cantidad en pantalla. */
+  /** Existencia de la sucursal al agregarlo, en UNIDADES BASE (fase 29C): tope en pantalla. */
   stock: number
+  /** Qué se vende: el envase completo o una unidad suelta. `quantity` va en esta unidad. */
+  unit: SaleUnit
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
+  /** Precio que se cobraría sin corrección (envase o unidad); si `unitPriceCents` es otro, se corrigió. */
+  defaultUnitPriceCents: number
+  /** Precio del envase y de la unidad fijado en el producto, para recalcular al cambiar de unidad. */
+  packagePriceCents: number
+  fixedUnitPriceCents: number | null
 }
 
 /** Un producto que se puede vender hoy en una sucursal (activo y con existencia). */
@@ -45,7 +64,14 @@ export interface SellableProduct {
   sku: string | null
   priceCents: number
   taxRateBp: number
+  /** Existencia en UNIDADES BASE (tableta, ml); igual al número de piezas si no se fracciona. */
   stock: number
+  /** Unidades base por envase (fase 29C); 1 = no se fracciona. */
+  unitsPerPackage: number
+  packageName: string | null
+  unitName: string | null
+  /** Precio de la unidad suelta fijado en el producto; nulo = se calcula del envase. */
+  unitPriceCents: number | null
   /** Categoría del producto (13G); null si no tiene. Una desactivada se trata como "sin categoría" en lib/. */
   categoryId: string | null
 }
@@ -64,6 +90,8 @@ export interface CheckoutSummary {
   lineItems: CheckoutLineItem[]
   /** Insumos cobrables de la consulta (los de uso interno no entran). */
   supplyItems: CheckoutSupplyItem[]
+  /** Honorarios y renglones de cirugía sin producto (fase 32). */
+  surgeryItems: CheckoutSurgeryItem[]
   subtotalCents: number
   taxCents: number
   discountCents: number
@@ -81,7 +109,12 @@ export interface NewPayment {
 
 export interface ProductSaleLine {
   productId: string
+  /** En la unidad vendida (`unit`). */
   quantity: number
+  /** 'package' (por defecto) o 'unit'. Solo un producto fraccionado se vende por unidad. */
+  unit?: SaleUnit
+  /** Corrección del precio de la unidad vendida en esta venta; ausente = el del producto. */
+  unitPriceCents?: number
 }
 
 export interface ChargeArgs {
@@ -90,6 +123,24 @@ export interface ChargeArgs {
   discountCents?: number
   /** Productos que se suman al ticket de la cita. */
   products?: ProductSaleLine[]
+}
+
+/** Un servicio en un cobro rápido (fase 30): sin cita, con el precio del catálogo. */
+export interface QuickServiceLine {
+  serviceId: string
+  quantity: number
+}
+
+export interface QuickSaleArgs {
+  branchId: string
+  services: QuickServiceLine[]
+  products: ProductSaleLine[]
+  payments: NewPayment[]
+  discountCents?: number
+  /** Quién atendió; para el reporte por empleado. */
+  attendedBy: string | null
+  /** Grupo de especie de la mascota atendida, solo estadística. */
+  speciesGroupId: string | null
 }
 
 export interface CounterSaleArgs {
@@ -160,14 +211,43 @@ export async function buildSummary(
     taxRateBp: row.tax_rate_bp,
   }))
 
+  // Renglones de cirugía sin producto (honorarios y consumibles fuera de inventario; fase 32):
+  // los que sí llevan producto ya vienen arriba como insumos. Con el precio de ese día.
+  const { data: surgery, error: surgeryError } = await supabase
+    .from('appointment_surgery_lines')
+    .select('id, description, unit_price_cents, tax_rate_bp, quantity')
+    .eq('appointment_id', appointmentId)
+    .is('product_id', null)
+    .eq('is_billable', true)
+    .is('deleted_at', null)
+    .order('created_at')
+
+  if (surgeryError) throw surgeryError
+
+  const surgeryItems: CheckoutSurgeryItem[] = (surgery ?? []).map((row) => ({
+    surgeryLineId: row.id,
+    description: row.description,
+    quantity: row.quantity,
+    unitPriceCents: row.unit_price_cents,
+    taxRateBp: row.tax_rate_bp,
+  }))
+
   const {
     subtotalCents,
     taxCents,
     totalCents: grossTotalCents,
-  } = sumLineItems([...lineItems, ...supplyItems])
+  } = sumLineItems([...lineItems, ...supplyItems, ...surgeryItems])
   const totalCents = applyDiscount(grossTotalCents, discountCents)
 
-  return { lineItems, supplyItems, subtotalCents, taxCents, discountCents, totalCents }
+  return {
+    lineItems,
+    supplyItems,
+    surgeryItems,
+    subtotalCents,
+    taxCents,
+    discountCents,
+    totalCents,
+  }
 }
 
 function paymentsPayload(payments: NewPayment[]) {
@@ -180,7 +260,13 @@ function paymentsPayload(payments: NewPayment[]) {
 }
 
 function productsPayload(products: ProductSaleLine[] = []) {
-  return products.map((p) => ({ product_id: p.productId, quantity: p.quantity }))
+  return products.map((p) => ({
+    product_id: p.productId,
+    quantity: p.quantity,
+    unit: p.unit ?? 'package',
+    // Solo se manda si se corrigió: así el precio lo sigue decidiendo la base.
+    ...(p.unitPriceCents !== undefined ? { unit_price_cents: p.unitPriceCents } : {}),
+  }))
 }
 
 /** Cobra una cita atendida (con productos opcionales) y devuelve el ticket completo. */
@@ -213,6 +299,29 @@ export async function chargeCounterSale(args: CounterSaleArgs): Promise<Ticket> 
 }
 
 /**
+ * Cobra un cobro rápido (fase 30): servicios y/o productos sin cita y sin cliente. Los tipos
+ * generados marcan los argumentos con valor por defecto como obligatorios y no nulos: de ahí
+ * los `as string`.
+ */
+export async function chargeQuickSale(args: QuickSaleArgs): Promise<Ticket> {
+  const { data: saleId, error } = await supabase.rpc('checkout_quick_sale', {
+    p_branch_id: args.branchId,
+    p_services: args.services.map((l) => ({
+      service_id: l.serviceId,
+      quantity: l.quantity,
+    })),
+    p_products: productsPayload(args.products),
+    p_payments: paymentsPayload(args.payments),
+    p_discount_cents: args.discountCents ?? 0,
+    p_attended_by: args.attendedBy as string,
+    p_species_group_id: args.speciesGroupId as string,
+  })
+
+  if (error) throw error
+  return getTicket(saleId)
+}
+
+/**
  * Productos que se pueden agregar al ticket en una sucursal: activos y con
  * existencia. Con existencia 0 no se ofrecen (decisión #2 de la fase); la base
  * lo vuelve a validar al cobrar, esto solo evita ofrecer lo que se va a rechazar.
@@ -224,7 +333,9 @@ export async function listSellableProducts(
   const [productsResult, stockResult] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name, sku, price_cents, tax_rate_bp, category_id')
+      .select(
+        'id, name, sku, price_cents, tax_rate_bp, category_id, units_per_package, package_name, unit_name, unit_price_cents',
+      )
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -250,6 +361,10 @@ export async function listSellableProducts(
       priceCents: p.price_cents,
       taxRateBp: p.tax_rate_bp,
       stock: stockByProduct.get(p.id) ?? 0,
+      unitsPerPackage: p.units_per_package,
+      packageName: p.package_name,
+      unitName: p.unit_name,
+      unitPriceCents: p.unit_price_cents,
       categoryId: p.category_id,
     }))
     .filter((p) => p.stock > 0)

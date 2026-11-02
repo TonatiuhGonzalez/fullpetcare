@@ -21,6 +21,9 @@ import * as invoiceRequestsService from '@/services/invoiceRequests'
 import type { CardFormCode, SellableProduct, Ticket } from '@/services/checkout'
 import type { Database } from '@/types/database'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
+import { formatStock, isFractional, type SaleUnit } from '@/lib/fractional'
+import * as hospitalService from '@/services/hospitalization'
+import type { StayListItem } from '@/services/hospitalization'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import { useSessionStore } from '@/stores/session'
 import { useCartStore } from '@/stores/cart'
@@ -48,6 +51,8 @@ const newCardType = ref<CardFormCode | null>(null)
 
 const productToAdd = ref<SellableProduct | null>(null)
 const productQuantity = ref(1)
+// Envase o unidad suelta, solo para productos fraccionados (fase 29C).
+const productUnit = ref<SaleUnit>('package')
 const productError = ref<string | null>(null)
 
 const requiresInvoice = ref(false)
@@ -72,6 +77,22 @@ const customerHasFiscalData = computed(
     !!customer.value?.postal_code,
 )
 
+/**
+ * Aviso (fase 33): la mascota de esta cita sigue hospitalizada. Casi siempre es un olvido de
+ * dar de alta; no bloquea el cobro. Si la consulta falla (p. ej. un rol sin permiso para ver
+ * hospitalización) simplemente no hay aviso.
+ */
+const openStay = ref<StayListItem | null>(null)
+
+async function loadOpenStay(petId: string): Promise<void> {
+  if (!session.activeTenantId) return
+  try {
+    openStay.value = await hospitalService.getOpenStayByPet(session.activeTenantId, petId)
+  } catch {
+    openStay.value = null
+  }
+}
+
 async function load(): Promise<void> {
   if (!session.activeTenantId) return
   loading.value = true
@@ -86,6 +107,7 @@ async function load(): Promise<void> {
       found.customer_id,
     )
     requiresInvoice.value = customer.value?.requires_invoice ?? false
+    await loadOpenStay(found.pet_id)
 
     if (found.status === 'completed') {
       await cart.loadAppointment(found.id)
@@ -108,17 +130,19 @@ async function loadProducts(branchId: string): Promise<void> {
 function handleAddProduct(): void {
   productError.value = null
   if (!productToAdd.value) return
-  if (!cart.addProduct(productToAdd.value, productQuantity.value)) {
-    productError.value = `Solo hay ${productToAdd.value.stock} pieza(s) de "${productToAdd.value.name}".`
+  const unit = isFractional(productToAdd.value) ? productUnit.value : 'package'
+  if (!cart.addProduct(productToAdd.value, productQuantity.value, unit)) {
+    productError.value = `Solo hay ${formatStock(productToAdd.value.stock, productToAdd.value)} de "${productToAdd.value.name}".`
     return
   }
   productToAdd.value = null
   productQuantity.value = 1
+  productUnit.value = 'package'
 }
 
-function handleProductQuantity(productId: string, value: string | number): void {
+function handleProductQuantity(key: string, value: string | number): void {
   productError.value = null
-  if (!cart.setProductQuantity(productId, Number(value))) {
+  if (!cart.setProductQuantity(key, Number(value))) {
     productError.value =
       'La cantidad debe ser un entero y no puede pasar de la existencia.'
   }
@@ -206,6 +230,22 @@ async function handleCharge(): Promise<void> {
       {{ loadError }}
     </v-alert>
 
+    <!-- Aviso (fase 33): la mascota sigue hospitalizada; no bloquea el cobro. -->
+    <v-alert
+      v-if="openStay"
+      type="warning"
+      density="compact"
+      variant="tonal"
+      class="mb-4"
+      data-testid="open-stay-alert"
+    >
+      {{ openStay.petName }} sigue hospitalizada en {{ openStay.spaceName }}. Si ya se
+      fue, da de alta su estancia en
+      <router-link :to="`/app/hospitalizacion/${openStay.id}`"
+        >Hospitalización</router-link
+      >.
+    </v-alert>
+
     <PageSkeleton v-if="showSkeleton" />
 
     <template v-else-if="appointment">
@@ -265,10 +305,27 @@ async function handleCharge(): Promise<void> {
               formatMXN(item.unitPriceCents * item.quantity)
             }}</template>
           </v-list-item>
-          <v-list-item v-for="item in cart.productItems" :key="item.productId">
+          <!-- Honorarios y renglones de cirugía sin producto (fase 32): solo lectura. -->
+          <v-list-item v-for="item in cart.surgeryItems" :key="item.surgeryLineId">
+            <template #title>
+              {{ item.description }} {{ item.quantity > 1 ? `× ${item.quantity}` : '' }}
+            </template>
+            <template #subtitle>Cirugía</template>
+            <template #append>{{
+              formatMXN(item.unitPriceCents * item.quantity)
+            }}</template>
+          </v-list-item>
+          <v-list-item v-for="item in cart.productItems" :key="item.key">
             <template #title>{{ item.description }}</template>
             <template #subtitle
-              >{{ formatMXN(item.unitPriceCents) }} c/u · hay {{ item.stock }}</template
+              >{{ formatMXN(item.unitPriceCents) }} c/u · hay
+              {{
+                formatStock(item.stock, {
+                  unitsPerPackage: item.unitsPerPackage,
+                  packageName: item.packageName,
+                  unitName: item.unitName,
+                })
+              }}</template
             >
             <template #append>
               <v-text-field
@@ -281,7 +338,7 @@ async function handleCharge(): Promise<void> {
                 style="width: 80px"
                 class="mr-2"
                 aria-label="Cantidad"
-                @update:model-value="handleProductQuantity(item.productId, $event)"
+                @update:model-value="handleProductQuantity(item.key, $event)"
               />
               <span class="mr-2">{{
                 formatMXN(item.unitPriceCents * item.quantity)
@@ -291,7 +348,7 @@ async function handleCharge(): Promise<void> {
                 size="x-small"
                 variant="text"
                 aria-label="Quitar producto"
-                @click="cart.removeProduct(item.productId)"
+                @click="cart.removeProduct(item.key)"
               />
             </template>
           </v-list-item>
@@ -312,10 +369,27 @@ async function handleCharge(): Promise<void> {
             <template #item="{ props: itemProps, item }">
               <v-list-item
                 v-bind="itemProps"
-                :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${item.raw.stock}`"
+                :subtitle="`${formatMXN(item.raw.priceCents)} · hay ${formatStock(item.raw.stock, item.raw)}`"
               />
             </template>
           </v-autocomplete>
+          <!-- Producto fraccionado (fase 29C): envase completo o unidad suelta. -->
+          <v-btn-toggle
+            v-if="productToAdd && isFractional(productToAdd)"
+            v-model="productUnit"
+            mandatory
+            density="compact"
+            color="primary"
+            variant="outlined"
+            divided
+          >
+            <v-btn value="package" size="small">{{
+              productToAdd.packageName ?? 'Envase'
+            }}</v-btn>
+            <v-btn value="unit" size="small">{{
+              productToAdd.unitName ?? 'Unidad'
+            }}</v-btn>
+          </v-btn-toggle>
           <v-text-field
             v-model.number="productQuantity"
             label="Cant.*"
@@ -384,7 +458,8 @@ async function handleCharge(): Promise<void> {
             <template #append>
               <span class="mr-2">{{ formatMXN(payment.amountCents) }}</span>
               <IconButton
-                icon="mdi-close" aria-label="Quitar pago"
+                icon="mdi-close"
+                aria-label="Quitar pago"
                 size="x-small"
                 variant="text"
                 @click="cart.removePayment(index)"

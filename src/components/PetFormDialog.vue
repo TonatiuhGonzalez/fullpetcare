@@ -11,7 +11,8 @@ import * as customersService from '@/services/customers'
 import type { Customer } from '@/services/customers'
 import * as petsService from '@/services/pets'
 import type { Pet } from '@/services/pets'
-import { speciesLabel } from '@/lib/petLabels'
+import PetSpeciesFields from '@/components/PetSpeciesFields.vue'
+import { usePetCatalog } from '@/composables/usePetCatalog'
 import type { Database } from '@/types/database'
 import { isFormValid, required } from '@/lib/validation'
 import type { FormHandle } from '@/lib/validation'
@@ -33,10 +34,6 @@ const emit = defineEmits<{
 
 const isEditing = computed(() => props.pet != null)
 
-const speciesOptions = (['dog', 'cat', 'other'] as PetSpecies[]).map((value) => ({
-  value,
-  title: speciesLabel(value),
-}))
 const sexOptions: Array<{ value: PetSex | null; title: string }> = [
   { value: null, title: 'No especificado' },
   { value: 'male', title: 'Macho' },
@@ -46,6 +43,10 @@ const sexOptions: Array<{ value: PetSex | null; title: string }> = [
 const name = ref('')
 const species = ref<PetSpecies>('dog')
 const breed = ref('')
+const speciesId = ref<string | null>(null)
+const breedId = ref<string | null>(null)
+const birthDateIsEstimated = ref(false)
+const { catalog, today, loadError, ensureLoaded } = usePetCatalog()
 const sex = ref<PetSex | null>(null)
 const birthDate = ref('')
 const isSterilized = ref(false)
@@ -73,6 +74,10 @@ watch(
     breed.value = p?.breed ?? ''
     sex.value = p?.sex ?? null
     birthDate.value = p?.birth_date ?? ''
+    speciesId.value = p?.species_id ?? null
+    breedId.value = p?.breed_id ?? null
+    birthDateIsEstimated.value = p?.birth_date_is_estimated ?? false
+    ensureLoaded(props.tenantId)
     isSterilized.value = p?.is_sterilized ?? false
     groomingNotes.value = p?.grooming_notes ?? ''
     medicalAlerts.value = p?.medical_alerts ?? ''
@@ -113,6 +118,9 @@ async function handleSubmit(): Promise<void> {
       breed: breed.value || null,
       sex: sex.value,
       birth_date: birthDate.value || null,
+      birth_date_is_estimated: !!birthDate.value && birthDateIsEstimated.value,
+      species_id: speciesId.value,
+      breed_id: breedId.value,
       is_sterilized: isSterilized.value,
       grooming_notes: groomingNotes.value || null,
       medical_alerts: medicalAlerts.value || null,
@@ -171,26 +179,25 @@ async function handleSubmit(): Promise<void> {
             no-data-text="No hay clientes. Primero da de alta al dueño en la pestaña Clientes."
           />
 
+          <PetSpeciesFields
+            v-model:species-id="speciesId"
+            v-model:breed-id="breedId"
+            v-model:breed-text="breed"
+            v-model:legacy-species="species"
+            v-model:birth-date="birthDate"
+            v-model:birth-date-is-estimated="birthDateIsEstimated"
+            :groups="catalog.groups"
+            :species="catalog.species"
+            :breeds="catalog.breeds"
+            :today="today"
+            :require-species="!isEditing || !!pet?.species_id"
+          />
+          <v-alert v-if="loadError" type="warning" density="compact" variant="tonal" class="mb-2">
+            {{ loadError }}
+          </v-alert>
           <v-row dense>
-            <v-col cols="6">
-              <v-select
-                v-model="species"
-                :items="speciesOptions"
-                label="Especie*"
-                :rules="[required]"
-              />
-            </v-col>
-            <v-col cols="6">
-              <v-text-field v-model="breed" label="Raza" />
-            </v-col>
-          </v-row>
-
-          <v-row dense>
-            <v-col cols="6">
+            <v-col cols="12" sm="6">
               <v-select v-model="sex" :items="sexOptions" label="Sexo" />
-            </v-col>
-            <v-col cols="6">
-              <v-text-field v-model="birthDate" label="Fecha de nacimiento" type="date" />
             </v-col>
           </v-row>
 

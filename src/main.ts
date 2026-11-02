@@ -7,6 +7,7 @@ import '@fontsource-variable/inter'
 
 import App from './App.vue'
 import { initThemeMode } from './composables/useThemeMode'
+import { registerServiceWorker } from './plugins/pwa'
 import { router } from './router'
 import { vuetify } from './plugins/vuetify'
 import './styles/main.scss'
@@ -21,3 +22,6 @@ app.use(vuetify)
 initThemeMode(vuetify.theme)
 
 app.mount('#app')
+
+// PWA (fase 16A): instalable y con pantalla de "sin conexión". Solo en producción.
+registerServiceWorker()

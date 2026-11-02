@@ -16,6 +16,7 @@ import PaymentSummary from '@/components/PaymentSummary.vue'
 import PosProductTile from '@/components/PosProductTile.vue'
 import TicketView from '@/components/TicketView.vue'
 import { checkoutErrorMessage } from '@/lib/checkoutErrors'
+import { formatStock, isFractional, type SaleUnit } from '@/lib/fractional'
 import { formatMXN, pesosToCents } from '@/lib/money'
 import {
   groupByCategory,
@@ -103,9 +104,18 @@ function updateRecentCapacity(width: number): void {
   )
 }
 
-/** Piezas de cada producto que ya lleva el ticket, para marcarlas en su tarjeta. */
+/**
+ * Existencia (en unidades base) de cada producto que ya lleva el ticket, para marcarla en su
+ * tarjeta: se cuentan juntas las partidas en envase y en unidades sueltas (fase 29C).
+ */
 const quantityInTicket = computed(
-  () => new Map(cart.productItems.map((p) => [p.productId, p.quantity])),
+  () =>
+    new Map(
+      [...new Set(cart.productItems.map((p) => p.productId))].map((id) => [
+        id,
+        cart.unitsInTicket(id),
+      ]),
+    ),
 )
 
 /** Muestra un aviso de captura en un toast de 3 s; un aviso nuevo reinicia el tiempo. */
@@ -122,7 +132,7 @@ function focusBarcode(): void {
 /** Suma una pieza al ticket; avisa si la existencia no alcanza (cantidades siempre enteras). */
 function addToTicket(product: SellableProduct): boolean {
   if (!cart.addProduct(product, 1)) {
-    setEntryMessage(`Solo hay ${product.stock} pieza(s) de "${product.name}".`)
+    setEntryMessage(`Solo hay ${formatStock(product.stock, product)} de "${product.name}".`)
     return false
   }
   lastAddedId.value = product.id
@@ -166,15 +176,33 @@ function selectOnFocus(event: FocusEvent): void {
   ;(event.target as HTMLInputElement | null)?.select()
 }
 
-function handleQuantity(productId: string, value: string | number): void {
-  if (!cart.setProductQuantity(productId, Number(value))) {
+function handleQuantity(key: string, value: string | number): void {
+  if (!cart.setProductQuantity(key, Number(value))) {
     setEntryMessage('La cantidad debe ser un entero y no puede pasar de la existencia.')
   }
 }
 
 /** Botones − y +: cambian la cantidad en uno (la existencia máxima la valida el store). */
-function stepQuantity(productId: string, current: number, delta: number): void {
-  handleQuantity(productId, current + delta)
+function stepQuantity(key: string, current: number, delta: number): void {
+  handleQuantity(key, current + delta)
+}
+
+/** Pasa una partida de envase a unidad suelta (o al revés), solo en productos fraccionados. */
+function handleUnit(key: string, unit: SaleUnit | null): void {
+  if (unit === null) return
+  if (!cart.setProductUnit(key, unit)) {
+    setEntryMessage('No hay existencia suficiente para cambiar la unidad.')
+  }
+}
+
+/** Corrige el precio de la unidad en esta venta (en pesos, como se captura). */
+function handleUnitPrice(key: string, value: string | number): void {
+  const pesos = Number(value)
+  if (value === '' || !Number.isFinite(pesos) || pesos < 0) {
+    setEntryMessage('El precio debe ser 0 o mayor.')
+    return
+  }
+  cart.setProductUnitPrice(key, pesosToCents(pesos))
 }
 
 const pieceCount = computed(() =>
@@ -590,13 +618,44 @@ function handleNewSale(): void {
           <tbody>
             <tr
               v-for="item in cart.productItems"
-              :key="item.productId"
+              :key="item.key"
               :class="{ 'pos-row-flash': item.productId === lastAddedId }"
             >
               <td class="pos-description" :title="item.description">
                 {{ item.description }}
+                <!-- Producto fraccionado (fase 29C): envase o unidad suelta. Por defecto, el envase. -->
+                <v-btn-toggle
+                  v-if="isFractional(item)"
+                  :model-value="item.unit"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  variant="outlined"
+                  divided
+                  class="d-flex mt-1"
+                  @update:model-value="handleUnit(item.key, $event)"
+                >
+                  <v-btn value="package" size="x-small">{{ item.packageName ?? 'Envase' }}</v-btn>
+                  <v-btn value="unit" size="x-small">{{ item.unitName ?? 'Unidad' }}</v-btn>
+                </v-btn-toggle>
               </td>
-              <td class="text-right">{{ formatMXN(item.unitPriceCents) }}</td>
+              <td class="text-right">
+                <!-- El precio de una unidad suelta se puede corregir en esta venta. -->
+                <v-text-field
+                  v-if="item.unit === 'unit'"
+                  :model-value="item.unitPriceCents / 100"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  density="compact"
+                  hide-details
+                  prefix="$"
+                  class="pos-price"
+                  aria-label="Precio por unidad"
+                  @update:model-value="handleUnitPrice(item.key, $event)"
+                />
+                <template v-else>{{ formatMXN(item.unitPriceCents) }}</template>
+              </td>
               <td class="text-center">
                 <div class="d-flex align-center justify-center ga-1">
                   <IconButton
@@ -605,7 +664,7 @@ function handleNewSale(): void {
                     variant="tonal"
                     aria-label="Quitar una pieza"
                     :disabled="item.quantity <= 1"
-                    @click="stepQuantity(item.productId, item.quantity, -1)"
+                    @click="stepQuantity(item.key, item.quantity, -1)"
                   />
                   <v-text-field
                     :model-value="item.quantity"
@@ -616,14 +675,14 @@ function handleNewSale(): void {
                     hide-details
                     class="pos-qty"
                     aria-label="Cantidad"
-                    @update:model-value="handleQuantity(item.productId, $event)"
+                    @update:model-value="handleQuantity(item.key, $event)"
                   />
                   <IconButton
                     icon="mdi-plus"
                     size="x-small"
                     variant="tonal"
                     aria-label="Agregar una pieza"
-                    @click="stepQuantity(item.productId, item.quantity, 1)"
+                    @click="stepQuantity(item.key, item.quantity, 1)"
                   />
                 </div>
               </td>
@@ -636,7 +695,7 @@ function handleNewSale(): void {
                   size="small"
                   variant="text"
                   aria-label="Quitar producto"
-                  @click="cart.removeProduct(item.productId)"
+                  @click="cart.removeProduct(item.key)"
                 />
               </td>
             </tr>
@@ -713,7 +772,7 @@ function handleNewSale(): void {
           <v-list v-if="priceResults.length > 0" density="compact">
             <v-list-item v-for="p in priceResults" :key="p.id" :title="p.name">
               <template #subtitle>
-                {{ p.sku ? `Código ${p.sku} · ` : '' }}hay {{ p.stock }}
+                {{ p.sku ? `Código ${p.sku} · ` : '' }}hay {{ formatStock(p.stock, p) }}
               </template>
               <template #append>
                 <span class="text-h6">{{ formatMXN(p.priceCents) }}</span>
@@ -1100,6 +1159,11 @@ function handleNewSale(): void {
 // Fila recién agregada: confirma que la captura entró.
 .pos-row-flash td {
   background-color: rgba(var(--v-theme-primary), 0.14);
+}
+
+.pos-price {
+  max-width: 120px;
+  margin-left: auto;
 }
 
 .pos-qty {

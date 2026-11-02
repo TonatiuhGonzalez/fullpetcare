@@ -26,6 +26,8 @@ import type {
 import GroomingRecordForm from '@/components/GroomingRecordForm.vue'
 import MedicalRecordForm from '@/components/MedicalRecordForm.vue'
 import AppointmentProductsPanel from '@/components/AppointmentProductsPanel.vue'
+import PrescriptionPanel from '@/components/PrescriptionPanel.vue'
+import SurgeryPanel from '@/components/SurgeryPanel.vue'
 import VaccinationDialog from '@/components/VaccinationDialog.vue'
 import { formatDate } from '@/lib/datetime'
 import { canRegisterSupplies } from '@/lib/roles'
@@ -234,6 +236,25 @@ async function handleVaccinationSaved(): Promise<void> {
         <p v-else class="text-body-2 text-medium-emphasis">
           Esta mascota no tiene vacunas registradas.
         </p>
+
+        <!-- Receta (fase 28): la emiten el dueño y el veterinario; la base lo revalida. -->
+        <template v-if="session.role === 'owner' || session.role === 'vet'">
+          <v-divider class="my-4" />
+          <PrescriptionPanel
+            :tenant-id="session.activeTenantId!"
+            :appointment-id="appointment.id"
+          />
+        </template>
+
+        <!-- Cirugía (fase 32): un paquete del catálogo ajustable. Mismo permiso que los insumos. -->
+        <template v-if="canRegisterSupplies(session.role)">
+          <v-divider class="my-4" />
+          <SurgeryPanel
+            :tenant-id="session.activeTenantId!"
+            :appointment-id="appointment.id"
+            @changed="productsPanel?.reload()"
+          />
+        </template>
 
         <!-- Solo dueño y veterinario: la base rechaza a los demás roles (11.12). -->
         <template v-if="canRegisterSupplies(session.role)">

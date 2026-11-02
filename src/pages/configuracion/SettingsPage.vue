@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Marco de la vista de configuración (tarea #1959): menú vertical que clasifica
 // la configuración y, junto a él, la sección elegida (ruta hija). "Empresa y
-// sucursales" es solo del dueño; "Vacunas" es del dueño y el veterinario; "Cuenta" la ven todos.
+// sucursales" es solo del dueño; "Vacunas", "Especies y razas" y "Cirugías" son del dueño y el veterinario; "Cuenta" la ven todos.
 import { CONTENT_WIDTH } from '@/lib/contentWidth'
 import { useSessionStore } from '@/stores/session'
 
@@ -32,6 +32,24 @@ const session = useSessionStore()
             to="/app/configuracion/vacunas"
             prepend-icon="mdi-needle"
             title="Vacunas"
+          />
+          <v-list-item
+            v-if="session.role === 'owner'"
+            to="/app/configuracion/hospitalizacion"
+            prepend-icon="mdi-hospital-box-outline"
+            title="Hospitalización"
+          />
+          <v-list-item
+            v-if="session.role === 'owner' || session.role === 'vet'"
+            to="/app/configuracion/cirugias"
+            prepend-icon="mdi-medical-bag"
+            title="Cirugías"
+          />
+          <v-list-item
+            v-if="session.role === 'owner' || session.role === 'vet'"
+            to="/app/configuracion/especies"
+            prepend-icon="mdi-paw"
+            title="Especies y razas"
           />
           <v-list-item
             to="/app/configuracion/cuenta"

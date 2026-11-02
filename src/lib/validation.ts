@@ -85,6 +85,15 @@ export function isValidCURP(value: string): boolean {
   )
 }
 
+/**
+ * Cédula profesional (la que se imprime en la receta). Es un número de 7 u 8 dígitos
+ * que expide la SEP. Se valida solo la FORMA: no hay forma de saber desde aquí si está
+ * registrada. Tolera espacios o puntos de separación al pegarla ("1 234 567").
+ */
+export function isValidProfessionalLicense(value: string): boolean {
+  return /^\d{7,8}$/.test(value.replace(/[\s.]/g, ''))
+}
+
 // ---------------------------------------------------------------------------
 // Cambio de contraseña propia
 // ---------------------------------------------------------------------------

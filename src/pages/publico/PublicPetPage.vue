@@ -14,6 +14,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import VisitKindChip from '@/components/VisitKindChip.vue'
 import { branchToday, formatDate, formatDateOnly } from '@/lib/datetime'
+import { forgetLastPetLink, saveLastPetLink } from '@/lib/lastPetLink'
 import { sexLabel, speciesLabel } from '@/lib/petLabels'
 import {
   cardHeadline,
@@ -105,11 +106,15 @@ async function load(): Promise<void> {
     // (CLAUDE.md §7.4: nunca detalles técnicos en la vista pública).
     if (error || !result) {
       status.value = 'error'
+      // Un link que ya no sirve no se recuerda: la app instalada no debe volver a él.
+      forgetLastPetLink(props.token)
       return
     }
     data.value = result as PublicPetDto
     emit('business-name', data.value.businessName)
     status.value = 'ready'
+    // La app instalada abre en /c y necesita saber a qué mascota ir (fase 16A).
+    saveLastPetLink(props.token)
   } catch {
     status.value = 'error'
   }
@@ -157,6 +162,18 @@ onMounted(load)
           </p>
         </div>
       </v-card>
+
+      <!-- Fase 16B: guardar la mascota en la cuenta del dueño (el link se vincula al entrar). -->
+      <v-btn
+        :to="{ name: 'mi-cuenta', query: { link: token } }"
+        variant="tonal"
+        color="primary"
+        block
+        prepend-icon="mdi-account-heart-outline"
+        class="mb-4"
+      >
+        Guardar en mi cuenta
+      </v-btn>
 
       <v-card v-if="data.upcomingAppointments.length > 0" class="pa-4 mb-4">
         <h2 class="section-title">
