@@ -98,3 +98,28 @@ jobs:
         run: |
           supabase functions deploy invoicing \
             --project-ref boajojegcmpvzjsloosk
+
+      # customer-account (fase 16B, cuenta del dueño de la mascota) también
+      # se quedó sin paso aquí: al promover develop a main la función no se
+      # subía y "Guardar en mi cuenta" fallaba con un 404 del gateway (el
+      # navegador lo muestra como "no se pudo guardar", porque un 404 no
+      # trae las cabeceras CORS que pide el preflight). Mismo patrón.
+      #
+      # A diferencia de invite-employee y platform-admin, esta función deja
+      # `verify_jwt = false` en supabase/config.toml: `request_code` lo llama
+      # alguien SIN sesión, y la plataforma lo rechazaría antes de ejecutar
+      # nada. La función valida el JWT a mano en las acciones que lo
+      # necesitan, y el CLI respeta el valor del config.toml al desplegar.
+      #
+      # Solo lee SUPABASE_URL y las llaves anon y service_role, que inyecta la
+      # propia plataforma: no hay secretos nuevos que configurar.
+      #
+      # OJO: depende de la migración de customer_accounts. deploy-migrations
+      # corre en el mismo push a main; si una falla, revisa que la otra haya
+      # quedado aplicada.
+      - name: Desplegar customer-account a fullpetcare-prod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy customer-account \
+            --project-ref boajojegcmpvzjsloosk
