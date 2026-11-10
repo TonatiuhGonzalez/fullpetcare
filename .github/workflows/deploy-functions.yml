@@ -22,6 +22,12 @@ on:
     branches: [main]
     paths:
       - 'supabase/functions/**'
+      # Si cambia este mismo archivo (p. ej. se agrega una función nueva
+      # a la lista de despliegue), también debe correr: antes un cambio
+      # solo aquí no desplegaba nada.
+      - '.github/workflows/deploy-functions.yml'
+  # Botón "Run workflow" en GitHub Actions para desplegar a mano.
+  workflow_dispatch:
 
 jobs:
   deploy:
