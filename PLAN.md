@@ -1446,6 +1446,27 @@ con `sendEmail()` aislado para poder cambiarlo). **No bloquea el desarrollo:** e
 a una bandeja de pruebas (Inbucket), así que cuenta, vínculo, funciones de lectura y pantallas se construyen y prueban
 completos. Lo que **sí** queda bloqueado es la tarea 16.7 (envío real) y, por tanto, abrir la cuenta a usuarios reales.
 
+**Decisión (2026-11-09, con el usuario): Resend de momento.** Se usará Resend como servicio de correo por su plan
+gratis (unos 3,000 correos al mes, con tope diario) y su configuración sencilla; se conecta a Supabase Auth como SMTP
+personalizado, **sin cambiar código ni agregar dependencia de npm**. Alternativas evaluadas: Brevo (cuota diaria más
+holgada, interfaz más cargada), Amazon SES (el más barato a escala, setup más técnico y trámite para salir del modo de
+pruebas) y Postmark (excelente entrega, de pago desde el inicio). Contras de Resend: servicio joven y el tope diario
+puede quedar corto si crece. **Es provisional:** cuando la empresa del usuario le dé un correo propio con SPF, se
+cambia, y el cambio es solo reemplazar los datos SMTP. Sigue pendiente decidir el dominio remitente (SPF, DKIM y DMARC
+en el DNS). La configuración se hace en el panel de Supabase y requiere que el usuario lo pida (CLAUDE.md §11).
+
+**Prueba con Resend (2026-11-12, tareas #2034 y #2869):** el correo real ya se probó **en producción** con Resend
+(`onboarding@resend.dev`, que solo entrega al correo dueño de la cuenta de Resend). Funcionan el restablecimiento de
+contraseña y la entrada del dueño de la mascota con código. Lo que hubo que ajustar, todo en el panel de Supabase y no
+en el código: (1) **Site URL** sin comodines (`https://fullpetcare.pages.dev`; los `/**` van solo en Redirect URLs),
+porque la función `customer-account` pide el código sin `redirectTo` y cae al Site URL; (2) la plantilla **Magic Link**
+con el contenido de `supabase/templates/access-code.html` (en el proyecto hospedado no se aplica sola); (3) **Email OTP
+Length = 6** (el hospedado traía 8 y la pantalla acepta 6); (4) un correo que ya existe como usuario del personal **no
+recibe código** a propósito (`request_code` responde siempre `{ok:true}`): se liberó cambiándole el correo al usuario
+viejo, no borrándolo, porque la bitácora apunta a él. Además la función no estaba desplegada: el workflow solo corría al
+cambiar `supabase/functions/**` (corregido en el PR #140). **Sigue provisional:** al pasar al correo de la empresa hay
+que repetir SMTP, remitente y una prueba de entrega a un correo ajeno.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
