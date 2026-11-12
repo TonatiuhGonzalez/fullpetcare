@@ -1921,6 +1921,55 @@ tabla propia) queda descartado a favor de Supabase Auth con código por correo (
   recordatorios de cita y vacuna (fase 22). _Verificar:_ el cuerpo no lleva contenido clínico; un dispositivo
   revocado no recibe.
 
+## Fase 37 — Landing, registro de empresa y registro del dueño (propuesta aprobada; `PLAN.md` D32)
+
+**Meta: que una empresa o un dueño de mascota puedan entrar por su cuenta, y que un sitio explique qué hace la
+aplicación.** Decidido con el usuario el 2026-11-12. Dependencias nuevas aprobadas: **Astro** (solo el landing) y
+**Cloudflare Turnstile** (script, sin paquete de npm). **Lo pendiente de definir** está en la última sección de D32.
+**Bloqueo conocido:** abrir los registros al público necesita el correo remitente real (16.7); mientras tanto se
+construye y se prueba con la bandeja local.
+
+### 37A. Landing
+
+- [ ] **37.1** 📚 Aprobar `PLAN.md` D32 y crear las tareas de seguimiento. _Verificar:_ el usuario aprobó por escrito.
+- [ ] **37.2** Proyecto Astro dentro del repositorio (carpeta aparte), con la identidad visual (§5.6), navegación
+  (Inicio, Características, Para empresas, Para dueños de mascota) y contenido propuesto y aprobado. _Verificar:_ en
+  navegador a 390 y 768 px, ambos temas, y que el HTML publicado trae el texto (SEO).
+- [ ] **37.3** Páginas de empresa: características a detalle, **planes informativos (mock, sin cobro)** y el formulario
+  de registro (lo construye 37.5). _Verificar:_ en navegador.
+- [ ] **37.4** Publicar el landing como **otro proyecto de Cloudflare Pages** con su CI, sin tocar la app ni sus links.
+  _Verificar:_ la app y un link `/c/…` existente siguen funcionando igual.
+
+### 37B. Registro de empresa
+
+- [ ] **37.5** 🧪 Registro de empresa sin intermediario: función pública que crea empresa, dueño, sucursal inicial,
+  catálogo de especies por defecto y plan de prueba sin vencimiento; código por correo y contraseña. Revalida todo en el
+  servidor y queda en la bitácora de plataforma. _Verificar:_ tests de que un registro no puede crear dos dueños ni
+  afectar otra empresa, de correo ya usado (como persona o como negocio) y de límites.
+- [ ] **37.6** Formulario de registro de empresa en el landing y primer ingreso a la app. _Verificar:_ en navegador, de
+  punta a punta con la bandeja local.
+
+### 37C. Registro del dueño de mascota
+
+- [ ] **37.7** 🧪 Registro del dueño con correo, nombre y contraseña, verificación por correo, un correo por persona y
+  sin choque con cuentas de negocio. Decidir qué pasa con las cuentas ya creadas con código. _Verificar:_ tests de los
+  choques de correo y de que la cuenta no ve nada de ninguna clínica sin vínculo.
+- [ ] **37.8** 🧪 Protección contra robots (Turnstile) y límites en **ambos** registros. _Verificar:_ un envío sin
+  verificación válida se rechaza en el servidor.
+
+### 37D. Mascotas personales
+
+- [ ] **37.9** 🧪 Mascotas personales del dueño (sin negocio) con su cartilla, con RLS propio. _Verificar:_ test de
+  aislamiento: una persona no ve las de otra, y ningún rol de negocio las lee.
+- [ ] **37.10** 🧪 El dueño genera un código o link para compartir una mascota con una clínica; al usarlo, la clínica
+  **copia** los datos a su expediente y el dueño conserva el suyo. La clínica nunca busca ni lista personas.
+  _Verificar:_ tests de código vencido, revocado y de otro dueño, y de que lo copiado no cambia el registro personal.
+- [ ] **37.11** Pantallas del dueño (mis mascotas, compartir) y de la clínica (usar un código). _Verificar:_ en navegador.
+
+### 37E. Cierre
+
+- [ ] **37.12** 📚 `lint`, `test:unit`, `test:db`; actualizar `CLAUDE.md` (§1, §3, §4, §6, §7) y marcar la fase.
+
 ## Fase 17 — Estados de carga: skeletons y aviso de navegación
 
 **Meta: que mientras llegan los datos se vea la forma de lo que viene (tablas y tarjetas), que navegar desde el menú dé

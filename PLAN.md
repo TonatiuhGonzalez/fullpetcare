@@ -1467,6 +1467,78 @@ viejo, no borrándolo, porque la bitácora apunta a él. Además la función no 
 cambiar `supabase/functions/**` (corregido en el PR #140). **Sigue provisional:** al pasar al correo de la empresa hay
 que repetir SMTP, remitente y una prueba de entrega a un correo ajeno.
 
+### D32 — Landing, registro de empresa y registro del dueño de la mascota
+
+**Estado:** aprobada con el usuario (2026-11-12); **sin construir**. Se construye por pasos, en la fase 37 de `TASKS.md`.
+Cambia dos reglas de seguridad ya escritas (ver "Reglas que cambian") y agrega un servicio de verificación contra robots.
+
+**Problema.** Hoy nadie entra por su cuenta: a una empresa la da de alta el equipo de la plataforma (§6.8, §7.5, con
+contraseña temporal) y la cuenta del dueño de la mascota solo nace con un link vigente de una clínica (D31, §7.4). La
+raíz del sitio lleva al login. Se pide un sitio que explique qué hace la aplicación y dos puertas de entrada: una para
+empresas y otra para dueños de mascotas.
+
+**Decisiones del usuario (2026-11-12).**
+1. **Landing con navegación:** barra superior con la navegación a la izquierda y los registros a la derecha; el cuerpo
+   lleva información, características y capacidades. Secciones: **Inicio, Características, Para empresas, Para dueños
+   de mascota**. El contenido y los textos los **propone Claude** con datos reales del sistema y el usuario los aprueba.
+2. **Dos caminos:** una **empresa** pasa a un bloque propio con **características a detalle, planes (informativos) y
+   el formulario de registro**; un **dueño de mascota** llega directo a su formulario.
+3. **El landing es un sitio aparte, en el mismo repositorio, hecho con Astro** (HTML estático, buen SEO), con la misma
+   identidad visual (§5.6). La app **no se toca ni se mueve**: sigue en su dirección actual para no romper los links de
+   mascotas ya enviados (`/c/…`), la PWA ya instalada, las sesiones guardadas ni la lista de direcciones permitidas de
+   Supabase y de las funciones (CORS). El landing se publica como **otro proyecto de Cloudflare Pages** con su propia
+   dirección `.pages.dev`.
+4. **Dominio propio: después.** `app.fullpetcare.pages.dev` **no existe** (no se pueden crear subdominios de
+   `pages.dev`). Cuando haya dominio: raíz para el landing y `app.` para la app, con redirecciones de los links viejos.
+   El mismo dominio resolvería el correo remitente (SPF y DKIM, D31).
+5. **Registro de empresa sin intermediario.** Datos: **nombre del negocio, nombre del dueño, correo, giro (estética,
+   veterinaria o ambos) y sucursal inicial**. El correo se verifica con **un código**; la contraseña se define en el
+   formulario (el personal inicia con contraseña, §7.6). La empresa nace **en prueba gratuita, sin vencimiento**, con
+   su sucursal y el **catálogo de especies por defecto** (`app.seed_species_catalog()`), **sin servicios**.
+6. **Planes:** vista **informativa y temporal** (un mock): no cobra. La pasarela de pago sigue fuera de alcance (§1).
+7. **Registro del dueño de mascota abierto:** **cualquiera puede crear cuenta**, con **correo, nombre y contraseña** y
+   verificación por correo, y con **protección contra robots**. Un correo es **una sola persona**, y **no puede existir
+   a la vez como cuenta de persona y como cuenta de negocio**. El vínculo con el link de una clínica (`/c/:token`,
+   "Guardar en mi cuenta") se **conserva** tal cual.
+8. **Mascotas personales (opción A):** el dueño puede **registrar sus propias mascotas sin que pertenezcan a un
+   negocio** (tablas nuevas, sin `tenant_id`, con RLS propio). Para enlazarse con una clínica **el dueño genera un código
+   o link y se lo comparte**; **la clínica no busca ni lista personas** (se descartó buscar por correo o teléfono: expone
+   datos sin consentimiento y deja averiguar qué correos están registrados). Al enlazar, **los datos se copian** a la
+   clínica (expediente del negocio, nunca se borra, §8.5) y **el dueño conserva su registro personal**.
+9. **La transferencia entre dueños no cambia** (fase 31, D30 punto 8): periodos de dueño, historial que se queda con el
+   dueño anterior y links revocados.
+10. **Dependencias aprobadas:** **Astro** (solo para el landing; la app sigue en Vue + Vuetify) y **Cloudflare
+    Turnstile** contra robots (script de widget; Supabase Auth lo soporta de fábrica, sin paquete de npm). Se registran
+    en `CLAUDE.md` §3 al instalarlas.
+
+**Alternativas del landing (descartadas).** Vue con prerender (`vite-ssg`): carga Vuetify completo en una página que no
+lo necesita. Migrar la app a Nuxt: reescritura sin ganancia, porque detrás del login el SEO no importa. HTML a mano:
+cero dependencias, pero navbar y pie repetidos en cada página. hCaptcha en lugar de Turnstile: sin ventaja aquí.
+
+**Reglas que cambian.**
+- **§6.8 y §7.5:** el alta de una empresa **ya no es solo del superadmin**. El superadmin conserva su alta y todo su
+  poder; el registro abierto es **otro camino** que debe quedar acotado (una sola empresa y un solo dueño por registro,
+  `is_demo = false`, bitácora de plataforma, que el superadmin pueda suspenderla).
+- **D31 y §7.4:** "sin link no hay cuenta de dueño" **deja de ser cierto**. Sigue siendo cierto que **una cuenta de
+  dueño nunca ve lo de una clínica sin un vínculo** hecho con un link de esa clínica.
+
+**Riesgos.**
+- **Correo de salida.** Con un registro abierto y verificación por correo, el remitente de prueba (`onboarding@resend.dev`,
+  solo entrega al dueño de la cuenta de Resend) **no alcanza** para probar con otras personas: hace falta el dominio y el
+  correo de la empresa (pendiente de D31, tarea 16.7). Sin eso, los registros se construyen y se prueban con la bandeja
+  local, pero no se abren al público.
+- **Empresas basura.** Una empresa de prueba sin vencimiento no caduca sola: Turnstile, verificación de correo y límite
+  de envíos son obligatorios, y el superadmin puede suspenderlas.
+- **Privacidad.** Una mascota personal es dato de una persona sin relación con ningún negocio: lo ve solo ella y lo que
+  ella comparte.
+
+**Por definir antes del paso que lo necesita (no se asume).**
+- Qué hacen las cuentas **ya creadas con código** (D31): si pueden poner contraseña o conviven con las nuevas.
+- Qué datos exactos lleva la **sucursal inicial** (mínimo: nombre) y la zona horaria (hoy la del alta es
+  `America/Mexico_City`, §6.8).
+- Qué campos y qué cartilla lleva una **mascota personal**, y la **lista blanca** de lo que ve la clínica al enlazar.
+- Nombre del proyecto de Pages del landing y fecha del dominio propio.
+
 ---
 
 ## Parte 4 — Riesgos conocidos
